@@ -162,9 +162,17 @@ export default function CartPage() {
     try {
       let receiptPath = "";
       if (receiptFile) {
-        const fd = new FormData();
-        fd.append("file", receiptFile);
-        const uploadRes = await fetch("/api/upload", { method: "POST", body: fd });
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(receiptFile);
+        });
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: base64, name: receiptFile.name }),
+        });
         const uploadData = await uploadRes.json();
         receiptPath = uploadData.path || "";
       }
