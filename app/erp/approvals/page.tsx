@@ -86,7 +86,7 @@ function ApprovalsContent({ user, currency: _c }: { user: any; currency: string 
                   <tr key={l.id}>
                     <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{new Date(l.created_at).toLocaleDateString("en-GB")}</td>
                     <td style={{fontWeight:600}}>{l.employee_name}</td>
-                    <td><span className={`badge ${{sick:"badge-red",annual:"badge-green",emergency:"badge-orange",unpaid:"badge-purple"}[l.leave_type]||"badge-purple"}`}>{l.leave_type}</span></td>
+                    <td><span className={`badge ${{sick:"badge-red",annual:"badge-green",emergency:"badge-orange",unpaid:"badge-purple"}[l.leave_type as string]||"badge-purple"}`}>{l.leave_type}</span></td>
                     <td style={{fontSize:13}}>{l.from_date}</td>
                     <td style={{fontSize:13}}>{l.to_date}</td>
                     <td style={{fontWeight:600,color:"var(--pg)"}}>{Math.round((new Date(l.to_date).getTime()-new Date(l.from_date).getTime())/(86400000))+1}d</td>
