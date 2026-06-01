@@ -5,12 +5,13 @@ import ERPLayout from "../ERPLayout";
 export default function ERPDashboard() {
   return (
     <ERPLayout title="Dashboard" active="dashboard">
-      {(user) => <DashboardContent user={user} />}
+      {(user, currency) => <DashboardContent user={user} currency={currency} />}
     </ERPLayout>
   );
 }
 
-function DashboardContent({ user }: { user: any }) {
+function DashboardContent({ user, currency }: { user: any; currency: string }) {
+  const fmt = (n: number) => currency==="PKR" ? `PKR ${Math.round(n).toLocaleString()}` : `£${Number(n).toFixed(2)}`;
   const [stats, setStats] = useState({ employees:0, pendingExpenses:0, pendingLeaves:0, todayAttendance:0 });
   const [todayStatus, setTodayStatus] = useState<any>(null);
   const [myExpenses, setMyExpenses] = useState<any[]>([]);
@@ -94,7 +95,7 @@ function DashboardContent({ user }: { user: any }) {
             <div className="erp-section-header"><div className="erp-section-title">My Expenses</div><a href="/erp/expenses" style={{color:"var(--pg)",fontSize:12,textDecoration:"none"}}>View All →</a></div>
             {myExpenses.length===0 ? <div className="erp-empty">No expenses yet</div> : myExpenses.map((e:any)=>(
               <div key={e.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid rgba(139,0,255,0.07)"}}>
-                <div><div style={{fontSize:13,fontWeight:600}}>£{Number(e.amount).toFixed(2)}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.35)"}}>{e.category}</div></div>
+                <div><div style={{fontSize:13,fontWeight:600}}>{fmt(Number(e.amount))}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.35)"}}>{e.category}</div></div>
                 <span className={statusBadge(e.status)}>{e.status}</span>
               </div>
             ))}

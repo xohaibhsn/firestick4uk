@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
 export default function ERPExpenses() {
-  return <ERPLayout title="Expenses" active="expenses">{(user) => <ExpContent user={user} />}</ERPLayout>;
+  return <ERPLayout title="Expenses" active="expenses">{(user, currency) => <ExpContent user={user} currency={currency} />}</ERPLayout>;
 }
 
-function ExpContent({ user }: { user: any }) {
+function ExpContent({ user, currency }: { user: any; currency: string }) {
+  const fmt = (n: number) => currency==="PKR" ? `PKR ${Math.round(n).toLocaleString()}` : `£${Number(n).toFixed(2)}`;
   const [expenses, setExpenses] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -62,7 +63,7 @@ function ExpContent({ user }: { user: any }) {
           {notifications.slice(0,3).map((n:any)=>(
             <div key={n.id} style={{marginBottom:8,padding:"10px 16px",background:n.status==="approved"?"rgba(0,200,100,0.08)":"rgba(255,68,68,0.08)",border:`1px solid ${n.status==="approved"?"rgba(0,200,100,0.25)":"rgba(255,68,68,0.2)"}`,borderRadius:10,fontSize:13,display:"flex",alignItems:"center",gap:12}}>
               <span style={{fontSize:18}}>{n.status==="approved"?"✅":"❌"}</span>
-              <div><strong>£{Number(n.amount).toFixed(2)} ({n.category})</strong> expense {n.status}{n.admin_note?` — "${n.admin_note}"`:""}.</div>
+              <div><strong>{fmt(Number(n.amount))} ({n.category})</strong> expense {n.status}{n.admin_note?` — "${n.admin_note}"`:""}.</div>
             </div>
           ))}
         </div>
@@ -71,7 +72,7 @@ function ExpContent({ user }: { user: any }) {
       <div style={{marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
           {pending>0&&<span className="badge badge-orange">{pending} Pending</span>}
-          {(user.role==="admin"||user.role==="manager")&&pending>0&&<span style={{fontSize:13,color:"rgba(255,255,255,0.5)"}}>Total: £{totalPending.toFixed(2)}</span>}
+          {(user.role==="admin"||user.role==="manager")&&pending>0&&<span style={{fontSize:13,color:"rgba(255,255,255,0.5)"}}>Total: {fmt(totalPending)}</span>}
         </div>
         {user.role!=="admin"&&<button className="erp-btn erp-btn-primary" onClick={()=>setShowForm(!showForm)}>+ Submit Expense</button>}
       </div>
@@ -82,7 +83,7 @@ function ExpContent({ user }: { user: any }) {
         <div className="erp-card" style={{marginBottom:20}}>
           <div style={{fontWeight:700,fontSize:15,marginBottom:16}}>New Expense Claim</div>
           <div className="erp-grid-2">
-            <div className="erp-field"><label>Amount (£) *</label><input type="number" step="0.01" className="erp-input" placeholder="0.00" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} /></div>
+            <div className="erp-field"><label>Amount ({currency==="PKR"?"PKR":"£"}) *</label><input type="number" step="0.01" className="erp-input" placeholder="0.00" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} /></div>
             <div className="erp-field"><label>Category</label><select className="erp-select" value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>{cats.map(c=><option key={c}>{c}</option>)}</select></div>
           </div>
           <div className="erp-field"><label>Description</label><textarea className="erp-textarea" rows={2} placeholder="What was this expense for?" value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} /></div>
@@ -117,7 +118,7 @@ function ExpContent({ user }: { user: any }) {
                 <tr key={e.id}>
                   <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{new Date(e.created_at).toLocaleDateString("en-GB")}</td>
                   {(user.role==="admin"||user.role==="manager")&&<td style={{fontWeight:600}}>{e.employee_name}</td>}
-                  <td style={{fontWeight:700,color:"var(--pg)"}}>£{Number(e.amount).toFixed(2)}</td>
+                  <td style={{fontWeight:700,color:"var(--pg)"}}>{fmt(Number(e.amount))}</td>
                   <td><span className="badge badge-purple">{e.category}</span></td>
                   <td style={{maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.description||"—"}</td>
                   <td>{e.receipt_path ? <a href={e.receipt_path} target="_blank" rel="noreferrer" style={{color:"var(--pg)",fontSize:12}}>📎 View</a> : <span style={{color:"rgba(255,255,255,0.2)",fontSize:12}}>—</span>}</td>

@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
 export default function ERPLeaves() {
-  return <ERPLayout title="Leave Requests" active="leaves">{(user) => <LeavesContent user={user} />}</ERPLayout>;
+  return <ERPLayout title="Leave Requests" active="leaves">{(user, currency) => <LeavesContent user={user} currency={currency} />}</ERPLayout>;
 }
 
-function LeavesContent({ user }: { user: any }) {
+function LeavesContent({ user, currency: _currency }: { user: any; currency: string }) {
   const [leaves, setLeaves] = useState<any[]>([]);
   const [balance, setBalance] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);

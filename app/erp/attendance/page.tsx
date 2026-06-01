@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
 export default function ERPAttendance() {
-  return <ERPLayout title="Attendance" active="attendance">{(user) => <AttContent user={user} />}</ERPLayout>;
+  return <ERPLayout title="Attendance" active="attendance">{(user, currency) => <AttContent user={user} currency={currency} />}</ERPLayout>;
 }
 
-function AttContent({ user }: { user: any }) {
+function AttContent({ user, currency: _currency }: { user: any; currency: string }) {
   const [records, setRecords] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [employees, setEmployees] = useState<any[]>([]);

@@ -79,7 +79,7 @@ export const erpStyles = `
 `;
 
 interface ERPUser { id: number; name: string; email: string; role: string; }
-type ERPLayoutProps = { children: (user: ERPUser) => React.ReactNode; title: string; active?: string; };
+type ERPLayoutProps = { children: (user: ERPUser, currency: string) => React.ReactNode; title: string; active?: string; };
 
 const navItems = [
   { href:"/erp/dashboard", icon:"📊", label:"Dashboard", key:"dashboard" },
@@ -101,6 +101,7 @@ const routeRoles: Record<string, string[]> = {
 
 export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
   const [user, setUser] = useState<ERPUser | null>(null);
+  const [currency, setCurrency] = useState("PKR");
 
   useEffect(() => {
     const s = localStorage.getItem("erp_session");
@@ -115,11 +116,18 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
       }
       setUser(u);
     } catch { window.location.href = "/erp"; }
+    setCurrency(localStorage.getItem("erp_currency") || "PKR");
   }, []);
 
   if (!user) return <><style>{erpStyles}</style><div style={{minHeight:"100vh",background:"#0a0010"}} /></>;
 
   const logout = () => { localStorage.removeItem("erp_session"); window.location.href = "/erp"; };
+
+  const toggleCurrency = () => {
+    const next = currency === "PKR" ? "GBP" : "PKR";
+    setCurrency(next);
+    localStorage.setItem("erp_currency", next);
+  };
 
   return (
     <>
@@ -159,9 +167,14 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
         <main className="erp-main">
           <div className="erp-header">
             <h1 className="erp-page-title">{title}</h1>
-            <span style={{fontSize:"13px",color:"rgba(255,255,255,0.35)"}}>👤 {user.name}</span>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <button onClick={toggleCurrency} style={{background:currency==="PKR"?"rgba(0,200,100,0.12)":"rgba(68,136,255,0.12)",border:`1px solid ${currency==="PKR"?"rgba(0,200,100,0.3)":"rgba(68,136,255,0.3)"}`,color:currency==="PKR"?"#00c864":"#6699ff",padding:"5px 14px",borderRadius:20,cursor:"pointer",fontSize:13,fontWeight:700,transition:"all 0.2s"}} title="Switch currency">
+                {currency==="PKR"?"₨ PKR":"£ GBP"}
+              </button>
+              <span style={{fontSize:"13px",color:"rgba(255,255,255,0.35)"}}>👤 {user.name}</span>
+            </div>
           </div>
-          {children(user)}
+          {children(user, currency)}
         </main>
       </div>
     </>

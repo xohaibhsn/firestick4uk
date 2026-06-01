@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
 export default function ERPEmployees() {
-  return <ERPLayout title="Employees" active="employees">{(user) => user.role==="admin" ? <EmpContent user={user} /> : <div style={{padding:40,textAlign:"center",color:"rgba(255,255,255,0.35)"}}>⛔ Admin access only</div>}</ERPLayout>;
+  return <ERPLayout title="Employees" active="employees">{(user, currency) => user.role==="admin" ? <EmpContent user={user} currency={currency} /> : <div style={{padding:40,textAlign:"center",color:"rgba(255,255,255,0.35)"}}>⛔ Admin access only</div>}</ERPLayout>;
 }
 
-function EmpContent({ user }: { user: any }) {
+function EmpContent({ user, currency }: { user: any; currency: string }) {
+  const fmt = (n: number) => currency==="PKR" ? `PKR ${Math.round(n).toLocaleString()}` : `£${Number(n).toFixed(2)}`;
   const [employees, setEmployees] = useState<any[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
@@ -65,7 +66,7 @@ function EmpContent({ user }: { user: any }) {
                   <td><span className={`badge ${roleColor[e.role]||"badge-purple"}`}>{e.role}</span></td>
                   <td style={{fontSize:12}}>{e.department||"—"}</td>
                   <td style={{fontSize:12,color:e.reports_to_name?"rgba(255,255,255,0.8)":"rgba(255,255,255,0.25)"}}>{e.reports_to_name||"—"}</td>
-                  <td style={{fontWeight:600,color:"var(--pg)"}}>{e.salary>0?`£${Number(e.salary).toFixed(2)}`:"—"}</td>
+                  <td style={{fontWeight:600,color:"var(--pg)"}}>{e.salary>0?fmt(Number(e.salary)):"—"}</td>
                   <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{e.joining_date||"—"}</td>
                   <td><span className={`badge ${e.active?"badge-green":"badge-red"}`}>{e.active?"Active":"Inactive"}</span></td>
                   <td style={{whiteSpace:"nowrap"}}>

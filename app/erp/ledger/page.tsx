@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
 export default function ERPLedger() {
-  return <ERPLayout title="Ledger" active="ledger">{(user) => user.role==="admin" ? <LedgerContent user={user} /> : <div style={{padding:40,textAlign:"center",color:"rgba(255,255,255,0.35)"}}>⛔ Admin access only</div>}</ERPLayout>;
+  return <ERPLayout title="Ledger" active="ledger">{(user, currency) => user.role==="admin" ? <LedgerContent user={user} currency={currency} /> : <div style={{padding:40,textAlign:"center",color:"rgba(255,255,255,0.35)"}}>⛔ Admin access only</div>}</ERPLayout>;
 }
 
-function LedgerContent({ user }: { user: any }) {
+function LedgerContent({ user, currency }: { user: any; currency: string }) {
+  const fmt = (n: number) => currency==="PKR" ? `PKR ${Math.round(n).toLocaleString()}` : `£${Number(n).toFixed(2)}`;
   const [accounts, setAccounts] = useState<any[]>([]);
   const [filterType, setFilterType] = useState("");
   const [selected, setSelected] = useState<any>(null);
@@ -73,7 +74,7 @@ function LedgerContent({ user }: { user: any }) {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <div><div style={{fontSize:13,fontWeight:600}}>{a.name}</div><span className={`badge ${typeColor[a.type]||"badge-purple"}`} style={{marginTop:3,display:"inline-block"}}>{a.type}</span></div>
                 <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:14,fontWeight:700,color:Number(a.balance)>=0?"#00c864":"#ff6666"}}>£{Number(a.balance||0).toFixed(2)}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:Number(a.balance)>=0?"#00c864":"#ff6666"}}>{fmt(Number(a.balance||0))}</div>
                   <div style={{fontSize:10,color:Number(a.balance)>=0?"rgba(0,200,100,0.6)":"rgba(255,68,68,0.6)"}}>{Number(a.balance)>=0?"Company owes":"Employee owes"}</div>
                 </div>
               </div>
@@ -96,7 +97,7 @@ function LedgerContent({ user }: { user: any }) {
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:11,color:"rgba(255,255,255,0.35)",letterSpacing:"1px",textTransform:"uppercase"}}>Running Balance</div>
-                  <div style={{fontSize:28,fontWeight:900,fontFamily:"'Cinzel',serif",color:balance>=0?"#00c864":"#ff6666"}}>£{balance.toFixed(2)}</div>
+                  <div style={{fontSize:28,fontWeight:900,fontFamily:"'Cinzel',serif",color:balance>=0?"#00c864":"#ff6666"}}>{fmt(balance)}</div>
                   <div style={{fontSize:11,marginTop:2,color:balance>=0?"rgba(0,200,100,0.6)":"rgba(255,68,68,0.6)"}}>{balance>=0?"Company owes this account":"Account owes company"}</div>
                 </div>
               </div>
@@ -132,7 +133,7 @@ function LedgerContent({ user }: { user: any }) {
                       <tr key={t.id}>
                         <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{new Date(t.created_at).toLocaleDateString("en-GB")}</td>
                         <td><span className={`badge ${t.type==="credit"?"badge-green":"badge-red"}`}>{t.type}</span></td>
-                        <td style={{fontWeight:700,color:t.type==="credit"?"#00c864":"#ff6666"}}>£{Number(t.amount).toFixed(2)}</td>
+                        <td style={{fontWeight:700,color:t.type==="credit"?"#00c864":"#ff6666"}}>{fmt(Number(t.amount))}</td>
                         <td style={{maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.description||"—"}</td>
                         <td style={{fontSize:11,color:"rgba(255,255,255,0.3)"}}>{t.reference_type||"manual"}</td>
                       </tr>

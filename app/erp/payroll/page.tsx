@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
 export default function ERPPayroll() {
-  return <ERPLayout title="Payroll" active="payroll">{(user) => (user.role==="admin"||user.role==="manager") ? <PayrollContent user={user} /> : <div style={{padding:40,textAlign:"center",color:"rgba(255,255,255,0.35)"}}>⛔ Access restricted</div>}</ERPLayout>;
+  return <ERPLayout title="Payroll" active="payroll">{(user, currency) => (user.role==="admin"||user.role==="manager") ? <PayrollContent user={user} currency={currency} /> : <div style={{padding:40,textAlign:"center",color:"rgba(255,255,255,0.35)"}}>⛔ Access restricted</div>}</ERPLayout>;
 }
 
-function PayrollContent({ user }: { user: any }) {
+function PayrollContent({ user, currency }: { user: any; currency: string }) {
+  const fmt = (n: number) => currency==="PKR" ? `PKR ${Math.round(n).toLocaleString()}` : `£${Number(n).toFixed(2)}`;
   const [payroll, setPayroll] = useState<any[]>([]);
   const [month, setMonth] = useState(new Date().toISOString().slice(0,7));
   const [loading, setLoading] = useState(false);
@@ -47,10 +48,10 @@ function PayrollContent({ user }: { user: any }) {
       {/* Summary cards */}
       <div className="erp-stat-grid" style={{marginBottom:20}}>
         {[
-          {label:"Total Base Salary",val:`£${total.base.toFixed(2)}`,icon:"💼"},
-          {label:"Total Expenses",val:`£${total.expenses.toFixed(2)}`,icon:"💸"},
-          {label:"Total Advances",val:`£${total.advances.toFixed(2)}`,icon:"⬇"},
-          {label:"Net Payroll",val:`£${total.net.toFixed(2)}`,icon:"💰"},
+          {label:"Total Base Salary",val:fmt(total.base),icon:"💼"},
+          {label:"Total Expenses",val:fmt(total.expenses),icon:"💸"},
+          {label:"Total Advances",val:fmt(total.advances),icon:"⬇"},
+          {label:"Net Payroll",val:fmt(total.net),icon:"💰"},
         ].map(s=>(
           <div key={s.label} className="erp-stat">
             <div className="erp-stat-icon">{s.icon}</div>
@@ -73,19 +74,19 @@ function PayrollContent({ user }: { user: any }) {
                     <td style={{fontWeight:600}}>{e.name}</td>
                     <td style={{fontSize:12,color:"rgba(255,255,255,0.45)"}}>{e.department||"—"}</td>
                     <td style={{textAlign:"center"}}><span className="badge badge-green">{e.present_days}d</span></td>
-                    <td style={{fontWeight:600}}>£{Number(e.base_salary||0).toFixed(2)}</td>
-                    <td style={{color:"#00c864"}}>+£{Number(e.approved_expenses||0).toFixed(2)}</td>
-                    <td style={{color:"#ff6666"}}>-£{Number(e.advances||0).toFixed(2)}</td>
-                    <td style={{fontWeight:700,fontFamily:"'Cinzel',serif",color:Number(e.net_pay)>0?"#bf5fff":"#ff6666",fontSize:15}}>£{Number(e.net_pay||0).toFixed(2)}</td>
+                    <td style={{fontWeight:600}}>{fmt(Number(e.base_salary||0))}</td>
+                    <td style={{color:"#00c864"}}>+{fmt(Number(e.approved_expenses||0))}</td>
+                    <td style={{color:"#ff6666"}}>-{fmt(Number(e.advances||0))}</td>
+                    <td style={{fontWeight:700,fontFamily:"'Cinzel',serif",color:Number(e.net_pay)>0?"#bf5fff":"#ff6666",fontSize:15}}>{fmt(Number(e.net_pay||0))}</td>
                   </tr>
                 ))}
                 {payroll.length>0&&(
                   <tr style={{borderTop:"2px solid rgba(139,0,255,0.25)"}}>
                     <td colSpan={3} style={{fontWeight:700,color:"rgba(255,255,255,0.6)",fontSize:12,letterSpacing:"1px",textTransform:"uppercase"}}>TOTAL</td>
-                    <td style={{fontWeight:700}}>£{total.base.toFixed(2)}</td>
-                    <td style={{fontWeight:700,color:"#00c864"}}>+£{total.expenses.toFixed(2)}</td>
-                    <td style={{fontWeight:700,color:"#ff6666"}}>-£{total.advances.toFixed(2)}</td>
-                    <td style={{fontWeight:900,fontFamily:"'Cinzel',serif",color:"var(--pg)",fontSize:16}}>£{total.net.toFixed(2)}</td>
+                    <td style={{fontWeight:700}}>{fmt(total.base)}</td>
+                    <td style={{fontWeight:700,color:"#00c864"}}>+{fmt(total.expenses)}</td>
+                    <td style={{fontWeight:700,color:"#ff6666"}}>-{fmt(total.advances)}</td>
+                    <td style={{fontWeight:900,fontFamily:"'Cinzel',serif",color:"var(--pg)",fontSize:16}}>{fmt(total.net)}</td>
                   </tr>
                 )}
               </tbody>
