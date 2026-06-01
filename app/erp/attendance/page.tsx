@@ -255,7 +255,7 @@ function AttContent({ user, currency: _c }: { user: any; currency: string }) {
                   </tbody>
                 </table>
               </div>
-              <div style={{marginTop:14,display:"flex",gap:10"}}>
+              <div style={{marginTop:14,display:"flex",gap:10,flexWrap:"wrap"}}>
                 <button className="erp-btn erp-btn-primary" onClick={submitBulk}>💾 Save Bulk Attendance</button>
                 <button className="erp-btn erp-btn-outline" onClick={()=>setBulkRecords(r=>r.map(x=>({...x,status:"present"})))}>Set All Present</button>
                 <button className="erp-btn erp-btn-outline" onClick={()=>setBulkRecords(r=>r.map(x=>({...x,status:"weekly_off"})))}>Set All Off</button>
