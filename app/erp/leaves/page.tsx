@@ -66,7 +66,7 @@ function LeavesContent({ user }: { user: any }) {
 
       <div style={{marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
         <div>{leaves.filter(l=>l.status==="pending").length>0&&<span className="badge badge-orange">{leaves.filter(l=>l.status==="pending").length} Pending</span>}</div>
-        {user.role==="employee"&&<button className="erp-btn erp-btn-primary" onClick={()=>setShowForm(!showForm)}>+ Request Leave</button>}
+        {user.role!=="admin"&&<button className="erp-btn erp-btn-primary" onClick={()=>setShowForm(!showForm)}>+ Request Leave</button>}
       </div>
 
       {msg&&<div style={{marginBottom:16,padding:"10px 16px",background:msg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${msg.startsWith("✅")?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,borderRadius:10,fontSize:13,color:msg.startsWith("✅")?"#00c864":"#ff6666"}}>{msg}</div>}

@@ -9,32 +9,48 @@ const getDB = async () => {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  let conn;
+  let conn: any;
   try {
     conn = await getDB();
 
+    // Auto-add reports_to column if not exists
+    try { await conn.query('ALTER TABLE erp_users ADD COLUMN reports_to INT NULL'); } catch (_) {}
+
     if (req.method === 'GET') {
-      const [rows] = await conn.query('SELECT id,name,email,role,department,salary,joining_date,active,created_at FROM erp_users ORDER BY created_at DESC');
+      const { role_filter } = req.query;
+      // For dropdown: get managers or admins
+      if (role_filter) {
+        const roles = String(role_filter).split(',');
+        const placeholders = roles.map(()=>'?').join(',');
+        const [rows] = await conn.query(`SELECT id,name,role FROM erp_users WHERE role IN (${placeholders}) AND active=1 ORDER BY name`, roles);
+        return res.status(200).json(Array.isArray(rows)?rows:[]);
+      }
+      const [rows] = await conn.query(`
+        SELECT u.id,u.name,u.email,u.role,u.department,u.salary,u.joining_date,u.active,u.created_at,u.reports_to,
+          m.name as reports_to_name
+        FROM erp_users u
+        LEFT JOIN erp_users m ON u.reports_to = m.id
+        ORDER BY u.created_at DESC
+      `);
       return res.status(200).json(Array.isArray(rows) ? rows : []);
     }
 
     if (req.method === 'POST') {
-      const { name, email, password, role, department, salary, joining_date } = req.body;
+      const { name, email, password, role, department, salary, joining_date, reports_to } = req.body;
       if (!name || !email || !password) return res.status(400).json({ error: 'Name, email and password required' });
       const [result]: any = await conn.query(
-        'INSERT INTO erp_users (name,email,password,role,department,salary,joining_date) VALUES (?,?,?,?,?,?,?)',
-        [name, email, password, role||'employee', department||'', salary||0, joining_date||null]
+        'INSERT INTO erp_users (name,email,password,role,department,salary,joining_date,reports_to) VALUES (?,?,?,?,?,?,?,?)',
+        [name, email, password, role||'employee', department||'', salary||0, joining_date||null, reports_to||null]
       );
-      // Auto-create ledger account for employee
       await conn.query('INSERT INTO erp_accounts (name,type,reference_id) VALUES (?,?,?)', [name, 'employee', result.insertId]);
       return res.status(200).json({ success: true, id: result.insertId });
     }
 
     if (req.method === 'PUT') {
-      const { id, name, email, role, department, salary, joining_date, active } = req.body;
+      const { id, name, email, role, department, salary, joining_date, active, reports_to } = req.body;
       await conn.query(
-        'UPDATE erp_users SET name=?,email=?,role=?,department=?,salary=?,joining_date=?,active=? WHERE id=?',
-        [name, email, role, department||'', salary||0, joining_date||null, active??1, id]
+        'UPDATE erp_users SET name=?,email=?,role=?,department=?,salary=?,joining_date=?,active=?,reports_to=? WHERE id=?',
+        [name, email, role, department||'', salary||0, joining_date||null, active??1, reports_to||null, id]
       );
       return res.status(200).json({ success: true });
     }

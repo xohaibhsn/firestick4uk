@@ -20,7 +20,7 @@ function ExpContent({ user }: { user: any }) {
   const load = () => {
     const url = (user.role==="admin"||user.role==="manager") ? "/api/erp/expenses" : `/api/erp/expenses?employee_id=${user.id}`;
     fetch(url).then(r=>r.json()).then(d=>setExpenses(Array.isArray(d)?d:[])).catch(()=>{});
-    if (user.role==="employee") {
+    if (user.role!=="admin") {
       fetch(`/api/erp/expenses?notifications=1&employee_id=${user.id}`).then(r=>r.json()).then(d=>setNotifications(Array.isArray(d)?d:[])).catch(()=>{});
     }
   };
@@ -73,7 +73,7 @@ function ExpContent({ user }: { user: any }) {
           {pending>0&&<span className="badge badge-orange">{pending} Pending</span>}
           {(user.role==="admin"||user.role==="manager")&&pending>0&&<span style={{fontSize:13,color:"rgba(255,255,255,0.5)"}}>Total: £{totalPending.toFixed(2)}</span>}
         </div>
-        {user.role==="employee"&&<button className="erp-btn erp-btn-primary" onClick={()=>setShowForm(!showForm)}>+ Submit Expense</button>}
+        {user.role!=="admin"&&<button className="erp-btn erp-btn-primary" onClick={()=>setShowForm(!showForm)}>+ Submit Expense</button>}
       </div>
 
       {msg&&<div style={{marginBottom:16,padding:"10px 16px",background:msg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${msg.startsWith("✅")?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,borderRadius:10,fontSize:13,color:msg.startsWith("✅")?"#00c864":"#ff6666"}}>{msg}</div>}
