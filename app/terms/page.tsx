@@ -207,7 +207,7 @@ export default function TermsPage() {
         </div>
 
         <footer>
-          <div className="footer-logo">FIRESTICK44UK</div>
+          <div className="footer-logo">FIRESTICK4UK</div>
           <ul className="footer-links">
             <li><a href="/privacy-policy">Privacy Policy</a></li>
             <li><a href="/terms">Terms & Conditions</a></li>

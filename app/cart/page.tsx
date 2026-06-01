@@ -235,7 +235,7 @@ export default function CartPage() {
           <a href="/order-tracking" className="btn-primary">Track My Order</a>
         </div>
         <footer>
-          <div className="footer-logo">FIRESTICK44UK</div>
+          <div className="footer-logo">FIRESTICK4UK</div>
           <div className="footer-copy">© 2026 Firestick44UK. All rights reserved.</div>
         </footer>
         <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
@@ -248,7 +248,7 @@ export default function CartPage() {
       <style>{navStyles}</style>
       <div className="bg-fixed" />
       <nav>
-        <a href="/" className="nav-logo">FIRESTICK44UK</a>
+        <a href="/" className="nav-logo">FIRESTICK4UK</a>
         <ul className={`nav-links ${menuOpen ? "open" : ""}`}>
           <li><a href="/" onClick={() => setMenuOpen(false)}>Home</a></li>
           <li><a href="/products" onClick={() => setMenuOpen(false)}>Products</a></li>
@@ -417,7 +417,7 @@ export default function CartPage() {
         )}
 
         <footer>
-          <div className="footer-logo">FIRESTICK44UK</div>
+          <div className="footer-logo">FIRESTICK4UK</div>
           <div className="footer-copy">© 2026 Firestick44UK. All rights reserved.</div>
         </footer>
       </div>

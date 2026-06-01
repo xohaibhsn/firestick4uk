@@ -286,7 +286,7 @@ export default function AdminPage() {
         <style>{styles}</style>
         <div className="login-screen">
           <div className="login-box">
-            <div className="login-logo">FIRESTICK44UK</div>
+            <div className="login-logo">FIRESTICK4UK</div>
             <div className="login-sub">Admin Panel</div>
             <input className="login-input" type="text" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key==="Enter" && handleLogin()} />
             <input className="login-input" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key==="Enter" && handleLogin()} />
@@ -371,7 +371,7 @@ export default function AdminPage() {
         {/* SIDEBAR */}
         <aside className="sidebar">
           <div className="sidebar-logo">
-            <div className="sidebar-logo-text">FIRESTICK44UK</div>
+            <div className="sidebar-logo-text">FIRESTICK4UK</div>
             <div className="sidebar-label">Admin Panel</div>
           </div>
           <nav className="sidebar-nav">
