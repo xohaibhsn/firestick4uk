@@ -174,8 +174,14 @@ const styles = `
   /* CUSTOMERS */
   .customer-avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright)); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:white; }
 
+  .sidebar-hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:6px;margin-right:12px;}
+  .sidebar-hamburger span{display:block;width:22px;height:2px;background:var(--purple-glow);border-radius:2px;transition:all 0.2s;}
+  .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:49;}
   @media(max-width:900px){
-    .sidebar{display:none;}
+    .sidebar{transform:translateX(-100%);transition:transform 0.28s ease;z-index:50;}
+    .sidebar.open{transform:translateX(0);}
+    .sidebar-overlay{display:block;}
+    .sidebar-hamburger{display:flex;}
     .main-content{margin-left:0;padding:20px 16px;}
     .table-wrap{overflow-x:auto;}
     .stats-grid{grid-template-columns:1fr 1fr;}
@@ -225,6 +231,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orders, setOrders] = useState(demoOrders);
   const [products, setProducts] = useState(demoProducts);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -632,9 +639,11 @@ export default function AdminPage() {
         </div>
       )}
 
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+
       <div className="admin-layout">
         {/* SIDEBAR */}
-        <aside className="sidebar">
+        <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
           <div className="sidebar-logo">
             <div className="sidebar-logo-text">FIRESTICK4UK</div>
             <div className="sidebar-label">Admin Panel</div>
@@ -647,7 +656,7 @@ export default function AdminPage() {
               { id:"customers", icon:"👥", label:"Customers" },
               { id:"blog", icon:"📝", label:"Blog" },
             ] as const).map(item => (
-              <button key={item.id} className={`nav-item ${tab===item.id?"active":""}`} onClick={() => setTab(item.id)}>
+              <button key={item.id} className={`nav-item ${tab===item.id?"active":""}`} onClick={() => { setTab(item.id); setSidebarOpen(false); }}>
                 <span className="nav-icon">{item.icon}</span>
                 {item.label}
                 {"badge" in item && item.badge && <span className={`nav-badge ${item.badgeColor||""}`}>{item.badge}</span>}
@@ -655,7 +664,7 @@ export default function AdminPage() {
             ))}
           </nav>
           <div className="sidebar-footer">
-            <button className="logout-btn" onClick={handleLogout}>
+            <button className="logout-btn" onClick={() => { handleLogout(); setSidebarOpen(false); }}>
               <span>🚪</span> Logout
             </button>
           </div>
@@ -664,13 +673,18 @@ export default function AdminPage() {
         {/* MAIN */}
         <main className="main-content">
           <div className="top-bar">
-            <h1 className="page-heading">
-              {tab==="dashboard" && <>Dashboard <span>Overview</span></>}
-              {tab==="orders" && <>Manage <span>Orders</span></>}
-              {tab==="products" && <>Manage <span>Products</span></>}
-              {tab==="customers" && <>Customer <span>Data</span></>}
-              {tab==="blog" && <>Manage <span>Blog</span></>}
-            </h1>
+            <div style={{display:"flex",alignItems:"center"}}>
+              <button className="sidebar-hamburger" onClick={() => setSidebarOpen(o => !o)} aria-label="Menu">
+                <span/><span/><span/>
+              </button>
+              <h1 className="page-heading">
+                {tab==="dashboard" && <>Dashboard <span>Overview</span></>}
+                {tab==="orders" && <>Manage <span>Orders</span></>}
+                {tab==="products" && <>Manage <span>Products</span></>}
+                {tab==="customers" && <>Customer <span>Data</span></>}
+                {tab==="blog" && <>Manage <span>Blog</span></>}
+              </h1>
+            </div>
             <div className="top-right">
               <span className="admin-badge">👤 Admin</span>
             </div>

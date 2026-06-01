@@ -75,7 +75,18 @@ export const erpStyles = `
   .erp-clock-in:hover{box-shadow:0 0 35px rgba(0,200,100,0.7);}
   .erp-clock-out{background:linear-gradient(135deg,#800000,var(--red));color:white;box-shadow:0 0 20px rgba(255,68,68,0.4);}
   .erp-clock-out:hover{box-shadow:0 0 35px rgba(255,68,68,0.7);}
-  @media(max-width:900px){.erp-sidebar{display:none;}.erp-main{margin-left:0;}.erp-stat-grid{grid-template-columns:1fr 1fr;}.erp-grid-2,.erp-grid-3{grid-template-columns:1fr;}}
+  .erp-hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:6px;margin-right:10px;}
+  .erp-hamburger span{display:block;width:22px;height:2px;background:var(--pg);border-radius:2px;transition:all 0.2s;}
+  .erp-sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:49;}
+  @media(max-width:900px){
+    .erp-sidebar{transform:translateX(-100%);transition:transform 0.28s ease;}
+    .erp-sidebar.open{transform:translateX(0);}
+    .erp-sidebar-overlay{display:block;}
+    .erp-hamburger{display:flex;}
+    .erp-main{margin-left:0;}
+    .erp-stat-grid{grid-template-columns:1fr 1fr;}
+    .erp-grid-2,.erp-grid-3{grid-template-columns:1fr;}
+  }
 `;
 
 interface ERPUser { id: number; name: string; email: string; role: string; }
@@ -102,6 +113,7 @@ const routeRoles: Record<string, string[]> = {
 export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
   const [user, setUser] = useState<ERPUser | null>(null);
   const [currency, setCurrency] = useState("PKR");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const s = localStorage.getItem("erp_session");
@@ -132,8 +144,9 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
   return (
     <>
       <style>{erpStyles}</style>
+      {sidebarOpen && <div className="erp-sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <div className="erp-layout">
-        <aside className="erp-sidebar">
+        <aside className={`erp-sidebar ${sidebarOpen ? "open" : ""}`}>
           <div className="erp-logo">
             <div className="erp-logo-text">FIRESTICK4UK</div>
             <div className="erp-logo-sub">ERP System</div>
@@ -141,7 +154,7 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
           <nav className="erp-nav">
             <div className="erp-nav-section">Main</div>
             {navItems.map(item => (
-              <a key={item.key} href={item.href} className={`erp-nav-item ${active===item.key?"active":""}`}>
+              <a key={item.key} href={item.href} className={`erp-nav-item ${active===item.key?"active":""}`} onClick={() => setSidebarOpen(false)}>
                 <span className="erp-nav-icon">{item.icon}</span>{item.label}
               </a>
             ))}
@@ -149,7 +162,7 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
               <>
                 <div className="erp-nav-section">Management</div>
                 {adminItems.filter(item=>item.roles.includes(user.role)).map(item => (
-                  <a key={item.key} href={item.href} className={`erp-nav-item ${active===item.key?"active":""}`}>
+                  <a key={item.key} href={item.href} className={`erp-nav-item ${active===item.key?"active":""}`} onClick={() => setSidebarOpen(false)}>
                     <span className="erp-nav-icon">{item.icon}</span>{item.label}
                   </a>
                 ))}
@@ -161,12 +174,17 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
               <div className="erp-user-name">{user.name}</div>
               <div className="erp-user-role">{user.role}</div>
             </div>
-            <button className="erp-logout" onClick={logout}>🚪 Logout</button>
+            <button className="erp-logout" onClick={() => { setSidebarOpen(false); logout(); }}>🚪 Logout</button>
           </div>
         </aside>
         <main className="erp-main">
           <div className="erp-header">
-            <h1 className="erp-page-title">{title}</h1>
+            <div style={{display:"flex",alignItems:"center"}}>
+              <button className="erp-hamburger" onClick={() => setSidebarOpen(o => !o)} aria-label="Menu">
+                <span/><span/><span/>
+              </button>
+              <h1 className="erp-page-title">{title}</h1>
+            </div>
             <div style={{display:"flex",alignItems:"center",gap:14}}>
               <button onClick={toggleCurrency} style={{background:currency==="PKR"?"rgba(0,200,100,0.12)":"rgba(68,136,255,0.12)",border:`1px solid ${currency==="PKR"?"rgba(0,200,100,0.3)":"rgba(68,136,255,0.3)"}`,color:currency==="PKR"?"#00c864":"#6699ff",padding:"5px 14px",borderRadius:20,cursor:"pointer",fontSize:13,fontWeight:700,transition:"all 0.2s"}} title="Switch currency">
                 {currency==="PKR"?"₨ PKR":"£ GBP"}
