@@ -88,9 +88,16 @@ const navItems = [
   { href:"/erp/leaves", icon:"🌿", label:"Leaves", key:"leaves" },
 ];
 const adminItems = [
-  { href:"/erp/employees", icon:"👥", label:"Employees", key:"employees" },
-  { href:"/erp/ledger", icon:"📒", label:"Ledger", key:"ledger" },
+  { href:"/erp/employees", icon:"👥", label:"Employees", key:"employees", roles:["admin"] },
+  { href:"/erp/ledger", icon:"📒", label:"Ledger", key:"ledger", roles:["admin"] },
+  { href:"/erp/payroll", icon:"💰", label:"Payroll", key:"payroll", roles:["admin","manager"] },
 ];
+
+const routeRoles: Record<string, string[]> = {
+  "/erp/ledger": ["admin"],
+  "/erp/employees": ["admin"],
+  "/erp/payroll": ["admin","manager"],
+};
 
 export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
   const [user, setUser] = useState<ERPUser | null>(null);
@@ -98,7 +105,16 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
   useEffect(() => {
     const s = localStorage.getItem("erp_session");
     if (!s) { window.location.href = "/erp"; return; }
-    try { setUser(JSON.parse(s)); } catch { window.location.href = "/erp"; }
+    try {
+      const u = JSON.parse(s);
+      const path = window.location.pathname;
+      const allowed = routeRoles[path];
+      if (allowed && !allowed.includes(u.role)) {
+        window.location.href = "/erp/dashboard";
+        return;
+      }
+      setUser(u);
+    } catch { window.location.href = "/erp"; }
   }, []);
 
   if (!user) return <><style>{erpStyles}</style><div style={{minHeight:"100vh",background:"#0a0010"}} /></>;
@@ -121,10 +137,10 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
                 <span className="erp-nav-icon">{item.icon}</span>{item.label}
               </a>
             ))}
-            {user.role === "admin" && (
+            {(user.role === "admin" || user.role === "manager") && (
               <>
-                <div className="erp-nav-section">Admin</div>
-                {adminItems.map(item => (
+                <div className="erp-nav-section">Management</div>
+                {adminItems.filter(item=>item.roles.includes(user.role)).map(item => (
                   <a key={item.key} href={item.href} className={`erp-nav-item ${active===item.key?"active":""}`}>
                     <span className="erp-nav-icon">{item.icon}</span>{item.label}
                   </a>

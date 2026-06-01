@@ -17,6 +17,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await connection.query(`CREATE TABLE IF NOT EXISTS erp_accounts (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, type ENUM('employee','vendor','client') NOT NULL, reference_id INT, opening_balance DECIMAL(10,2) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
     await connection.query(`CREATE TABLE IF NOT EXISTS erp_transactions (id INT AUTO_INCREMENT PRIMARY KEY, account_id INT NOT NULL, type ENUM('credit','debit') NOT NULL, amount DECIMAL(10,2) NOT NULL, description TEXT, reference_type VARCHAR(50), reference_id INT, created_by INT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
     await connection.query(`CREATE TABLE IF NOT EXISTS erp_leaves (id INT AUTO_INCREMENT PRIMARY KEY, employee_id INT NOT NULL, leave_type ENUM('sick','annual','emergency','unpaid') DEFAULT 'annual', from_date DATE NOT NULL, to_date DATE NOT NULL, reason TEXT, status ENUM('pending','approved','rejected') DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    await connection.query(`CREATE TABLE IF NOT EXISTS erp_audit_log (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, action VARCHAR(255), details TEXT, ip_address VARCHAR(50), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+
+    // Add new columns to existing tables (ignore if already exist)
+    for (const sql of [
+      "ALTER TABLE erp_users ADD COLUMN monthly_expense_limit DECIMAL(10,2) DEFAULT 500",
+      "ALTER TABLE erp_expenses ADD COLUMN month_year VARCHAR(7)",
+    ]) { try { await connection.query(sql); } catch (_) {} }
 
     // Insert default admin if not exists
     const [existing]: any = await connection.query('SELECT id FROM erp_users WHERE email = ?', ['admin@firestick4uk.com']);
@@ -28,8 +35,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
     const [rows]: any = await connection.query('SELECT id,name,email,role,department FROM erp_users WHERE email=? AND password=? AND active=1', [email, password]);
-    if (!rows.length) return res.status(401).json({ error: 'Invalid credentials' });
-
+    if (!rows.length) {
+      await connection.query('INSERT INTO erp_audit_log (action,details,ip_address) VALUES (?,?,?)', ['LOGIN_FAILED', `Failed login for ${email}`, req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown']).catch(()=>{});
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    await connection.query('INSERT INTO erp_audit_log (user_id,action,details,ip_address) VALUES (?,?,?,?)', [rows[0].id,'LOGIN',`${rows[0].name} logged in`,req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown']).catch(()=>{});
     return res.status(200).json({ success: true, user: rows[0] });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });

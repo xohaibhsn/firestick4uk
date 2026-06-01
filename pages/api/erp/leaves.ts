@@ -8,13 +8,34 @@ const getDB = async () => {
   ]);
 };
 
+const LIMITS: Record<string,number> = { annual:14, sick:10, emergency:3 };
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   let conn;
   try {
     conn = await getDB();
 
     if (req.method === 'GET') {
-      const { employee_id } = req.query;
+      const { employee_id, balance, year } = req.query;
+
+      // Leave balance
+      if (balance && employee_id) {
+        const y = String(year || new Date().getFullYear());
+        const [rows]: any = await conn.query(`
+          SELECT leave_type, SUM(DATEDIFF(to_date, from_date)+1) as days_taken
+          FROM erp_leaves
+          WHERE employee_id=? AND status='approved' AND YEAR(from_date)=?
+          GROUP BY leave_type
+        `, [employee_id, y]);
+        const taken: Record<string,number> = {annual:0,sick:0,emergency:0};
+        rows.forEach((r:any) => { if (taken[r.leave_type]!==undefined) taken[r.leave_type]=Number(r.days_taken); });
+        return res.status(200).json({
+          annual_taken: taken.annual, annual_limit: LIMITS.annual, annual_remaining: LIMITS.annual - taken.annual,
+          sick_taken: taken.sick, sick_limit: LIMITS.sick, sick_remaining: LIMITS.sick - taken.sick,
+          emergency_taken: taken.emergency, emergency_limit: LIMITS.emergency, emergency_remaining: LIMITS.emergency - taken.emergency,
+        });
+      }
+
       let query = 'SELECT l.*,u.name as employee_name FROM erp_leaves l JOIN erp_users u ON l.employee_id=u.id';
       const params: any[] = [];
       if (employee_id) { query += ' WHERE l.employee_id=?'; params.push(employee_id); }
@@ -37,6 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { id, status } = req.body;
       if (!id || !status) return res.status(400).json({ error: 'Missing fields' });
       await conn.query('UPDATE erp_leaves SET status=? WHERE id=?', [status, id]);
+      await conn.query('INSERT INTO erp_audit_log (action,details) VALUES (?,?)', [`LEAVE_${status.toUpperCase()}`, `Leave #${id} ${status}`]).catch(()=>{});
       return res.status(200).json({ success: true });
     }
 

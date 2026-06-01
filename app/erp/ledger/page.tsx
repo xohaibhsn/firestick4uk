@@ -8,12 +8,15 @@ export default function ERPLedger() {
 
 function LedgerContent({ user }: { user: any }) {
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [filterType, setFilterType] = useState("");
   const [selected, setSelected] = useState<any>(null);
   const [txns, setTxns] = useState<any[]>([]);
   const [balance, setBalance] = useState(0);
-  const [entryForm, setEntryForm] = useState({type:"credit",amount:"",description:""});
+  const [entryForm, setEntryForm] = useState({type:"credit",amount:"",description:"",reference_type:""});
   const [accForm, setAccForm] = useState({name:"",type:"client",opening_balance:""});
   const [showAccForm, setShowAccForm] = useState(false);
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
   const [msg, setMsg] = useState("");
 
   const loadAccounts = () => { fetch("/api/erp/ledger").then(r=>r.json()).then(d=>setAccounts(Array.isArray(d)?d:[])).catch(()=>{}); };
@@ -27,7 +30,7 @@ function LedgerContent({ user }: { user: any }) {
   const addEntry = async () => {
     if (!entryForm.amount||!selected) { setMsg("❌ Amount required"); return; }
     const res = await fetch("/api/erp/ledger",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...entryForm,account_id:selected.id,created_by:user.id})}).then(r=>r.json()).catch(()=>({}));
-    if (res.success) { setMsg("✅ Entry added"); setEntryForm({type:"credit",amount:"",description:""}); selectAccount(selected); loadAccounts(); }
+    if (res.success) { setMsg("✅ Entry added"); setEntryForm({type:"credit",amount:"",description:"",reference_type:""}); selectAccount(selected); loadAccounts(); }
     else setMsg(`❌ ${res.error}`);
   };
 
@@ -39,6 +42,12 @@ function LedgerContent({ user }: { user: any }) {
   };
 
   const typeColor: any = {employee:"badge-green",vendor:"badge-orange",client:"badge-blue"};
+  const filteredAccounts = filterType ? accounts.filter((a:any)=>a.type===filterType) : accounts;
+  const filteredTxns = txns.filter((t:any)=>{
+    if (filterFrom && new Date(t.created_at) < new Date(filterFrom)) return false;
+    if (filterTo && new Date(t.created_at) > new Date(filterTo+"T23:59:59")) return false;
+    return true;
+  });
 
   return (
     <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:20,alignItems:"start"}}>
@@ -46,23 +55,31 @@ function LedgerContent({ user }: { user: any }) {
       <div>
         <div className="erp-card" style={{marginBottom:14}}>
           <div className="erp-section-header"><div className="erp-section-title">Accounts</div><button className="erp-btn erp-btn-primary erp-btn-sm" onClick={()=>setShowAccForm(!showAccForm)}>+</button></div>
+          <div style={{marginBottom:10}}>
+            <select className="erp-select" style={{padding:"6px 10px",fontSize:12}} value={filterType} onChange={e=>setFilterType(e.target.value)}>
+              <option value="">All Types</option><option value="employee">Employee</option><option value="vendor">Vendor</option><option value="client">Client</option>
+            </select>
+          </div>
           {showAccForm && (
-            <div style={{marginBottom:14}}>
+            <div style={{marginBottom:14,padding:"14px",background:"rgba(139,0,255,0.05)",borderRadius:10,border:"1px solid rgba(139,0,255,0.15)"}}>
               <div className="erp-field"><label>Name</label><input className="erp-input" placeholder="Account name" value={accForm.name} onChange={e=>setAccForm(f=>({...f,name:e.target.value}))} /></div>
               <div className="erp-field"><label>Type</label><select className="erp-select" value={accForm.type} onChange={e=>setAccForm(f=>({...f,type:e.target.value}))}><option value="employee">Employee</option><option value="vendor">Vendor</option><option value="client">Client</option></select></div>
               <div className="erp-field"><label>Opening Balance (£)</label><input className="erp-input" type="number" placeholder="0.00" value={accForm.opening_balance} onChange={e=>setAccForm(f=>({...f,opening_balance:e.target.value}))} /></div>
               <button className="erp-btn erp-btn-primary" style={{width:"100%"}} onClick={addAccount}>Create Account</button>
             </div>
           )}
-          {accounts.map((a:any)=>(
+          {filteredAccounts.map((a:any)=>(
             <div key={a.id} onClick={()=>selectAccount(a)} style={{padding:"10px 12px",borderRadius:10,cursor:"pointer",marginBottom:4,border:`1px solid ${selected?.id===a.id?"rgba(139,0,255,0.5)":"rgba(139,0,255,0.1)"}`,background:selected?.id===a.id?"rgba(139,0,255,0.14)":"transparent",transition:"all 0.2s"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div><div style={{fontSize:13,fontWeight:600}}>{a.name}</div><span className={`badge ${typeColor[a.type]||"badge-purple"}`} style={{marginTop:3}}>{a.type}</span></div>
-                <div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:700,color:Number(a.balance)>=0?"#00c864":"#ff6666"}}>£{Number(a.balance||0).toFixed(2)}</div></div>
+                <div><div style={{fontSize:13,fontWeight:600}}>{a.name}</div><span className={`badge ${typeColor[a.type]||"badge-purple"}`} style={{marginTop:3,display:"inline-block"}}>{a.type}</span></div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:14,fontWeight:700,color:Number(a.balance)>=0?"#00c864":"#ff6666"}}>£{Number(a.balance||0).toFixed(2)}</div>
+                  <div style={{fontSize:10,color:Number(a.balance)>=0?"rgba(0,200,100,0.6)":"rgba(255,68,68,0.6)"}}>{Number(a.balance)>=0?"Company owes":"Employee owes"}</div>
+                </div>
               </div>
             </div>
           ))}
-          {accounts.length===0 && <div className="erp-empty">No accounts yet</div>}
+          {filteredAccounts.length===0 && <div className="erp-empty">No accounts</div>}
         </div>
       </div>
 
@@ -80,6 +97,7 @@ function LedgerContent({ user }: { user: any }) {
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:11,color:"rgba(255,255,255,0.35)",letterSpacing:"1px",textTransform:"uppercase"}}>Running Balance</div>
                   <div style={{fontSize:28,fontWeight:900,fontFamily:"'Cinzel',serif",color:balance>=0?"#00c864":"#ff6666"}}>£{balance.toFixed(2)}</div>
+                  <div style={{fontSize:11,marginTop:2,color:balance>=0?"rgba(0,200,100,0.6)":"rgba(255,68,68,0.6)"}}>{balance>=0?"Company owes this account":"Account owes company"}</div>
                 </div>
               </div>
               <hr style={{border:"none",borderTop:"1px solid rgba(139,0,255,0.12)",margin:"16px 0"}} />
@@ -97,13 +115,20 @@ function LedgerContent({ user }: { user: any }) {
             </div>
 
             <div className="erp-card">
-              <div className="erp-section-title" style={{marginBottom:14}}>Transactions</div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
+                <div className="erp-section-title">Transactions</div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                  <input type="date" className="erp-input" style={{width:"auto",padding:"5px 10px",fontSize:12}} value={filterFrom} onChange={e=>setFilterFrom(e.target.value)} placeholder="From" />
+                  <input type="date" className="erp-input" style={{width:"auto",padding:"5px 10px",fontSize:12}} value={filterTo} onChange={e=>setFilterTo(e.target.value)} placeholder="To" />
+                  <button className="erp-btn erp-btn-outline erp-btn-sm" onClick={()=>window.print()}>🖨 Print</button>
+                </div>
+              </div>
               <div className="erp-table-wrap">
                 <table>
                   <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th><th>Reference</th></tr></thead>
                   <tbody>
-                    {txns.length===0 && <tr><td colSpan={5} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No transactions yet</td></tr>}
-                    {txns.map((t:any)=>(
+                    {filteredTxns.length===0 && <tr><td colSpan={5} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No transactions yet</td></tr>}
+                    {filteredTxns.map((t:any)=>(
                       <tr key={t.id}>
                         <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{new Date(t.created_at).toLocaleDateString("en-GB")}</td>
                         <td><span className={`badge ${t.type==="credit"?"badge-green":"badge-red"}`}>{t.type}</span></td>
