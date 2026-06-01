@@ -354,7 +354,7 @@ export default function OrderTrackingPage() {
               <h4>Need Help?</h4>
               <p>Can&apos;t find your order or have a question? Chat with us on WhatsApp.</p>
             </div>
-            <a href="https://wa.me/447000000000" className="wa-btn" target="_blank" rel="noopener noreferrer">
+            <a href="https://wa.me/447934519060" className="wa-btn" target="_blank" rel="noopener noreferrer">
               💬 WhatsApp Us
             </a>
           </div>
@@ -372,7 +372,7 @@ export default function OrderTrackingPage() {
         </footer>
       </div>
 
-      <a href="https://wa.me/447000000000" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
+      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
     </>
   );
 }

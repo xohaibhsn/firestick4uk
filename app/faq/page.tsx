@@ -210,7 +210,7 @@ export default function FAQPage() {
             <div className="help-title">Still Have Questions?</div>
             <p className="help-sub">Can&apos;t find the answer you&apos;re looking for? Our team is happy to help.</p>
             <div className="help-btns">
-              <a href="https://wa.me/447000000000" className="btn-whatsapp" target="_blank" rel="noopener noreferrer">
+              <a href="https://wa.me/447934519060" className="btn-whatsapp" target="_blank" rel="noopener noreferrer">
                 💬 WhatsApp Us
               </a>
               <a href="/contact" className="btn-contact">📧 Contact Form</a>
@@ -230,7 +230,7 @@ export default function FAQPage() {
         </footer>
       </div>
 
-      <a href="https://wa.me/447000000000" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
+      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
     </>
   );
 }

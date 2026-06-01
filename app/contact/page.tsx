@@ -205,7 +205,7 @@ export default function ContactPage() {
 
         {/* CONTACT CARDS */}
         <div className="contact-cards">
-          <a href="https://wa.me/447000000000" className="contact-card" target="_blank" rel="noopener noreferrer">
+          <a href="https://wa.me/447934519060" className="contact-card" target="_blank" rel="noopener noreferrer">
             <span className="contact-card-icon">💬</span>
             <div className="contact-card-title">WhatsApp</div>
             <div className="contact-card-value">+44 7000 000000</div>
@@ -294,7 +294,7 @@ export default function ContactPage() {
                 <strong>Fastest way to reach us</strong>
                 Send us a message on WhatsApp for instant support. We typically reply within minutes during business hours.
               </div>
-              <a href="https://wa.me/447000000000" className="info-card-link" target="_blank" rel="noopener noreferrer">
+              <a href="https://wa.me/447934519060" className="info-card-link" target="_blank" rel="noopener noreferrer">
                 Chat Now on WhatsApp →
               </a>
             </div>
@@ -356,7 +356,7 @@ export default function ContactPage() {
         </footer>
       </div>
 
-      <a href="https://wa.me/447000000000" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
+      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
     </>
   );
 }

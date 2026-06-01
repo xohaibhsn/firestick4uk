@@ -236,7 +236,7 @@ export default function CartPage() {
           <div className="footer-logo">FIRESTICK44UK</div>
           <div className="footer-copy">© 2026 Firestick44UK. All rights reserved.</div>
         </footer>
-        <a href="https://wa.me/447000000000" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
+        <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
       </>
     );
   }
@@ -419,7 +419,7 @@ export default function CartPage() {
           <div className="footer-copy">© 2026 Firestick44UK. All rights reserved.</div>
         </footer>
       </div>
-      <a href="https://wa.me/447000000000" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
+      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
     </>
   );
 }

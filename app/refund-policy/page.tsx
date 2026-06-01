@@ -249,7 +249,7 @@ export default function RefundPolicyPage() {
             <div className="cta-title">Need Help With a Return?</div>
             <p className="cta-sub">Our team is here to help. Contact us via WhatsApp for the fastest response.</p>
             <div className="cta-btns">
-              <a href="https://wa.me/447000000000" className="btn-wa" target="_blank" rel="noopener noreferrer">💬 WhatsApp Us</a>
+              <a href="https://wa.me/447934519060" className="btn-wa" target="_blank" rel="noopener noreferrer">💬 WhatsApp Us</a>
               <a href="/contact" className="btn-contact">📧 Email Us</a>
             </div>
           </div>
@@ -267,7 +267,7 @@ export default function RefundPolicyPage() {
         </footer>
       </div>
 
-      <a href="https://wa.me/447000000000" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
+      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
     </>
   );
 }
