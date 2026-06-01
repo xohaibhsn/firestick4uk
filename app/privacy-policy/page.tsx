@@ -243,7 +243,7 @@ export default function PrivacyPolicyPage() {
             <li><a href="/refund-policy">Refund Policy</a></li>
             <li><a href="/faq">FAQ</a></li>
           </ul>
-          <div className="footer-copy">© 2026 Firestick44UK. All rights reserved.</div>
+          <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
         </footer>
       </div>
 

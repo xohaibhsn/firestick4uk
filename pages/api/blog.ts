@@ -17,23 +17,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ]);
 
     if (req.method === 'GET') {
-      const [rows] = await connection.query(`
-        SELECT o.*,
-          GROUP_CONCAT(oi.product_name ORDER BY oi.id SEPARATOR ' + ') AS items_list
-        FROM orders o
-        LEFT JOIN order_items oi ON o.order_id = oi.order_id
-        GROUP BY o.order_id
-        ORDER BY o.created_at DESC
-      `);
+      const [rows] = await connection.query(
+        'SELECT * FROM blog_posts WHERE active = 1 ORDER BY created_at DESC'
+      );
       return res.status(200).json(Array.isArray(rows) ? rows : []);
     }
 
-    if (req.method === 'PATCH') {
-      const { order_id, status } = req.body;
-      await connection.query(
-        'UPDATE orders SET status = ? WHERE order_id = ?',
-        [status, order_id]
+    if (req.method === 'POST') {
+      const { title, excerpt, category, emoji, badge, badgeText } = req.body;
+      const [result]: any = await connection.query(
+        'INSERT INTO blog_posts (title, excerpt, category, emoji, badge, badgeText, active) VALUES (?, ?, ?, ?, ?, ?, 1)',
+        [title, excerpt || '', category || 'Guides', emoji || '📝', badge || 'guide', badgeText || 'Guide']
       );
+      return res.status(200).json({ success: true, id: result.insertId });
+    }
+
+    if (req.method === 'PUT') {
+      const { id, title, excerpt, category, emoji, badge, badgeText } = req.body;
+      await connection.query(
+        'UPDATE blog_posts SET title=?, excerpt=?, category=?, emoji=?, badge=?, badgeText=? WHERE id=?',
+        [title, excerpt || '', category || 'Guides', emoji || '📝', badge || 'guide', badgeText || 'Guide', id]
+      );
+      return res.status(200).json({ success: true });
+    }
+
+    if (req.method === 'DELETE') {
+      const { id } = req.query;
+      await connection.query('DELETE FROM blog_posts WHERE id = ?', [id]);
       return res.status(200).json({ success: true });
     }
 

@@ -182,8 +182,9 @@ const demoCustomers = [
   { name:"Emma Wilson", email:"emma@example.com", phone:"+44 7444 444444", orders:1, spent:"£9.99", joined:"May 2026" },
 ];
 
-type Tab = "dashboard"|"orders"|"products"|"customers";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"blog";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
+type BlogPost = { id:number; title:string; excerpt:string; category:string; emoji:string; badge:string; badgeText:string; };
 
 export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -198,6 +199,9 @@ export default function AdminPage() {
   const [orderModal, setOrderModal] = useState<typeof demoOrders[0]|null>(null);
   const [productModal, setProductModal] = useState<typeof demoProducts[0]|null|"new">(null);
   const [editProduct, setEditProduct] = useState({ name:"", category:"", price:"", stock:"", emoji:"📦" });
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [blogModal, setBlogModal] = useState<BlogPost|"new"|null>(null);
+  const [editBlog, setEditBlog] = useState({ title:"", excerpt:"", category:"Guides", emoji:"📝", badge:"guide", badgeText:"Guide" });
 
   useEffect(() => {
     if (localStorage.getItem("adminLoggedIn") === "true") setLoggedIn(true);
@@ -208,6 +212,28 @@ export default function AdminPage() {
     fetch("/api/admin-products")
       .then(r => r.json())
       .then(data => { if (Array.isArray(data) && data.length > 0) setProducts(data); })
+      .catch(() => {});
+    fetch("/api/admin-orders")
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setOrders(data.map((o: any) => ({
+            id: o.order_id,
+            customer: o.customer_name,
+            email: o.customer_email,
+            phone: o.customer_phone,
+            items: o.items_list || o.payment_method || "—",
+            total: `£${parseFloat(o.total || 0).toFixed(2)}`,
+            status: o.status,
+            date: o.created_at ? new Date(o.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—",
+            receipt: !!o.receipt_path,
+          })));
+        }
+      })
+      .catch(() => {});
+    fetch("/api/blog")
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setBlogPosts(data); })
       .catch(() => {});
   }, [loggedIn]);
 
@@ -227,8 +253,35 @@ export default function AdminPage() {
   };
 
   const updateStatus = (id: string, status: OrderStatus) => {
+    fetch("/api/admin-orders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_id: id, status }),
+    }).catch(() => {});
     setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
     setOrderModal(null);
+  };
+
+  const saveBlog = async () => {
+    if (blogModal === "new") {
+      const res = await fetch("/api/blog", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editBlog),
+      }).then(r => r.json()).catch(() => ({}));
+      setBlogPosts([...blogPosts, { ...editBlog, id: res.id || Date.now() }]);
+    } else if (blogModal) {
+      await fetch("/api/blog", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...editBlog, id: blogModal.id }),
+      }).catch(() => {});
+      setBlogPosts(blogPosts.map(p => p.id === (blogModal as BlogPost).id ? { ...p, ...editBlog } : p));
+    }
+    setBlogModal(null);
+  };
+
+  const deleteBlog = (id: number) => {
+    fetch(`/api/blog?id=${id}`, { method: "DELETE" }).catch(() => {});
+    setBlogPosts(blogPosts.filter(p => p.id !== id));
   };
 
   const deleteProduct = (id: number) => {
@@ -367,6 +420,29 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* BLOG MODAL */}
+      {blogModal && (
+        <div className="modal-overlay" onClick={() => setBlogModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">{blogModal === "new" ? "Add Blog Post" : "Edit Blog Post"}</div>
+            <div className="modal-field"><label>Title</label><input placeholder="Post title" value={editBlog.title} onChange={e => setEditBlog({...editBlog,title:e.target.value})} /></div>
+            <div className="modal-field"><label>Excerpt</label><textarea rows={3} placeholder="Short description..." value={editBlog.excerpt} onChange={e => setEditBlog({...editBlog,excerpt:e.target.value})} style={{resize:"vertical"}} /></div>
+            <div className="modal-field">
+              <label>Category</label>
+              <select value={editBlog.category} onChange={e => setEditBlog({...editBlog,category:e.target.value})}>
+                <option>Guides</option><option>Tips</option><option>News</option>
+              </select>
+            </div>
+            <div className="modal-field"><label>Emoji Icon</label><input placeholder="e.g. 📝" value={editBlog.emoji} onChange={e => setEditBlog({...editBlog,emoji:e.target.value})} /></div>
+            <div className="modal-field"><label>Badge Text</label><input placeholder="e.g. Guide" value={editBlog.badgeText} onChange={e => setEditBlog({...editBlog,badgeText:e.target.value,badge:e.target.value.toLowerCase()})} /></div>
+            <div className="modal-actions">
+              <button className="modal-cancel" onClick={() => setBlogModal(null)}>Cancel</button>
+              <button className="modal-save" onClick={saveBlog}>Save Post</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="admin-layout">
         {/* SIDEBAR */}
         <aside className="sidebar">
@@ -380,6 +456,7 @@ export default function AdminPage() {
               { id:"orders", icon:"🛒", label:"Orders", badge: pendingCount > 0 ? String(pendingCount) : null, badgeColor:"orange" },
               { id:"products", icon:"📦", label:"Products" },
               { id:"customers", icon:"👥", label:"Customers" },
+              { id:"blog", icon:"📝", label:"Blog" },
             ] as const).map(item => (
               <button key={item.id} className={`nav-item ${tab===item.id?"active":""}`} onClick={() => setTab(item.id)}>
                 <span className="nav-icon">{item.icon}</span>
@@ -403,6 +480,7 @@ export default function AdminPage() {
               {tab==="orders" && <>Manage <span>Orders</span></>}
               {tab==="products" && <>Manage <span>Products</span></>}
               {tab==="customers" && <>Customer <span>Data</span></>}
+              {tab==="blog" && <>Manage <span>Blog</span></>}
             </h1>
             <div className="top-right">
               <span className="admin-badge">👤 Admin</span>
@@ -525,6 +603,37 @@ export default function AdminPage() {
                         <td>
                           <button className="action-btn btn-edit" onClick={() => openEditProduct(p)}>Edit</button>
                           <button className="action-btn btn-delete" onClick={() => deleteProduct(p.id)}>Delete</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* BLOG */}
+          {tab==="blog" && (
+            <div className="section-card">
+              <div className="section-header">
+                <div className="section-title">Blog Posts ({blogPosts.length})</div>
+                <button className="add-btn" onClick={() => { setEditBlog({title:"",excerpt:"",category:"Guides",emoji:"📝",badge:"guide",badgeText:"Guide"}); setBlogModal("new"); }}>+ Add Post</button>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Icon</th><th>Title</th><th>Category</th><th>Actions</th></tr></thead>
+                  <tbody>
+                    {blogPosts.length === 0 && (
+                      <tr><td colSpan={4} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No blog posts yet. Add your first post above.</td></tr>
+                    )}
+                    {blogPosts.map(p => (
+                      <tr key={p.id}>
+                        <td style={{fontSize:"22px"}}>{p.emoji}</td>
+                        <td style={{fontWeight:600,maxWidth:"280px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title}</td>
+                        <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{p.category}</span></td>
+                        <td>
+                          <button className="action-btn btn-edit" onClick={() => { setEditBlog({title:p.title,excerpt:p.excerpt,category:p.category,emoji:p.emoji,badge:p.badge,badgeText:p.badgeText}); setBlogModal(p); }}>Edit</button>
+                          <button className="action-btn btn-delete" onClick={() => deleteBlog(p.id)}>Delete</button>
                         </td>
                       </tr>
                     ))}

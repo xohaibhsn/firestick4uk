@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -183,9 +183,32 @@ export default function BlogPage() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [allPosts, setAllPosts] = useState(posts);
 
-  const featuredPost = posts.find(p => p.featured);
-  const filteredPosts = posts.filter(p => !p.featured && (activeCategory === "All" || p.category === activeCategory));
+  useEffect(() => {
+    fetch("/api/blog")
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setAllPosts(data.map((p: any) => ({
+            id: p.id,
+            emoji: p.emoji || "📝",
+            badge: p.badge || "guide",
+            badgeText: p.badgeText || "Guide",
+            title: p.title,
+            excerpt: p.excerpt,
+            date: p.created_at ? new Date(p.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}) : "",
+            readTime: "3 min read",
+            category: p.category || "Guides",
+            featured: false,
+          })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const featuredPost = allPosts.find(p => p.featured);
+  const filteredPosts = allPosts.filter(p => !p.featured && (activeCategory === "All" || p.category === activeCategory));
 
   return (
     <>
@@ -286,7 +309,7 @@ export default function BlogPage() {
             <li><a href="/refund-policy">Refund Policy</a></li>
             <li><a href="/faq">FAQ</a></li>
           </ul>
-          <div className="footer-copy">© 2026 Firestick44UK. All rights reserved.</div>
+          <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
         </footer>
       </div>
 
