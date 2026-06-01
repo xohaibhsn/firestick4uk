@@ -1,0 +1,122 @@
+"use client";
+import { useEffect, useState } from "react";
+import ERPLayout from "../ERPLayout";
+
+export default function ERPExpenses() {
+  return <ERPLayout title="Expenses" active="expenses">{(user) => <ExpContent user={user} />}</ERPLayout>;
+}
+
+function ExpContent({ user }: { user: any }) {
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ amount:"", description:"", category:"Travel", receipt_path:"" });
+  const [noteModal, setNoteModal] = useState<any>(null);
+  const [note, setNote] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const load = () => {
+    const url = user.role==="admin" ? "/api/erp/expenses" : `/api/erp/expenses?employee_id=${user.id}`;
+    fetch(url).then(r=>r.json()).then(d=>setExpenses(Array.isArray(d)?d:[])).catch(()=>{});
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const uploadReceipt = async (file: File) => {
+    setUploading(true);
+    try {
+      const base64 = await new Promise<string>((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result as string); r.onerror=rej; r.readAsDataURL(file); });
+      const data = await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file:base64,name:file.name})}).then(r=>r.json());
+      if (data.path) setForm(f=>({...f,receipt_path:data.path}));
+    } catch {}
+    setUploading(false);
+  };
+
+  const submit = async () => {
+    if (!form.amount) { setMsg("❌ Amount is required"); return; }
+    const res = await fetch("/api/erp/expenses",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,employee_id:user.id})}).then(r=>r.json()).catch(()=>({}));
+    if (res.success) { setMsg("✅ Expense submitted"); setForm({amount:"",description:"",category:"Travel",receipt_path:""}); setShowForm(false); load(); }
+    else setMsg(`❌ ${res.error}`);
+  };
+
+  const decide = async (id:number, status:string) => {
+    await fetch("/api/erp/expenses",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status,admin_note:note,approved_by:user.id})});
+    setNoteModal(null); setNote(""); load();
+  };
+
+  const statusColor: any = {pending:"badge-orange",approved:"badge-green",rejected:"badge-red"};
+  const cats = ["Travel","Meals","Equipment","Software","Office","Marketing","Other"];
+
+  return (
+    <div>
+      <div style={{marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+        <div>{expenses.filter(e=>e.status==="pending").length > 0 && <span className="badge badge-orange" style={{fontSize:12}}>{expenses.filter(e=>e.status==="pending").length} Pending</span>}</div>
+        {user.role!=="admin" && <button className="erp-btn erp-btn-primary" onClick={()=>setShowForm(!showForm)}>+ Submit Expense</button>}
+      </div>
+
+      {msg && <div style={{marginBottom:16,padding:"10px 16px",background:msg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${msg.startsWith("✅")?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,borderRadius:10,fontSize:13,color:msg.startsWith("✅")?"#00c864":"#ff6666"}}>{msg}</div>}
+
+      {showForm && (
+        <div className="erp-card" style={{marginBottom:20}}>
+          <div style={{fontWeight:700,marginBottom:16,fontSize:15}}>New Expense Claim</div>
+          <div className="erp-grid-2">
+            <div className="erp-field"><label>Amount (£) *</label><input type="number" step="0.01" className="erp-input" placeholder="0.00" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} /></div>
+            <div className="erp-field"><label>Category</label><select className="erp-select" value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>{cats.map(c=><option key={c}>{c}</option>)}</select></div>
+          </div>
+          <div className="erp-field"><label>Description</label><textarea className="erp-textarea" rows={2} placeholder="What was this expense for?" value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} /></div>
+          <div className="erp-field">
+            <label>Receipt</label>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              {form.receipt_path && <span style={{fontSize:12,color:"#00c864"}}>✅ Uploaded</span>}
+              <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",padding:"7px 14px",borderRadius:8,fontSize:12,color:"var(--pg)"}}>
+                {uploading?"Uploading...":"Upload Receipt"}
+                <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&uploadReceipt(e.target.files[0])} disabled={uploading} />
+              </label>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:10,marginTop:4}}>
+            <button className="erp-btn erp-btn-primary" onClick={submit}>Submit Claim</button>
+            <button className="erp-btn erp-btn-outline" onClick={()=>setShowForm(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <div className="erp-card">
+        <div className="erp-section-header"><div className="erp-section-title">Expense Claims</div></div>
+        <div className="erp-table-wrap">
+          <table>
+            <thead><tr><th>Date</th>{user.role==="admin"&&<th>Employee</th>}<th>Amount</th><th>Category</th><th>Description</th><th>Receipt</th><th>Status</th>{user.role==="admin"&&<th>Actions</th>}</tr></thead>
+            <tbody>
+              {expenses.length===0 && <tr><td colSpan={8} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No expenses found</td></tr>}
+              {expenses.map((e:any)=>(
+                <tr key={e.id}>
+                  <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{new Date(e.created_at).toLocaleDateString("en-GB")}</td>
+                  {user.role==="admin"&&<td style={{fontWeight:600}}>{e.employee_name}</td>}
+                  <td style={{fontWeight:700,color:"var(--pg)"}}>£{Number(e.amount).toFixed(2)}</td>
+                  <td><span className="badge badge-purple">{e.category}</span></td>
+                  <td style={{maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.description||"—"}</td>
+                  <td>{e.receipt_path ? <a href={e.receipt_path} target="_blank" rel="noreferrer" style={{color:"var(--pg)",fontSize:12}}>View</a> : <span style={{color:"rgba(255,255,255,0.25)",fontSize:12}}>None</span>}</td>
+                  <td><span className={`badge ${statusColor[e.status]}`}>{e.status}</span></td>
+                  {user.role==="admin"&&<td>{e.status==="pending"&&<div style={{display:"flex",gap:6}}><button className="erp-btn erp-btn-green erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"approved"});setNote("");}}>Approve</button><button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"rejected"});setNote("");}}>Reject</button></div>}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {noteModal && (
+        <div className="erp-modal-overlay" onClick={()=>setNoteModal(null)}>
+          <div className="erp-modal" onClick={e=>e.stopPropagation()}>
+            <div className="erp-modal-title">{noteModal.action==="approved"?"✅ Approve Expense":"❌ Reject Expense"}</div>
+            <div className="erp-field"><label>Note (optional)</label><textarea className="erp-textarea" placeholder="Add a note for the employee..." value={note} onChange={e=>setNote(e.target.value)} /></div>
+            <div className="erp-modal-actions">
+              <button className="erp-btn erp-btn-outline" onClick={()=>setNoteModal(null)}>Cancel</button>
+              <button className={`erp-btn ${noteModal.action==="approved"?"erp-btn-green":"erp-btn-red"}`} onClick={()=>decide(noteModal.id,noteModal.action)}>{noteModal.action==="approved"?"Approve & Credit Ledger":"Reject"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
