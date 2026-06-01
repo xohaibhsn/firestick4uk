@@ -163,9 +163,24 @@ export default function ContactPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
 
-  const handleSubmit = () => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
     if (!form.name || !form.email || !form.message) return;
-    setSubmitted(true);
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (data.success || res.ok) setSubmitted(true);
+      else alert('Failed to send message. Please try WhatsApp instead.');
+    } catch {
+      alert('Failed to send message. Please try WhatsApp instead.');
+    }
+    setSubmitting(false);
   };
 
   return (
@@ -208,7 +223,7 @@ export default function ContactPage() {
           <a href="https://wa.me/447934519060" className="contact-card" target="_blank" rel="noopener noreferrer">
             <span className="contact-card-icon">💬</span>
             <div className="contact-card-title">WhatsApp</div>
-            <div className="contact-card-value">+44 7000 000000</div>
+            <div className="contact-card-value">+44 7934 519060</div>
             <div className="contact-card-sub">Fastest response</div>
           </a>
           <a href="mailto:support@firestick44uk.com" className="contact-card">
@@ -276,8 +291,8 @@ export default function ContactPage() {
                   <textarea placeholder="How can we help you?" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} />
                 </div>
                 <button className="submit-btn" onClick={handleSubmit}
-                  disabled={!form.name || !form.email || !form.message}>
-                  Send Message →
+                  disabled={submitting || !form.name || !form.email || !form.message}>
+                  {submitting ? 'Sending...' : 'Send Message →'}
                 </button>
               </>
             )}

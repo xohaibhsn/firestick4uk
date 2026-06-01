@@ -155,7 +155,7 @@ export default function ProductsPage() {
             <div className="loading">No products found.</div>
           ) : (
             filtered.map((p) => (
-              <div className="product-card" key={p.id}>
+              <div className="product-card" key={p.id} onClick={() => window.location.href=`/products/${p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`} style={{cursor:"pointer"}}>
                 <div className="product-image">
                   {p.badge && (
                     <span className={`badge ${p.badge==="BEST VALUE"?"gold":p.badge==="NEW"?"new":p.badge==="BUNDLE"?"bundle":""}`}>
@@ -163,7 +163,7 @@ export default function ProductsPage() {
                     </span>
                   )}
                   {p.image ? (
-                    <img src={p.image} alt={p.name} />
+                    <img src={p.image} alt={p.name} loading="lazy" />
                   ) : (
                     <div className="image-placeholder">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
@@ -181,7 +181,7 @@ export default function ProductsPage() {
                     <div className="product-price">£{Number(p.price).toFixed(2)}</div>
                     <button
                       className={`add-btn ${added===p.id?"added":""}`}
-                      onClick={()=>handleAddToCart(p)}
+                      onClick={e=>{e.stopPropagation();handleAddToCart(p);}}
                     >
                       {added===p.id?"✓ Added!":"Add to Cart"}
                     </button>

@@ -23,10 +23,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     connection = await connectWithTimeout;
 
-    const [rows] = await connection.query(
-      'SELECT * FROM products WHERE active = 1 ORDER BY id ASC'
-    );
+    const { slug, id } = req.query;
 
+    if (id) {
+      const [rows]: any = await connection.query('SELECT * FROM products WHERE id = ? AND active = 1', [id]);
+      return res.status(200).json(rows[0] || null);
+    }
+
+    if (slug) {
+      const [rows]: any = await connection.query(
+        "SELECT * FROM products WHERE active = 1 AND LOWER(REPLACE(REPLACE(name, ' ', '-'), '/', '')) = ?",
+        [String(slug).toLowerCase()]
+      );
+      return res.status(200).json(rows[0] || null);
+    }
+
+    const [rows] = await connection.query('SELECT * FROM products WHERE active = 1 ORDER BY id ASC');
     return res.status(200).json(Array.isArray(rows) ? rows : []);
   } catch (error: any) {
     console.error('DB Error:', error.message);

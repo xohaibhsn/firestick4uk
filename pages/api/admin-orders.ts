@@ -17,6 +17,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ]);
 
     if (req.method === 'GET') {
+      if (req.query.customers === '1') {
+        const [rows] = await connection.query(`
+          SELECT customer_name, customer_email, customer_phone,
+            COUNT(*) AS order_count,
+            SUM(total) AS total_spent,
+            MIN(created_at) AS first_order
+          FROM orders
+          GROUP BY customer_email, customer_name, customer_phone
+          ORDER BY first_order DESC
+        `);
+        return res.status(200).json(Array.isArray(rows) ? rows : []);
+      }
       const [rows] = await connection.query(`
         SELECT o.*,
           GROUP_CONCAT(oi.product_name ORDER BY oi.id SEPARATOR ' + ') AS items_list

@@ -200,6 +200,7 @@ export default function AdminPage() {
   const [productModal, setProductModal] = useState<typeof demoProducts[0]|null|"new">(null);
   const [editProduct, setEditProduct] = useState({ name:"", category:"", price:"", stock:"", emoji:"📦", image:"" });
   const [imageUploading, setImageUploading] = useState(false);
+  const [customers, setCustomers] = useState(demoCustomers);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [blogModal, setBlogModal] = useState<BlogPost|"new"|null>(null);
   const [editBlog, setEditBlog] = useState({ title:"", excerpt:"", category:"Guides", emoji:"📝", badge:"guide", badgeText:"Guide" });
@@ -228,6 +229,9 @@ export default function AdminPage() {
             status: o.status,
             date: o.created_at ? new Date(o.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—",
             receipt: !!o.receipt_path,
+            receipt_path: o.receipt_path || "",
+            address: [o.delivery_address, o.city, o.postcode].filter(Boolean).join(", "),
+            payment: o.payment_method || "",
           })));
         }
       })
@@ -236,15 +240,39 @@ export default function AdminPage() {
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setBlogPosts(data); })
       .catch(() => {});
+    fetch("/api/admin-orders?customers=1")
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setCustomers(data.map((c: any) => ({
+            name: c.customer_name || "",
+            email: c.customer_email || "",
+            phone: c.customer_phone || "",
+            orders: Number(c.order_count) || 0,
+            spent: `£${parseFloat(c.total_spent || 0).toFixed(2)}`,
+            joined: c.first_order ? new Date(c.first_order).toLocaleDateString("en-GB",{month:"short",year:"numeric"}) : "—",
+          })));
+        }
+      })
+      .catch(() => {});
   }, [loggedIn]);
 
-  const handleLogin = () => {
-    if (username === "admin" && password === "admin123") {
-      localStorage.setItem("adminLoggedIn", "true");
-      setLoggedIn(true);
-      setLoginError("");
-    } else {
-      setLoginError("❌ Incorrect username or password");
+  const handleLogin = async () => {
+    try {
+      const res = await fetch("/api/admin-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      }).then(r => r.json());
+      if (res.success) {
+        localStorage.setItem("adminLoggedIn", "true");
+        setLoggedIn(true);
+        setLoginError("");
+      } else {
+        setLoginError("❌ Incorrect username or password");
+      }
+    } catch {
+      setLoginError("❌ Login failed. Please try again.");
     }
   };
 
@@ -380,8 +408,11 @@ export default function AdminPage() {
         <div className="modal-overlay" onClick={() => setReceiptModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">Payment Receipt — {receiptModal}</div>
-            <div className="receipt-preview">🧾<br /><span style={{fontSize:"14px",color:"rgba(255,255,255,0.4)"}}>Receipt image would appear here</span></div>
-            <p style={{fontSize:"13px",color:"rgba(255,255,255,0.45)",marginBottom:"16px"}}>In the live system, the customer&apos;s uploaded receipt image will display here for verification.</p>
+            {(() => { const o = orders.find(x => x.id === receiptModal); const path = (o as any)?.receipt_path; return path ? (
+              <img src={path} alt="Receipt" style={{width:"100%",borderRadius:12,marginBottom:16,border:"1px solid rgba(139,0,255,0.3)"}} />
+            ) : (
+              <div className="receipt-preview">🧾<br /><span style={{fontSize:"14px",color:"rgba(255,255,255,0.4)"}}>No receipt image uploaded</span></div>
+            ); })()}
             <div className="modal-actions">
               <button className="modal-cancel" onClick={() => setReceiptModal(null)}>Close</button>
               <button className="modal-save" onClick={() => { updateStatus(receiptModal,"confirmed"); setReceiptModal(null); }}>✅ Verify & Confirm</button>
@@ -399,6 +430,8 @@ export default function AdminPage() {
             <div className="modal-field"><label>Email</label><input readOnly value={orderModal.email} /></div>
             <div className="modal-field"><label>Phone / WhatsApp</label><input readOnly value={orderModal.phone} /></div>
             <div className="modal-field"><label>Items</label><input readOnly value={orderModal.items} /></div>
+            <div className="modal-field"><label>Delivery Address</label><input readOnly value={(orderModal as any).address || "—"} /></div>
+            <div className="modal-field"><label>Payment Method</label><input readOnly value={(orderModal as any).payment || "—"} /></div>
             <div className="modal-field"><label>Total</label><input readOnly value={orderModal.total} /></div>
             <div className="modal-field">
               <label>Update Status</label>
@@ -681,13 +714,13 @@ export default function AdminPage() {
           {tab==="customers" && (
             <div className="section-card">
               <div className="section-header">
-                <div className="section-title">Customers ({demoCustomers.length})</div>
+                <div className="section-title">Customers ({customers.length})</div>
               </div>
               <div className="table-wrap">
                 <table>
                   <thead><tr><th></th><th>Name</th><th>Email</th><th>Phone / WhatsApp</th><th>Orders</th><th>Total Spent</th><th>Joined</th><th>Actions</th></tr></thead>
                   <tbody>
-                    {demoCustomers.map((c,i) => (
+                    {customers.map((c,i) => (
                       <tr key={i}>
                         <td><div className="customer-avatar">{c.name[0]}</div></td>
                         <td style={{fontWeight:600}}>{c.name}</td>
