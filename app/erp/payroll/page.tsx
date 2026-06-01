@@ -7,7 +7,7 @@ export default function ERPPayroll() {
 }
 
 function PayrollContent({ user, currency }: { user: any; currency: string }) {
-  const fmt = (n: number) => currency==="PKR" ? `PKR ${Math.round(n).toLocaleString()}` : `£${Number(n).toFixed(2)}`;
+  const fmt = (n: number) => `Rs. ${Math.round(n).toLocaleString()}`;
   const [payroll, setPayroll] = useState<any[]>([]);
   const [month, setMonth] = useState(new Date().toISOString().slice(0,7));
   const [loading, setLoading] = useState(false);
@@ -15,7 +15,10 @@ function PayrollContent({ user, currency }: { user: any; currency: string }) {
 
   const load = () => {
     setLoading(true);
-    fetch(`/api/erp/payroll?month=${month}`).then(r=>r.json()).then(d=>{ setPayroll(Array.isArray(d)?d:[]); setLoading(false); }).catch(()=>setLoading(false));
+    const url = user.role==="manager"
+      ? `/api/erp/payroll?month=${month}&employee_id=${user.id}`
+      : `/api/erp/payroll?month=${month}`;
+    fetch(url).then(r=>r.json()).then(d=>{ setPayroll(Array.isArray(d)?d:[]); setLoading(false); }).catch(()=>setLoading(false));
   };
   useEffect(()=>{ load(); },[]);
 

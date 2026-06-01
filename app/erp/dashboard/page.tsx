@@ -11,7 +11,7 @@ export default function ERPDashboard() {
 }
 
 function DashboardContent({ user, currency }: { user: any; currency: string }) {
-  const fmt = (n: number) => currency==="PKR" ? `PKR ${Math.round(n).toLocaleString()}` : `£${Number(n).toFixed(2)}`;
+  const fmt = (n: number) => `Rs. ${Math.round(n).toLocaleString()}`;
   const [stats, setStats] = useState({ employees:0, pendingExpenses:0, pendingLeaves:0, todayAttendance:0 });
   const [todayStatus, setTodayStatus] = useState<any>(null);
   const [myExpenses, setMyExpenses] = useState<any[]>([]);

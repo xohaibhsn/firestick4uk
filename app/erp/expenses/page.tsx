@@ -7,7 +7,7 @@ export default function ERPExpenses() {
 }
 
 function ExpContent({ user, currency }: { user: any; currency: string }) {
-  const fmt = (n: number) => currency==="PKR" ? `PKR ${Math.round(n).toLocaleString()}` : `£${Number(n).toFixed(2)}`;
+  const fmt = (n: number) => `Rs. ${Math.round(n).toLocaleString()}`;
   const [expenses, setExpenses] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);

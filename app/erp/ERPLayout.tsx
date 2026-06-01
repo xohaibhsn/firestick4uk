@@ -92,27 +92,49 @@ export const erpStyles = `
 interface ERPUser { id: number; name: string; email: string; role: string; }
 type ERPLayoutProps = { children: (user: ERPUser, currency: string) => React.ReactNode; title: string; active?: string; };
 
-const navItems = [
+const employeeNav = [
+  { href:"/erp/dashboard", icon:"📊", label:"Dashboard", key:"dashboard" },
+  { href:"/erp/attendance", icon:"⏰", label:"Attendance", key:"attendance" },
+  { href:"/erp/expenses", icon:"💸", label:"My Expenses", key:"expenses" },
+  { href:"/erp/leaves", icon:"🌿", label:"My Leaves", key:"leaves" },
+  { href:"/erp/my-payroll", icon:"💰", label:"My Payroll", key:"my-payroll" },
+  { href:"/erp/my-ledger", icon:"📒", label:"My Ledger", key:"my-ledger" },
+];
+
+const managerNav = [
+  { href:"/erp/dashboard", icon:"📊", label:"Dashboard", key:"dashboard" },
+  { href:"/erp/attendance", icon:"⏰", label:"Attendance", key:"attendance" },
+  { href:"/erp/expenses", icon:"💸", label:"My Expenses", key:"expenses" },
+  { href:"/erp/leaves", icon:"🌿", label:"My Leaves", key:"leaves" },
+  { href:"/erp/my-payroll", icon:"💰", label:"My Payroll", key:"my-payroll" },
+  { href:"/erp/my-ledger", icon:"📒", label:"My Ledger", key:"my-ledger" },
+  { href:"/erp/approvals", icon:"✅", label:"Approvals", key:"approvals" },
+];
+
+const adminNav = [
   { href:"/erp/dashboard", icon:"📊", label:"Dashboard", key:"dashboard" },
   { href:"/erp/attendance", icon:"⏰", label:"Attendance", key:"attendance" },
   { href:"/erp/expenses", icon:"💸", label:"Expenses", key:"expenses" },
   { href:"/erp/leaves", icon:"🌿", label:"Leaves", key:"leaves" },
-];
-const adminItems = [
-  { href:"/erp/employees", icon:"👥", label:"Employees", key:"employees", roles:["admin"] },
-  { href:"/erp/ledger", icon:"📒", label:"Ledger", key:"ledger", roles:["admin"] },
-  { href:"/erp/payroll", icon:"💰", label:"Payroll", key:"payroll", roles:["admin","manager"] },
+  { href:"/erp/employees", icon:"👥", label:"Employees", key:"employees" },
+  { href:"/erp/ledger", icon:"📒", label:"Ledger", key:"ledger" },
+  { href:"/erp/payroll", icon:"💰", label:"Payroll", key:"payroll" },
+  { href:"/erp/audit", icon:"🔍", label:"Audit Log", key:"audit" },
 ];
 
 const routeRoles: Record<string, string[]> = {
   "/erp/ledger": ["admin"],
   "/erp/employees": ["admin"],
-  "/erp/payroll": ["admin","manager"],
+  "/erp/payroll": ["admin"],
+  "/erp/approvals": ["admin","manager"],
+  "/erp/my-payroll": ["admin","manager","employee"],
+  "/erp/my-ledger": ["admin","manager","employee"],
+  "/erp/audit": ["admin"],
 };
 
 export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
   const [user, setUser] = useState<ERPUser | null>(null);
-  const [currency, setCurrency] = useState("PKR");
+  const currency = "PKR";
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -128,18 +150,12 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
       }
       setUser(u);
     } catch { window.location.href = "/erp"; }
-    setCurrency(localStorage.getItem("erp_currency") || "PKR");
   }, []);
 
   if (!user) return <><style>{erpStyles}</style><div style={{minHeight:"100vh",background:"#0a0010"}} /></>;
 
   const logout = () => { localStorage.removeItem("erp_session"); window.location.href = "/erp"; };
 
-  const toggleCurrency = () => {
-    const next = currency === "PKR" ? "GBP" : "PKR";
-    setCurrency(next);
-    localStorage.setItem("erp_currency", next);
-  };
 
   return (
     <>
@@ -152,22 +168,11 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
             <div className="erp-logo-sub">ERP System</div>
           </div>
           <nav className="erp-nav">
-            <div className="erp-nav-section">Main</div>
-            {navItems.map(item => (
+            {(user.role==="admin" ? adminNav : user.role==="manager" ? managerNav : employeeNav).map(item => (
               <a key={item.key} href={item.href} className={`erp-nav-item ${active===item.key?"active":""}`} onClick={() => setSidebarOpen(false)}>
                 <span className="erp-nav-icon">{item.icon}</span>{item.label}
               </a>
             ))}
-            {(user.role === "admin" || user.role === "manager") && (
-              <>
-                <div className="erp-nav-section">Management</div>
-                {adminItems.filter(item=>item.roles.includes(user.role)).map(item => (
-                  <a key={item.key} href={item.href} className={`erp-nav-item ${active===item.key?"active":""}`} onClick={() => setSidebarOpen(false)}>
-                    <span className="erp-nav-icon">{item.icon}</span>{item.label}
-                  </a>
-                ))}
-              </>
-            )}
           </nav>
           <div className="erp-footer">
             <div className="erp-user-card">
@@ -186,9 +191,7 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
               <h1 className="erp-page-title">{title}</h1>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:14}}>
-              <button onClick={toggleCurrency} style={{background:currency==="PKR"?"rgba(0,200,100,0.12)":"rgba(68,136,255,0.12)",border:`1px solid ${currency==="PKR"?"rgba(0,200,100,0.3)":"rgba(68,136,255,0.3)"}`,color:currency==="PKR"?"#00c864":"#6699ff",padding:"5px 14px",borderRadius:20,cursor:"pointer",fontSize:13,fontWeight:700,transition:"all 0.2s"}} title="Switch currency">
-                {currency==="PKR"?"₨ PKR":"£ GBP"}
-              </button>
+              <span style={{fontSize:"12px",color:"rgba(255,255,255,0.3)",background:"rgba(0,200,100,0.1)",border:"1px solid rgba(0,200,100,0.2)",padding:"4px 10px",borderRadius:16}}>₨ PKR</span>
               <span style={{fontSize:"13px",color:"rgba(255,255,255,0.35)"}}>👤 {user.name}</span>
             </div>
           </div>

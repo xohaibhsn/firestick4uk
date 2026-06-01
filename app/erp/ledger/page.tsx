@@ -7,7 +7,7 @@ export default function ERPLedger() {
 }
 
 function LedgerContent({ user, currency }: { user: any; currency: string }) {
-  const fmt = (n: number) => currency==="PKR" ? `PKR ${Math.round(n).toLocaleString()}` : `£${Number(n).toFixed(2)}`;
+  const fmt = (n: number) => `Rs. ${Math.round(n).toLocaleString()}`;
   const [accounts, setAccounts] = useState<any[]>([]);
   const [filterType, setFilterType] = useState("");
   const [selected, setSelected] = useState<any>(null);

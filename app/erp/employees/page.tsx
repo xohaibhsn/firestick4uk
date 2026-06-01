@@ -7,7 +7,7 @@ export default function ERPEmployees() {
 }
 
 function EmpContent({ user, currency }: { user: any; currency: string }) {
-  const fmt = (n: number) => currency==="PKR" ? `PKR ${Math.round(n).toLocaleString()}` : `£${Number(n).toFixed(2)}`;
+  const fmt = (n: number) => `Rs. ${Math.round(n).toLocaleString()}`;
   const [employees, setEmployees] = useState<any[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
@@ -102,7 +102,7 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
             </div>
             <div className="erp-grid-2">
               <div className="erp-field"><label>Department</label><select className="erp-select" value={form.department} onChange={e=>setForm(f=>({...f,department:e.target.value}))}>{depts.map(d=><option key={d} value={d}>{d||"— Select —"}</option>)}</select></div>
-              <div className="erp-field"><label>Monthly Salary (£)</label><input className="erp-input" type="number" value={form.salary} onChange={e=>setForm(f=>({...f,salary:e.target.value}))} placeholder="0.00" /></div>
+              <div className="erp-field"><label>Monthly Salary (Rs.)</label><input className="erp-input" type="number" value={form.salary} onChange={e=>setForm(f=>({...f,salary:e.target.value}))} placeholder="0.00" /></div>
             </div>
             <div className="erp-grid-2">
               <div className="erp-field"><label>Joining Date</label><input className="erp-input" type="date" value={form.joining_date} onChange={e=>setForm(f=>({...f,joining_date:e.target.value}))} /></div>

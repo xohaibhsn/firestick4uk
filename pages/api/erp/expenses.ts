@@ -37,19 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { employee_id, amount, description, category, receipt_path } = req.body;
       if (!employee_id || !amount) return res.status(400).json({ error: 'Missing required fields' });
 
-      // Monthly limit check
       const monthYear = new Date().toISOString().slice(0,7);
-      const [userRows]: any = await conn.query('SELECT monthly_expense_limit FROM erp_users WHERE id=?', [employee_id]);
-      const limit = Number(userRows[0]?.monthly_expense_limit || 500);
-      const [monthTotal]: any = await conn.query(
-        'SELECT COALESCE(SUM(amount),0) as total FROM erp_expenses WHERE employee_id=? AND month_year=? AND status != "rejected"',
-        [employee_id, monthYear]
-      );
-      const usedThisMonth = Number(monthTotal[0]?.total || 0);
-      if (usedThisMonth + Number(amount) > limit) {
-        return res.status(400).json({ error: `Monthly expense limit exceeded. Used: £${usedThisMonth.toFixed(2)} / £${limit.toFixed(2)}` });
-      }
-
       const [result]: any = await conn.query(
         'INSERT INTO erp_expenses (employee_id,amount,description,category,receipt_path,month_year) VALUES (?,?,?,?,?,?)',
         [employee_id, amount, description||'', category||'Other', receipt_path||'', monthYear]

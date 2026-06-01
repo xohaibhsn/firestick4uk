@@ -15,8 +15,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'GET') {
       const month = String(req.query.month || new Date().toISOString().slice(0,7));
+      const { employee_id } = req.query;
 
-      const [employees]: any = await conn.query('SELECT id,name,department,salary FROM erp_users WHERE active=1 AND role != "admin" ORDER BY name');
+      const empQuery = employee_id
+        ? 'SELECT id,name,department,salary,role FROM erp_users WHERE active=1 AND id=?'
+        : 'SELECT id,name,department,salary,role FROM erp_users WHERE active=1 ORDER BY name';
+      const empParams = employee_id ? [employee_id] : [];
+      const [employees]: any = await conn.query(empQuery, empParams);
 
       const payroll = await Promise.all(employees.map(async (emp: any) => {
         const [expRows]: any = await conn.query(
