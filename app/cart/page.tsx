@@ -205,7 +205,7 @@ export default function CartPage() {
         <style>{navStyles}</style>
         <div className="bg-fixed" />
         <nav>
-          <a href="/" className="nav-logo">FIRESTICK44UK</a>
+          <a href="/" className="nav-logo">FIRESTICK4UK</a>
           <ul className="nav-links">
             <li><a href="/">Home</a></li>
             <li><a href="/order-tracking">Track Order</a></li>

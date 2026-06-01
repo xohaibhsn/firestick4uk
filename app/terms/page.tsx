@@ -68,7 +68,7 @@ export default function TermsPage() {
       <style>{styles}</style>
       <div className="bg-fixed" />
       <nav>
-        <a href="/" className="nav-logo">FIRESTICK44UK</a>
+        <a href="/" className="nav-logo">FIRESTICK4UK</a>
         <ul className={`nav-links ${menuOpen ? "open" : ""}`}>
           <li><a href="/" onClick={() => setMenuOpen(false)}>Home</a></li>
           <li><a href="/products" onClick={() => setMenuOpen(false)}>Products</a></li>
