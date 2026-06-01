@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -199,8 +199,21 @@ export default function AdminPage() {
   const [productModal, setProductModal] = useState<typeof demoProducts[0]|null|"new">(null);
   const [editProduct, setEditProduct] = useState({ name:"", category:"", price:"", stock:"", emoji:"📦" });
 
+  useEffect(() => {
+    if (localStorage.getItem("adminLoggedIn") === "true") setLoggedIn(true);
+  }, []);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    fetch("/api/admin-products")
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data) && data.length > 0) setProducts(data); })
+      .catch(() => {});
+  }, [loggedIn]);
+
   const handleLogin = () => {
     if (username === "admin" && password === "admin123") {
+      localStorage.setItem("adminLoggedIn", "true");
       setLoggedIn(true);
       setLoginError("");
     } else {
@@ -208,17 +221,45 @@ export default function AdminPage() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("adminLoggedIn");
+    setLoggedIn(false);
+  };
+
   const updateStatus = (id: string, status: OrderStatus) => {
     setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
     setOrderModal(null);
   };
 
-  const deleteProduct = (id: number) => setProducts(products.filter(p => p.id !== id));
+  const deleteProduct = (id: number) => {
+    fetch(`/api/admin-products?id=${id}`, { method: "DELETE" }).catch(() => {});
+    setProducts(products.filter(p => p.id !== id));
+  };
 
-  const saveProduct = () => {
+  const saveProduct = async () => {
+    const payload = {
+      name: editProduct.name,
+      description: "",
+      price: editProduct.price,
+      category: editProduct.category,
+      badge: editProduct.emoji || null,
+      image: null,
+      stock: editProduct.stock || "Digital",
+    };
     if (productModal === "new") {
-      setProducts([...products, { ...editProduct, id: Date.now() }]);
+      const res = await fetch("/api/admin-products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).then(r => r.json()).catch(() => ({}));
+      const newId = res.id || Date.now();
+      setProducts([...products, { ...editProduct, id: newId }]);
     } else if (productModal) {
+      await fetch("/api/admin-products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, id: productModal.id, active: 1 }),
+      }).catch(() => {});
       setProducts(products.map(p => p.id === productModal.id ? { ...p, ...editProduct } : p));
     }
     setProductModal(null);
@@ -349,7 +390,7 @@ export default function AdminPage() {
             ))}
           </nav>
           <div className="sidebar-footer">
-            <button className="logout-btn" onClick={() => setLoggedIn(false)}>
+            <button className="logout-btn" onClick={handleLogout}>
               <span>🚪</span> Logout
             </button>
           </div>
