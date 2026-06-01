@@ -124,7 +124,17 @@ function ExpContent({ user, currency }: { user: any; currency: string }) {
                   <td>{e.receipt_path ? <a href={e.receipt_path} target="_blank" rel="noreferrer" style={{color:"var(--pg)",fontSize:12}}>📎 View</a> : <span style={{color:"rgba(255,255,255,0.2)",fontSize:12}}>—</span>}</td>
                   <td><span className={`badge ${statusColor[e.status]}`}>{e.status}</span></td>
                   <td style={{fontSize:11,color:"rgba(255,255,255,0.4)",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.admin_note||"—"}</td>
-                  {(user.role==="admin"||user.role==="manager")&&<td>{e.status==="pending"&&<div style={{display:"flex",gap:6}}><button className="erp-btn erp-btn-green erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"approved"});setNote("");}}>Approve</button><button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"rejected"});setNote("");}}>Reject</button></div>}</td>}
+                  {(user.role==="admin"||user.role==="manager")&&<td>
+                    {e.status==="pending"&&<div style={{display:"flex",gap:6}}>
+                      <button className="erp-btn erp-btn-green erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"approved"});setNote("");}}>Approve</button>
+                      <button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"rejected",requireNote:false});setNote("");}}>Reject</button>
+                    </div>}
+                    {user.role==="admin"&&e.status==="approved"&&(
+                      <button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"rejected",requireNote:true,label:"Admin Override Reject"});setNote("");}}>
+                        🔄 Override Reject
+                      </button>
+                    )}
+                  </td>}
                 </tr>
               ))}
             </tbody>
@@ -135,11 +145,21 @@ function ExpContent({ user, currency }: { user: any; currency: string }) {
       {noteModal&&(
         <div className="erp-modal-overlay" onClick={()=>setNoteModal(null)}>
           <div className="erp-modal" onClick={e=>e.stopPropagation()}>
-            <div className="erp-modal-title">{noteModal.action==="approved"?"✅ Approve Expense":"❌ Reject Expense"}</div>
-            <div className="erp-field"><label>Note for employee (optional)</label><textarea className="erp-textarea" placeholder="Add a note..." value={note} onChange={e=>setNote(e.target.value)} /></div>
+            <div className="erp-modal-title">{noteModal.label||(noteModal.action==="approved"?"✅ Approve Expense":"❌ Reject Expense")}</div>
+            {noteModal.requireNote&&<div style={{marginBottom:12,padding:"8px 12px",background:"rgba(255,68,68,0.08)",border:"1px solid rgba(255,68,68,0.25)",borderRadius:8,fontSize:12,color:"#ff8888"}}>⚠️ Admin override: reason is mandatory</div>}
+            <div className="erp-field">
+              <label>Reason / Note {noteModal.requireNote?"*":"(optional)"}</label>
+              <textarea className="erp-textarea" placeholder={noteModal.requireNote?"Reason for rejecting approved expense (mandatory)...":"Add a note..."} value={note} onChange={e=>setNote(e.target.value)} />
+            </div>
             <div className="erp-modal-actions">
               <button className="erp-btn erp-btn-outline" onClick={()=>setNoteModal(null)}>Cancel</button>
-              <button className={`erp-btn ${noteModal.action==="approved"?"erp-btn-green":"erp-btn-red"}`} onClick={()=>decide(noteModal.id,noteModal.action)}>{noteModal.action==="approved"?"✅ Approve & Credit Ledger":"❌ Reject"}</button>
+              <button
+                className={`erp-btn ${noteModal.action==="approved"?"erp-btn-green":"erp-btn-red"}`}
+                disabled={noteModal.requireNote&&!note.trim()}
+                onClick={()=>{ if(noteModal.requireNote&&!note.trim()) return; decide(noteModal.id,noteModal.action); }}
+              >
+                {noteModal.action==="approved"?"✅ Approve & Credit Ledger":"❌ Reject"}
+              </button>
             </div>
           </div>
         </div>

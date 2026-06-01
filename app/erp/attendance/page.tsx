@@ -73,7 +73,20 @@ function AttContent({ user, currency: _c }: { user: any; currency: string }) {
   useEffect(() => {
     loadToday();
     loadHistory();
-    if (isAdmin) fetch("/api/erp/employees").then(r=>r.json()).then(d=>{ const active=d.filter((e:any)=>e.active); setEmployees(active); setBulkRecords(active.map((e:any)=>({employee_id:e.id,name:e.name,status:"present",admin_note:""}))); }).catch(()=>{});
+    if (isAdmin) {
+      // Admin: all employees. Manager: only reporting employees
+      const empUrl = user.role==="manager"
+        ? `/api/erp/employees?reports_to=${user.id}`
+        : "/api/erp/employees";
+      fetch(empUrl).then(r=>r.json()).then(d=>{
+        // Manager cannot manage other admins or managers
+        const allowed = user.role==="admin"
+          ? d.filter((e:any)=>e.active)
+          : d.filter((e:any)=>e.active && e.role==="employee");
+        setEmployees(allowed);
+        setBulkRecords(allowed.map((e:any)=>({employee_id:e.id,name:e.name,status:"present",admin_note:""})));
+      }).catch(()=>{});
+    }
   }, []);
 
   // Load leave balance when manual form employee changes
@@ -321,7 +334,7 @@ function AttContent({ user, currency: _c }: { user: any; currency: string }) {
                     </td>
                     <td style={{fontSize:11,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"rgba(255,255,255,0.4)"}}>{r.admin_note||"—"}</td>
                     {isAdmin&&<td style={{fontSize:11,color:"rgba(255,255,255,0.35)"}}>{r.marked_by_name||<span style={{color:"rgba(255,255,255,0.2)"}}>Self</span>}</td>}
-                    <td>{isAdmin&&<button className="erp-btn erp-btn-outline erp-btn-sm" onClick={()=>openEdit(r)}>Edit</button>}</td>
+                    <td>{isAdmin&&(user.role==="admin"||(user.role==="manager"&&employees.some(e=>e.employee_id===r.employee_id||e.id===r.employee_id)))&&<button className="erp-btn erp-btn-outline erp-btn-sm" onClick={()=>openEdit(r)}>Edit</button>}</td>
                   </tr>
                 ))}
               </tbody>

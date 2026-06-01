@@ -17,7 +17,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try { await conn.query('ALTER TABLE erp_users ADD COLUMN reports_to INT NULL'); } catch (_) {}
 
     if (req.method === 'GET') {
-      const { role_filter } = req.query;
+      const { role_filter, reports_to, id: emp_id } = req.query;
+
+      // Single employee by id
+      if (emp_id) {
+        const [rows]: any = await conn.query('SELECT id,name,email,role,department,salary,joining_date,active,reports_to FROM erp_users WHERE id=?', [emp_id]);
+        return res.status(200).json(rows[0]||null);
+      }
+
       // For dropdown: get managers or admins
       if (role_filter) {
         const roles = String(role_filter).split(',');
@@ -25,6 +32,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const [rows] = await conn.query(`SELECT id,name,role FROM erp_users WHERE role IN (${placeholders}) AND active=1 ORDER BY name`, roles);
         return res.status(200).json(Array.isArray(rows)?rows:[]);
       }
+
+      // Reporting employees (for manager)
+      if (reports_to) {
+        const [rows] = await conn.query('SELECT id,name,role,department FROM erp_users WHERE reports_to=? AND active=1 ORDER BY name', [reports_to]);
+        return res.status(200).json(Array.isArray(rows)?rows:[]);
+      }
+
       const [rows] = await conn.query(`
         SELECT u.id,u.name,u.email,u.role,u.department,u.salary,u.joining_date,u.active,u.created_at,u.reports_to,
           m.name as reports_to_name
