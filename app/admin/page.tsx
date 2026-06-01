@@ -238,8 +238,8 @@ export default function AdminPage() {
   const [blogModal, setBlogModal] = useState<BlogPost|"new"|null>(null);
   const [featImgUploading, setFeatImgUploading] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
-  const defaultBlog = { title:"", slug:"", excerpt:"", content:"", category:"Guides", emoji:"📝", badge:"guide", badgeText:"Guide", featured_image:"", meta_title:"", meta_description:"", focus_keyword:"", status:"published" as const, featured:false };
-  const [editBlog, setEditBlog] = useState(defaultBlog);
+  const defaultBlog = { title:"", slug:"", excerpt:"", content:"", category:"Guides", emoji:"📝", badge:"guide", badgeText:"Guide", featured_image:"", meta_title:"", meta_description:"", focus_keyword:"", status:"published" as "published"|"draft", featured:false };
+  const [editBlog, setEditBlog] = useState<typeof defaultBlog>(defaultBlog);
 
   useEffect(() => {
     if (localStorage.getItem("adminLoggedIn") === "true") setLoggedIn(true);
