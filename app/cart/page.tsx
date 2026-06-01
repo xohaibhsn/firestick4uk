@@ -378,9 +378,10 @@ export default function CartPage() {
                     <>
                       <div className="bank-details">
                         <h4>Bank Account Details</h4>
-                        <div className="bank-row"><span>Account Name</span><span>Firestick44UK Ltd</span></div>
-                        <div className="bank-row"><span>Sort Code</span><span>12-34-56</span></div>
-                        <div className="bank-row"><span>Account No.</span><span>12345678</span></div>
+                        <div className="bank-row"><span>Account Name</span><span>Robert George Bennett</span></div>
+                        <div className="bank-row"><span>Sort Code</span><span>60-84-07</span></div>
+                        <div className="bank-row"><span>Account No.</span><span>70745518</span></div>
+                        <div className="bank-row"><span>Reference</span><span>Your name only</span></div>
                         <div className="bank-row"><span>Amount</span><span>£{grandTotal.toFixed(2)}</span></div>
                       </div>
                       <div className="form-group">

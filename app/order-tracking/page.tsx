@@ -158,30 +158,10 @@ const styles = `
   }
 `;
 
-// Demo orders
-const demoOrders: Record<string, {
+type OrderResult = {
   id: string; status: "pending" | "confirmed" | "dispatched" | "delivered";
   items: { name: string; price: number; qty: number }[];
   total: number; name: string; email: string; phone: string; address: string; date: string;
-}> = {
-  "FK44-62305": {
-    id: "FK44-62305", status: "confirmed",
-    items: [{ name: "B1G 6 Month Plan", price: 49.99, qty: 1 }, { name: "Firestick 4K", price: 39.99, qty: 1 }],
-    total: 89.98, name: "John Smith", email: "john@example.com", phone: "+44 7000 000000",
-    address: "123 High Street, London, SW1A 1AA", date: "30 May 2026"
-  },
-  "FK44-11111": {
-    id: "FK44-11111", status: "dispatched",
-    items: [{ name: "Android Box Ultra", price: 69.99, qty: 1 }],
-    total: 73.98, name: "Sarah Jones", email: "sarah@example.com", phone: "+44 7111 111111",
-    address: "45 Oak Avenue, Manchester, M1 1AA", date: "28 May 2026"
-  },
-  "FK44-22222": {
-    id: "FK44-22222", status: "pending",
-    items: [{ name: "B1G 1 Year Plan", price: 79.99, qty: 1 }],
-    total: 79.99, name: "Ali Hassan", email: "ali@example.com", phone: "+44 7222 222222",
-    address: "12 Park Road, Birmingham, B1 1AA", date: "30 May 2026"
-  },
 };
 
 const statusSteps = [
@@ -195,19 +175,45 @@ const statusOrder = ["pending", "confirmed", "dispatched", "delivered"];
 
 export default function OrderTrackingPage() {
   const [query, setQuery] = useState("");
-  const [result, setResult] = useState<typeof demoOrders[string] | null>(null);
+  const [result, setResult] = useState<OrderResult | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const handleSearch = () => {
-    const trimmed = query.trim().toUpperCase();
-    if (demoOrders[trimmed]) {
-      setResult(demoOrders[trimmed]);
-      setNotFound(false);
-    } else {
-      setResult(null);
+  const handleSearch = async () => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    setSearching(true);
+    setResult(null);
+    setNotFound(false);
+    try {
+      const res = await fetch(`/api/track?order_id=${encodeURIComponent(trimmed)}`);
+      const data = await res.json();
+      if (res.ok && data.order) {
+        const o = data.order;
+        const items = (data.items || []).map((it: any) => ({
+          name: it.product_name,
+          price: parseFloat(it.price),
+          qty: it.quantity,
+        }));
+        setResult({
+          id: o.order_id,
+          status: o.status,
+          items,
+          total: parseFloat(o.total),
+          name: o.customer_name,
+          email: o.customer_email,
+          phone: o.customer_phone,
+          address: [o.delivery_address, o.city, o.postcode].filter(Boolean).join(", "),
+          date: o.created_at ? new Date(o.created_at).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" }) : "",
+        });
+      } else {
+        setNotFound(true);
+      }
+    } catch {
       setNotFound(true);
     }
+    setSearching(false);
   };
 
   const currentStatusIndex = result ? statusOrder.indexOf(result.status) : -1;
@@ -271,7 +277,7 @@ export default function OrderTrackingPage() {
               onChange={e => setQuery(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSearch()}
             />
-            <button className="search-btn" onClick={handleSearch}>Track Order</button>
+            <button className="search-btn" onClick={handleSearch} disabled={searching}>{searching ? "Searching..." : "Track Order"}</button>
           </div>
           {notFound && <p className="error-msg">❌ Order not found. Please check your Order ID and try again.</p>}
         </div>
