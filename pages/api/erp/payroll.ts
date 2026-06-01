@@ -9,7 +9,7 @@ const getDB = async () => {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  let conn;
+  let conn: any;
   try {
     conn = await getDB();
 
