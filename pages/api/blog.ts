@@ -16,10 +16,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       new Promise((_, reject) => setTimeout(() => reject(new Error('DB connection timeout')), 6000)),
     ]);
 
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS blog_posts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(500) NOT NULL,
+        excerpt TEXT,
+        category VARCHAR(100) DEFAULT 'Guides',
+        emoji VARCHAR(10) DEFAULT '📝',
+        badge VARCHAR(50) DEFAULT 'guide',
+        badgeText VARCHAR(50) DEFAULT 'Guide',
+        active TINYINT(1) DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     if (req.method === 'GET') {
-      const [rows] = await connection.query(
+      const [rows]: any = await connection.query(
         'SELECT * FROM blog_posts WHERE active = 1 ORDER BY created_at DESC'
       );
+      if (Array.isArray(rows) && rows.length === 0) {
+        await connection.query(`
+          INSERT INTO blog_posts (title, excerpt, category, emoji, badge, badgeText) VALUES
+          ('How to Set Up Your Firestick in 5 Minutes', 'Getting started with your new Amazon Firestick is easier than you think. Follow these simple steps to be streaming in minutes.', 'Guides', '🔥', 'guide', 'Guide'),
+          ('Best IPTV Subscriptions in the UK 2026', 'Looking for the best IPTV service in the UK? We compare the top options so you can pick the right plan for your budget and needs.', 'Tips', '📺', 'tips', 'Tips'),
+          ('Firestick4UK — What''s New This Month', 'We have added new subscription plans, improved our order tracking system, and launched faster delivery. Here is everything that changed.', 'News', '🚀', 'news', 'News')
+        `);
+        const [fresh] = await connection.query('SELECT * FROM blog_posts WHERE active = 1 ORDER BY created_at DESC');
+        return res.status(200).json(Array.isArray(fresh) ? fresh : []);
+      }
       return res.status(200).json(Array.isArray(rows) ? rows : []);
     }
 

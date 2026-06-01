@@ -260,7 +260,7 @@ export default function BlogPage() {
                   <span>📅 {featuredPost.date}</span>
                   <span>⏱ {featuredPost.readTime}</span>
                 </div>
-                <a href="#" className="read-more">Read Article →</a>
+                <a href="/contact" className="read-more">Enquire →</a>
               </div>
             </div>
           </div>
@@ -277,7 +277,7 @@ export default function BlogPage() {
                 <p className="card-excerpt">{post.excerpt}</p>
                 <div className="card-footer">
                   <div className="card-meta">📅 {post.date} · ⏱ {post.readTime}</div>
-                  <a href="#" className="read-more">Read →</a>
+                  <a href="/contact" className="read-more">Enquire →</a>
                 </div>
               </div>
             </div>

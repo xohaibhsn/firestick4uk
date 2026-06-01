@@ -283,7 +283,7 @@ export default function AboutPage() {
             <h2 className="cta-title">Ready to Shop With Us?</h2>
             <p className="cta-sub">Join hundreds of happy UK customers. Fast delivery. Real support.</p>
             <div className="cta-btns">
-              <a href="/" className="btn-primary">Browse Products</a>
+              <a href="/products" className="btn-primary">Browse Products</a>
               <a href="/contact" className="btn-secondary">Get In Touch</a>
             </div>
           </div>
