@@ -192,6 +192,8 @@ export default function CartPage() {
         setOrderId(data.order_id);
         clearCart();
         setStep("success");
+      } else {
+        alert("Order failed: " + (data.error || "Please try again."));
       }
     } catch (err) {
       alert("Something went wrong. Please try again.");
