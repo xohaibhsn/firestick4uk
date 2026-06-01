@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -114,6 +114,32 @@ const styles = `
   .btn-edit { background:rgba(255,140,0,0.12); color:var(--orange); border:1px solid rgba(255,140,0,0.25); }
   .btn-edit:hover { background:rgba(255,140,0,0.25); }
 
+  /* BLOG EDITOR */
+  .modal-blog { max-width:900px; width:96vw; max-height:92vh; }
+  .editor-toolbar { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; padding:8px; background:rgba(139,0,255,0.06); border:1px solid rgba(139,0,255,0.2); border-radius:8px; }
+  .tool-btn { background:rgba(139,0,255,0.1); border:1px solid rgba(139,0,255,0.2); color:rgba(255,255,255,0.8); padding:5px 10px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.2s; }
+  .tool-btn:hover { background:rgba(139,0,255,0.3); color:white; }
+  .tool-sep { width:1px; background:rgba(139,0,255,0.2); margin:2px 4px; }
+  .rich-editor { min-height:200px; max-height:300px; overflow-y:auto; background:rgba(139,0,255,0.05); border:1px solid rgba(139,0,255,0.25); border-radius:10px; padding:14px 16px; color:white; font-size:14px; line-height:1.7; outline:none; }
+  .rich-editor:focus { border-color:var(--purple-glow); }
+  .rich-editor h2 { font-size:20px; font-weight:700; margin:12px 0 6px; color:var(--purple-glow); }
+  .rich-editor h3 { font-size:16px; font-weight:600; margin:10px 0 4px; color:rgba(191,95,255,0.8); }
+  .rich-editor ul, .rich-editor ol { padding-left:20px; margin:6px 0; }
+  .rich-editor li { margin:3px 0; }
+  .rich-editor blockquote { border-left:3px solid var(--purple-glow); padding-left:12px; color:rgba(255,255,255,0.6); margin:8px 0; font-style:italic; }
+  .rich-editor a { color:var(--purple-glow); }
+  .seo-section { background:rgba(139,0,255,0.04); border:1px solid rgba(139,0,255,0.12); border-radius:10px; padding:16px; margin-top:4px; }
+  .seo-section h5 { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.4); margin-bottom:12px; }
+  .char-count { font-size:11px; color:rgba(255,255,255,0.3); text-align:right; margin-top:3px; }
+  .char-warn { color:#ffb400; }
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; }
+  .toggle-label { font-size:13px; color:rgba(255,255,255,0.7); }
+  .toggle-switch { position:relative; width:44px; height:24px; }
+  .toggle-switch input { display:none; }
+  .toggle-track { position:absolute; inset:0; background:rgba(255,255,255,0.1); border-radius:12px; cursor:pointer; transition:background 0.2s; }
+  .toggle-track.on { background:var(--purple-bright); }
+  .toggle-thumb { position:absolute; top:3px; left:3px; width:18px; height:18px; background:white; border-radius:50%; transition:left 0.2s; }
+  .toggle-track.on .toggle-thumb { left:23px; }
   /* RECEIPT */
   .receipt-thumb { width:40px; height:40px; border-radius:8px; background:rgba(139,0,255,0.15);
     border:1px solid rgba(139,0,255,0.3); display:flex; align-items:center; justify-content:center; font-size:18px; cursor:pointer; }
@@ -191,7 +217,7 @@ const demoCustomers = [
 
 type Tab = "dashboard"|"orders"|"products"|"customers"|"blog";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
-type BlogPost = { id:number; title:string; excerpt:string; category:string; emoji:string; badge:string; badgeText:string; };
+type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; };
 
 export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -205,12 +231,15 @@ export default function AdminPage() {
   const [receiptModal, setReceiptModal] = useState<string|null>(null);
   const [orderModal, setOrderModal] = useState<typeof demoOrders[0]|null>(null);
   const [productModal, setProductModal] = useState<typeof demoProducts[0]|null|"new">(null);
-  const [editProduct, setEditProduct] = useState({ name:"", category:"", price:"", stock:"", emoji:"📦", image:"" });
+  const [editProduct, setEditProduct] = useState({ name:"", category:"", price:"", stock:"", image:"" });
   const [imageUploading, setImageUploading] = useState(false);
   const [customers, setCustomers] = useState(demoCustomers);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [blogModal, setBlogModal] = useState<BlogPost|"new"|null>(null);
-  const [editBlog, setEditBlog] = useState({ title:"", excerpt:"", category:"Guides", emoji:"📝", badge:"guide", badgeText:"Guide" });
+  const [featImgUploading, setFeatImgUploading] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const defaultBlog = { title:"", slug:"", excerpt:"", content:"", category:"Guides", emoji:"📝", badge:"guide", badgeText:"Guide", featured_image:"", meta_title:"", meta_description:"", focus_keyword:"", status:"published" as const, featured:false };
+  const [editBlog, setEditBlog] = useState(defaultBlog);
 
   useEffect(() => {
     if (localStorage.getItem("adminLoggedIn") === "true") setLoggedIn(true);
@@ -298,19 +327,32 @@ export default function AdminPage() {
     setOrderModal(null);
   };
 
+  const toSlug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+
+  const handleFeatImg = async (file: File) => {
+    setFeatImgUploading(true);
+    try {
+      const base64 = await new Promise<string>((resolve,reject) => { const r=new FileReader(); r.onload=()=>resolve(r.result as string); r.onerror=reject; r.readAsDataURL(file); });
+      const res = await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file:base64,name:file.name})}).then(r=>r.json());
+      if (res.path) setEditBlog(p=>({...p,featured_image:res.path}));
+    } catch {}
+    setFeatImgUploading(false);
+  };
+
+  const execCmd = useCallback((cmd: string, val?: string) => {
+    document.execCommand(cmd, false, val);
+    if (editorRef.current) setEditBlog(p=>({...p,content:editorRef.current!.innerHTML}));
+  }, []);
+
   const saveBlog = async () => {
+    const content = editorRef.current?.innerHTML || editBlog.content;
+    const payload = { ...editBlog, content };
     if (blogModal === "new") {
-      const res = await fetch("/api/blog", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editBlog),
-      }).then(r => r.json()).catch(() => ({}));
-      setBlogPosts([...blogPosts, { ...editBlog, id: res.id || Date.now() }]);
+      const res = await fetch("/api/blog",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}).then(r=>r.json()).catch(()=>({}));
+      setBlogPosts([...blogPosts, { ...payload, id: res.id || Date.now() } as BlogPost]);
     } else if (blogModal) {
-      await fetch("/api/blog", {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...editBlog, id: blogModal.id }),
-      }).catch(() => {});
-      setBlogPosts(blogPosts.map(p => p.id === (blogModal as BlogPost).id ? { ...p, ...editBlog } : p));
+      await fetch("/api/blog",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...payload,id:(blogModal as BlogPost).id})}).catch(()=>{});
+      setBlogPosts(blogPosts.map(p=>p.id===(blogModal as BlogPost).id?{...p,...payload} as BlogPost:p));
     }
     setBlogModal(null);
   };
@@ -351,7 +393,7 @@ export default function AdminPage() {
       description: "",
       price: rawPrice,
       category: editProduct.category,
-      badge: editProduct.emoji || null,
+      badge: null,
       image: editProduct.image || null,
       stock: editProduct.stock || "Digital",
     };
@@ -375,22 +417,13 @@ export default function AdminPage() {
   };
 
   const openEditProduct = (p: any) => {
-    const rawPrice = p.price ? (String(p.price).includes('.') || !String(p.price).includes('£')
-      ? `£${Number(String(p.price).replace(/[^0-9.]/g,'')).toFixed(2)}`
-      : p.price) : "";
-    setEditProduct({
-      name: p.name || "",
-      category: p.category || "Subscription",
-      price: rawPrice,
-      stock: p.stock || "Digital",
-      emoji: p.emoji || p.badge || "📦",
-      image: p.image || "",
-    });
+    const rawPrice = p.price ? `£${Number(String(p.price).replace(/[^0-9.]/g,'')).toFixed(2)}` : "";
+    setEditProduct({ name:p.name||"", category:p.category||"Subscription", price:rawPrice, stock:p.stock||"Digital", image:p.image||"" });
     setProductModal(p);
   };
 
   const openNewProduct = () => {
-    setEditProduct({ name:"", category:"Subscription", price:"", stock:"Digital", emoji:"📦", image:"" });
+    setEditProduct({ name:"", category:"Subscription", price:"", stock:"Digital", image:"" });
     setProductModal("new");
   };
 
@@ -482,13 +515,12 @@ export default function AdminPage() {
             </div>
             <div className="modal-field"><label>Price</label><input placeholder="e.g. £9.99" value={editProduct.price} onChange={e => setEditProduct({...editProduct,price:e.target.value})} /></div>
             <div className="modal-field"><label>Stock / Type</label><input placeholder="e.g. 10 or Digital" value={editProduct.stock} onChange={e => setEditProduct({...editProduct,stock:e.target.value})} /></div>
-            <div className="modal-field"><label>Emoji Icon</label><input placeholder="e.g. 📦" value={editProduct.emoji} onChange={e => setEditProduct({...editProduct,emoji:e.target.value})} /></div>
             <div className="modal-field">
               <label>Product Image</label>
               <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
                 {editProduct.image
                   ? <img src={editProduct.image} alt="product" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid rgba(139,0,255,0.3)"}} />
-                  : <div style={{width:60,height:60,background:"rgba(139,0,255,0.1)",border:"1px dashed rgba(139,0,255,0.4)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{editProduct.emoji||"📦"}</div>
+                  : <div style={{width:60,height:60,background:"rgba(139,0,255,0.1)",border:"1px dashed rgba(139,0,255,0.4)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📦</div>
                 }
                 <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.35)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"var(--purple-glow)"}}>
                   {imageUploading ? "Uploading..." : "Upload Image"}
@@ -505,24 +537,96 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* BLOG MODAL */}
+      {/* BLOG MODAL — Rich Editor */}
       {blogModal && (
         <div className="modal-overlay" onClick={() => setBlogModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{blogModal === "new" ? "Add Blog Post" : "Edit Blog Post"}</div>
-            <div className="modal-field"><label>Title</label><input placeholder="Post title" value={editBlog.title} onChange={e => setEditBlog({...editBlog,title:e.target.value})} /></div>
-            <div className="modal-field"><label>Excerpt</label><textarea rows={3} placeholder="Short description..." value={editBlog.excerpt} onChange={e => setEditBlog({...editBlog,excerpt:e.target.value})} style={{resize:"vertical"}} /></div>
+          <div className="modal modal-blog" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">{blogModal==="new"?"New Blog Post":"Edit Blog Post"}</div>
+
+            {/* Title + Slug */}
+            <div className="modal-field"><label>Title *</label><input placeholder="Post title" value={editBlog.title} onChange={e => { const t=e.target.value; setEditBlog(p=>({...p,title:t,slug:p.slug===toSlug(p.title)||p.slug===""?toSlug(t):p.slug})); }} /></div>
+            <div className="modal-field"><label>Slug</label><input placeholder="auto-generated-from-title" value={editBlog.slug} onChange={e => setEditBlog(p=>({...p,slug:e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-")}))} /></div>
+
+            {/* Featured Image */}
             <div className="modal-field">
-              <label>Category</label>
-              <select value={editBlog.category} onChange={e => setEditBlog({...editBlog,category:e.target.value})}>
-                <option>Guides</option><option>Tips</option><option>News</option>
-              </select>
+              <label>Featured Image</label>
+              <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
+                {editBlog.featured_image && <img src={editBlog.featured_image} alt="" style={{width:80,height:50,objectFit:"cover",borderRadius:6,border:"1px solid rgba(139,0,255,0.3)"}} />}
+                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.35)",padding:"7px 14px",borderRadius:8,fontSize:13,color:"var(--purple-glow)"}}>
+                  {featImgUploading?"Uploading...":"Upload Image"}
+                  <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&handleFeatImg(e.target.files[0])} disabled={featImgUploading} />
+                </label>
+                {editBlog.featured_image && <button style={{background:"none",border:"none",color:"rgba(255,100,100,0.7)",cursor:"pointer",fontSize:12}} onClick={()=>setEditBlog(p=>({...p,featured_image:""}))}>Remove</button>}
+              </div>
             </div>
-            <div className="modal-field"><label>Emoji Icon</label><input placeholder="e.g. 📝" value={editBlog.emoji} onChange={e => setEditBlog({...editBlog,emoji:e.target.value})} /></div>
-            <div className="modal-field"><label>Badge Text</label><input placeholder="e.g. Guide" value={editBlog.badgeText} onChange={e => setEditBlog({...editBlog,badgeText:e.target.value,badge:e.target.value.toLowerCase()})} /></div>
-            <div className="modal-actions">
-              <button className="modal-cancel" onClick={() => setBlogModal(null)}>Cancel</button>
-              <button className="modal-save" onClick={saveBlog}>Save Post</button>
+
+            {/* Rich Text Editor */}
+            <div className="modal-field">
+              <label>Content</label>
+              <div className="editor-toolbar">
+                {[["bold","B"],["italic","I"]].map(([cmd,lbl])=><button key={cmd} className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd(cmd);}}><strong>{lbl}</strong></button>)}
+                <div className="tool-sep"/>
+                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("formatBlock","h2");}}>H2</button>
+                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("formatBlock","h3");}}>H3</button>
+                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("formatBlock","p");}}>P</button>
+                <div className="tool-sep"/>
+                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("insertUnorderedList");}}>• List</button>
+                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("insertOrderedList");}}>1. List</button>
+                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("formatBlock","blockquote");}}>❝</button>
+                <div className="tool-sep"/>
+                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();const url=prompt("URL:");if(url)execCmd("createLink",url);}}>🔗</button>
+                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("removeFormat");}}>✕ Clear</button>
+              </div>
+              <div ref={editorRef} className="rich-editor" contentEditable suppressContentEditableWarning onInput={e=>setEditBlog(p=>({...p,content:e.currentTarget.innerHTML}))} />
+            </div>
+
+            {/* Excerpt */}
+            <div className="modal-field"><label>Excerpt (SEO description)</label><textarea rows={2} placeholder="Short description shown on blog listing..." value={editBlog.excerpt} onChange={e=>setEditBlog(p=>({...p,excerpt:e.target.value}))} style={{resize:"vertical"}} /></div>
+
+            {/* Category + Badge */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px"}}>
+              <div className="modal-field">
+                <label>Category</label>
+                <select value={editBlog.category} onChange={e=>setEditBlog(p=>({...p,category:e.target.value}))}>
+                  <option>Guides</option><option>Tips</option><option>News</option>
+                </select>
+              </div>
+              <div className="modal-field"><label>Badge Text</label><input placeholder="e.g. Guide" value={editBlog.badgeText} onChange={e=>setEditBlog(p=>({...p,badgeText:e.target.value,badge:e.target.value.toLowerCase()}))} /></div>
+            </div>
+
+            {/* SEO Section */}
+            <div className="seo-section">
+              <h5>🔍 SEO Settings</h5>
+              <div className="modal-field"><label>Meta Title</label><input placeholder="SEO title (50-60 chars)" value={editBlog.meta_title} onChange={e=>setEditBlog(p=>({...p,meta_title:e.target.value}))} /></div>
+              <div className="modal-field">
+                <label>Meta Description</label>
+                <textarea rows={2} placeholder="SEO description (max 160 chars)" value={editBlog.meta_description} onChange={e=>setEditBlog(p=>({...p,meta_description:e.target.value.slice(0,160)}))} style={{resize:"none"}} />
+                <div className={`char-count ${editBlog.meta_description.length>140?"char-warn":""}`}>{editBlog.meta_description.length}/160</div>
+              </div>
+              <div className="modal-field"><label>Focus Keyword</label><input placeholder="e.g. firestick uk" value={editBlog.focus_keyword} onChange={e=>setEditBlog(p=>({...p,focus_keyword:e.target.value}))} /></div>
+            </div>
+
+            {/* Status + Featured toggles */}
+            <div style={{marginTop:"16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"}}>
+              <div className="toggle-row" style={{background:"rgba(139,0,255,0.05)",borderRadius:10,padding:"10px 14px"}}>
+                <span className="toggle-label">Status: <strong>{editBlog.status==="published"?"Published":"Draft"}</strong></span>
+                <div className="toggle-switch" onClick={()=>setEditBlog(p=>({...p,status:p.status==="published"?"draft":"published"}))}>
+                  <div className={`toggle-track ${editBlog.status==="published"?"on":""}`}><div className="toggle-thumb"/></div>
+                </div>
+              </div>
+              <div className="toggle-row" style={{background:"rgba(139,0,255,0.05)",borderRadius:10,padding:"10px 14px"}}>
+                <span className="toggle-label">⭐ Featured Post</span>
+                <div className="toggle-switch" onClick={()=>setEditBlog(p=>({...p,featured:!p.featured}))}>
+                  <div className={`toggle-track ${editBlog.featured?"on":""}`}><div className="toggle-thumb"/></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{marginTop:"20px"}}>
+              <button className="modal-cancel" onClick={()=>setBlogModal(null)}>Cancel</button>
+              <button className="modal-save" onClick={saveBlog} disabled={!editBlog.title}>
+                {editBlog.status==="published"?"Publish Post":"Save Draft"}
+              </button>
             </div>
           </div>
         </div>
@@ -639,19 +743,25 @@ export default function AdminPage() {
               </div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Date</th><th>Receipt</th><th>Status</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Date</th><th>Payment</th><th>Receipt</th><th>Status</th><th>Actions</th></tr></thead>
                   <tbody>
                     {filteredOrders.map(o => (
                       <tr key={o.id}>
                         <td style={{fontFamily:"monospace",color:"var(--purple-glow)",whiteSpace:"nowrap"}}>{o.id}</td>
                         <td style={{whiteSpace:"nowrap"}}>{o.customer}</td>
-                        <td style={{maxWidth:"160px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.items}</td>
+                        <td style={{maxWidth:"140px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.items}</td>
                         <td style={{fontWeight:700,whiteSpace:"nowrap"}}>{o.total}</td>
                         <td style={{whiteSpace:"nowrap",color:"rgba(255,255,255,0.4)",fontSize:"12px"}}>{o.date}</td>
                         <td>
+                          {(o as any).payment === "cod"
+                            ? <span style={{fontSize:"11px",padding:"3px 9px",borderRadius:"10px",background:"rgba(0,200,100,0.1)",border:"1px solid rgba(0,200,100,0.3)",color:"#00c864",fontWeight:700}}>💵 COD</span>
+                            : <span style={{fontSize:"11px",padding:"3px 9px",borderRadius:"10px",background:"rgba(68,136,255,0.1)",border:"1px solid rgba(68,136,255,0.3)",color:"#6699ff",fontWeight:700}}>🏦 Bank</span>
+                          }
+                        </td>
+                        <td>
                           {o.receipt
-                            ? <div className="receipt-thumb" onClick={() => setReceiptModal(o.id)} title="View Receipt">🧾</div>
-                            : <span style={{color:"rgba(255,255,255,0.25)",fontSize:"12px"}}>N/A</span>
+                            ? <button className="action-btn btn-view" style={{fontSize:"11px",padding:"4px 10px"}} onClick={() => setReceiptModal(o.id)}>View Receipt</button>
+                            : <span style={{color:"rgba(255,255,255,0.25)",fontSize:"11px"}}>No Receipt</span>
                           }
                         </td>
                         <td><span className={statusClass(o.status)}>{o.status}</span></td>
@@ -702,22 +812,23 @@ export default function AdminPage() {
             <div className="section-card">
               <div className="section-header">
                 <div className="section-title">Blog Posts ({blogPosts.length})</div>
-                <button className="add-btn" onClick={() => { setEditBlog({title:"",excerpt:"",category:"Guides",emoji:"📝",badge:"guide",badgeText:"Guide"}); setBlogModal("new"); }}>+ Add Post</button>
+                <button className="add-btn" onClick={() => { setEditBlog(defaultBlog); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML="";},50); setBlogModal("new"); }}>+ Add Post</button>
               </div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Icon</th><th>Title</th><th>Category</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>Image</th><th>Title</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead>
                   <tbody>
                     {blogPosts.length === 0 && (
-                      <tr><td colSpan={4} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No blog posts yet. Add your first post above.</td></tr>
+                      <tr><td colSpan={5} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No blog posts yet. Add your first post above.</td></tr>
                     )}
                     {blogPosts.map(p => (
                       <tr key={p.id}>
-                        <td style={{fontSize:"22px"}}>{p.emoji}</td>
-                        <td style={{fontWeight:600,maxWidth:"280px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title}</td>
+                        <td>{p.featured_image ? <img src={p.featured_image} alt="" style={{width:44,height:44,objectFit:"cover",borderRadius:6,border:"1px solid rgba(139,0,255,0.3)"}} /> : <span style={{fontSize:"20px"}}>{p.emoji||"📝"}</span>}</td>
+                        <td style={{fontWeight:600,maxWidth:"240px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.featured?<span style={{color:"var(--gold)",marginRight:4}}>⭐</span>:null}{p.title}</td>
                         <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{p.category}</span></td>
-                        <td>
-                          <button className="action-btn btn-edit" onClick={() => { setEditBlog({title:p.title,excerpt:p.excerpt,category:p.category,emoji:p.emoji,badge:p.badge,badgeText:p.badgeText}); setBlogModal(p); }}>Edit</button>
+                        <td><span style={{fontSize:"11px",padding:"3px 10px",borderRadius:"10px",fontWeight:700,background:p.status==="published"?"rgba(0,200,100,0.12)":"rgba(255,180,0,0.12)",border:p.status==="published"?"1px solid rgba(0,200,100,0.3)":"1px solid rgba(255,180,0,0.3)",color:p.status==="published"?"#00c864":"#ffb400"}}>{p.status==="published"?"Published":"Draft"}</span></td>
+                        <td style={{whiteSpace:"nowrap"}}>
+                          <button className="action-btn btn-edit" onClick={() => { setEditBlog({title:p.title,slug:p.slug||"",excerpt:p.excerpt||"",content:p.content||"",category:p.category||"Guides",emoji:p.emoji||"📝",badge:p.badge||"guide",badgeText:p.badgeText||"Guide",featured_image:p.featured_image||"",meta_title:p.meta_title||"",meta_description:p.meta_description||"",focus_keyword:p.focus_keyword||"",status:p.status||"published",featured:!!p.featured}); setBlogModal(p); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML=p.content||"";},80); }}>Edit</button>
                           <button className="action-btn btn-delete" onClick={() => deleteBlog(p.id)}>Delete</button>
                         </td>
                       </tr>

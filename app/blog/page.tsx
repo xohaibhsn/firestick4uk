@@ -197,10 +197,12 @@ export default function BlogPage() {
             badgeText: p.badgeText || "Guide",
             title: p.title,
             excerpt: p.excerpt,
+            slug: p.slug || String(p.id),
+            featured_image: p.featured_image || "",
             date: p.created_at ? new Date(p.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}) : "",
             readTime: "3 min read",
             category: p.category || "Guides",
-            featured: false,
+            featured: !!p.featured,
           })));
         }
       })
@@ -251,7 +253,11 @@ export default function BlogPage() {
         {featuredPost && (activeCategory === "All" || activeCategory === featuredPost.category) && (
           <div className="featured-post">
             <div className="featured-card">
-              <div className="featured-image">{featuredPost.emoji}</div>
+              <div className="featured-image">
+                {(featuredPost as any).featured_image
+                  ? <img src={(featuredPost as any).featured_image} alt={featuredPost.title} style={{width:"100%",height:"100%",objectFit:"cover"}} loading="lazy" />
+                  : featuredPost.emoji}
+              </div>
               <div className="featured-content">
                 <span className={`post-badge ${featuredPost.badge}`}>⭐ Featured — {featuredPost.badgeText}</span>
                 <div className="featured-title">{featuredPost.title}</div>
@@ -260,7 +266,7 @@ export default function BlogPage() {
                   <span>📅 {featuredPost.date}</span>
                   <span>⏱ {featuredPost.readTime}</span>
                 </div>
-                <a href="/contact" className="read-more">Enquire →</a>
+                <a href={`/blog/${(featuredPost as any).slug || featuredPost.id}`} className="read-more">Read Article →</a>
               </div>
             </div>
           </div>
@@ -269,15 +275,19 @@ export default function BlogPage() {
         {/* GRID */}
         <div className="blog-grid">
           {filteredPosts.map(post => (
-            <div className="blog-card" key={post.id}>
-              <div className="card-image">{post.emoji}</div>
+            <div className="blog-card" key={post.id} style={{cursor:"pointer"}} onClick={()=>window.location.href=`/blog/${(post as any).slug||post.id}`}>
+              <div className="card-image">
+                {(post as any).featured_image
+                  ? <img src={(post as any).featured_image} alt={post.title} style={{width:"100%",height:"100%",objectFit:"cover"}} loading="lazy" />
+                  : post.emoji}
+              </div>
               <div className="card-body">
                 <span className={`post-badge ${post.badge}`}>{post.badgeText}</span>
                 <div className="card-title" style={{ marginTop: "12px" }}>{post.title}</div>
                 <p className="card-excerpt">{post.excerpt}</p>
                 <div className="card-footer">
                   <div className="card-meta">📅 {post.date} · ⏱ {post.readTime}</div>
-                  <a href="/contact" className="read-more">Enquire →</a>
+                  <a href={`/blog/${(post as any).slug||post.id}`} className="read-more" onClick={e=>e.stopPropagation()}>Read →</a>
                 </div>
               </div>
             </div>
