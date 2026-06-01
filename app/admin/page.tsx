@@ -292,7 +292,6 @@ export default function AdminPage() {
             <input className="login-input" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key==="Enter" && handleLogin()} />
             <button className="login-btn" onClick={handleLogin}>Login to Admin Panel</button>
             {loginError && <div className="login-error">{loginError}</div>}
-            <div style={{marginTop:"16px",fontSize:"12px",color:"rgba(255,255,255,0.25)"}}>Demo: admin / admin123</div>
           </div>
         </div>
       </>
