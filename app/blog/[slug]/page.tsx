@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 
 interface Post {
   id: number; title: string; slug: string; content: string; excerpt: string;
@@ -8,16 +8,17 @@ interface Post {
   created_at: string;
 }
 
-export default function BlogPostPage({ params }: { params: { slug: string } }) {
+export default function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(params);
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/blog?slug=${encodeURIComponent(params.slug)}`)
+    fetch(`/api/blog?slug=${encodeURIComponent(slug)}`)
       .then(r => r.json())
       .then(data => { setPost(data); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [params.slug]);
+  }, [slug]);
 
   const dateStr = post?.created_at
     ? new Date(post.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
@@ -36,7 +37,7 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
         .nav-links{display:flex;gap:28px;list-style:none;}
         .nav-links a{color:rgba(255,255,255,0.7);text-decoration:none;font-size:13px;font-weight:500;letter-spacing:1px;text-transform:uppercase;transition:color 0.2s;}
         .nav-links a:hover{color:var(--purple-glow);}
-        .wrap{position:relative;z-index:1;padding:110px 0 80px;max-width:780px;margin:0 auto;padding-left:24px;padding-right:24px;}
+        .wrap{position:relative;z-index:1;padding:110px 24px 80px;max-width:780px;margin:0 auto;}
         .back{color:rgba(255,255,255,0.4);text-decoration:none;font-size:13px;display:inline-flex;align-items:center;gap:5px;margin-bottom:28px;transition:color 0.2s;}
         .back:hover{color:var(--purple-glow);}
         .post-badge{display:inline-block;background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright));color:white;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;}

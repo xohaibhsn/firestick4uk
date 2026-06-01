@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useCart } from "../../lib/cartContext";
 
 interface Product {
@@ -7,18 +7,19 @@ interface Product {
   price: number; badge: string | null; image: string | null; category: string; stock: string;
 }
 
-export default function ProductDetailPage({ params }: { params: { slug: string } }) {
+export default function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(params);
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [added, setAdded] = useState(false);
   const { addToCart } = useCart();
 
   useEffect(() => {
-    fetch(`/api/products?slug=${encodeURIComponent(params.slug)}`)
+    fetch(`/api/products?slug=${encodeURIComponent(slug)}`)
       .then(r => r.json())
       .then(data => { setProduct(data); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [params.slug]);
+  }, [slug]);
 
   const handleAdd = () => {
     if (!product) return;

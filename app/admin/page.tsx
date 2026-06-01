@@ -404,7 +404,7 @@ export default function AdminPage() {
         body: JSON.stringify(payload),
       }).then(r => r.json()).catch(() => ({}));
       const newId = res.id || Date.now();
-      setProducts([...products, { ...editProduct, id: newId }]);
+      setProducts([...products, { ...editProduct, id: newId, emoji: "" }]);
     } else if (productModal) {
       await fetch("/api/admin-products", {
         method: "PUT",
