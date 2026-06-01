@@ -150,7 +150,14 @@ const styles = `
 
   @media(max-width:900px){
     .sidebar{display:none;}
-    .main-content{margin-left:0;}
+    .main-content{margin-left:0;padding:20px 16px;}
+    .table-wrap{overflow-x:auto;}
+    .stats-grid{grid-template-columns:1fr 1fr;}
+    .section-header{flex-direction:column;align-items:flex-start;gap:12px;}
+  }
+  @media(max-width:500px){
+    .stats-grid{grid-template-columns:1fr;}
+    .modal{padding:24px 20px;}
   }
 `;
 
@@ -338,10 +345,11 @@ export default function AdminPage() {
   };
 
   const saveProduct = async () => {
+    const rawPrice = String(editProduct.price).replace(/[^0-9.]/g, "");
     const payload = {
       name: editProduct.name,
       description: "",
-      price: editProduct.price,
+      price: rawPrice,
       category: editProduct.category,
       badge: editProduct.emoji || null,
       image: editProduct.image || null,
@@ -366,8 +374,18 @@ export default function AdminPage() {
     setProductModal(null);
   };
 
-  const openEditProduct = (p: typeof demoProducts[0]) => {
-    setEditProduct({ name: p.name, category: p.category, price: p.price, stock: p.stock, emoji: p.emoji, image: (p as any).image || "" });
+  const openEditProduct = (p: any) => {
+    const rawPrice = p.price ? (String(p.price).includes('.') || !String(p.price).includes('£')
+      ? `£${Number(String(p.price).replace(/[^0-9.]/g,'')).toFixed(2)}`
+      : p.price) : "";
+    setEditProduct({
+      name: p.name || "",
+      category: p.category || "Subscription",
+      price: rawPrice,
+      stock: p.stock || "Digital",
+      emoji: p.emoji || p.badge || "📦",
+      image: p.image || "",
+    });
     setProductModal(p);
   };
 

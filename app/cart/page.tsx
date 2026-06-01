@@ -134,6 +134,10 @@ const navStyles = `
     .page-header { padding:40px 24px 24px; }
     footer { padding:30px 24px; flex-direction:column; text-align:center; }
   }
+  @media(max-width:500px){
+    .cart-item { grid-template-columns:70px 1fr auto; gap:12px; padding:14px; }
+    .place-order-btn { font-size:14px; padding:15px; }
+  }
 `;
 
 type Step = "cart" | "checkout" | "success";
@@ -146,6 +150,7 @@ export default function CartPage() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [placing, setPlacing] = useState(false);
   const [orderId, setOrderId] = useState("");
+  const [orderError, setOrderError] = useState("");
 
   const [form, setForm] = useState({
     name: "", email: "", phone: "", address: "", city: "", postcode: "", notes: ""
@@ -158,6 +163,7 @@ export default function CartPage() {
     if (!form.name || !form.email || !form.phone || !form.address) return;
     if (paymentMethod === "bank" && !receiptFile) return;
     setPlacing(true);
+    setOrderError("");
 
     try {
       let receiptPath = "";
@@ -201,10 +207,12 @@ export default function CartPage() {
         clearCart();
         setStep("success");
       } else {
-        alert("Order failed: " + (data.error || "Please try again."));
+        setOrderError(data.error?.includes("connect") || data.error?.includes("timeout")
+          ? "Our system is temporarily unavailable. Please try again in a moment."
+          : "Order could not be placed. Please try again or contact us on WhatsApp.");
       }
-    } catch (err) {
-      alert("Something went wrong. Please try again.");
+    } catch {
+      setOrderError("Network error. Please check your connection and try again.");
     }
     setPlacing(false);
   };
@@ -416,6 +424,19 @@ export default function CartPage() {
                     onClick={handleOrder}>
                     {placing ? "Placing Order..." : "Place Order →"}
                   </button>
+                  {orderError && (
+                    <div style={{marginTop:"14px",background:"rgba(255,68,68,0.1)",border:"1px solid rgba(255,68,68,0.3)",borderRadius:"12px",padding:"14px 16px"}}>
+                      <p style={{color:"#ff8888",fontSize:"13px",marginBottom:"10px"}}>⚠️ {orderError}</p>
+                      <div style={{display:"flex",gap:"10px",flexWrap:"wrap"}}>
+                        <button onClick={handleOrder} style={{background:"rgba(255,68,68,0.2)",border:"1px solid rgba(255,68,68,0.4)",color:"#ff8888",padding:"7px 16px",borderRadius:"8px",fontSize:"12px",cursor:"pointer"}}>
+                          🔄 Retry
+                        </button>
+                        <a href="https://wa.me/447934519060" target="_blank" rel="noopener noreferrer" style={{background:"rgba(37,211,102,0.15)",border:"1px solid rgba(37,211,102,0.3)",color:"#25d366",padding:"7px 16px",borderRadius:"8px",fontSize:"12px",textDecoration:"none"}}>
+                          💬 WhatsApp Us
+                        </a>
+                      </div>
+                    </div>
+                  )}
                   <button onClick={() => setStep("cart")} style={{width:"100%", background:"none", border:"none", color:"rgba(255,255,255,0.4)", fontSize:"13px", marginTop:"12px", cursor:"pointer"}}>
                     ← Back to Cart
                   </button>

@@ -24,6 +24,7 @@ const STARS = Array.from({length:50}).map((_,i) => ({
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [added, setAdded] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [filter, setFilter] = useState("All");
@@ -32,8 +33,12 @@ export default function ProductsPage() {
   useEffect(() => {
     fetch('/api/products')
       .then(res => res.json())
-      .then(data => { setProducts(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(data => {
+        if (Array.isArray(data)) { setProducts(data); }
+        else { setLoadError(true); }
+        setLoading(false);
+      })
+      .catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
   const handleAddToCart = (p: Product) => {
@@ -151,6 +156,13 @@ export default function ProductsPage() {
         <div className="products-grid">
           {loading ? (
             <div className="loading">Loading products...</div>
+          ) : loadError ? (
+            <div className="loading" style={{textAlign:"center",padding:"40px 0"}}>
+              <div style={{fontSize:"32px",marginBottom:"12px"}}>⚠️</div>
+              <div style={{color:"rgba(255,255,255,0.7)",marginBottom:"8px"}}>Could not load products right now.</div>
+              <div style={{color:"rgba(255,255,255,0.4)",fontSize:"13px",marginBottom:"20px"}}>Please try again in a moment or contact us via WhatsApp.</div>
+              <button onClick={() => window.location.reload()} style={{background:"linear-gradient(135deg,#4a0080,#8b00ff)",color:"white",border:"none",padding:"10px 24px",borderRadius:"30px",cursor:"pointer",fontSize:"14px"}}>Try Again</button>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="loading">No products found.</div>
           ) : (
