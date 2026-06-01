@@ -4,14 +4,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let connection;
   try {
     const mysql = require('mysql2/promise');
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST || 'srv497.hstgr.io',
-      user: process.env.DB_USER || 'u992747032_firestick4uk',
-      password: process.env.DB_PASSWORD || 'Firestick@2026',
-      database: process.env.DB_NAME || 'u992747032_firestick4uk',
-      port: Number(process.env.DB_PORT) || 3306,
-      connectTimeout: 10000,
-    });
+    connection = await Promise.race([
+      mysql.createConnection({
+        host: process.env.DB_HOST || 'srv497.hstgr.io',
+        user: process.env.DB_USER || 'u992747032_firestick4uk',
+        password: process.env.DB_PASSWORD || 'Firestick@2026',
+        database: process.env.DB_NAME || 'u992747032_firestick4uk',
+        port: Number(process.env.DB_PORT) || 3306,
+        connectTimeout: 5000,
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('DB connection timeout')), 6000)),
+    ]);
 
     if (req.method === 'GET') {
       const [rows] = await connection.query('SELECT * FROM products ORDER BY created_at DESC');
