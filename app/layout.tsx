@@ -15,7 +15,24 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Firestick4UK — Premium IPTV & Firestick UK",
-  description: "Buy Firestick, IPTV subscriptions and Android boxes in the UK.",
+  description: "Buy Firestick, IPTV subscriptions and Android boxes in the UK. Fast delivery, easy setup, real support.",
+  keywords: "Firestick UK, IPTV subscription, Android box, streaming device, buy firestick UK",
+  authors: [{ name: "Firestick4UK" }],
+  openGraph: {
+    title: "Firestick4UK — Premium IPTV & Firestick UK",
+    description: "Buy Firestick, IPTV subscriptions and Android boxes in the UK. Fast delivery, easy setup, real support.",
+    url: "https://firestick4uk.com",
+    siteName: "Firestick4UK",
+    type: "website",
+    images: [{ url: "https://firestick4uk.com/og-image.jpg", width: 1200, height: 630, alt: "Firestick4UK" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Firestick4UK — Premium IPTV & Firestick UK",
+    description: "Buy Firestick, IPTV subscriptions and Android boxes in the UK. Fast delivery, easy setup, real support.",
+    images: ["https://firestick4uk.com/og-image.jpg"],
+  },
+  metadataBase: new URL("https://firestick4uk.com"),
 };
 
 export default function RootLayout({

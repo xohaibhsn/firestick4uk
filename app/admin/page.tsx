@@ -198,7 +198,8 @@ export default function AdminPage() {
   const [receiptModal, setReceiptModal] = useState<string|null>(null);
   const [orderModal, setOrderModal] = useState<typeof demoOrders[0]|null>(null);
   const [productModal, setProductModal] = useState<typeof demoProducts[0]|null|"new">(null);
-  const [editProduct, setEditProduct] = useState({ name:"", category:"", price:"", stock:"", emoji:"📦" });
+  const [editProduct, setEditProduct] = useState({ name:"", category:"", price:"", stock:"", emoji:"📦", image:"" });
+  const [imageUploading, setImageUploading] = useState(false);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [blogModal, setBlogModal] = useState<BlogPost|"new"|null>(null);
   const [editBlog, setEditBlog] = useState({ title:"", excerpt:"", category:"Guides", emoji:"📝", badge:"guide", badgeText:"Guide" });
@@ -289,6 +290,25 @@ export default function AdminPage() {
     setProducts(products.filter(p => p.id !== id));
   };
 
+  const handleProductImage = async (file: File) => {
+    setImageUploading(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: base64, name: file.name }),
+      }).then(r => r.json());
+      if (res.path) setEditProduct(p => ({ ...p, image: res.path }));
+    } catch {}
+    setImageUploading(false);
+  };
+
   const saveProduct = async () => {
     const payload = {
       name: editProduct.name,
@@ -296,7 +316,7 @@ export default function AdminPage() {
       price: editProduct.price,
       category: editProduct.category,
       badge: editProduct.emoji || null,
-      image: null,
+      image: editProduct.image || null,
       stock: editProduct.stock || "Digital",
     };
     if (productModal === "new") {
@@ -319,12 +339,12 @@ export default function AdminPage() {
   };
 
   const openEditProduct = (p: typeof demoProducts[0]) => {
-    setEditProduct({ name: p.name, category: p.category, price: p.price, stock: p.stock, emoji: p.emoji });
+    setEditProduct({ name: p.name, category: p.category, price: p.price, stock: p.stock, emoji: p.emoji, image: (p as any).image || "" });
     setProductModal(p);
   };
 
   const openNewProduct = () => {
-    setEditProduct({ name:"", category:"Subscription", price:"", stock:"Digital", emoji:"📦" });
+    setEditProduct({ name:"", category:"Subscription", price:"", stock:"Digital", emoji:"📦", image:"" });
     setProductModal("new");
   };
 
@@ -412,9 +432,23 @@ export default function AdminPage() {
             <div className="modal-field"><label>Price</label><input placeholder="e.g. £9.99" value={editProduct.price} onChange={e => setEditProduct({...editProduct,price:e.target.value})} /></div>
             <div className="modal-field"><label>Stock / Type</label><input placeholder="e.g. 10 or Digital" value={editProduct.stock} onChange={e => setEditProduct({...editProduct,stock:e.target.value})} /></div>
             <div className="modal-field"><label>Emoji Icon</label><input placeholder="e.g. 📦" value={editProduct.emoji} onChange={e => setEditProduct({...editProduct,emoji:e.target.value})} /></div>
+            <div className="modal-field">
+              <label>Product Image</label>
+              <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
+                {editProduct.image
+                  ? <img src={editProduct.image} alt="product" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid rgba(139,0,255,0.3)"}} />
+                  : <div style={{width:60,height:60,background:"rgba(139,0,255,0.1)",border:"1px dashed rgba(139,0,255,0.4)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{editProduct.emoji||"📦"}</div>
+                }
+                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.35)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"var(--purple-glow)"}}>
+                  {imageUploading ? "Uploading..." : "Upload Image"}
+                  <input type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files?.[0] && handleProductImage(e.target.files[0])} disabled={imageUploading} />
+                </label>
+                {editProduct.image && <button style={{background:"none",border:"none",color:"rgba(255,100,100,0.7)",cursor:"pointer",fontSize:13}} onClick={() => setEditProduct(p=>({...p,image:""}))}>Remove</button>}
+              </div>
+            </div>
             <div className="modal-actions">
               <button className="modal-cancel" onClick={() => setProductModal(null)}>Cancel</button>
-              <button className="modal-save" onClick={saveProduct}>Save Product</button>
+              <button className="modal-save" onClick={saveProduct} disabled={imageUploading}>Save Product</button>
             </div>
           </div>
         </div>
