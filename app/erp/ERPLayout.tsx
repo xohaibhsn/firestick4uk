@@ -109,6 +109,7 @@ const managerNav = [
   { href:"/erp/my-payroll", icon:"💰", label:"My Payroll", key:"my-payroll" },
   { href:"/erp/my-ledger", icon:"📒", label:"My Ledger", key:"my-ledger" },
   { href:"/erp/approvals", icon:"✅", label:"Approvals", key:"approvals" },
+  { href:"/erp/office-expenses", icon:"🏢", label:"Office Expenses", key:"office-expenses" },
 ];
 
 const adminNav = [
@@ -116,6 +117,7 @@ const adminNav = [
   { href:"/erp/attendance", icon:"⏰", label:"Attendance", key:"attendance" },
   { href:"/erp/expenses", icon:"💸", label:"Expenses", key:"expenses" },
   { href:"/erp/leaves", icon:"🌿", label:"Leaves", key:"leaves" },
+  { href:"/erp/office-expenses", icon:"🏢", label:"Office Expenses", key:"office-expenses" },
   { href:"/erp/employees", icon:"👥", label:"Employees", key:"employees" },
   { href:"/erp/ledger", icon:"📒", label:"Ledger", key:"ledger" },
   { href:"/erp/payroll", icon:"💰", label:"Payroll", key:"payroll" },
@@ -130,6 +132,7 @@ const routeRoles: Record<string, string[]> = {
   "/erp/my-payroll": ["admin","manager","employee"],
   "/erp/my-ledger": ["admin","manager","employee"],
   "/erp/audit": ["admin"],
+  "/erp/office-expenses": ["admin","manager"],
 };
 
 export default function ERPLayout({ children, title, active }: ERPLayoutProps) {

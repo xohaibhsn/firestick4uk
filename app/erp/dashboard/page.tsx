@@ -13,6 +13,7 @@ export default function ERPDashboard() {
 function DashboardContent({ user, currency }: { user: any; currency: string }) {
   const fmt = (n: number) => `Rs. ${Math.round(n).toLocaleString()}`;
   const [stats, setStats] = useState({ employees:0, pendingExpenses:0, pendingLeaves:0, todayAttendance:0 });
+  const [officeExpSummary, setOfficeExpSummary] = useState<any>({ total:0, categories:[] });
   const [todayStatus, setTodayStatus] = useState<any>(null);
   const [myExpenses, setMyExpenses] = useState<any[]>([]);
   const [myLeaves, setMyLeaves] = useState<any[]>([]);
@@ -20,11 +21,13 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0,10);
+    const curMonth = new Date().toISOString().slice(0,7);
     fetch(`/api/erp/attendance?employee_id=${user.id}&date=${today}`).then(r=>r.json()).then(d=>{ if(d[0]) setTodayStatus(d[0]); }).catch(()=>{});
     if (user.role === "admin") {
       fetch("/api/erp/employees").then(r=>r.json()).then(d=>setStats(s=>({...s,employees:d.filter((e:any)=>e.active).length}))).catch(()=>{});
       fetch("/api/erp/expenses").then(r=>r.json()).then(d=>setStats(s=>({...s,pendingExpenses:d.filter((e:any)=>e.status==="pending").length}))).catch(()=>{});
       fetch("/api/erp/leaves").then(r=>r.json()).then(d=>setStats(s=>({...s,pendingLeaves:d.filter((l:any)=>l.status==="pending").length}))).catch(()=>{});
+      fetch(`/api/erp/office-expenses?summary=1&month=${curMonth}`).then(r=>r.json()).then(d=>setOfficeExpSummary(d||{total:0,categories:[]})).catch(()=>{});
     } else {
       fetch(`/api/erp/expenses?employee_id=${user.id}`).then(r=>r.json()).then(d=>setMyExpenses(d.slice(0,4))).catch(()=>{});
       fetch(`/api/erp/leaves?employee_id=${user.id}`).then(r=>r.json()).then(d=>setMyLeaves(d.slice(0,4))).catch(()=>{});
@@ -79,6 +82,27 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
             ].map((s,i)=>(
               <div className="erp-stat" key={i}><div className="erp-stat-icon">{s.icon}</div><div className="erp-stat-val">{s.val}</div><div className="erp-stat-label">{s.label}</div></div>
             ))}
+          </div>
+
+          {/* Office Expenses Summary */}
+          <div className="erp-card" style={{marginBottom:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12,marginBottom:officeExpSummary.categories?.length?14:0}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:700}}>🏢 This Month Office Expenses</div>
+                <div style={{fontFamily:"'Cinzel',serif",fontSize:22,fontWeight:900,color:"#ff8c00",marginTop:4}}>{fmt(officeExpSummary.total||0)}</div>
+              </div>
+              <a href="/erp/office-expenses" style={{color:"var(--pg)",fontSize:12,textDecoration:"none"}}>View All →</a>
+            </div>
+            {(officeExpSummary.categories||[]).length > 0 && (
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {(officeExpSummary.categories||[]).slice(0,3).map((c:any)=>(
+                  <div key={c.category} style={{flex:1,minWidth:100,background:"rgba(255,140,0,0.08)",border:"1px solid rgba(255,140,0,0.2)",borderRadius:10,padding:"8px 12px"}}>
+                    <div style={{fontSize:12,color:"rgba(255,255,255,0.5)",marginBottom:2}}>{c.category}</div>
+                    <div style={{fontWeight:700,color:"#ff8c00"}}>{fmt(Number(c.total))}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="erp-card">
             <div className="erp-section-header"><div className="erp-section-title">Quick Actions</div></div>
