@@ -114,6 +114,11 @@ const styles = `
   .btn-edit { background:rgba(255,140,0,0.12); color:var(--orange); border:1px solid rgba(255,140,0,0.25); }
   .btn-edit:hover { background:rgba(255,140,0,0.25); }
 
+  .modal-product { max-width:760px; width:96vw; max-height:92vh; }
+  .seo-box { background:rgba(139,0,255,0.04); border:1px solid rgba(139,0,255,0.12); border-radius:10px; padding:16px; margin-top:4px; }
+  .seo-box-title { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.35); margin-bottom:12px; }
+  .char-bar { height:3px; border-radius:3px; margin-top:5px; transition:width 0.2s; }
+
   /* BLOG EDITOR */
   .modal-blog { max-width:900px; width:96vw; max-height:92vh; }
   .editor-toolbar { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; padding:8px; background:rgba(139,0,255,0.06); border:1px solid rgba(139,0,255,0.2); border-radius:8px; }
@@ -238,7 +243,7 @@ export default function AdminPage() {
   const [receiptModal, setReceiptModal] = useState<string|null>(null);
   const [orderModal, setOrderModal] = useState<typeof demoOrders[0]|null>(null);
   const [productModal, setProductModal] = useState<typeof demoProducts[0]|null|"new">(null);
-  const [editProduct, setEditProduct] = useState({ name:"", category:"", price:"", stock:"", image:"" });
+  const [editProduct, setEditProduct] = useState({ name:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"" });
   const [imageUploading, setImageUploading] = useState(false);
   const [customers, setCustomers] = useState(demoCustomers);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
@@ -397,12 +402,18 @@ export default function AdminPage() {
     const rawPrice = String(editProduct.price).replace(/[^0-9.]/g, "");
     const payload = {
       name: editProduct.name,
-      description: "",
+      description: editProduct.short_description || "",
       price: rawPrice,
       category: editProduct.category,
       badge: null,
       image: editProduct.image || null,
       stock: editProduct.stock || "Digital",
+      short_description: editProduct.short_description || "",
+      full_description: editProduct.full_description || "",
+      features: editProduct.features || "",
+      seo_title: editProduct.seo_title || "",
+      meta_description: editProduct.meta_description || "",
+      focus_keyword: editProduct.focus_keyword || "",
     };
     if (productModal === "new") {
       const res = await fetch("/api/admin-products", {
@@ -425,12 +436,12 @@ export default function AdminPage() {
 
   const openEditProduct = (p: any) => {
     const rawPrice = p.price ? `£${Number(String(p.price).replace(/[^0-9.]/g,'')).toFixed(2)}` : "";
-    setEditProduct({ name:p.name||"", category:p.category||"Subscription", price:rawPrice, stock:p.stock||"Digital", image:p.image||"" });
+    setEditProduct({ name:p.name||"", category:p.category||"Subscription", price:rawPrice, stock:p.stock||"Digital", image:p.image||"", short_description:p.short_description||"", full_description:p.full_description||"", features:p.features||"", seo_title:p.seo_title||"", meta_description:p.meta_description||"", focus_keyword:p.focus_keyword||"" });
     setProductModal(p);
   };
 
   const openNewProduct = () => {
-    setEditProduct({ name:"", category:"Subscription", price:"", stock:"Digital", image:"" });
+    setEditProduct({ name:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"" });
     setProductModal("new");
   };
 
@@ -511,17 +522,25 @@ export default function AdminPage() {
       {/* PRODUCT MODAL */}
       {productModal && (
         <div className="modal-overlay" onClick={() => setProductModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal modal-product" onClick={e => e.stopPropagation()}>
             <div className="modal-title">{productModal === "new" ? "Add New Product" : "Edit Product"}</div>
-            <div className="modal-field"><label>Product Name</label><input placeholder="e.g. B1G 1 Year Plan" value={editProduct.name} onChange={e => setEditProduct({...editProduct,name:e.target.value})} /></div>
-            <div className="modal-field">
-              <label>Category</label>
-              <select value={editProduct.category} onChange={e => setEditProduct({...editProduct,category:e.target.value})}>
-                <option>Subscription</option><option>Device</option><option>Bundle</option>
-              </select>
+
+            {/* Basic Info */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+              <div className="modal-field"><label>Product Name *</label><input placeholder="e.g. B1G 1 Year Plan" value={editProduct.name} onChange={e => setEditProduct({...editProduct,name:e.target.value})} /></div>
+              <div className="modal-field">
+                <label>Category</label>
+                <select value={editProduct.category} onChange={e => setEditProduct({...editProduct,category:e.target.value})}>
+                  <option>Subscription</option><option>Device</option><option>Bundle</option>
+                </select>
+              </div>
             </div>
-            <div className="modal-field"><label>Price</label><input placeholder="e.g. £9.99" value={editProduct.price} onChange={e => setEditProduct({...editProduct,price:e.target.value})} /></div>
-            <div className="modal-field"><label>Stock / Type</label><input placeholder="e.g. 10 or Digital" value={editProduct.stock} onChange={e => setEditProduct({...editProduct,stock:e.target.value})} /></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+              <div className="modal-field"><label>Price</label><input placeholder="e.g. £9.99" value={editProduct.price} onChange={e => setEditProduct({...editProduct,price:e.target.value})} /></div>
+              <div className="modal-field"><label>Stock / Type</label><input placeholder="e.g. 10 or Digital" value={editProduct.stock} onChange={e => setEditProduct({...editProduct,stock:e.target.value})} /></div>
+            </div>
+
+            {/* Image */}
             <div className="modal-field">
               <label>Product Image</label>
               <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
@@ -536,6 +555,44 @@ export default function AdminPage() {
                 {editProduct.image && <button style={{background:"none",border:"none",color:"rgba(255,100,100,0.7)",cursor:"pointer",fontSize:13}} onClick={() => setEditProduct(p=>({...p,image:""}))}>Remove</button>}
               </div>
             </div>
+
+            {/* Descriptions */}
+            <div className="modal-field">
+              <label style={{display:"flex",justifyContent:"space-between"}}>
+                Short Description
+                <span style={{fontSize:11,color:editProduct.short_description.length>180?"#ff6666":"rgba(255,255,255,0.3)"}}>{editProduct.short_description.length}/200</span>
+              </label>
+              <textarea rows={2} placeholder="Brief product summary shown on listing page..." maxLength={200} value={editProduct.short_description} onChange={e => setEditProduct({...editProduct,short_description:e.target.value})} style={{resize:"vertical"}} />
+            </div>
+            <div className="modal-field">
+              <label>Full Description</label>
+              <textarea rows={3} placeholder="Detailed product description for the product page..." value={editProduct.full_description} onChange={e => setEditProduct({...editProduct,full_description:e.target.value})} style={{resize:"vertical"}} />
+            </div>
+            <div className="modal-field">
+              <label>Features (one per line)</label>
+              <textarea rows={3} placeholder={"✅ 1 Year IPTV Access\n✅ 10,000+ Channels\n✅ Free Setup Support"} value={editProduct.features} onChange={e => setEditProduct({...editProduct,features:e.target.value})} style={{resize:"vertical"}} />
+            </div>
+
+            {/* SEO Section */}
+            <div className="seo-box">
+              <div className="seo-box-title">🔍 SEO Settings</div>
+              <div className="modal-field">
+                <label style={{display:"flex",justifyContent:"space-between"}}>
+                  SEO Title <span style={{fontSize:11,color:editProduct.seo_title.length>55?"#ff6666":editProduct.seo_title.length>40?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.seo_title.length}/60</span>
+                </label>
+                <input placeholder={`Auto: "${editProduct.name || 'Product Name'} | Firestick4UK"`} maxLength={60} value={editProduct.seo_title} onChange={e => setEditProduct({...editProduct,seo_title:e.target.value})} />
+                <div className="char-bar" style={{background:"rgba(255,255,255,0.08)",width:"100%"}}><div className="char-bar" style={{width:`${Math.min(100,(editProduct.seo_title.length/60)*100)}%`,background:editProduct.seo_title.length>55?"#ff6666":editProduct.seo_title.length>40?"#00c864":"rgba(139,0,255,0.5)"}} /></div>
+              </div>
+              <div className="modal-field">
+                <label style={{display:"flex",justifyContent:"space-between"}}>
+                  Meta Description <span style={{fontSize:11,color:editProduct.meta_description.length>150?"#ff6666":editProduct.meta_description.length>120?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.meta_description.length}/160</span>
+                </label>
+                <textarea rows={2} placeholder={`Auto: Short description will be used if empty`} maxLength={160} value={editProduct.meta_description} onChange={e => setEditProduct({...editProduct,meta_description:e.target.value})} style={{resize:"none"}} />
+                <div className="char-bar" style={{background:"rgba(255,255,255,0.08)",width:"100%"}}><div className="char-bar" style={{width:`${Math.min(100,(editProduct.meta_description.length/160)*100)}%`,background:editProduct.meta_description.length>150?"#ff6666":editProduct.meta_description.length>120?"#00c864":"rgba(139,0,255,0.5)"}} /></div>
+              </div>
+              <div className="modal-field" style={{marginBottom:0}}><label>Focus Keyword</label><input placeholder="e.g. firestick 4k uk" value={editProduct.focus_keyword} onChange={e => setEditProduct({...editProduct,focus_keyword:e.target.value})} /></div>
+            </div>
+
             <div className="modal-actions">
               <button className="modal-cancel" onClick={() => setProductModal(null)}>Cancel</button>
               <button className="modal-save" onClick={saveProduct} disabled={imageUploading}>Save Product</button>

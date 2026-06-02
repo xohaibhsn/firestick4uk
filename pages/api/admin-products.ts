@@ -16,25 +16,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       new Promise((_, reject) => setTimeout(() => reject(new Error('DB connection timeout')), 6000)),
     ]);
 
+    // Auto-migrate: add new SEO/description columns
+    for (const col of [
+      "ALTER TABLE products ADD COLUMN short_description TEXT",
+      "ALTER TABLE products ADD COLUMN full_description TEXT",
+      "ALTER TABLE products ADD COLUMN seo_title VARCHAR(60)",
+      "ALTER TABLE products ADD COLUMN meta_description VARCHAR(160)",
+      "ALTER TABLE products ADD COLUMN focus_keyword VARCHAR(100)",
+      "ALTER TABLE products ADD COLUMN features TEXT",
+      "ALTER TABLE products ADD COLUMN og_image VARCHAR(500)",
+    ]) { try { await connection.query(col); } catch (_) {} }
+
     if (req.method === 'GET') {
       const [rows] = await connection.query('SELECT * FROM products ORDER BY created_at DESC');
       return res.status(200).json(Array.isArray(rows) ? rows : []);
     }
 
     if (req.method === 'POST') {
-      const { name, description, price, category, badge, image, stock } = req.body;
+      const { name, description, price, category, badge, image, stock,
+        short_description, full_description, seo_title, meta_description, focus_keyword, features, og_image } = req.body;
+
+      const finalSeoTitle = (seo_title || '').trim() || name;
+      const finalMetaDesc = (meta_description || '').trim() || (short_description || '').trim() || '';
+
       const [result]: any = await connection.query(
-        'INSERT INTO products (name, description, price, category, badge, image, stock, active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
-        [name, description, price, category, badge || null, image || null, stock || 'Digital']
+        `INSERT INTO products (name, description, price, category, badge, image, stock, active,
+          short_description, full_description, seo_title, meta_description, focus_keyword, features, og_image)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, description || '', price, category, badge || null, image || null, stock || 'Digital',
+         short_description || '', full_description || '', finalSeoTitle, finalMetaDesc,
+         focus_keyword || '', features || '', og_image || '']
       );
       return res.status(200).json({ success: true, id: result.insertId });
     }
 
     if (req.method === 'PUT') {
-      const { id, name, description, price, category, badge, image, stock, active } = req.body;
+      const { id, name, description, price, category, badge, image, stock, active,
+        short_description, full_description, seo_title, meta_description, focus_keyword, features, og_image } = req.body;
+
+      const finalSeoTitle = (seo_title || '').trim() || name;
+      const finalMetaDesc = (meta_description || '').trim() || (short_description || '').trim() || '';
+
       await connection.query(
-        'UPDATE products SET name=?, description=?, price=?, category=?, badge=?, image=?, stock=?, active=? WHERE id=?',
-        [name, description, price, category, badge || null, image || null, stock, active, id]
+        `UPDATE products SET name=?, description=?, price=?, category=?, badge=?, image=?, stock=?, active=?,
+          short_description=?, full_description=?, seo_title=?, meta_description=?, focus_keyword=?, features=?, og_image=?
+         WHERE id=?`,
+        [name, description || '', price, category, badge || null, image || null, stock, active,
+         short_description || '', full_description || '', finalSeoTitle, finalMetaDesc,
+         focus_keyword || '', features || '', og_image || '', id]
       );
       return res.status(200).json({ success: true });
     }
@@ -51,6 +80,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('DB Error:', error.message);
     return res.status(500).json({ error: error.message });
   } finally {
-    if (connection) await connection.end();
+    if (connection) try { await connection.end(); } catch (_) {}
   }
 }
