@@ -26,7 +26,7 @@ const styles = `
   @media(max-width:768px){
     nav{padding:16px 24px;}
     .nav-links{display:none;}
-    .nav-links.open{display:flex;flex-direction:column;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(13,0,16,0.98);align-items:center;justify-content:center;gap:28px;z-index:99;}
+    .nav-links.open{display:flex;flex-direction:column;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(13,0,16,0.98);align-items:center;justify-content:center;gap:28px;z-index:9999;margin:0;padding:0;}
     .hamburger{display:flex;}
   }
   .page-wrapper { position:relative; z-index:1; padding-top:100px; min-height:100vh; }
