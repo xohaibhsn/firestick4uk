@@ -1,7 +1,8 @@
 User-agent: *
 Allow: /
 
-Disallow: /admin
+Disallow: /sidhu
 Disallow: /api/
+Disallow: /erp
 
 Sitemap: https://firestick4uk.com/sitemap.xml
