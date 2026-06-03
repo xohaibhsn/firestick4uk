@@ -47,6 +47,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       "ALTER TABLE blog_posts ADD COLUMN focus_keyword VARCHAR(255)",
       "ALTER TABLE blog_posts ADD COLUMN status VARCHAR(20) DEFAULT 'published'",
       "ALTER TABLE blog_posts ADD COLUMN featured TINYINT(1) DEFAULT 0",
+      "ALTER TABLE blog_posts ADD COLUMN canonical_url VARCHAR(500)",
+      "ALTER TABLE blog_posts ADD COLUMN faqs TEXT",
     ];
     for (const col of newCols) {
       try { await connection.query(col); } catch (_) {}
@@ -83,19 +85,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
-      const { title, slug, excerpt, content, category, emoji, badge, badgeText, featured_image, meta_title, meta_description, focus_keyword, status, featured } = req.body;
+      const { title, slug, excerpt, content, category, emoji, badge, badgeText, featured_image, meta_title, meta_description, focus_keyword, status, featured, canonical_url, faqs } = req.body;
+      const finalCanonical = (canonical_url || '').trim() || `https://firestick4uk.com/blog/${slug || ''}`;
       const [result]: any = await connection.query(
-        'INSERT INTO blog_posts (title, slug, excerpt, content, category, emoji, badge, badgeText, featured_image, meta_title, meta_description, focus_keyword, status, featured, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
-        [title, slug || '', excerpt || '', content || '', category || 'Guides', emoji || '📝', badge || 'guide', badgeText || 'Guide', featured_image || '', meta_title || '', meta_description || '', focus_keyword || '', status || 'published', featured ? 1 : 0]
+        'INSERT INTO blog_posts (title, slug, excerpt, content, category, emoji, badge, badgeText, featured_image, meta_title, meta_description, focus_keyword, status, featured, canonical_url, faqs, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
+        [title, slug || '', excerpt || '', content || '', category || 'Guides', emoji || '📝', badge || 'guide', badgeText || 'Guide', featured_image || '', meta_title || '', meta_description || '', focus_keyword || '', status || 'published', featured ? 1 : 0, finalCanonical, faqs ? JSON.stringify(faqs) : null]
       );
       return res.status(200).json({ success: true, id: result.insertId });
     }
 
     if (req.method === 'PUT') {
-      const { id, title, slug, excerpt, content, category, emoji, badge, badgeText, featured_image, meta_title, meta_description, focus_keyword, status, featured } = req.body;
+      const { id, title, slug, excerpt, content, category, emoji, badge, badgeText, featured_image, meta_title, meta_description, focus_keyword, status, featured, canonical_url, faqs } = req.body;
+      const finalCanonical = (canonical_url || '').trim() || `https://firestick4uk.com/blog/${slug || ''}`;
       await connection.query(
-        'UPDATE blog_posts SET title=?, slug=?, excerpt=?, content=?, category=?, emoji=?, badge=?, badgeText=?, featured_image=?, meta_title=?, meta_description=?, focus_keyword=?, status=?, featured=? WHERE id=?',
-        [title, slug || '', excerpt || '', content || '', category || 'Guides', emoji || '📝', badge || 'guide', badgeText || 'Guide', featured_image || '', meta_title || '', meta_description || '', focus_keyword || '', status || 'published', featured ? 1 : 0, id]
+        'UPDATE blog_posts SET title=?, slug=?, excerpt=?, content=?, category=?, emoji=?, badge=?, badgeText=?, featured_image=?, meta_title=?, meta_description=?, focus_keyword=?, status=?, featured=?, canonical_url=?, faqs=? WHERE id=?',
+        [title, slug || '', excerpt || '', content || '', category || 'Guides', emoji || '📝', badge || 'guide', badgeText || 'Guide', featured_image || '', meta_title || '', meta_description || '', focus_keyword || '', status || 'published', featured ? 1 : 0, finalCanonical, faqs ? JSON.stringify(faqs) : null, id]
       );
       return res.status(200).json({ success: true });
     }

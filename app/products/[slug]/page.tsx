@@ -68,7 +68,17 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const { slug } = await params;
   const product = await getProduct(slug);
 
-  const jsonLd = product ? {
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "https://firestick4uk.com" },
+      { "@type": "ListItem", position: 2, name: "Products", item: "https://firestick4uk.com/products" },
+      { "@type": "ListItem", position: 3, name: product?.name || slug, item: `https://firestick4uk.com/products/${slug}` },
+    ],
+  };
+
+  const productLd = product ? {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
@@ -85,10 +95,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   return (
     <>
-      {jsonLd && (
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
+      {productLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(productLd) }}
         />
       )}
       <ProductDetail slug={slug} initialProduct={product as any} />

@@ -228,7 +228,7 @@ const demoCustomers = [
 
 type Tab = "dashboard"|"orders"|"products"|"customers"|"blog";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
-type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; };
+type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
 
 export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -250,7 +250,7 @@ export default function AdminPage() {
   const [blogModal, setBlogModal] = useState<BlogPost|"new"|null>(null);
   const [featImgUploading, setFeatImgUploading] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
-  const defaultBlog = { title:"", slug:"", excerpt:"", content:"", category:"Guides", emoji:"📝", badge:"guide", badgeText:"Guide", featured_image:"", meta_title:"", meta_description:"", focus_keyword:"", status:"published" as "published"|"draft", featured:false };
+  const defaultBlog = { title:"", slug:"", excerpt:"", content:"", category:"Guides", emoji:"📝", badge:"guide", badgeText:"Guide", featured_image:"", meta_title:"", meta_description:"", focus_keyword:"", status:"published" as "published"|"draft", featured:false, canonical_url:"", faqs:[] as Array<{question:string;answer:string}> };
   const [editBlog, setEditBlog] = useState<typeof defaultBlog>(defaultBlog);
 
   useEffect(() => {
@@ -668,6 +668,27 @@ export default function AdminPage() {
                 <div className={`char-count ${editBlog.meta_description.length>140?"char-warn":""}`}>{editBlog.meta_description.length}/160</div>
               </div>
               <div className="modal-field"><label>Focus Keyword</label><input placeholder="e.g. firestick uk" value={editBlog.focus_keyword} onChange={e=>setEditBlog(p=>({...p,focus_keyword:e.target.value}))} /></div>
+              <div className="modal-field" style={{marginBottom:0}}>
+                <label>Canonical URL</label>
+                <input placeholder={`https://firestick4uk.com/blog/${editBlog.slug||"post-slug"}`} value={editBlog.canonical_url} onChange={e=>setEditBlog(p=>({...p,canonical_url:e.target.value}))} />
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",marginTop:3}}>Leave empty to auto-generate from slug</div>
+              </div>
+            </div>
+
+            {/* FAQ Section */}
+            <div className="seo-section" style={{marginTop:8}}>
+              <h5 style={{fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase",color:"rgba(255,255,255,0.4)",marginBottom:"12px"}}>❓ FAQ Section (Schema Markup)</h5>
+              {editBlog.faqs.map((faq,i)=>(
+                <div key={i} style={{marginBottom:10,padding:"12px",background:"rgba(139,0,255,0.05)",border:"1px solid rgba(139,0,255,0.12)",borderRadius:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <span style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>FAQ #{i+1}</span>
+                    <button style={{background:"none",border:"none",color:"rgba(255,100,100,0.6)",cursor:"pointer",fontSize:12}} onClick={()=>setEditBlog(p=>({...p,faqs:p.faqs.filter((_,j)=>j!==i)}))}>Remove</button>
+                  </div>
+                  <input className="modal-field" style={{width:"100%",background:"rgba(139,0,255,0.07)",border:"1px solid rgba(139,0,255,0.2)",borderRadius:8,padding:"8px 12px",color:"white",fontSize:13,marginBottom:6,outline:"none"}} placeholder="Question" value={faq.question} onChange={e=>setEditBlog(p=>({...p,faqs:p.faqs.map((f,j)=>j===i?{...f,question:e.target.value}:f)}))} />
+                  <textarea style={{width:"100%",background:"rgba(139,0,255,0.07)",border:"1px solid rgba(139,0,255,0.2)",borderRadius:8,padding:"8px 12px",color:"white",fontSize:13,resize:"vertical",outline:"none",minHeight:60,fontFamily:"inherit"}} placeholder="Answer" value={faq.answer} onChange={e=>setEditBlog(p=>({...p,faqs:p.faqs.map((f,j)=>j===i?{...f,answer:e.target.value}:f)}))} />
+                </div>
+              ))}
+              <button className="erp-btn" style={{background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",color:"var(--purple-glow)",padding:"7px 16px",borderRadius:8,cursor:"pointer",fontSize:13}} onClick={()=>setEditBlog(p=>({...p,faqs:[...p.faqs,{question:"",answer:""}]}))}>+ Add FAQ</button>
             </div>
 
             {/* Status + Featured toggles */}
@@ -899,7 +920,7 @@ export default function AdminPage() {
                         <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{p.category}</span></td>
                         <td><span style={{fontSize:"11px",padding:"3px 10px",borderRadius:"10px",fontWeight:700,background:p.status==="published"?"rgba(0,200,100,0.12)":"rgba(255,180,0,0.12)",border:p.status==="published"?"1px solid rgba(0,200,100,0.3)":"1px solid rgba(255,180,0,0.3)",color:p.status==="published"?"#00c864":"#ffb400"}}>{p.status==="published"?"Published":"Draft"}</span></td>
                         <td style={{whiteSpace:"nowrap"}}>
-                          <button className="action-btn btn-edit" onClick={() => { setEditBlog({title:p.title,slug:p.slug||"",excerpt:p.excerpt||"",content:p.content||"",category:p.category||"Guides",emoji:p.emoji||"📝",badge:p.badge||"guide",badgeText:p.badgeText||"Guide",featured_image:p.featured_image||"",meta_title:p.meta_title||"",meta_description:p.meta_description||"",focus_keyword:p.focus_keyword||"",status:p.status||"published",featured:!!p.featured}); setBlogModal(p); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML=p.content||"";},80); }}>Edit</button>
+                          <button className="action-btn btn-edit" onClick={() => { const faqsParsed = p.faqs ? (typeof p.faqs==="string" ? JSON.parse(p.faqs) : p.faqs) : []; setEditBlog({title:p.title,slug:p.slug||"",excerpt:p.excerpt||"",content:p.content||"",category:p.category||"Guides",emoji:p.emoji||"📝",badge:p.badge||"guide",badgeText:p.badgeText||"Guide",featured_image:p.featured_image||"",meta_title:p.meta_title||"",meta_description:p.meta_description||"",focus_keyword:p.focus_keyword||"",status:p.status||"published",featured:!!p.featured,canonical_url:p.canonical_url||"",faqs:faqsParsed}); setBlogModal(p); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML=p.content||"";},80); }}>Edit</button>
                           <button className="action-btn btn-delete" onClick={() => deleteBlog(p.id)}>Delete</button>
                         </td>
                       </tr>

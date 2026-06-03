@@ -146,8 +146,21 @@ export default function FAQPage() {
     ? faqs
     : { [activeCategory]: faqs[activeCategory as keyof typeof faqs] };
 
+  // Build FAQPage JSON-LD from all FAQ entries
+  const allFaqEntries = Object.values(faqs).flat();
+  const faqSchemaLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: allFaqEntries.map(f => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchemaLd) }} />
       <style>{styles}</style>
       <div className="bg-fixed" />
 
