@@ -1,12 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-
-const getDB = async () => {
-  const mysql = require('mysql2/promise');
-  return Promise.race([
-    mysql.createConnection({ host: process.env.DB_HOST||'srv497.hstgr.io', user: process.env.DB_USER||'u992747032_firestick4uk', password: process.env.DB_PASSWORD||'Firestick@2026', database: process.env.DB_NAME||'u992747032_firestick4uk', port: 3306, connectTimeout: 5000 }),
-    new Promise((_,reject) => setTimeout(()=>reject(new Error('timeout')),6000)),
-  ]);
-};
+import pool from '../../lib/db';
 
 const DEFAULT_FAQS = [
   ['How do I place an order?','Browse our products, add items to your cart, fill in your delivery details, choose your payment method (bank transfer or cash on delivery), and click Place Order. You\'ll receive an Order ID instantly.','Orders & Payment',1],
@@ -28,11 +21,8 @@ const DEFAULT_FAQS = [
 ];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  let conn: any;
   try {
-    conn = await getDB();
-
-    await conn.query(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS faqs (
         id INT AUTO_INCREMENT PRIMARY KEY,
         question TEXT NOT NULL,
@@ -44,11 +34,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       )
     `);
 
-    // Insert defaults if empty
-    const [count]: any = await conn.query('SELECT COUNT(*) as c FROM faqs');
+    const [count]: any = await pool.query('SELECT COUNT(*) as c FROM faqs');
     if (Number(count[0]?.c || 0) === 0) {
       for (const [q,a,cat,ord] of DEFAULT_FAQS) {
-        await conn.query('INSERT INTO faqs (question,answer,category,sort_order) VALUES (?,?,?,?)', [q,a,cat,ord]);
+        await pool.query('INSERT INTO faqs (question,answer,category,sort_order) VALUES (?,?,?,?)', [q,a,cat,ord]);
       }
     }
 
@@ -57,14 +46,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let query = 'SELECT * FROM faqs';
       if (!admin) query += ' WHERE is_visible=1';
       query += ' ORDER BY category, sort_order ASC';
-      const [rows] = await conn.query(query);
+      const [rows] = await pool.query(query);
       return res.status(200).json(Array.isArray(rows)?rows:[]);
     }
 
     if (req.method === 'POST') {
       const { question, answer, category, sort_order } = req.body;
       if (!question || !answer) return res.status(400).json({ error: 'Question and answer required' });
-      const [r]: any = await conn.query(
+      const [r]: any = await pool.query(
         'INSERT INTO faqs (question,answer,category,sort_order) VALUES (?,?,?,?)',
         [question, answer, category||'General', sort_order||0]
       );
@@ -74,7 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'PUT') {
       const { id, question, answer, category, sort_order, is_visible } = req.body;
       if (!id) return res.status(400).json({ error: 'ID required' });
-      await conn.query(
+      await pool.query(
         'UPDATE faqs SET question=?,answer=?,category=?,sort_order=?,is_visible=? WHERE id=?',
         [question, answer, category||'General', sort_order||0, is_visible??1, id]
       );
@@ -83,14 +72,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'DELETE') {
       const { id } = req.query;
-      await conn.query('DELETE FROM faqs WHERE id=?', [id]);
+      await pool.query('DELETE FROM faqs WHERE id=?', [id]);
       return res.status(200).json({ success:true });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
-  } finally {
-    if (conn) try { await conn.end(); } catch (_) {}
   }
 }

@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
+import pool from '../../lib/db';
 
 export const config = { api: { bodyParser: { sizeLimit: '2mb' } } };
 
@@ -23,22 +24,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const filePath = path.join(uploadsDir, fileName);
     fs.writeFileSync(filePath, base64Data, 'base64');
 
-    // Also copy as public/favicon.ico if .ico or .png
     if (ext === '.ico' || ext === '.png') {
       fs.writeFileSync(path.join(process.cwd(), 'public', 'favicon.ico'), base64Data, 'base64');
     }
 
     const publicUrl = `/uploads/favicon/${fileName}`;
 
-    // Update in DB
     try {
-      const mysql = require('mysql2/promise');
-      const conn = await Promise.race([
-        mysql.createConnection({ host: process.env.DB_HOST||'srv497.hstgr.io', user: process.env.DB_USER||'u992747032_firestick4uk', password: process.env.DB_PASSWORD||'Firestick@2026', database: process.env.DB_NAME||'u992747032_firestick4uk', port: 3306, connectTimeout: 5000 }),
-        new Promise((_,reject) => setTimeout(()=>reject(new Error('timeout')),4000)),
-      ]) as any;
-      await conn.query('UPDATE site_content SET content_value=? WHERE content_key="favicon_url"', [publicUrl]);
-      await conn.end();
+      await pool.query('UPDATE site_content SET content_value=? WHERE content_key="favicon_url"', [publicUrl]);
     } catch (_) {}
 
     return res.status(200).json({ success: true, url: publicUrl });

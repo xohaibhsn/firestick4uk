@@ -1,12 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-
-const getDB = async () => {
-  const mysql = require('mysql2/promise');
-  return Promise.race([
-    mysql.createConnection({ host: process.env.DB_HOST||'srv497.hstgr.io', user: process.env.DB_USER||'u992747032_firestick4uk', password: process.env.DB_PASSWORD||'Firestick@2026', database: process.env.DB_NAME||'u992747032_firestick4uk', port: 3306, connectTimeout: 5000 }),
-    new Promise((_,reject) => setTimeout(()=>reject(new Error('timeout')),6000)),
-  ]);
-};
+import pool from '../../lib/db';
 
 const DEFAULTS = [
   ['home_hero','{"title":"Best Firestick Service in UK","subtitle":"Premium IPTV & Streaming Solutions","button_text":"Shop Now","button_link":"/products","secondary_button_text":"Learn More","secondary_button_link":"/about"}','json','home','Hero Section',1,1],
@@ -20,20 +13,15 @@ const DEFAULTS = [
 ];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  let conn: any;
   try {
-    conn = await getDB();
-
-    // Auto-migrate
     for (const col of [
       "ALTER TABLE site_content ADD COLUMN section_order INT DEFAULT 0",
       "ALTER TABLE site_content ADD COLUMN is_visible TINYINT(1) DEFAULT 1",
-    ]) { try { await conn.query(col); } catch (_) {} }
+    ]) { try { await pool.query(col); } catch (_) {} }
 
-    // Insert defaults
     for (const [key,val,type,page,label,order,vis] of DEFAULTS) {
       try {
-        await conn.query(
+        await pool.query(
           'INSERT IGNORE INTO site_content (content_key,content_value,content_type,page_name,label,section_order,is_visible) VALUES (?,?,?,?,?,?,?)',
           [key,val,type,page,label,order,vis]
         );
@@ -46,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const params: any[] = [page || 'home'];
       if (!all) query += ' AND is_visible=1';
       query += ' ORDER BY section_order ASC';
-      const [rows]: any = await conn.query(query, params);
+      const [rows]: any = await pool.query(query, params);
       const result = (Array.isArray(rows)?rows:[]).map((r:any) => ({
         key: r.content_key,
         label: r.label,
@@ -62,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { key, value } = req.body;
       if (!key) return res.status(400).json({ error: 'Key required' });
       const json = typeof value === 'string' ? value : JSON.stringify(value);
-      await conn.query('UPDATE site_content SET content_value=? WHERE content_key=?', [json, key]);
+      await pool.query('UPDATE site_content SET content_value=? WHERE content_key=?', [json, key]);
       return res.status(200).json({ success: true });
     }
 
@@ -70,13 +58,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { action } = req.query;
       if (action === 'visibility') {
         const { key, is_visible } = req.body;
-        await conn.query('UPDATE site_content SET is_visible=? WHERE content_key=?', [is_visible?1:0, key]);
+        await pool.query('UPDATE site_content SET is_visible=? WHERE content_key=?', [is_visible?1:0, key]);
         return res.status(200).json({ success: true });
       }
       if (action === 'reorder') {
         const { order } = req.body;
         for (const item of (order||[])) {
-          await conn.query('UPDATE site_content SET section_order=? WHERE content_key=?', [item.section_order, item.key]);
+          await pool.query('UPDATE site_content SET section_order=? WHERE content_key=?', [item.section_order, item.key]);
         }
         return res.status(200).json({ success: true });
       }
@@ -86,7 +74,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
-  } finally {
-    if (conn) try { await conn.end(); } catch (_) {}
   }
 }

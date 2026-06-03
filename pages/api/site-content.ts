@@ -1,12 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-
-const getDB = async () => {
-  const mysql = require('mysql2/promise');
-  return Promise.race([
-    mysql.createConnection({ host: process.env.DB_HOST||'srv497.hstgr.io', user: process.env.DB_USER||'u992747032_firestick4uk', password: process.env.DB_PASSWORD||'Firestick@2026', database: process.env.DB_NAME||'u992747032_firestick4uk', port: 3306, connectTimeout: 5000 }),
-    new Promise((_,reject) => setTimeout(()=>reject(new Error('timeout')),6000)),
-  ]);
-};
+import pool from '../../lib/db';
 
 const DEFAULTS = [
   ['site_title','Firestick4UK','text','settings','Website Title'],
@@ -28,11 +21,8 @@ const DEFAULTS = [
 ];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  let conn: any;
   try {
-    conn = await getDB();
-
-    await conn.query(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS site_content (
         id INT AUTO_INCREMENT PRIMARY KEY,
         content_key VARCHAR(100) UNIQUE NOT NULL,
@@ -44,10 +34,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       )
     `);
 
-    // Insert defaults
     for (const [key, val, type, page, label] of DEFAULTS) {
       try {
-        await conn.query(
+        await pool.query(
           'INSERT IGNORE INTO site_content (content_key, content_value, content_type, page_name, label) VALUES (?,?,?,?,?)',
           [key, val, type, page, label]
         );
@@ -60,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const params: any[] = [];
       if (page && page !== 'all') { query += ' WHERE page_name=?'; params.push(page); }
       query += ' ORDER BY id ASC';
-      const [rows]: any = await conn.query(query, params);
+      const [rows]: any = await pool.query(query, params);
       const result: Record<string,string> = {};
       for (const r of rows) result[r.content_key] = r.content_value || '';
       return res.status(200).json(result);
@@ -70,17 +59,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { key, value, updates } = req.body;
       if (updates && Array.isArray(updates)) {
         for (const u of updates) {
-          await conn.query('UPDATE site_content SET content_value=? WHERE content_key=?', [u.value||'', u.key]);
+          await pool.query('UPDATE site_content SET content_value=? WHERE content_key=?', [u.value||'', u.key]);
         }
       } else if (key) {
-        await conn.query('UPDATE site_content SET content_value=? WHERE content_key=?', [value||'', key]);
+        await pool.query('UPDATE site_content SET content_value=? WHERE content_key=?', [value||'', key]);
       }
       return res.status(200).json({ success: true });
     }
 
     if (req.method === 'PUT') {
       const { content_key, content_value, content_type, page_name, label } = req.body;
-      await conn.query(
+      await pool.query(
         'INSERT INTO site_content (content_key,content_value,content_type,page_name,label) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE content_value=?,label=?',
         [content_key, content_value||'', content_type||'text', page_name||'', label||content_key, content_value||'', label||content_key]
       );
@@ -89,14 +78,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'DELETE') {
       const { key } = req.query;
-      await conn.query('DELETE FROM site_content WHERE content_key=?', [key]);
+      await pool.query('DELETE FROM site_content WHERE content_key=?', [key]);
       return res.status(200).json({ success: true });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
-  } finally {
-    if (conn) try { await conn.end(); } catch (_) {}
   }
 }

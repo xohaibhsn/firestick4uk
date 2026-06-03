@@ -1,24 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import pool from '../../lib/db';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  let connection;
   try {
-    const mysql = require('mysql2/promise');
-    connection = await Promise.race([
-      mysql.createConnection({
-        host: process.env.DB_HOST || 'srv497.hstgr.io',
-        user: process.env.DB_USER || 'u992747032_firestick4uk',
-        password: process.env.DB_PASSWORD || 'Firestick@2026',
-        database: process.env.DB_NAME || 'u992747032_firestick4uk',
-        port: Number(process.env.DB_PORT) || 3306,
-        connectTimeout: 5000,
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('DB connection timeout')), 6000)),
-    ]);
-
     if (req.method === 'GET') {
       if (req.query.customers === '1') {
-        const [rows] = await connection.query(`
+        const [rows] = await pool.query(`
           SELECT customer_name, customer_email, customer_phone,
             COUNT(*) AS order_count,
             SUM(total) AS total_spent,
@@ -29,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `);
         return res.status(200).json(Array.isArray(rows) ? rows : []);
       }
-      const [rows] = await connection.query(`
+      const [rows] = await pool.query(`
         SELECT o.*,
           GROUP_CONCAT(oi.product_name ORDER BY oi.id SEPARATOR ' + ') AS items_list
         FROM orders o
@@ -42,18 +29,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'PATCH') {
       const { order_id, status } = req.body;
-      await connection.query(
-        'UPDATE orders SET status = ? WHERE order_id = ?',
-        [status, order_id]
-      );
+      await pool.query('UPDATE orders SET status = ? WHERE order_id = ?', [status, order_id]);
       return res.status(200).json({ success: true });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
-
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
-  } finally {
-    if (connection) try { await connection.end(); } catch (_) {}
   }
 }

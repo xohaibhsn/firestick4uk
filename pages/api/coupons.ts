@@ -1,23 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { RL_GENERAL, getClientIp } from '../../lib/rateLimit';
-
-const getDB = async () => {
-  const mysql = require('mysql2/promise');
-  return Promise.race([
-    mysql.createConnection({ host: process.env.DB_HOST||'srv497.hstgr.io', user: process.env.DB_USER||'u992747032_firestick4uk', password: process.env.DB_PASSWORD||'Firestick@2026', database: process.env.DB_NAME||'u992747032_firestick4uk', port: 3306, connectTimeout: 5000 }),
-    new Promise((_,reject) => setTimeout(()=>reject(new Error('timeout')),6000)),
-  ]);
-};
+import pool from '../../lib/db';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { allowed } = RL_GENERAL(getClientIp(req));
   if (!allowed) return res.status(429).json({ error: 'Too many requests' });
 
-  let conn: any;
   try {
-    conn = await getDB();
-
-    await conn.query(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS coupons (
         id INT AUTO_INCREMENT PRIMARY KEY,
         code VARCHAR(50) UNIQUE NOT NULL,
@@ -32,16 +22,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       )
     `);
 
-    await conn.query(`INSERT IGNORE INTO coupons (code,type,value,minimum_order) VALUES ('WELCOME10','percentage',10,0),('SAVE5','fixed',5,20)`);
+    await pool.query(`INSERT IGNORE INTO coupons (code,type,value,minimum_order) VALUES ('WELCOME10','percentage',10,0),('SAVE5','fixed',5,20)`);
 
     const { action } = req.query;
 
-    // Validate coupon
     if (req.method === 'POST' && action === 'validate') {
       const { code, cart_total } = req.body;
       if (!code) return res.status(400).json({ valid:false, message:"Please enter a coupon code" });
 
-      const [rows]: any = await conn.query(
+      const [rows]: any = await pool.query(
         'SELECT * FROM coupons WHERE code=? AND is_active=1',
         [String(code).toUpperCase().trim()]
       );
@@ -64,44 +53,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // List all (admin)
     if (req.method === 'GET') {
-      const [rows] = await conn.query('SELECT * FROM coupons ORDER BY created_at DESC');
+      const [rows] = await pool.query('SELECT * FROM coupons ORDER BY created_at DESC');
       return res.status(200).json(Array.isArray(rows)?rows:[]);
     }
 
-    // Create (admin)
     if (req.method === 'POST') {
       const { code, type, value, minimum_order, usage_limit, expires_at } = req.body;
       if (!code||!type||!value) return res.status(400).json({ error:'Missing required fields' });
-      const [r]: any = await conn.query(
+      const [r]: any = await pool.query(
         'INSERT INTO coupons (code,type,value,minimum_order,usage_limit,expires_at) VALUES (?,?,?,?,?,?)',
         [String(code).toUpperCase().trim(), type, value, minimum_order||0, usage_limit||null, expires_at||null]
       );
       return res.status(200).json({ success:true, id:r.insertId });
     }
 
-    // Update (admin)
     if (req.method === 'PUT') {
       const { id, code, type, value, minimum_order, usage_limit, expires_at, is_active } = req.body;
-      await conn.query(
+      await pool.query(
         'UPDATE coupons SET code=?,type=?,value=?,minimum_order=?,usage_limit=?,expires_at=?,is_active=? WHERE id=?',
         [String(code).toUpperCase().trim(), type, value, minimum_order||0, usage_limit||null, expires_at||null, is_active?1:0, id]
       );
       return res.status(200).json({ success:true });
     }
 
-    // Delete (admin)
     if (req.method === 'DELETE') {
       const { id } = req.query;
-      await conn.query('DELETE FROM coupons WHERE id=?', [id]);
+      await pool.query('DELETE FROM coupons WHERE id=?', [id]);
       return res.status(200).json({ success:true });
     }
 
     return res.status(405).json({ error:'Method not allowed' });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
-  } finally {
-    if (conn) try { await conn.end(); } catch (_) {}
   }
 }
