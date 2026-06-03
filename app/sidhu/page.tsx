@@ -44,8 +44,18 @@ const styles = `
   .top-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
   .page-heading { font-family:'Cinzel',serif; font-size:22px; font-weight:700; color:#111111; }
   .page-heading span { color:#5B21B6; }
-  .top-right { display:flex; align-items:center; gap:14px; }
+  .top-right { display:flex; align-items:center; gap:14px; position:relative; }
   .admin-badge { background:#F5F5F5; border:1px solid #E5E5E5; color:#666666; font-size:12px; padding:6px 14px; border-radius:20px; }
+  .admin-user-btn { display:flex; align-items:center; gap:6px; background:#F5F5F5; border:1px solid #E5E5E5; color:#111111; font-size:13px; font-weight:500; padding:7px 14px; border-radius:20px; cursor:pointer; transition:all 0.15s; }
+  .admin-user-btn:hover { background:#EEEEEE; border-color:#CCCCCC; }
+  .admin-dropdown { position:absolute; top:calc(100% + 8px); right:0; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:10px; min-width:160px; box-shadow:0 4px 20px rgba(0,0,0,0.12); z-index:200; overflow:hidden; }
+  .admin-dropdown-header { padding:12px 16px 10px; border-bottom:1px solid #F0F0F0; }
+  .admin-dropdown-name { font-size:14px; font-weight:600; color:#111111; }
+  .admin-dropdown-role { font-size:11px; color:#888888; margin-top:1px; }
+  .admin-dropdown-item { display:flex; align-items:center; gap:10px; padding:11px 16px; font-size:13px; cursor:pointer; color:#111111; transition:background 0.15s; border:none; background:none; width:100%; text-align:left; }
+  .admin-dropdown-item:hover { background:#F5F5F5; }
+  .admin-dropdown-item.danger { color:#DC2626; }
+  .admin-dropdown-item.danger:hover { background:#FEF2F2; }
 
   /* STATS */
   .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:24px; }
@@ -207,6 +217,7 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState("");
   const [tab, setTab] = useState<Tab>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [adminDropOpen, setAdminDropOpen] = useState(false);
   const [orders, setOrders] = useState(demoOrders);
   const [products, setProducts] = useState(demoProducts);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -741,6 +752,7 @@ export default function AdminPage() {
       )}
 
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+      {adminDropOpen && <div style={{position:"fixed",inset:0,zIndex:199}} onClick={() => setAdminDropOpen(false)} />}
 
       <div className="admin-layout">
         {/* SIDEBAR */}
@@ -769,10 +781,8 @@ export default function AdminPage() {
               </button>
             ))}
           </nav>
-          <div className="sidebar-footer">
-            <button className="logout-btn" onClick={() => { handleLogout(); setSidebarOpen(false); }}>
-              <span>🚪</span> Logout
-            </button>
+          <div className="sidebar-footer" style={{padding:"12px 10px"}}>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",textAlign:"center",letterSpacing:"1px"}}>FIRESTICK4UK ADMIN</div>
           </div>
         </aside>
 
@@ -797,7 +807,20 @@ export default function AdminPage() {
               </h1>
             </div>
             <div className="top-right">
-              <span className="admin-badge">👤 Admin</span>
+              <button className="admin-user-btn" onClick={() => setAdminDropOpen(o => !o)}>
+                👤 Admin <span style={{fontSize:10,color:"#888888"}}>{adminDropOpen?"▲":"▼"}</span>
+              </button>
+              {adminDropOpen && (
+                <div className="admin-dropdown" onClick={e => e.stopPropagation()}>
+                  <div className="admin-dropdown-header">
+                    <div className="admin-dropdown-name">Admin</div>
+                    <div className="admin-dropdown-role">Administrator</div>
+                  </div>
+                  <button className="admin-dropdown-item danger" onClick={() => { setAdminDropOpen(false); handleLogout(); }}>
+                    🚪 Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

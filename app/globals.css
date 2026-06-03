@@ -476,54 +476,43 @@ html body .erp-layout,
 html body .erp-layout * {
   /* ERP manages its own colors */
 }
-/* Override any accidental light-theme leakage into ERP */
-html body .erp-main { background: #0F0520 !important; color: #FFFFFF !important; }
-html body .erp-sidebar { background: #0F0520 !important; color: #FFFFFF !important; }
-html body .erp-card { background: rgba(255,255,255,0.04) !important; color: #FFFFFF !important; border-color: rgba(255,255,255,0.1) !important; }
-html body .erp-card * { color: #FFFFFF !important; }
-html body .erp-section-title { color: #FFFFFF !important; }
-html body .erp-page-title { color: #FFFFFF !important; }
-html body th, html body td { /* reset below for ERP */ }
-/* ERP tables */
-html body .erp-table-wrap th { color: #AAAAAA !important; background: transparent !important; border-bottom-color: rgba(255,255,255,0.08) !important; }
-html body .erp-table-wrap td { color: #DDDDDD !important; border-bottom-color: rgba(255,255,255,0.05) !important; }
-html body .erp-table-wrap tr:hover td { background: rgba(255,255,255,0.03) !important; }
-
-/* ══════════════════════════════════════════════
-   ERP FORM INPUTS — override light theme defaults
-   ERP uses dark backgrounds, needs white text
-   ══════════════════════════════════════════════ */
+/* ERP LIGHT THEME — override dark theme globals */
+html body .erp-main { background: #F5F5F5 !important; color: #111111 !important; }
+html body .erp-sidebar { background: #111111 !important; color: #FFFFFF !important; }
+html body .erp-card { background: #FFFFFF !important; color: #111111 !important; border-color: #E5E5E5 !important; }
+html body .erp-card * { color: #111111 !important; }
+html body .erp-section-title { color: #111111 !important; }
+html body .erp-page-title { color: #111111 !important; -webkit-text-fill-color: #111111 !important; }
+html body .erp-page-title span { color: #5B21B6 !important; -webkit-text-fill-color: #5B21B6 !important; }
+html body .erp-stat-val { color: #111111 !important; }
+html body .erp-stat-label { color: #666666 !important; }
+/* ERP tables — light theme */
+html body .erp-table-wrap th { color: #666666 !important; background: #F9F9F9 !important; border-bottom-color: #E5E5E5 !important; }
+html body .erp-table-wrap td { color: #333333 !important; border-bottom-color: #F0F0F0 !important; }
+html body .erp-table-wrap tr:hover td { background: #FAFAFA !important; }
+/* ERP form inputs — light theme */
 html body .erp-layout input:not([type="checkbox"]):not([type="radio"]),
 html body .erp-layout textarea,
 html body .erp-layout select {
-  background: rgba(255,255,255,0.06) !important;
-  border: 1px solid rgba(255,255,255,0.12) !important;
-  color: #FFFFFF !important;
+  background: #FFFFFF !important;
+  border: 1px solid #E5E5E5 !important;
+  color: #111111 !important;
 }
 html body .erp-layout input:focus,
 html body .erp-layout textarea:focus,
 html body .erp-layout select:focus {
-  border-color: #BFA5FF !important;
-  box-shadow: 0 0 0 3px rgba(191,165,255,0.15) !important;
-  background: rgba(255,255,255,0.1) !important;
+  border-color: #5B21B6 !important;
+  box-shadow: 0 0 0 3px rgba(91,33,182,0.1) !important;
 }
 html body .erp-layout input::placeholder,
-html body .erp-layout textarea::placeholder {
-  color: rgba(255,255,255,0.35) !important;
-}
-html body .erp-layout label { color: #AAAAAA !important; }
-html body .erp-layout select option { background: #1a0035 !important; color: #FFFFFF !important; }
-
-/* ERP headings — white on dark */
+html body .erp-layout textarea::placeholder { color: #999999 !important; }
+html body .erp-layout label { color: #666666 !important; }
+html body .erp-layout select option { background: #FFFFFF !important; color: #111111 !important; }
 html body .erp-layout h1,
 html body .erp-layout h2,
 html body .erp-layout h3,
-html body .erp-layout h4 { color: #FFFFFF !important; }
-
-/* ERP list items */
+html body .erp-layout h4 { color: #111111 !important; }
 html body .erp-layout ul li,
-html body .erp-layout ol li { color: #CCCCCC !important; }
-
-/* ERP page title override (NOT the public nav one) */
-html body .erp-page-title { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
-html body .erp-page-title span { color: #BFA5FF !important; -webkit-text-fill-color: #BFA5FF !important; }
+html body .erp-layout ol li { color: #333333 !important; }
+/* Sidebar stays dark */
+html body .erp-sidebar * { color: #FFFFFF !important; }
