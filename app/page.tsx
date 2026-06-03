@@ -17,7 +17,13 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [added, setAdded] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const { addToCart, cart } = useCart();
+
+  const handleSearch = () => {
+    const q = searchTerm.trim();
+    if (q) window.location.href = `/products?q=${encodeURIComponent(q)}`;
+  };
 
   // Section data from DB
   const [sec, setSec] = useState<Record<string,any>>({
@@ -76,6 +82,13 @@ export default function Home() {
         .section-title span { color:#5B21B6; }
         .view-all-link { font-size:13px; font-weight:600; color:#5B21B6; text-decoration:none; border:1px solid #5B21B6; padding:8px 20px; border-radius:8px; transition:all 0.2s; white-space:nowrap; }
         .view-all-link:hover { background:#5B21B6; color:#FFFFFF; }
+        .search-wrap { max-width:1300px; margin:0 auto; padding:0 60px 28px; }
+        .search-bar { display:flex; align-items:center; gap:10px; background:#FFFFFF; border:2px solid #E5E5E5; border-radius:50px; padding:6px 6px 6px 24px; transition:border-color 0.2s; }
+        .search-bar:focus-within { border-color:#5B21B6; }
+        .search-input { flex:1; border:none; outline:none; font-size:16px; color:#111111; background:transparent; font-family:'Raleway',sans-serif; padding:8px 0; }
+        .search-input::placeholder { color:#AAAAAA; }
+        .search-btn { background:#5B21B6; color:#FFFFFF; border:none; border-radius:50px; padding:12px 28px; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap; font-family:'Raleway',sans-serif; }
+        .search-btn:hover { background:#1A1A1A; }
         .products-grid { max-width:1300px; margin:0 auto; padding:0 60px 20px; display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:22px; }
         .view-all-wrap { max-width:1300px; margin:0 auto; padding:20px 60px 60px; text-align:center; border-bottom:1px solid #E5E5E5; }
         .view-all-btn { display:inline-block; background:#111111; color:#FFFFFF; padding:14px 40px; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; transition:all 0.2s; }
@@ -147,6 +160,10 @@ export default function Home() {
           .nav-links.open a{font-size:18px;color:#111111;}
           .hamburger{display:flex;}
           .products-header{padding:32px 24px 20px;flex-direction:column;align-items:flex-start;gap:14px;}
+          .search-wrap{padding:0 24px 24px;}
+          .search-bar{padding:5px 5px 5px 18px;}
+          .search-input{font-size:15px;}
+          .search-btn{padding:11px 20px;font-size:13px;}
           .products-grid{padding:0 24px 16px;}
           .view-all-wrap{padding:16px 24px 40px;}
           .hero{grid-template-columns:1fr;padding:40px 24px 40px;gap:32px;}
@@ -181,6 +198,20 @@ export default function Home() {
             <h2 className="section-title">Featured <span>Products</span></h2>
           </div>
           <a href="/products" className="view-all-link">View All Products →</a>
+        </div>
+
+        <div className="search-wrap">
+          <div className="search-bar">
+            <input
+              className="search-input"
+              type="text"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSearch()}
+            />
+            <button className="search-btn" onClick={handleSearch}>🔍 Search</button>
+          </div>
         </div>
 
         <div className="products-grid">
