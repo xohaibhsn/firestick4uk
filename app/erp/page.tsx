@@ -32,25 +32,23 @@ export default function ERPLoginPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
-        body{background:#0a0010;color:#fff;font-family:'Raleway',sans-serif;}
-        .bg{position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse at 30% 30%,#2d0050 0%,transparent 50%),radial-gradient(ellipse at 70% 70%,#1a0035 0%,transparent 55%),#0a0010;}
-        .wrap{position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
-        .box{background:linear-gradient(135deg,rgba(74,0,128,0.28),rgba(26,0,37,0.92));border:1px solid rgba(139,0,255,0.28);border-radius:24px;padding:48px 40px;width:100%;max-width:420px;text-align:center;}
-        .logo{font-family:'Cinzel',serif;font-size:18px;font-weight:900;background:linear-gradient(135deg,#bf5fff,#ffd700);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;}
-        .sub{font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:3px;text-transform:uppercase;margin-bottom:36px;}
-        .title{font-family:'Cinzel',serif;font-size:22px;font-weight:700;color:white;margin-bottom:8px;}
-        .desc{color:rgba(255,255,255,0.4);font-size:13px;margin-bottom:28px;}
-        input{width:100%;background:rgba(139,0,255,0.08);border:1px solid rgba(139,0,255,0.22);border-radius:11px;padding:13px 16px;color:white;font-family:'Raleway',sans-serif;font-size:14px;outline:none;margin-bottom:12px;transition:all 0.2s;}
-        input:focus{border-color:#bf5fff;background:rgba(139,0,255,0.14);}
-        input::placeholder{color:rgba(255,255,255,0.22);}
-        .btn{width:100%;background:linear-gradient(135deg,#4a0080,#8b00ff);color:white;border:none;padding:14px;border-radius:50px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 0 24px rgba(139,0,255,0.4);transition:all 0.3s;margin-top:4px;}
-        .btn:hover{box-shadow:0 0 40px rgba(139,0,255,0.7);}
+        body{background:#F5F5F5;color:#111111;font-family:'Raleway',sans-serif;}
+        .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#F5F5F5;}
+        .box{background:#FFFFFF;border:1px solid #E5E5E5;border-radius:16px;padding:48px 40px;width:100%;max-width:420px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
+        .logo{font-family:'Cinzel',serif;font-size:22px;font-weight:900;color:#111111;margin-bottom:6px;}
+        .sub{font-size:12px;color:#666666;letter-spacing:2px;text-transform:uppercase;margin-bottom:32px;}
+        .title{font-family:'Cinzel',serif;font-size:18px;font-weight:700;color:#111111;margin-bottom:6px;}
+        .desc{color:#888888;font-size:13px;margin-bottom:24px;}
+        input{width:100%;background:#FFFFFF;border:1px solid #E5E5E5;border-radius:8px;padding:12px 16px;color:#111111;font-family:'Raleway',sans-serif;font-size:14px;outline:none;margin-bottom:12px;transition:border-color 0.2s;}
+        input:focus{border-color:#5B21B6;box-shadow:0 0 0 3px rgba(91,33,182,0.1);}
+        input::placeholder{color:#999999;}
+        .btn{width:100%;background:#5B21B6;color:#FFFFFF;border:none;padding:14px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s;margin-top:4px;}
+        .btn:hover{background:#4C1D95;transform:translateY(-1px);box-shadow:0 4px 12px rgba(91,33,182,0.3);}
         .btn:disabled{opacity:0.5;cursor:not-allowed;}
-        .err{color:#ff8888;font-size:13px;margin-top:12px;}
-        .back{display:block;margin-top:20px;color:rgba(255,255,255,0.3);font-size:12px;text-decoration:none;transition:color 0.2s;}
-        .back:hover{color:#bf5fff;}
+        .err{color:#DC2626;font-size:13px;margin-top:10px;}
+        .back{display:block;margin-top:20px;color:#888888;font-size:12px;text-decoration:none;transition:color 0.2s;}
+        .back:hover{color:#5B21B6;}
       `}</style>
-      <div className="bg" />
       <div className="wrap">
         <div className="box">
           <div className="logo">FIRESTICK4UK</div>
