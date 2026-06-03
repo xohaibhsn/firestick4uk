@@ -86,61 +86,58 @@ export default function ProductsPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-        :root { --purple-deep: #0d0010; --purple-mid: #4a0080; --purple-bright: #8b00ff; --purple-glow: #bf5fff; --purple-light: #e0b3ff; --gold: #ffd700; }
-        body { background: var(--purple-deep); color: #fff; font-family: 'Raleway', sans-serif; overflow-x: hidden; }
-        .bg-animated { position: fixed; inset: 0; z-index: 0; background: radial-gradient(ellipse at 20% 20%, #2d0050 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, #1a0035 0%, transparent 50%), #0a0010; overflow: hidden; }
-        .star { position:absolute; width:2px; height:2px; background:white; border-radius:50%; animation:twinkle var(--dur) ease-in-out infinite; opacity:0; }
-        @keyframes twinkle { 0%,100%{opacity:0} 50%{opacity:var(--op)} }
-        nav { position: fixed; top:0; left:0; right:0; z-index:100; padding: 18px 60px; display: flex; align-items: center; justify-content: space-between; background:rgba(13,0,16,0.96); backdrop-filter:blur(20px); border-bottom:1px solid rgba(139,0,255,0.2); }
-        .nav-logo { font-family: 'Cinzel', serif; font-size: 20px; font-weight: 900; background: linear-gradient(135deg, var(--purple-glow), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; letter-spacing: 2px; }
+        body { background:#FFFFFF; color:#111111; font-family:'Raleway',sans-serif; overflow-x:hidden; }
+        nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:18px 60px; display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; border-bottom:1px solid #E5E5E5; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+        .nav-logo { font-family:'Cinzel',serif; font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
         .nav-links { display:flex; gap:36px; list-style:none; }
-        .nav-links a { color:rgba(255,255,255,0.8); text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.3s; }
-        .nav-links a:hover { color:var(--purple-glow); }
-        .nav-cta { background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright)) !important; color:white !important; padding:10px 24px !important; border-radius:30px !important; font-weight:600 !important; }
+        .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.3s; }
+        .nav-links a:hover { color:#5B21B6; }
+        .nav-cta { background:#5B21B6 !important; color:#FFFFFF !important; padding:10px 24px !important; border-radius:30px !important; font-weight:600 !important; }
         .hamburger { display:none; flex-direction:column; gap:5px; cursor:pointer; background:none; border:none; padding:5px; z-index:101; }
-        .hamburger span { display:block; width:25px; height:2px; background:var(--purple-glow); }
-        .page-wrapper { position:relative; z-index:1; padding-top:100px; }
+        .hamburger span { display:block; width:25px; height:2px; background:#111111; border-radius:2px; }
+        .page-wrapper { position:relative; z-index:1; padding-top:100px; background:#FFFFFF; }
         .page-header { max-width:1300px; margin:0 auto; padding:60px 60px 30px; }
-        .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:var(--purple-glow); margin-bottom:12px; }
-        .page-title { font-family:'Cinzel',serif; font-size:clamp(26px,3.5vw,44px); font-weight:700; color:white; }
-        .page-title span { background:linear-gradient(135deg,var(--purple-glow),var(--gold)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-        .filters { max-width:1300px; margin:0 auto; padding:0 60px 30px; display:flex; gap:12px; flex-wrap:wrap; }
-        .filter-btn { padding:8px 20px; border-radius:30px; border:1px solid rgba(139,0,255,0.3); background:rgba(139,0,255,0.08); color:rgba(255,255,255,0.7); font-size:13px; cursor:pointer; transition:all 0.3s; }
-        .filter-btn:hover, .filter-btn.active { background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright)); color:white; border-color:transparent; }
-        .products-grid { max-width:1300px; margin:0 auto; padding:0 60px 80px; display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:22px; }
-        .product-card { background:linear-gradient(135deg,rgba(74,0,128,0.25),rgba(26,0,37,0.85)); border:1px solid rgba(139,0,255,0.2); border-radius:20px; overflow:hidden; transition:all 0.4s; position:relative; animation:fadeInUp 0.6s ease forwards; opacity:0; }
-        @keyframes fadeInUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
-        .product-card:hover { transform:translateY(-8px); border-color:rgba(139,0,255,0.6); box-shadow:0 20px 60px rgba(139,0,255,0.25); }
-        .product-image { width:100%; aspect-ratio:1/1; background:linear-gradient(135deg,rgba(74,0,128,0.4),rgba(139,0,255,0.15)); border-bottom:1px solid rgba(139,0,255,0.2); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+        .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; }
+        .page-title { font-family:'Cinzel',serif; font-size:clamp(26px,3.5vw,44px); font-weight:700; color:#111111; }
+        .page-title span { color:#5B21B6; }
+        .filters { max-width:1300px; margin:0 auto; padding:0 60px 30px; display:flex; gap:10px; flex-wrap:wrap; }
+        .filter-btn { padding:8px 20px; border-radius:30px; border:1px solid #E5E5E5; background:#F5F5F5; color:#111111; font-size:13px; cursor:pointer; transition:all 0.2s; }
+        .filter-btn:hover { border-color:#5B21B6; color:#5B21B6; }
+        .filter-btn.active { background:#5B21B6; color:#FFFFFF; border-color:transparent; }
+        .products-grid { max-width:1300px; margin:0 auto; padding:0 60px 80px; display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:22px; }
+        .product-card { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:12px; overflow:hidden; transition:all 0.3s; position:relative; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+        @keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        .product-card:hover { transform:translateY(-4px); border-color:#5B21B6; box-shadow:0 8px 24px rgba(0,0,0,0.12); }
+        .product-image { width:100%; aspect-ratio:1/1; background:#F5F5F5; border-bottom:1px solid #E5E5E5; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
         .product-image img { width:100%; height:100%; object-fit:cover; }
-        .image-placeholder { display:flex; flex-direction:column; align-items:center; gap:10px; color:rgba(191,95,255,0.4); }
-        .image-placeholder svg { width:48px; height:48px; opacity:0.5; }
-        .image-placeholder span { font-size:11px; letter-spacing:2px; text-transform:uppercase; }
-        .badge { position:absolute; top:12px; right:12px; z-index:2; background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright)); color:white; font-size:10px; font-weight:700; padding:4px 12px; border-radius:20px; }
-        .badge.gold { background:linear-gradient(135deg,#b8860b,var(--gold)); color:#000; }
-        .badge.new { background:linear-gradient(135deg,#006400,#00c800); }
-        .badge.bundle { background:linear-gradient(135deg,#8b4500,#ff8c00); }
-        .product-info { padding:22px; }
-        .product-name { font-family:'Cinzel',serif; font-size:17px; font-weight:700; color:white; margin-bottom:8px; }
-        .product-desc { font-size:13px; color:rgba(255,255,255,0.5); line-height:1.7; margin-bottom:18px; }
+        .image-placeholder { display:flex; flex-direction:column; align-items:center; gap:10px; color:#CCCCCC; }
+        .image-placeholder svg { width:48px; height:48px; opacity:0.4; }
+        .image-placeholder span { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#AAAAAA; }
+        .badge { position:absolute; top:12px; right:12px; z-index:2; background:#5B21B6; color:#FFFFFF; font-size:10px; font-weight:700; padding:4px 12px; border-radius:20px; }
+        .badge.gold { background:#111111; color:#FFFFFF; }
+        .badge.new { background:#16A34A; color:#FFFFFF; }
+        .badge.bundle { background:#EA580C; color:#FFFFFF; }
+        .product-info { padding:18px 20px; }
+        .product-name { font-family:'Cinzel',serif; font-size:16px; font-weight:700; color:#111111; margin-bottom:6px; }
+        .product-desc { font-size:13px; color:#555555; line-height:1.7; margin-bottom:16px; }
         .product-footer { display:flex; align-items:center; justify-content:space-between; }
-        .product-price { font-size:22px; font-weight:700; color:var(--purple-glow); font-family:'Cinzel',serif; }
-        .add-btn { background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright)); color:white; border:none; padding:10px 20px; border-radius:30px; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.3s; }
-        .add-btn:hover { box-shadow:0 0 25px rgba(139,0,255,0.6); transform:scale(1.05); }
-        .add-btn.added { background:linear-gradient(135deg,#006400,#00c800); }
-        .loading { text-align:center; padding:60px; color:var(--purple-glow); font-size:18px; }
-        footer { position:relative; z-index:1; padding:50px 60px; border-top:1px solid rgba(139,0,255,0.15); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; }
-        .footer-logo { font-family:'Cinzel',serif; font-size:17px; font-weight:900; background:linear-gradient(135deg,var(--purple-glow),var(--gold)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .product-price { font-size:20px; font-weight:700; color:#111111; font-family:'Cinzel',serif; }
+        .add-btn { background:#5B21B6; color:#FFFFFF; border:none; padding:10px 20px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; }
+        .add-btn:hover { background:#4C1D95; transform:translateY(-1px); }
+        .add-btn.added { background:#16A34A; }
+        .loading { text-align:center; padding:60px; color:#666666; font-size:18px; }
+        footer { background:#111111; padding:50px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; }
+        .footer-logo { font-family:'Cinzel',serif; font-size:17px; font-weight:900; color:#FFFFFF; }
         .footer-links { display:flex; gap:24px; list-style:none; flex-wrap:wrap; }
-        .footer-links a { color:rgba(255,255,255,0.4); text-decoration:none; font-size:13px; transition:color 0.3s; }
-        .footer-links a:hover { color:var(--purple-glow); }
-        .footer-copy { font-size:12px; color:rgba(255,255,255,0.3); }
+        .footer-links a { color:rgba(255,255,255,0.6); text-decoration:none; font-size:13px; transition:color 0.2s; }
+        .footer-links a:hover { color:#FFFFFF; }
+        .footer-copy { font-size:12px; color:rgba(255,255,255,0.4); }
         .whatsapp-btn { position:fixed; bottom:30px; right:30px; z-index:999; width:58px; height:58px; border-radius:50%; background:linear-gradient(135deg,#25d366,#128c7e); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 25px rgba(37,211,102,0.5); text-decoration:none; font-size:26px; transition:all 0.3s; }
-        .whatsapp-btn:hover { transform:scale(1.15); }
+        .whatsapp-btn:hover { transform:scale(1.1); }
         @media(max-width:768px){
           nav{padding:16px 24px;}
           .nav-links{display:none;}
-          .nav-links.open{display:flex;flex-direction:column;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(13,0,16,0.98);align-items:center;justify-content:center;gap:28px;z-index:9999;margin:0;padding:0;}
+          .nav-links.open{display:flex;flex-direction:column;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#FFFFFF;align-items:center;justify-content:center;gap:28px;z-index:9999;margin:0;padding:0;}
           .hamburger{display:flex;}
           .page-header{padding:40px 24px 24px;}
           .filters{padding:0 24px 24px;}
