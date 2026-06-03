@@ -19,19 +19,21 @@ export const erpStyles = `
   .erp-nav-item.active{background:#5B21B6;color:#FFFFFF !important;border-color:transparent;}
   .erp-nav-icon{font-size:16px;width:20px;text-align:center;color:#FFFFFF !important;}
   .erp-nav-section{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#888888 !important;padding:10px 12px 4px;margin-top:6px;}
-  /* ERP footer user card + dropdown */
-  .erp-footer{padding:12px 10px;border-top:1px solid rgba(255,255,255,0.08);position:relative;}
-  .erp-user-card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 12px;cursor:pointer;transition:background 0.15s;display:flex;align-items:center;justify-content:space-between;}
-  .erp-user-card:hover{background:rgba(255,255,255,0.1);}
-  .erp-user-name{font-size:13px;font-weight:600;color:#FFFFFF !important;}
-  .erp-user-role{font-size:11px;color:#AAAAAA !important;text-transform:capitalize;}
-  .erp-user-arrow{font-size:10px;color:#AAAAAA !important;}
-  .erp-user-dropdown{position:absolute;bottom:calc(100% - 8px);left:10px;right:10px;background:#1A1A1A;border:1px solid rgba(255,255,255,0.12);border-radius:10px;overflow:hidden;box-shadow:0 -8px 24px rgba(0,0,0,0.4);z-index:100;}
-  .erp-user-dropdown-item{display:flex;align-items:center;gap:10px;padding:11px 14px;font-size:13px;cursor:pointer;color:#FFFFFF !important;transition:background 0.15s;border:none;background:none;width:100%;text-align:left;}
-  .erp-user-dropdown-item:hover{background:rgba(255,255,255,0.08);}
-  .erp-user-dropdown-item.danger{color:#FF9999 !important;}
-  .erp-user-dropdown-item.danger:hover{background:rgba(220,38,38,0.15);}
-  .erp-user-dropdown-divider{height:1px;background:rgba(255,255,255,0.08);margin:2px 0;}
+  /* ERP footer — branding only */
+  .erp-footer{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.08);}
+  .erp-footer-brand{font-size:11px;color:#666666 !important;text-align:center;letter-spacing:1px;}
+  /* ERP header user dropdown */
+  .erp-header-user-wrap{position:relative;}
+  .erp-header-user-btn{display:flex;align-items:center;gap:6px;font-size:13px;color:#444444;background:#F0F0F0;border:1px solid #E5E5E5;padding:6px 14px;border-radius:20px;cursor:pointer;transition:all 0.15s;font-family:'Raleway',sans-serif;font-weight:600;}
+  .erp-header-user-btn:hover{background:#E8E0F8;border-color:#5B21B6;color:#5B21B6;}
+  .erp-header-dropdown{position:absolute;right:0;top:calc(100% + 6px);background:#FFFFFF;border:1px solid #E5E5E5;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,0.1);min-width:190px;overflow:hidden;z-index:9999;}
+  .erp-header-dropdown-header{padding:12px 14px;border-bottom:1px solid #F0F0F0;}
+  .erp-header-dropdown-name{font-size:13px;font-weight:700;color:#111111 !important;}
+  .erp-header-dropdown-role{font-size:11px;color:#888888 !important;text-transform:capitalize;margin-top:2px;}
+  .erp-header-dropdown-item{display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:13px;cursor:pointer;color:#333333 !important;transition:background 0.15s;border:none;background:none;width:100%;text-align:left;font-family:'Raleway',sans-serif;}
+  .erp-header-dropdown-item:hover{background:#F9F9F9;}
+  .erp-header-dropdown-item.danger{color:#DC2626 !important;}
+  .erp-header-dropdown-item.danger:hover{background:#FEF2F2;}
   /* ERP MAIN — light bg */
   .erp-main{margin-left:220px;flex:1;padding:28px;background:#F5F5F5;min-height:100vh;color:#111111;}
   .erp-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;}
@@ -193,20 +195,7 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
             ))}
           </nav>
           <div className="erp-footer">
-            {userDropOpen && (
-              <div className="erp-user-dropdown">
-                <button className="erp-user-dropdown-item danger" onClick={() => { setUserDropOpen(false); setSidebarOpen(false); logout(); }}>
-                  🚪 Logout
-                </button>
-              </div>
-            )}
-            <div className="erp-user-card" onClick={() => setUserDropOpen(o => !o)}>
-              <div>
-                <div className="erp-user-name">{user.name}</div>
-                <div className="erp-user-role">{user.role}</div>
-              </div>
-              <span className="erp-user-arrow">{userDropOpen ? "▲" : "▼"}</span>
-            </div>
+            <div className="erp-footer-brand">FIRESTICK4UK ERP</div>
           </div>
         </aside>
         <main className="erp-main">
@@ -218,7 +207,25 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
               <h1 className="erp-page-title">{title}</h1>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:"13px",color:"#666666",background:"#F0F0F0",border:"1px solid #E5E5E5",padding:"5px 12px",borderRadius:20}}>👤 {user.name}</span>
+              <div className="erp-header-user-wrap">
+                <button className="erp-header-user-btn" onClick={() => setUserDropOpen(o => !o)}>
+                  👤 {user.name} {userDropOpen ? "▲" : "▼"}
+                </button>
+                {userDropOpen && (
+                  <>
+                    <div style={{position:"fixed",inset:0,zIndex:9998}} onClick={() => setUserDropOpen(false)} />
+                    <div className="erp-header-dropdown">
+                      <div className="erp-header-dropdown-header">
+                        <div className="erp-header-dropdown-name">{user.name}</div>
+                        <div className="erp-header-dropdown-role">{user.role}</div>
+                      </div>
+                      <button className="erp-header-dropdown-item danger" onClick={() => { setUserDropOpen(false); logout(); }}>
+                        🚪 Logout
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
           {children(user, currency)}
