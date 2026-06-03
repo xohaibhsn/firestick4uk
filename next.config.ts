@@ -13,11 +13,11 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   generateEtags: false,
   images: {
+    unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "firestick4uk.com" },
       { protocol: "https", hostname: "srv497.hstgr.io" },
     ],
-    formats: ["image/avif", "image/webp"],
   },
   compress: true,
   async headers() {
