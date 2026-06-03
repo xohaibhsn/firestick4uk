@@ -153,13 +153,13 @@ html body .page-wrap {
   z-index: 1;
 }
 
-/* ── Cards & Sections ───────────────── */
-html body .section-card,
-html body .erp-card {
+/* ── Cards & Sections (admin only, NOT erp) ─ */
+html body .section-card {
   background: #FFFFFF !important;
   border: 1px solid #E5E5E5 !important;
   color: #111111 !important;
 }
+/* ERP keeps its own dark theme — do NOT override */
 
 /* ── Tables ─────────────────────────── */
 html body th {
@@ -390,11 +390,8 @@ html body .page-title { color: #111111 !important; -webkit-text-fill-color: #111
 html body .page-title span { color: #5B21B6 !important; -webkit-text-fill-color: #5B21B6 !important; }
 
 /* ── ERP badge/status fixes ─────────────── */
-html body .erp-stat-val { color: #111111 !important; }
-html body .erp-stat-label { color: #666666 !important; }
-html body .erp-section-title { color: #111111 !important; }
-html body .erp-user-name { color: #111111 !important; }
-html body .erp-logo-text { color: #FFFFFF !important; }
+/* ERP uses dark theme — these overrides removed to prevent dark-on-dark text */
+/* ERP text colors are handled in app/erp/ERPLayout.tsx directly */
 
 /* ── Admin status badges (correct contrast) */
 html body .status-pending   { background: #FEF3C7 !important; border-color: rgba(234,179,8,0.3) !important; color: #92400E !important; }
@@ -457,3 +454,75 @@ html body .section-card *, html body .erp-card * { }
 html body .page-wrapper { background: #FFFFFF !important; }
 html body .content-layout { background: transparent !important; }
 html body .policy-content { background: transparent !important; }
+
+/* ══════════════════════════════════════════════
+   ADMIN SIDEBAR — force white text on dark bg
+   ══════════════════════════════════════════════ */
+html body .sidebar { color: #FFFFFF !important; }
+html body .sidebar .nav-item { color: #CCCCCC !important; }
+html body .sidebar .nav-item:hover { color: #FFFFFF !important; }
+html body .sidebar .nav-item.active { color: #FFFFFF !important; background: #5B21B6 !important; }
+html body .sidebar .nav-icon { color: #FFFFFF !important; }
+html body .sidebar .sidebar-logo-text { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
+html body .sidebar .sidebar-label { color: #AAAAAA !important; }
+html body .sidebar .logout-btn { color: #FF9999 !important; }
+
+/* ══════════════════════════════════════════════
+   ERP — exclude from light theme overrides
+   ERP is intentionally dark — DO NOT override
+   ══════════════════════════════════════════════ */
+html body .erp-layout,
+html body .erp-layout * {
+  /* ERP manages its own colors */
+}
+/* Override any accidental light-theme leakage into ERP */
+html body .erp-main { background: #0F0520 !important; color: #FFFFFF !important; }
+html body .erp-sidebar { background: #0F0520 !important; color: #FFFFFF !important; }
+html body .erp-card { background: rgba(255,255,255,0.04) !important; color: #FFFFFF !important; border-color: rgba(255,255,255,0.1) !important; }
+html body .erp-card * { color: #FFFFFF !important; }
+html body .erp-section-title { color: #FFFFFF !important; }
+html body .erp-page-title { color: #FFFFFF !important; }
+html body th, html body td { /* reset below for ERP */ }
+/* ERP tables */
+html body .erp-table-wrap th { color: #AAAAAA !important; background: transparent !important; border-bottom-color: rgba(255,255,255,0.08) !important; }
+html body .erp-table-wrap td { color: #DDDDDD !important; border-bottom-color: rgba(255,255,255,0.05) !important; }
+html body .erp-table-wrap tr:hover td { background: rgba(255,255,255,0.03) !important; }
+
+/* ══════════════════════════════════════════════
+   ERP FORM INPUTS — override light theme defaults
+   ERP uses dark backgrounds, needs white text
+   ══════════════════════════════════════════════ */
+html body .erp-layout input:not([type="checkbox"]):not([type="radio"]),
+html body .erp-layout textarea,
+html body .erp-layout select {
+  background: rgba(255,255,255,0.06) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  color: #FFFFFF !important;
+}
+html body .erp-layout input:focus,
+html body .erp-layout textarea:focus,
+html body .erp-layout select:focus {
+  border-color: #BFA5FF !important;
+  box-shadow: 0 0 0 3px rgba(191,165,255,0.15) !important;
+  background: rgba(255,255,255,0.1) !important;
+}
+html body .erp-layout input::placeholder,
+html body .erp-layout textarea::placeholder {
+  color: rgba(255,255,255,0.35) !important;
+}
+html body .erp-layout label { color: #AAAAAA !important; }
+html body .erp-layout select option { background: #1a0035 !important; color: #FFFFFF !important; }
+
+/* ERP headings — white on dark */
+html body .erp-layout h1,
+html body .erp-layout h2,
+html body .erp-layout h3,
+html body .erp-layout h4 { color: #FFFFFF !important; }
+
+/* ERP list items */
+html body .erp-layout ul li,
+html body .erp-layout ol li { color: #CCCCCC !important; }
+
+/* ERP page title override (NOT the public nav one) */
+html body .erp-page-title { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
+html body .erp-page-title span { color: #BFA5FF !important; -webkit-text-fill-color: #BFA5FF !important; }
