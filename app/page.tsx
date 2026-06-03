@@ -12,16 +12,7 @@ interface Product {
   image: string | null;
 }
 
-const STARS = Array.from({length:70}).map((_,i) => ({
-  left: `${((i * 137.5) % 100).toFixed(2)}%`,
-  top: `${((i * 97.3) % 100).toFixed(2)}%`,
-  dur: `${2 + (i % 4)}s`,
-  op: `${(0.2 + (i % 8) * 0.08).toFixed(2)}`,
-  delay: `${(i % 5)}s`
-}));
-
 export default function Home() {
-  const [scrollY, setScrollY] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,8 +28,6 @@ export default function Home() {
   });
 
   useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY);
-    window.addEventListener("scroll", handleScroll);
     fetch('/api/products')
       .then(res => res.json())
       .then(data => { setProducts(Array.isArray(data) ? data : []); setLoading(false); })
@@ -53,7 +42,7 @@ export default function Home() {
         }
       })
       .catch(() => {});
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {};
   }, []);
 
   const handleAddToCart = (p: Product) => {
@@ -79,7 +68,24 @@ export default function Home() {
         .hamburger { display:none; flex-direction:column; gap:5px; cursor:pointer; background:none; border:none; padding:5px; z-index:101; }
         .hamburger span { display:block; width:25px; height:2px; background:#111111; border-radius:2px; }
         .page-wrapper { position:relative; z-index:1; padding-top:80px; background:#FFFFFF; }
-        .products-header { max-width:1300px; margin:0 auto; padding:60px 60px 40px; }
+        /* HERO */
+        .hero { background:#FFFFFF; padding:80px 60px 70px; max-width:1300px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center; }
+        .hero-content {}
+        .hero-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:16px; display:block; font-weight:600; }
+        .hero-title { font-family:'Cinzel',serif; font-size:clamp(28px,4vw,52px); font-weight:900; color:#111111; line-height:1.15; margin-bottom:20px; }
+        .hero-title span { color:#5B21B6; }
+        .hero-subtitle { font-size:17px; color:#555555; line-height:1.8; margin-bottom:36px; max-width:480px; }
+        .hero-btns { display:flex; gap:14px; flex-wrap:wrap; }
+        .hero-btn-primary { background:#5B21B6; color:#FFFFFF; padding:16px 36px; border-radius:8px; font-size:15px; font-weight:700; text-decoration:none; transition:all 0.2s; display:inline-block; letter-spacing:0.5px; }
+        .hero-btn-primary:hover { background:#4C1D95; transform:translateY(-2px); box-shadow:0 6px 20px rgba(91,33,182,0.35); }
+        .hero-btn-secondary { background:#111111; color:#FFFFFF; padding:16px 36px; border-radius:8px; font-size:15px; font-weight:600; text-decoration:none; transition:all 0.2s; display:inline-block; }
+        .hero-btn-secondary:hover { background:#5B21B6; transform:translateY(-2px); }
+        .hero-visual { background:linear-gradient(135deg,#EDE9FE,#F5F3FF); border-radius:24px; aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; font-size:80px; border:1px solid #DDD6FE; }
+        .hero-stats { display:flex; gap:32px; margin-top:40px; padding-top:32px; border-top:1px solid #E5E5E5; }
+        .stat-item {}
+        .stat-num { font-family:'Cinzel',serif; font-size:28px; font-weight:900; color:#111111; display:block; }
+        .stat-label { font-size:12px; color:#888888; letter-spacing:1px; text-transform:uppercase; }
+        .products-header { max-width:1300px; margin:0 auto; padding:20px 60px 40px; border-top:1px solid #E5E5E5; }
         .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; }
         .section-title { font-family:'Cinzel',serif; font-size:clamp(26px,3.5vw,44px); font-weight:700; color:#111111; }
         .section-title span { color:#5B21B6; }
@@ -133,7 +139,10 @@ export default function Home() {
           .nav-links.open{display:flex;flex-direction:column;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#FFFFFF;align-items:center;justify-content:center;gap:28px;z-index:9999;margin:0;padding:0;}
           .nav-links.open a{font-size:18px;color:#111111;}
           .hamburger{display:flex;}
-          .products-header{padding:40px 24px 24px;}
+          .hero{grid-template-columns:1fr;padding:50px 24px 40px;gap:32px;}
+          .hero-visual{display:none;}
+          .hero-stats{gap:20px;}
+          .products-header{padding:20px 24px 24px;}
           .products-grid{padding:0 24px 60px;}
           .features-section{padding:40px 24px 50px;}
           .cta-section{margin:0 24px 60px;padding:50px 24px;}
@@ -141,17 +150,7 @@ export default function Home() {
         }
       `}</style>
 
-      <div className="bg-animated">
-        {STARS.map((s,i)=>(
-          <div key={i} className="star" style={{
-            left: s.left, top: s.top,
-            "--dur": s.dur, "--op": s.op,
-            animationDelay: s.delay
-          } as React.CSSProperties}/>
-        ))}
-      </div>
-
-      <nav className={scrollY > 40 ? "scrolled" : ""}>
+      <nav>
         <a href="/" className="nav-logo">FIRESTICK4UK</a>
         <ul className={`nav-links ${menuOpen?"open":""}`}>
           <li><a href="/" onClick={()=>setMenuOpen(false)}>Home</a></li>
@@ -167,6 +166,28 @@ export default function Home() {
       </nav>
 
       <div className="page-wrapper">
+        {/* HERO */}
+        <div className="hero">
+          <div className="hero-content">
+            <span className="hero-tag">✦ UK&apos;s #1 Firestick Service</span>
+            <h1 className="hero-title">
+              {sec.home_hero?.title?.split(' ').slice(0,-2).join(' ') || "Best Firestick"}<br/>
+              <span>{sec.home_hero?.title?.split(' ').slice(-2).join(' ') || "Service in UK"}</span>
+            </h1>
+            <p className="hero-subtitle">{sec.home_hero?.subtitle || "Premium IPTV & Streaming Solutions for the whole UK. Fast delivery, easy setup, real support."}</p>
+            <div className="hero-btns">
+              <a href={sec.home_hero?.button_link||"/products"} className="hero-btn-primary">{sec.home_hero?.button_text||"Shop Now"} →</a>
+              <a href={sec.home_hero?.secondary_button_link||"/about"} className="hero-btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>
+            </div>
+            <div className="hero-stats">
+              <div className="stat-item"><span className="stat-num">500+</span><span className="stat-label">Happy Customers</span></div>
+              <div className="stat-item"><span className="stat-num">4.9★</span><span className="stat-label">Average Rating</span></div>
+              <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
+            </div>
+          </div>
+          <div className="hero-visual">📺</div>
+        </div>
+
         <div className="products-header">
           <div className="section-tag">✦ Our Store</div>
           <h2 className="section-title">Browse Our <span>Products</span></h2>
