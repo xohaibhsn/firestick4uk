@@ -516,8 +516,12 @@ html body .erp-layout ul li,
 html body .erp-layout ol li { color: #333333 !important; }
 /* Sidebar stays dark */
 html body .erp-sidebar * { color: #FFFFFF !important; }
-/* Fix: general "html body nav" rule sets bg #FFFFFF — override for ERP sidebar nav */
+/* Fix: general "html body nav" rule sets bg #FFFFFF — override for ERP + Admin sidebar nav */
 html body .erp-sidebar nav { background: transparent !important; }
 html body .erp-nav-item { color: #CCCCCC !important; }
 html body .erp-nav-item:hover { background: rgba(255,255,255,0.08) !important; color: #FFFFFF !important; }
 html body .erp-nav-item.active { background: #5B21B6 !important; color: #FFFFFF !important; }
+html body .sidebar nav { background: transparent !important; }
+html body .sidebar .nav-item { color: #CCCCCC !important; }
+html body .sidebar .nav-item:hover { background: rgba(255,255,255,0.08) !important; color: #FFFFFF !important; }
+html body .sidebar .nav-item.active { background: #5B21B6 !important; color: #FFFFFF !important; }
