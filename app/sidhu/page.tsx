@@ -1217,7 +1217,7 @@ export default function AdminPage() {
                   <button className="modal-cancel" onClick={()=>setFaqModal(null)}>Cancel</button>
                   <button className="modal-save" onClick={async()=>{
                     if(!editFaq.question||!editFaq.answer){setFaqMsg("❌ Question and answer required");return;}
-                    let res;
+                    let res: any;
                     if(faqModal==="new"){res=await fetch("/api/faqs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(editFaq)}).then(r=>r.json()).catch(()=>({}));if(res.success){setFaqMsg("✅ FAQ added");setFaqs(prev=>[...prev,{id:res.id,...editFaq,sort_order:0,is_visible:1} as FAQ]);}}
                     else{res=await fetch("/api/faqs",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...(faqModal as FAQ),...editFaq})}).then(r=>r.json()).catch(()=>({}));if(res.success){setFaqMsg("✅ FAQ updated");setFaqs(prev=>prev.map((x:FAQ)=>x.id===(faqModal as FAQ).id?{...x,...editFaq}:x));}}
                     setFaqModal(null);setTimeout(()=>setFaqMsg(""),3000);
