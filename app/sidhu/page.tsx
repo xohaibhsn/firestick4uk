@@ -302,9 +302,9 @@ export default function AdminPage() {
     fetch("/api/site-content?page=all")
       .then(r => r.json())
       .then(d => { if (d && typeof d === "object") setSiteContent(d); })
+      .catch(() => {});
     fetch("/api/sections?page=home&all=1").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); }).catch(()=>{});
     fetch("/api/faqs?admin=true").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setFaqs(d); }).catch(()=>{});
-      .catch(() => {});
   }, [loggedIn]);
 
   const saveContent = async (keys: string[]) => {
