@@ -196,7 +196,7 @@ const demoCustomers = [
   { name:"Emma Wilson", email:"emma@example.com", phone:"+44 7444 444444", orders:1, spent:"£9.99", joined:"May 2026" },
 ];
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"blog"|"settings"|"pages"|"coupons";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
 
@@ -232,6 +232,21 @@ export default function AdminPage() {
   const [contentMsg, setContentMsg] = useState("");
   const [activePage, setActivePage] = useState("home");
   const [faviconUploading, setFaviconUploading] = useState(false);
+
+  // Page Builder
+  type SectionItem = { key:string; label:string; page:string; order:number; visible:boolean; data:any; };
+  const [sections, setSections] = useState<SectionItem[]>([]);
+  const [builderPage, setBuilderPage] = useState("home");
+  const [sectionModal, setSectionModal] = useState<SectionItem|null>(null);
+  const [sectionEditing, setSectionEditing] = useState<any>({});
+  const [sectionMsg, setSectionMsg] = useState("");
+
+  // FAQs
+  type FAQ = { id:number; question:string; answer:string; category:string; sort_order:number; is_visible:number; };
+  const [faqs, setFaqs] = useState<FAQ[]>([]);
+  const [faqModal, setFaqModal] = useState<FAQ|"new"|null>(null);
+  const [editFaq, setEditFaq] = useState({ question:"", answer:"", category:"General" });
+  const [faqMsg, setFaqMsg] = useState("");
 
   useEffect(() => {
     if (localStorage.getItem("sAdminSession") === "true") setLoggedIn(true);
@@ -287,6 +302,8 @@ export default function AdminPage() {
     fetch("/api/site-content?page=all")
       .then(r => r.json())
       .then(d => { if (d && typeof d === "object") setSiteContent(d); })
+    fetch("/api/sections?page=home&all=1").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); }).catch(()=>{});
+    fetch("/api/faqs?admin=true").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setFaqs(d); }).catch(()=>{});
       .catch(() => {});
   }, [loggedIn]);
 
@@ -740,6 +757,8 @@ export default function AdminPage() {
               { id:"customers", icon:"👥", label:"Customers" },
               { id:"blog", icon:"📝", label:"Blog" },
               { id:"coupons", icon:"🎟️", label:"Coupons" },
+              { id:"builder", icon:"🎨", label:"Page Builder" },
+              { id:"faqadmin", icon:"❓", label:"FAQs" },
               { id:"pages", icon:"📄", label:"Pages" },
               { id:"settings", icon:"⚙️", label:"Site Settings" },
             ] as const).map(item => (
@@ -771,6 +790,8 @@ export default function AdminPage() {
                 {tab==="customers" && <>Customer <span>Data</span></>}
                 {tab==="blog" && <>Manage <span>Blog</span></>}
                 {tab==="coupons" && <>Manage <span>Coupons</span></>}
+                {tab==="builder" && <>Page <span>Builder</span></>}
+                {tab==="faqadmin" && <>Manage <span>FAQs</span></>}
                 {tab==="pages" && <>Page <span>Editor</span></>}
                 {tab==="settings" && <>Site <span>Settings</span></>}
               </h1>
@@ -1023,6 +1044,184 @@ export default function AdminPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 🎨 PAGE BUILDER */}
+          {tab==="builder" && (
+            <div>
+              {sectionMsg && <div style={{marginBottom:14,padding:"10px 14px",background:sectionMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:sectionMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{sectionMsg}</div>}
+              {/* Page selector */}
+              <div style={{display:"flex",gap:10,marginBottom:20}}>
+                {[["home","🏠 Home"],["about","ℹ️ About"]].map(([k,l])=>(
+                  <button key={k} className={`action-btn ${builderPage===k?"btn-verify":"btn-view"}`} style={{padding:"10px 20px",fontSize:13}} onClick={()=>{
+                    setBuilderPage(k);
+                    fetch(`/api/sections?page=${k}&all=1`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); }).catch(()=>{});
+                  }}>{l}</button>
+                ))}
+              </div>
+              {/* Sections list */}
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                {sections.filter(s=>s.page===builderPage).sort((a,b)=>a.order-b.order).map((sec,i,arr)=>(
+                  <div key={sec.key} className="section-card" style={{padding:"16px 20px",display:"flex",alignItems:"center",gap:14}}>
+                    {/* Reorder arrows */}
+                    <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                      <button className="action-btn btn-view" style={{padding:"2px 6px",fontSize:10}} disabled={i===0} onClick={async()=>{
+                        const prev=arr[i-1]; const newOrder=[{key:sec.key,section_order:prev.order},{key:prev.key,section_order:sec.order}];
+                        await fetch("/api/sections?action=reorder",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({order:newOrder})});
+                        setSections(s=>s.map(x=>x.key===sec.key?{...x,order:prev.order}:x.key===prev.key?{...x,order:sec.order}:x));
+                      }}>▲</button>
+                      <button className="action-btn btn-view" style={{padding:"2px 6px",fontSize:10}} disabled={i===arr.length-1} onClick={async()=>{
+                        const next=arr[i+1]; const newOrder=[{key:sec.key,section_order:next.order},{key:next.key,section_order:sec.order}];
+                        await fetch("/api/sections?action=reorder",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({order:newOrder})});
+                        setSections(s=>s.map(x=>x.key===sec.key?{...x,order:next.order}:x.key===next.key?{...x,order:sec.order}:x));
+                      }}>▼</button>
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:600,fontSize:14,marginBottom:3}}>{sec.label}</div>
+                      <div style={{fontSize:11,color:"#888888"}}>{JSON.stringify(sec.data).slice(0,80)}...</div>
+                    </div>
+                    <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                      {/* Visibility toggle */}
+                      <span style={{fontSize:11,background:sec.visible?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${sec.visible?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,color:sec.visible?"#00c864":"#ff6666",padding:"3px 10px",borderRadius:20,cursor:"pointer"}} onClick={async()=>{
+                        await fetch("/api/sections?action=visibility",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:sec.key,is_visible:!sec.visible})});
+                        setSections(s=>s.map(x=>x.key===sec.key?{...x,visible:!sec.visible}:x));
+                      }}>{sec.visible?"👁 Visible":"🚫 Hidden"}</span>
+                      {/* Edit button */}
+                      <button className="action-btn btn-edit" onClick={()=>{ setSectionEditing(JSON.parse(JSON.stringify(sec.data))); setSectionModal(sec); setSectionMsg(""); }}>✏️ Edit</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Section Edit Modal */}
+          {sectionModal && (
+            <div className="modal-overlay" onClick={()=>setSectionModal(null)}>
+              <div className="modal" style={{maxWidth:600,width:"96vw"}} onClick={e=>e.stopPropagation()}>
+                <div className="modal-title">Edit: {sectionModal.label}</div>
+
+                {/* HERO */}
+                {['hero','_hero'].some(k=>sectionModal.key.includes(k)) && (
+                  <div>
+                    <div className="modal-field"><label>Title</label><input value={sectionEditing.title||""} onChange={e=>setSectionEditing((p:any)=>({...p,title:e.target.value}))} /></div>
+                    <div className="modal-field"><label>Subtitle</label><textarea rows={2} value={sectionEditing.subtitle||""} onChange={e=>setSectionEditing((p:any)=>({...p,subtitle:e.target.value}))} /></div>
+                    <div className="modal-field"><label>Primary Button Text</label><input value={sectionEditing.button_text||""} onChange={e=>setSectionEditing((p:any)=>({...p,button_text:e.target.value}))} /></div>
+                    <div className="modal-field"><label>Primary Button Link</label><input value={sectionEditing.button_link||""} onChange={e=>setSectionEditing((p:any)=>({...p,button_link:e.target.value}))} /></div>
+                    <div className="modal-field"><label>Secondary Button Text</label><input value={sectionEditing.secondary_button_text||""} onChange={e=>setSectionEditing((p:any)=>({...p,secondary_button_text:e.target.value}))} /></div>
+                    <div className="modal-field"><label>Secondary Button Link</label><input value={sectionEditing.secondary_button_link||""} onChange={e=>setSectionEditing((p:any)=>({...p,secondary_button_link:e.target.value}))} /></div>
+                  </div>
+                )}
+
+                {/* FEATURES/VALUES/ITEMS */}
+                {(['features','values','testimonials'].some(k=>sectionModal.key.includes(k))) && (
+                  <div>
+                    <div className="modal-field"><label>Section Title</label><input value={sectionEditing.title||""} onChange={e=>setSectionEditing((p:any)=>({...p,title:e.target.value}))} /></div>
+                    <div style={{marginBottom:12}}>
+                      <div style={{fontWeight:600,fontSize:12,letterSpacing:"1px",textTransform:"uppercase",color:"#666",marginBottom:8}}>Items</div>
+                      {(sectionEditing.items||[]).map((item:any,i:number)=>(
+                        <div key={i} style={{marginBottom:10,padding:12,background:"#F9F9F9",borderRadius:8,border:"1px solid #E5E5E5"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                            <span style={{fontSize:12,color:"#888"}}>Item #{i+1}</span>
+                            <button style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:12}} onClick={()=>setSectionEditing((p:any)=>({...p,items:p.items.filter((_:any,j:number)=>j!==i)}))}>Remove</button>
+                          </div>
+                          {sectionModal.key.includes('testimonial') ? (
+                            <>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Name</label><input value={item.name||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,name:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Rating (1-5)</label><input type="number" min={1} max={5} value={item.rating||5} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,rating:Number(e.target.value)}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:0}}><label>Review Text</label><textarea rows={2} value={item.text||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,text:e.target.value}:x)}))} /></div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Icon (emoji)</label><input value={item.icon||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,icon:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Title</label><input value={item.title||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,title:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:0}}><label>Description</label><textarea rows={2} value={item.description||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,description:e.target.value}:x)}))} /></div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                      <button className="action-btn btn-view" onClick={()=>setSectionEditing((p:any)=>({...p,items:[...(p.items||[]),sectionModal.key.includes('testimonial')?{name:"",rating:5,text:""}:{icon:"⭐",title:"",description:""}]}))} >+ Add Item</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* NEWSLETTER/MISSION */}
+                {(['newsletter','mission','featured_products'].some(k=>sectionModal.key.includes(k))) && (
+                  <div>
+                    <div className="modal-field"><label>Title</label><input value={sectionEditing.title||""} onChange={e=>setSectionEditing((p:any)=>({...p,title:e.target.value}))} /></div>
+                    {sectionEditing.subtitle!==undefined&&<div className="modal-field"><label>Subtitle</label><textarea rows={2} value={sectionEditing.subtitle||""} onChange={e=>setSectionEditing((p:any)=>({...p,subtitle:e.target.value}))} /></div>}
+                    {sectionEditing.text!==undefined&&<div className="modal-field"><label>Text</label><textarea rows={3} value={sectionEditing.text||""} onChange={e=>setSectionEditing((p:any)=>({...p,text:e.target.value}))} /></div>}
+                    {sectionEditing.button_text!==undefined&&<div className="modal-field"><label>Button Text</label><input value={sectionEditing.button_text||""} onChange={e=>setSectionEditing((p:any)=>({...p,button_text:e.target.value}))} /></div>}
+                    {sectionEditing.show_count!==undefined&&<div className="modal-field"><label>Show Count</label><select value={sectionEditing.show_count||6} onChange={e=>setSectionEditing((p:any)=>({...p,show_count:Number(e.target.value)}))}><option value={3}>3</option><option value={6}>6</option><option value={9}>9</option></select></div>}
+                  </div>
+                )}
+
+                <div className="modal-actions">
+                  <button className="modal-cancel" onClick={()=>setSectionModal(null)}>Cancel</button>
+                  <button className="modal-save" onClick={async()=>{
+                    const res=await fetch("/api/sections",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:sectionModal.key,value:sectionEditing})}).then(r=>r.json()).catch(()=>({}));
+                    if(res.success){setSectionMsg("✅ Section saved!");setSections(s=>s.map(x=>x.key===sectionModal.key?{...x,data:sectionEditing}:x));setSectionModal(null);}
+                    else setSectionMsg(`❌ ${res.error||"Failed"}`);
+                    setTimeout(()=>setSectionMsg(""),3000);
+                  }}>💾 Save Section</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ❓ FAQ ADMIN */}
+          {tab==="faqadmin" && (
+            <div>
+              {faqMsg && <div style={{marginBottom:14,padding:"10px 14px",background:faqMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:faqMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{faqMsg}</div>}
+              <div style={{marginBottom:16,display:"flex",justifyContent:"flex-end"}}>
+                <button className="add-btn" onClick={()=>{setEditFaq({question:"",answer:"",category:"General"});setFaqModal("new");}}>+ Add FAQ</button>
+              </div>
+              {/* Group by category */}
+              {Array.from(new Set(faqs.map((f:FAQ)=>f.category))).map(cat=>(
+                <div key={cat} className="section-card" style={{marginBottom:16,overflow:"hidden"}}>
+                  <div className="section-header"><div className="section-title">{cat}</div></div>
+                  <div className="table-wrap">
+                    <table>
+                      <thead><tr><th>Question</th><th>Visible</th><th>Actions</th></tr></thead>
+                      <tbody>
+                        {faqs.filter((f:FAQ)=>f.category===cat).map((f:FAQ)=>(
+                          <tr key={f.id}>
+                            <td style={{maxWidth:320,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.question}</td>
+                            <td><span style={{fontSize:11,background:f.is_visible?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${f.is_visible?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,color:f.is_visible?"#00c864":"#ff6666",padding:"3px 10px",borderRadius:20,cursor:"pointer"}} onClick={async()=>{await fetch("/api/faqs",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...f,is_visible:f.is_visible?0:1})});setFaqs(prev=>prev.map((x:FAQ)=>x.id===f.id?{...x,is_visible:f.is_visible?0:1}:x));}}>{f.is_visible?"Visible":"Hidden"}</span></td>
+                            <td>
+                              <button className="action-btn btn-edit" style={{marginRight:6}} onClick={()=>{setEditFaq({question:f.question,answer:f.answer,category:f.category});setFaqModal(f);}}>Edit</button>
+                              <button className="action-btn btn-delete" onClick={async()=>{if(!confirm("Delete this FAQ?"))return;await fetch(`/api/faqs?id=${f.id}`,{method:"DELETE"});setFaqs(prev=>prev.filter((x:FAQ)=>x.id!==f.id));}}>Delete</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* FAQ Modal */}
+          {faqModal && (
+            <div className="modal-overlay" onClick={()=>setFaqModal(null)}>
+              <div className="modal" onClick={e=>e.stopPropagation()}>
+                <div className="modal-title">{faqModal==="new"?"Add New FAQ":"Edit FAQ"}</div>
+                <div className="modal-field"><label>Category</label><select value={editFaq.category} onChange={e=>setEditFaq(f=>({...f,category:e.target.value}))}><option>Orders & Payment</option><option>Delivery & Shipping</option><option>Products & Setup</option><option>Returns & Refunds</option><option>General</option></select></div>
+                <div className="modal-field"><label>Question *</label><textarea rows={2} value={editFaq.question} onChange={e=>setEditFaq(f=>({...f,question:e.target.value}))} placeholder="Enter question..." /></div>
+                <div className="modal-field"><label>Answer *</label><textarea rows={4} value={editFaq.answer} onChange={e=>setEditFaq(f=>({...f,answer:e.target.value}))} placeholder="Enter answer..." /></div>
+                <div className="modal-actions">
+                  <button className="modal-cancel" onClick={()=>setFaqModal(null)}>Cancel</button>
+                  <button className="modal-save" onClick={async()=>{
+                    if(!editFaq.question||!editFaq.answer){setFaqMsg("❌ Question and answer required");return;}
+                    let res;
+                    if(faqModal==="new"){res=await fetch("/api/faqs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(editFaq)}).then(r=>r.json()).catch(()=>({}));if(res.success){setFaqMsg("✅ FAQ added");setFaqs(prev=>[...prev,{id:res.id,...editFaq,sort_order:0,is_visible:1} as FAQ]);}}
+                    else{res=await fetch("/api/faqs",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...(faqModal as FAQ),...editFaq})}).then(r=>r.json()).catch(()=>({}));if(res.success){setFaqMsg("✅ FAQ updated");setFaqs(prev=>prev.map((x:FAQ)=>x.id===(faqModal as FAQ).id?{...x,...editFaq}:x));}}
+                    setFaqModal(null);setTimeout(()=>setFaqMsg(""),3000);
+                  }}>Save FAQ</button>
                 </div>
               </div>
             </div>

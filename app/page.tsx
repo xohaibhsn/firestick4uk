@@ -28,6 +28,14 @@ export default function Home() {
   const [added, setAdded] = useState<number | null>(null);
   const { addToCart, cart } = useCart();
 
+  // Section data from DB
+  const [sec, setSec] = useState<Record<string,any>>({
+    home_hero: { title:"Best Firestick Service in UK", subtitle:"Premium IPTV & Streaming Solutions", button_text:"Shop Now", button_link:"/products", secondary_button_text:"Learn More", secondary_button_link:"/about" },
+    home_features: { title:"Why Choose Us", items:[{icon:"⚡",title:"Fast Setup",description:"Ready in minutes"},{icon:"🔒",title:"Secure",description:"Safe & reliable"},{icon:"💬",title:"24/7 Support",description:"Always here for you"},{icon:"🚀",title:"Fast Delivery",description:"Quick & efficient"}] },
+    home_testimonials: { title:"What Our Customers Say", items:[{name:"John Smith",rating:5,text:"Amazing service!"},{name:"Sarah Jones",rating:5,text:"Best firestick service in UK!"}] },
+    home_newsletter: { title:"Stay in the Loop", subtitle:"Get the latest guides, tips and offers", button_text:"Subscribe" },
+  });
+
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener("scroll", handleScroll);
@@ -35,6 +43,16 @@ export default function Home() {
       .then(res => res.json())
       .then(data => { setProducts(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
+    fetch('/api/sections?page=home')
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const map: Record<string,any> = {};
+          data.forEach(s => { map[s.key] = s.data; });
+          setSec(prev => ({ ...prev, ...map }));
+        }
+      })
+      .catch(() => {});
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -198,33 +216,44 @@ export default function Home() {
           )}
         </div>
 
+        {/* Features — from DB */}
         <div className="features-section">
           <div className="section-tag">✦ Why Choose Us</div>
-          <h2 className="section-title">Built For <span>You</span></h2>
+          <h2 className="section-title">{sec.home_features?.title || "Why Choose Us"}</h2>
           <div className="features-grid">
-            {[
-              {icon:"⚡",title:"Fast Activation",desc:"Subscriptions activated within hours of payment confirmation."},
-              {icon:"🔒",title:"Secure Payment",desc:"Pay via UK bank transfer. Upload receipt and we verify manually."},
-              {icon:"🚚",title:"Fast Delivery",desc:"Devices delivered across the UK within 2-3 working days."},
-              {icon:"📞",title:"WhatsApp Support",desc:"Real human support via WhatsApp. No bots, no delays."},
-              {icon:"📱",title:"Works Everywhere",desc:"Compatible with Smart TVs, phones, tablets and more."},
-              {icon:"🎯",title:"Order Tracking",desc:"Track your order status in real time from our website."},
-            ].map((f,i)=>(
+            {(sec.home_features?.items || []).map((f:any,i:number)=>(
               <div className="feature-item" key={i}>
                 <span className="feature-icon">{f.icon}</span>
                 <div className="feature-title">{f.title}</div>
-                <div className="feature-desc">{f.desc}</div>
+                <div className="feature-desc">{f.description}</div>
               </div>
             ))}
           </div>
         </div>
 
+        {/* Testimonials — from DB */}
+        {sec.home_testimonials?.items?.length > 0 && (
+          <div className="features-section" style={{paddingTop:0}}>
+            <h2 className="section-title" style={{marginBottom:32}}>{sec.home_testimonials.title || "What Our Customers Say"}</h2>
+            <div className="features-grid">
+              {sec.home_testimonials.items.map((t:any,i:number)=>(
+                <div className="feature-item" key={i}>
+                  <div style={{fontSize:20,marginBottom:8}}>{"⭐".repeat(t.rating||5)}</div>
+                  <div className="feature-desc" style={{marginBottom:10}}>"{t.text}"</div>
+                  <div className="feature-title" style={{fontSize:14}}>— {t.name}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* CTA — from DB */}
         <div className="cta-section">
-          <h2 className="cta-title">Ready to Order?</h2>
-          <p className="cta-sub">Fast delivery. Easy setup. Real support.</p>
+          <h2 className="cta-title">{sec.home_hero?.title || "Best Firestick Service in UK"}</h2>
+          <p className="cta-sub">{sec.home_hero?.subtitle || "Premium IPTV & Streaming Solutions"}</p>
           <div className="cta-btns">
-            <a href="/cart" className="btn-primary">View Cart</a>
-            <a href="/contact" className="btn-secondary">Contact Us</a>
+            <a href={sec.home_hero?.button_link||"/products"} className="btn-primary">{sec.home_hero?.button_text||"Shop Now"}</a>
+            <a href={sec.home_hero?.secondary_button_link||"/about"} className="btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>
           </div>
         </div>
 
