@@ -156,8 +156,26 @@ export default function CartPage() {
     name: "", email: "", phone: "", address: "", city: "", postcode: "", notes: ""
   });
 
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [couponApplied, setCouponApplied] = useState<{code:string;type:string;value:number;discount_amount:number;message:string}|null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponChecking, setCouponChecking] = useState(false);
+
   const shipping = cart.some(i => i.name.toLowerCase().includes("plan")) ? 0 : cart.length > 0 ? 3.99 : 0;
-  const grandTotal = total + shipping;
+  const subtotal = total;
+  const vatAmount = Math.round(subtotal * 0.20 * 100) / 100;
+  const discountAmount = couponApplied ? couponApplied.discount_amount : 0;
+  const grandTotal = Math.round((subtotal + shipping + vatAmount - discountAmount) * 100) / 100;
+
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponChecking(true); setCouponError(""); setCouponApplied(null);
+    const res = await fetch("/api/coupons?action=validate", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ code: couponCode, cart_total: subtotal + shipping }) }).then(r=>r.json()).catch(()=>({}));
+    if (res.valid) { setCouponApplied(res); setCouponError(""); }
+    else { setCouponError(res.message || "Invalid coupon"); }
+    setCouponChecking(false);
+  };
 
   const handleOrder = async () => {
     if (!form.name || !form.email || !form.phone || !form.address) return;
@@ -197,7 +215,10 @@ export default function CartPage() {
           payment_method: paymentMethod,
           receipt_path: receiptPath,
           items: cart,
-          total: grandTotal
+          total: grandTotal,
+          coupon_code: couponApplied?.code || null,
+          discount_amount: discountAmount,
+          vat_amount: vatAmount,
         })
       });
 
@@ -316,10 +337,21 @@ export default function CartPage() {
             <div className="order-summary">
               <div className="summary-header"><h3>Order Summary</h3></div>
               <div className="summary-body">
-                <div className="summary-row"><span>Subtotal</span><span>£{total.toFixed(2)}</span></div>
+                <div className="summary-row"><span>Subtotal</span><span>£{subtotal.toFixed(2)}</span></div>
                 <div className="summary-row"><span>Shipping</span><span>{shipping === 0 ? "Free" : `£${shipping.toFixed(2)}`}</span></div>
+                <div className="summary-row"><span>VAT (20%)</span><span>£{vatAmount.toFixed(2)}</span></div>
+                {couponApplied && <div className="summary-row" style={{color:"#00c864"}}><span>Discount ({couponApplied.code})</span><span>-£{discountAmount.toFixed(2)}</span></div>}
                 <hr className="summary-divider" />
                 <div className="summary-row summary-total"><span>Total</span><span>£{grandTotal.toFixed(2)}</span></div>
+              </div>
+              {/* Coupon input */}
+              <div style={{padding:"0 20px 16px"}}>
+                <div style={{display:"flex",gap:8,marginBottom:6}}>
+                  <input style={{flex:1,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"8px 12px",color:"white",fontSize:13,outline:"none"}} placeholder="Coupon code" value={couponCode} onChange={e=>setCouponCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&applyCoupon()} />
+                  <button style={{background:"rgba(139,0,255,0.2)",border:"1px solid rgba(139,0,255,0.4)",color:"var(--purple-glow)",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,whiteSpace:"nowrap"}} onClick={applyCoupon} disabled={couponChecking}>{couponChecking?"...":"Apply"}</button>
+                </div>
+                {couponApplied && <div style={{fontSize:12,color:"#00c864"}}>✅ {couponApplied.message} — Save £{discountAmount.toFixed(2)}</div>}
+                {couponError && <div style={{fontSize:12,color:"#ff6666"}}>❌ {couponError}</div>}
               </div>
               <button className="checkout-btn" disabled={cart.length === 0} onClick={() => setStep("checkout")}>
                 Proceed to Checkout →
@@ -413,8 +445,10 @@ export default function CartPage() {
                   )}
 
                   <div className="summary-body" style={{background:"rgba(139,0,255,0.05)", borderRadius:"12px", marginBottom:"16px"}}>
-                    <div className="summary-row"><span>Subtotal</span><span>£{total.toFixed(2)}</span></div>
+                    <div className="summary-row"><span>Subtotal</span><span>£{subtotal.toFixed(2)}</span></div>
                     <div className="summary-row"><span>Shipping</span><span>{shipping === 0 ? "Free" : `£${shipping.toFixed(2)}`}</span></div>
+                    <div className="summary-row"><span>VAT (20%)</span><span>£{vatAmount.toFixed(2)}</span></div>
+                    {couponApplied && <div className="summary-row" style={{color:"#00c864"}}><span>Discount ({couponApplied.code})</span><span>-£{discountAmount.toFixed(2)}</span></div>}
                     <hr className="summary-divider" />
                     <div className="summary-row summary-total"><span>Total</span><span>£{grandTotal.toFixed(2)}</span></div>
                   </div>

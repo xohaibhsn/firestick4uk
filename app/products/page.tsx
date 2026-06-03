@@ -1,6 +1,6 @@
 "use client";
 export const dynamic = 'force-dynamic';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useCart } from "../lib/cartContext";
 
 interface Product {
@@ -28,17 +28,44 @@ export default function ProductsPage() {
   const [added, setAdded] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [filter, setFilter] = useState("All");
+  const [sort, setSort] = useState("featured");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  // Live search
+  const [searchQ, setSearchQ] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchActive, setSearchActive] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
   const { addToCart, cart } = useCart();
 
-  useEffect(() => {
-    fetch('/api/products')
+  const fetchProducts = useCallback((cat = filter, s = sort, mn = minPrice, mx = maxPrice) => {
+    setLoading(true);
+    let url = `/api/products?sort=${s}`;
+    if (cat !== "All") url += `&category=${encodeURIComponent(cat)}`;
+    if (mn) url += `&minPrice=${mn}`;
+    if (mx) url += `&maxPrice=${mx}`;
+    fetch(url)
       .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) { setProducts(data); }
-        else { setLoadError(true); }
-        setLoading(false);
-      })
+      .then(data => { if (Array.isArray(data)) { setProducts(data); setLoadError(false); } else { setLoadError(true); } setLoading(false); })
       .catch(() => { setLoadError(true); setLoading(false); });
+  }, [filter, sort, minPrice, maxPrice]);
+
+  useEffect(() => { fetchProducts(); }, []);
+
+  // Debounced live search
+  useEffect(() => {
+    if (!searchQ || searchQ.length < 2) { setSearchResults([]); return; }
+    const t = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(searchQ)}`).then(r=>r.json()).then(d=>{ setSearchResults(Array.isArray(d)?d:[]); setSearchOpen(true); }).catch(()=>{});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchQ]);
+
+  useEffect(() => {
+    const handle = (e: MouseEvent) => { if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false); };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
   }, []);
 
   const handleAddToCart = (p: Product) => {
@@ -47,8 +74,12 @@ export default function ProductsPage() {
     setTimeout(() => setAdded(null), 1500);
   };
 
+  const applyFilter = (cat: string) => { setFilter(cat); fetchProducts(cat, sort, minPrice, maxPrice); };
+  const applySort = (s: string) => { setSort(s); fetchProducts(filter, s, minPrice, maxPrice); };
+  const applyPrice = () => fetchProducts(filter, sort, minPrice, maxPrice);
+
   const categories = ["All", ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))];
-  const filtered = filter === "All" ? products : products.filter(p => p.category === filter);
+  const filtered = products;
 
   return (
     <>
@@ -134,6 +165,30 @@ export default function ProductsPage() {
           <li><a href="/contact" onClick={()=>setMenuOpen(false)}>Contact</a></li>
           <li><a href="/cart" className="nav-cta" onClick={()=>setMenuOpen(false)}>🛒 Cart {cart.length > 0 && `(${cart.length})`}</a></li>
         </ul>
+        {/* Live Search */}
+        <div ref={searchRef} style={{position:"relative",display:"flex",alignItems:"center",gap:8}}>
+          {searchActive
+            ? <input autoFocus style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.4)",borderRadius:20,padding:"7px 16px",color:"white",fontSize:13,outline:"none",width:220}} placeholder="Search products..." value={searchQ} onChange={e=>setSearchQ(e.target.value)} onKeyDown={e=>e.key==="Escape"&&(setSearchActive(false),setSearchQ(""),setSearchOpen(false))} />
+            : <button style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.6)",fontSize:20,padding:"4px 8px"}} onClick={()=>setSearchActive(true)} title="Search">🔍</button>
+          }
+          {searchOpen && searchResults.length > 0 && (
+            <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:320,background:"linear-gradient(135deg,rgba(26,0,40,0.98),rgba(13,0,20,0.99))",border:"1px solid rgba(139,0,255,0.3)",borderRadius:14,overflow:"hidden",zIndex:200,boxShadow:"0 8px 32px rgba(0,0,0,0.6)",animation:"fadeIn 0.15s ease"}}>
+              {searchResults.map((r:any)=>(
+                <a key={r.id} href={`/products/${r.slug}`} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 16px",textDecoration:"none",borderBottom:"1px solid rgba(139,0,255,0.07)",transition:"background 0.15s"}} onMouseEnter={e=>(e.currentTarget.style.background="rgba(139,0,255,0.08)")} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
+                  {r.image ? <img src={r.image} alt={r.name} style={{width:40,height:40,borderRadius:6,objectFit:"cover",border:"1px solid rgba(139,0,255,0.2)"}} loading="lazy" /> : <div style={{width:40,height:40,borderRadius:6,background:"rgba(139,0,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>📦</div>}
+                  <div style={{flex:1,overflow:"hidden"}}>
+                    <div style={{fontSize:13,fontWeight:600,color:"white",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.name}</div>
+                    <div style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>{r.category} · £{Number(r.price).toFixed(2)}</div>
+                  </div>
+                </a>
+              ))}
+              <a href={`/products?q=${encodeURIComponent(searchQ)}`} style={{display:"block",padding:"10px 16px",fontSize:12,color:"var(--purple-glow)",textDecoration:"none",textAlign:"center",background:"rgba(139,0,255,0.05)"}}>View all results for &quot;{searchQ}&quot; →</a>
+            </div>
+          )}
+          {searchOpen && searchQ.length >= 2 && searchResults.length === 0 && (
+            <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:240,background:"rgba(13,0,20,0.98)",border:"1px solid rgba(139,0,255,0.2)",borderRadius:10,padding:"14px 16px",zIndex:200,fontSize:13,color:"rgba(255,255,255,0.4)"}}>No products found for &quot;{searchQ}&quot;</div>
+          )}
+        </div>
         <button className="hamburger" onClick={()=>setMenuOpen(!menuOpen)} aria-label="Menu">
           <span/><span/><span/>
         </button>
@@ -145,12 +200,25 @@ export default function ProductsPage() {
           <h1 className="page-title">All <span>Products</span></h1>
         </div>
 
-        <div className="filters">
-          {categories.map(cat => (
-            <button key={cat} className={`filter-btn ${filter===cat?"active":""}`} onClick={()=>setFilter(cat)}>
-              {cat}
-            </button>
-          ))}
+        {/* Filters + Sort */}
+        <div style={{maxWidth:1300,margin:"0 auto",padding:"0 60px 20px",display:"flex",flexWrap:"wrap",gap:12,alignItems:"center"}}>
+          <div className="filters" style={{margin:0,padding:0,flex:1,minWidth:200}}>
+            {["All","Subscription","Device","Bundle"].map(cat => (
+              <button key={cat} className={`filter-btn ${filter===cat?"active":""}`} onClick={()=>applyFilter(cat)}>{cat}</button>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+            <input type="number" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none"}} placeholder="Min £" value={minPrice} onChange={e=>setMinPrice(e.target.value)} />
+            <span style={{color:"rgba(255,255,255,0.3)",fontSize:13}}>—</span>
+            <input type="number" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none"}} placeholder="Max £" value={maxPrice} onChange={e=>setMaxPrice(e.target.value)} />
+            <button style={{background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",color:"var(--purple-glow)",padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600}} onClick={applyPrice}>Apply</button>
+            <select style={{background:"rgba(13,0,20,0.9)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none",cursor:"pointer"}} value={sort} onChange={e=>applySort(e.target.value)}>
+              <option value="featured">Featured</option>
+              <option value="price_asc">Price: Low → High</option>
+              <option value="price_desc">Price: High → Low</option>
+              <option value="newest">Newest</option>
+            </select>
+          </div>
         </div>
 
         <div className="products-grid">

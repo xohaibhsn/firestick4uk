@@ -226,7 +226,7 @@ const demoCustomers = [
   { name:"Emma Wilson", email:"emma@example.com", phone:"+44 7444 444444", orders:1, spent:"£9.99", joined:"May 2026" },
 ];
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"blog"|"settings"|"pages";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"blog"|"settings"|"pages"|"coupons";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
 
@@ -246,6 +246,9 @@ export default function AdminPage() {
   const [editProduct, setEditProduct] = useState({ name:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"" });
   const [imageUploading, setImageUploading] = useState(false);
   const [customers, setCustomers] = useState(demoCustomers);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [couponForm, setCouponForm] = useState({ code:"", type:"percentage", value:"", minimum_order:"0", usage_limit:"", expires_at:"" });
+  const [couponMsg, setCouponMsg] = useState("");
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [blogModal, setBlogModal] = useState<BlogPost|"new"|null>(null);
   const [featImgUploading, setFeatImgUploading] = useState(false);
@@ -310,6 +313,7 @@ export default function AdminPage() {
         }
       })
       .catch(() => {});
+    fetch("/api/coupons").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setCoupons(d); }).catch(()=>{});
     fetch("/api/site-content?page=all")
       .then(r => r.json())
       .then(d => { if (d && typeof d === "object") setSiteContent(d); })
@@ -765,6 +769,7 @@ export default function AdminPage() {
               { id:"products", icon:"📦", label:"Products" },
               { id:"customers", icon:"👥", label:"Customers" },
               { id:"blog", icon:"📝", label:"Blog" },
+              { id:"coupons", icon:"🎟️", label:"Coupons" },
               { id:"pages", icon:"📄", label:"Pages" },
               { id:"settings", icon:"⚙️", label:"Site Settings" },
             ] as const).map(item => (
@@ -795,6 +800,7 @@ export default function AdminPage() {
                 {tab==="products" && <>Manage <span>Products</span></>}
                 {tab==="customers" && <>Customer <span>Data</span></>}
                 {tab==="blog" && <>Manage <span>Blog</span></>}
+                {tab==="coupons" && <>Manage <span>Coupons</span></>}
                 {tab==="pages" && <>Page <span>Editor</span></>}
                 {tab==="settings" && <>Site <span>Settings</span></>}
               </h1>
@@ -995,6 +1001,59 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* 🎟️ COUPONS */}
+          {tab==="coupons" && (
+            <div>
+              {couponMsg && <div style={{marginBottom:16,padding:"10px 16px",background:couponMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${couponMsg.startsWith("✅")?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,borderRadius:10,fontSize:13,color:couponMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{couponMsg}</div>}
+              {/* Add Coupon Form */}
+              <div className="section-card" style={{padding:20,marginBottom:20}}>
+                <div className="section-title" style={{marginBottom:16}}>Add New Coupon</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
+                  <div className="modal-field"><label>Code *</label><input placeholder="SAVE10" style={{width:"100%",textTransform:"uppercase"}} value={couponForm.code} onChange={e=>setCouponForm(f=>({...f,code:e.target.value.toUpperCase()}))} /></div>
+                  <div className="modal-field"><label>Type</label><select style={{width:"100%"}} value={couponForm.type} onChange={e=>setCouponForm(f=>({...f,type:e.target.value}))}><option value="percentage">% Percentage</option><option value="fixed">£ Fixed</option></select></div>
+                  <div className="modal-field"><label>Value</label><input type="number" placeholder="10" style={{width:"100%"}} value={couponForm.value} onChange={e=>setCouponForm(f=>({...f,value:e.target.value}))} /></div>
+                  <div className="modal-field"><label>Min Order (£)</label><input type="number" placeholder="0" style={{width:"100%"}} value={couponForm.minimum_order} onChange={e=>setCouponForm(f=>({...f,minimum_order:e.target.value}))} /></div>
+                  <div className="modal-field"><label>Usage Limit</label><input type="number" placeholder="Unlimited" style={{width:"100%"}} value={couponForm.usage_limit} onChange={e=>setCouponForm(f=>({...f,usage_limit:e.target.value}))} /></div>
+                  <div className="modal-field"><label>Expires</label><input type="date" style={{width:"100%"}} value={couponForm.expires_at} onChange={e=>setCouponForm(f=>({...f,expires_at:e.target.value}))} /></div>
+                </div>
+                <button className="btn-primary" style={{marginTop:8}} onClick={async()=>{
+                  if(!couponForm.code||!couponForm.value){setCouponMsg("❌ Code and value required");return;}
+                  const r=await fetch("/api/coupons",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(couponForm)}).then(x=>x.json()).catch(()=>({}));
+                  if(r.success){setCouponMsg("✅ Coupon created!");setCouponForm({code:"",type:"percentage",value:"",minimum_order:"0",usage_limit:"",expires_at:""});fetch("/api/coupons").then(x=>x.json()).then(d=>Array.isArray(d)&&setCoupons(d));}
+                  else setCouponMsg(`❌ ${r.error||"Failed"}`);
+                  setTimeout(()=>setCouponMsg(""),3000);
+                }}>+ Create Coupon</button>
+              </div>
+              {/* Coupons Table */}
+              <div className="section-card">
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>Code</th><th>Type</th><th>Value</th><th>Min Order</th><th>Used / Limit</th><th>Expires</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {coupons.length===0&&<tr><td colSpan={8} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No coupons yet</td></tr>}
+                      {coupons.map((c:any)=>(
+                        <tr key={c.id}>
+                          <td style={{fontFamily:"monospace",color:"var(--purple-glow)",fontWeight:700}}>{c.code}</td>
+                          <td><span className="status-badge status-pending" style={{fontSize:11}}>{c.type==="percentage"?`${c.value}%`:`£${c.value}`}</span></td>
+                          <td style={{fontWeight:600}}>{c.type==="percentage"?`${c.value}%`:`£${Number(c.value).toFixed(2)}`}</td>
+                          <td>{c.minimum_order>0?`£${c.minimum_order}`:"None"}</td>
+                          <td>{c.used_count}{c.usage_limit?`/${c.usage_limit}`:" / ∞"}</td>
+                          <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{c.expires_at?new Date(c.expires_at).toLocaleDateString("en-GB"):"Never"}</td>
+                          <td>
+                            <span className={`status-badge ${c.is_active?"status-confirmed":"status-pending"}`} style={{cursor:"pointer"}} onClick={async()=>{await fetch("/api/coupons",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...c,is_active:!c.is_active})});fetch("/api/coupons").then(r=>r.json()).then(d=>Array.isArray(d)&&setCoupons(d));}}>
+                              {c.is_active?"Active":"Inactive"}
+                            </span>
+                          </td>
+                          <td><button className="action-btn btn-delete" onClick={async()=>{if(!confirm("Delete?"))return;await fetch(`/api/coupons?id=${c.id}`,{method:"DELETE"});setCoupons(prev=>prev.filter(x=>x.id!==c.id));}}>Delete</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}

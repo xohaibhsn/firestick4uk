@@ -1,43 +1,50 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { RL_GENERAL, getClientIp } from '../../lib/rateLimit';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  let connection;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { allowed } = RL_GENERAL(getClientIp(req));
+  if (!allowed) return res.status(429).json({ error: 'Too many requests' });
+
+  let connection: any;
   try {
     const mysql = require('mysql2/promise');
     connection = await Promise.race([
-      mysql.createConnection({
-        host: process.env.DB_HOST || 'srv497.hstgr.io',
-        user: process.env.DB_USER || 'u992747032_firestick4uk',
-        password: process.env.DB_PASSWORD || 'Firestick@2026',
-        database: process.env.DB_NAME || 'u992747032_firestick4uk',
-        port: Number(process.env.DB_PORT) || 3306,
-        connectTimeout: 5000,
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('DB connection timeout')), 6000)),
+      mysql.createConnection({ host: process.env.DB_HOST||'srv497.hstgr.io', user: process.env.DB_USER||'u992747032_firestick4uk', password: process.env.DB_PASSWORD||'Firestick@2026', database: process.env.DB_NAME||'u992747032_firestick4uk', port: Number(process.env.DB_PORT)||3306, connectTimeout: 5000 }),
+      new Promise((_,reject) => setTimeout(()=>reject(new Error('DB connection timeout')),6000)),
     ]);
 
-    if (req.method === 'POST') {
-      const { customer_name, customer_email, customer_phone, delivery_address, city, postcode, notes, payment_method, receipt_path, items, total } = req.body;
+    // Add new columns if not exist
+    for (const col of [
+      "ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(50)",
+      "ALTER TABLE orders ADD COLUMN discount_amount DECIMAL(10,2) DEFAULT 0",
+      "ALTER TABLE orders ADD COLUMN vat_amount DECIMAL(10,2) DEFAULT 0",
+    ]) { try { await connection.query(col); } catch (_) {} }
 
-      const order_id = 'ORD-' + Date.now();
+    const { customer_name, customer_email, customer_phone, delivery_address, city, postcode, notes,
+      payment_method, receipt_path, items, total, coupon_code, discount_amount, vat_amount } = req.body;
 
+    const order_id = 'ORD-' + Date.now();
+
+    await connection.query(
+      'INSERT INTO orders (order_id,customer_name,customer_email,customer_phone,delivery_address,city,postcode,notes,payment_method,receipt_path,total,coupon_code,discount_amount,vat_amount,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [order_id, customer_name, customer_email, customer_phone, delivery_address, city, postcode, notes||'', payment_method, receipt_path||'', total, coupon_code||null, discount_amount||0, vat_amount||0, 'pending']
+    );
+
+    for (const item of items) {
       await connection.query(
-        'INSERT INTO orders (order_id, customer_name, customer_email, customer_phone, delivery_address, city, postcode, notes, payment_method, receipt_path, total, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [order_id, customer_name, customer_email, customer_phone, delivery_address, city, postcode, notes || '', payment_method, receipt_path || '', total, 'pending']
+        'INSERT INTO order_items (order_id,product_id,product_name,price,quantity) VALUES (?,?,?,?,?)',
+        [order_id, item.id, item.name, item.price, item.qty]
       );
-
-      for (const item of items) {
-        await connection.query(
-          'INSERT INTO order_items (order_id, product_id, product_name, price, quantity) VALUES (?, ?, ?, ?, ?)',
-          [order_id, item.id, item.name, item.price, item.qty]
-        );
-      }
-
-      return res.status(200).json({ success: true, order_id });
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    // Increment coupon used_count
+    if (coupon_code) {
+      await connection.query('UPDATE coupons SET used_count=used_count+1 WHERE code=?', [coupon_code]).catch(()=>{});
+    }
 
+    return res.status(200).json({ success:true, order_id });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   } finally {
