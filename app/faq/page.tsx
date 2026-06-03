@@ -19,8 +19,8 @@ const styles = `
     -webkit-background-clip:text; -webkit-text-fill-color:transparent;
     text-decoration:none; letter-spacing:2px; }
   .nav-links { display:flex; gap:36px; list-style:none; }
-  .nav-links a { color:rgba(255,255,255,0.8); text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.3s; }
-  .nav-links a:hover { color:var(--purple-glow); }
+  .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.3s; }
+  .nav-links a:hover { color:#5B21B6; }
   .nav-cta { background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright)) !important; color:white !important; padding:10px 24px !important; border-radius:30px !important; font-weight:600 !important; }
   .hamburger { display:none; flex-direction:column; gap:5px; cursor:pointer; background:none; border:none; padding:5px; z-index:101; }
   .hamburger span { display:block; width:25px; height:2px; background:var(--purple-glow); }
@@ -34,25 +34,25 @@ const styles = `
   .page-wrapper { position:relative; z-index:1; padding-top:100px; min-height:100vh; }
 
   .page-header { max-width:800px; margin:0 auto; padding:50px 24px 40px; text-align:center; }
-  .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:var(--purple-glow); margin-bottom:12px; }
-  .page-title { font-family:'Cinzel',serif; font-size:clamp(28px,4vw,48px); font-weight:700; color:white; margin-bottom:14px; }
+  .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; }
+  .page-title { font-family:'Cinzel',serif; font-size:clamp(28px,4vw,48px); font-weight:700; color:#111111; margin-bottom:14px; }
   .page-title span { background:linear-gradient(135deg,var(--purple-glow),var(--gold)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-  .page-sub { color:rgba(255,255,255,0.5); font-size:15px; line-height:1.7; }
+  .page-sub { color:#555555; font-size:15px; line-height:1.7; }
 
   /* CATEGORIES */
   .faq-categories { max-width:900px; margin:0 auto; padding:0 24px 40px;
     display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
   .cat-btn { padding:8px 22px; border-radius:30px; font-size:13px; font-weight:500;
     cursor:pointer; transition:all 0.3s; border:1px solid rgba(139,0,255,0.3);
-    background:rgba(139,0,255,0.06); color:rgba(255,255,255,0.6); }
-  .cat-btn:hover { border-color:rgba(139,0,255,0.6); color:var(--purple-glow); }
+    background:rgba(139,0,255,0.06); color:#444444; }
+  .cat-btn:hover { border-color:rgba(139,0,255,0.6); color:#5B21B6; }
   .cat-btn.active { background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright));
-    color:white; border-color:transparent; box-shadow:0 0 15px rgba(139,0,255,0.4); }
+    color:#111111; border-color:transparent; box-shadow:0 0 15px rgba(139,0,255,0.4); }
 
   /* FAQ LIST */
   .faq-section { max-width:800px; margin:0 auto; padding:0 24px; }
   .faq-group { margin-bottom:40px; }
-  .faq-group-title { font-family:'Cinzel',serif; font-size:16px; font-weight:700; color:var(--purple-glow);
+  .faq-group-title { font-family:'Cinzel',serif; font-size:16px; font-weight:700; color:#5B21B6;
     margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid rgba(139,0,255,0.15);
     letter-spacing:1px; }
   .faq-list { display:flex; flex-direction:column; gap:10px; }
@@ -62,23 +62,23 @@ const styles = `
   .faq-item.open { border-color:rgba(139,0,255,0.45); background:rgba(139,0,255,0.1); }
   .faq-question { padding:18px 22px; cursor:pointer; display:flex; justify-content:space-between;
     align-items:center; gap:16px; }
-  .faq-question-text { font-size:15px; font-weight:500; color:white; }
-  .faq-arrow { color:var(--purple-glow); font-size:18px; transition:transform 0.3s; flex-shrink:0; }
+  .faq-question-text { font-size:15px; font-weight:500; color:#111111; }
+  .faq-arrow { color:#5B21B6; font-size:18px; transition:transform 0.3s; flex-shrink:0; }
   .faq-arrow.open { transform:rotate(180deg); }
-  .faq-answer { padding:0 22px 18px; font-size:14px; color:rgba(255,255,255,0.55); line-height:1.8;
+  .faq-answer { padding:0 22px 18px; font-size:14px; color:#444444; line-height:1.8;
     border-top:1px solid rgba(139,0,255,0.1); padding-top:14px; }
 
   /* STILL NEED HELP */
   .help-section { max-width:800px; margin:50px auto 80px; padding:0 24px; }
   .help-box { background:linear-gradient(135deg,rgba(74,0,128,0.3),rgba(139,0,255,0.15));
     border:1px solid rgba(139,0,255,0.3); border-radius:24px; padding:50px 40px; text-align:center; }
-  .help-title { font-family:'Cinzel',serif; font-size:clamp(20px,3vw,28px); font-weight:700; color:white; margin-bottom:12px; }
-  .help-sub { color:rgba(255,255,255,0.5); font-size:15px; margin-bottom:30px; }
+  .help-title { font-family:'Cinzel',serif; font-size:clamp(20px,3vw,28px); font-weight:700; color:#111111; margin-bottom:12px; }
+  .help-sub { color:#555555; font-size:15px; margin-bottom:30px; }
   .help-btns { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
-  .btn-whatsapp { background:linear-gradient(135deg,#25d366,#128c7e); color:white; padding:14px 32px;
+  .btn-whatsapp { background:linear-gradient(135deg,#25d366,#128c7e); color:#111111; padding:14px 32px;
     border-radius:50px; text-decoration:none; font-size:14px; font-weight:600; transition:all 0.3s; }
   .btn-whatsapp:hover { box-shadow:0 0 25px rgba(37,211,102,0.5); transform:translateY(-2px); }
-  .btn-contact { background:transparent; color:var(--purple-light); padding:14px 32px;
+  .btn-contact { background:transparent; color:#5B21B6; padding:14px 32px;
     border-radius:50px; text-decoration:none; font-size:14px; font-weight:600;
     border:1px solid rgba(139,0,255,0.5); transition:all 0.3s; }
   .btn-contact:hover { background:rgba(139,0,255,0.15); transform:translateY(-2px); }
@@ -90,9 +90,9 @@ const styles = `
     background:linear-gradient(135deg,var(--purple-glow),var(--gold));
     -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
   .footer-links { display:flex; gap:20px; list-style:none; flex-wrap:wrap; }
-  .footer-links a { color:rgba(255,255,255,0.4); text-decoration:none; font-size:13px; transition:color 0.3s; }
-  .footer-links a:hover { color:var(--purple-glow); }
-  .footer-copy { font-size:12px; color:rgba(255,255,255,0.3); }
+  .footer-links a { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; transition:color 0.3s; }
+  .footer-links a:hover { color:#5B21B6; }
+  .footer-copy { font-size:12px; color:rgba(255,255,255,0.55); }
 
   .whatsapp-btn { position:fixed; bottom:30px; right:30px; z-index:999; width:58px; height:58px;
     border-radius:50%; background:linear-gradient(135deg,#25d366,#128c7e);
