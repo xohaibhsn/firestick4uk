@@ -69,7 +69,19 @@ export default function Home() {
         .hamburger span { display:block; width:25px; height:2px; background:#111111; border-radius:2px; }
         .page-wrapper { position:relative; z-index:1; padding-top:80px; background:#FFFFFF; }
         /* HERO */
-        .hero { background:#FFFFFF; padding:80px 60px 70px; max-width:1300px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center; }
+        .products-header { max-width:1300px; margin:0 auto; padding:50px 60px 28px; display:flex; justify-content:space-between; align-items:flex-end; }
+        .products-header-left {}
+        .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:10px; display:block; font-weight:600; }
+        .section-title { font-family:'Cinzel',serif; font-size:clamp(22px,3vw,36px); font-weight:700; color:#111111; }
+        .section-title span { color:#5B21B6; }
+        .view-all-link { font-size:13px; font-weight:600; color:#5B21B6; text-decoration:none; border:1px solid #5B21B6; padding:8px 20px; border-radius:8px; transition:all 0.2s; white-space:nowrap; }
+        .view-all-link:hover { background:#5B21B6; color:#FFFFFF; }
+        .products-grid { max-width:1300px; margin:0 auto; padding:0 60px 20px; display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:22px; }
+        .view-all-wrap { max-width:1300px; margin:0 auto; padding:20px 60px 60px; text-align:center; border-bottom:1px solid #E5E5E5; }
+        .view-all-btn { display:inline-block; background:#111111; color:#FFFFFF; padding:14px 40px; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; transition:all 0.2s; }
+        .view-all-btn:hover { background:#5B21B6; transform:translateY(-1px); }
+        /* HERO */
+        .hero { background:#FFFFFF; padding:60px 60px 70px; max-width:1300px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center; }
         .hero-content {}
         .hero-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:16px; display:block; font-weight:600; }
         .hero-title { font-family:'Cinzel',serif; font-size:clamp(28px,4vw,52px); font-weight:900; color:#111111; line-height:1.15; margin-bottom:20px; }
@@ -85,11 +97,6 @@ export default function Home() {
         .stat-item {}
         .stat-num { font-family:'Cinzel',serif; font-size:28px; font-weight:900; color:#111111; display:block; }
         .stat-label { font-size:12px; color:#888888; letter-spacing:1px; text-transform:uppercase; }
-        .products-header { max-width:1300px; margin:0 auto; padding:20px 60px 40px; border-top:1px solid #E5E5E5; }
-        .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; }
-        .section-title { font-family:'Cinzel',serif; font-size:clamp(26px,3.5vw,44px); font-weight:700; color:#111111; }
-        .section-title span { color:#5B21B6; }
-        .products-grid { max-width:1300px; margin:0 auto; padding:0 60px 80px; display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:22px; }
         .product-card { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:12px; overflow:hidden; transition:all 0.3s; cursor:pointer; position:relative; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
         .product-card:hover { transform:translateY(-4px); box-shadow:0 8px 24px rgba(0,0,0,0.12); border-color:#5B21B6; }
         .product-image { width:100%; aspect-ratio:1/1; background:#F5F5F5; border-bottom:1px solid #E5E5E5; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
@@ -110,7 +117,7 @@ export default function Home() {
         .add-btn:hover { background:#1A1A1A; transform:translateY(-1px); }
         .add-btn.added { background:#16A34A; }
         .loading { text-align:center; padding:60px; color:#666666; font-size:18px; }
-        .features-section { max-width:1300px; margin:0 auto; padding:70px 60px 80px; border-top:1px solid #E5E5E5; background:#F5F5F5; }
+        .features-section { max-width:1300px; margin:0 auto; padding:60px 60px 70px; border-top:1px solid #E5E5E5; background:#F5F5F5; }
         .features-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-top:40px; }
         .feature-item { padding:28px 24px; border-radius:12px; background:#FFFFFF; border:1px solid #E5E5E5; transition:all 0.3s; }
         .feature-item:hover { box-shadow:0 4px 16px rgba(0,0,0,0.08); transform:translateY(-2px); border-color:#5B21B6; }
@@ -139,11 +146,12 @@ export default function Home() {
           .nav-links.open{display:flex;flex-direction:column;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#FFFFFF;align-items:center;justify-content:center;gap:28px;z-index:9999;margin:0;padding:0;}
           .nav-links.open a{font-size:18px;color:#111111;}
           .hamburger{display:flex;}
-          .hero{grid-template-columns:1fr;padding:50px 24px 40px;gap:32px;}
+          .products-header{padding:32px 24px 20px;flex-direction:column;align-items:flex-start;gap:14px;}
+          .products-grid{padding:0 24px 16px;}
+          .view-all-wrap{padding:16px 24px 40px;}
+          .hero{grid-template-columns:1fr;padding:40px 24px 40px;gap:32px;}
           .hero-visual{display:none;}
           .hero-stats{gap:20px;}
-          .products-header{padding:20px 24px 24px;}
-          .products-grid{padding:0 24px 60px;}
           .features-section{padding:40px 24px 50px;}
           .cta-section{margin:0 24px 60px;padding:50px 24px;}
           footer{padding:36px 24px;flex-direction:column;text-align:center;}
@@ -166,31 +174,13 @@ export default function Home() {
       </nav>
 
       <div className="page-wrapper">
-        {/* HERO */}
-        <div className="hero">
-          <div className="hero-content">
-            <span className="hero-tag">✦ UK&apos;s #1 Firestick Service</span>
-            <h1 className="hero-title">
-              {sec.home_hero?.title?.split(' ').slice(0,-2).join(' ') || "Best Firestick"}<br/>
-              <span>{sec.home_hero?.title?.split(' ').slice(-2).join(' ') || "Service in UK"}</span>
-            </h1>
-            <p className="hero-subtitle">{sec.home_hero?.subtitle || "Premium IPTV & Streaming Solutions for the whole UK. Fast delivery, easy setup, real support."}</p>
-            <div className="hero-btns">
-              <a href={sec.home_hero?.button_link||"/products"} className="hero-btn-primary">{sec.home_hero?.button_text||"Shop Now"} →</a>
-              <a href={sec.home_hero?.secondary_button_link||"/about"} className="hero-btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>
-            </div>
-            <div className="hero-stats">
-              <div className="stat-item"><span className="stat-num">500+</span><span className="stat-label">Happy Customers</span></div>
-              <div className="stat-item"><span className="stat-num">4.9★</span><span className="stat-label">Average Rating</span></div>
-              <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
-            </div>
-          </div>
-          <div className="hero-visual">📺</div>
-        </div>
-
+        {/* PRODUCTS GRID — first thing after navbar */}
         <div className="products-header">
-          <div className="section-tag">✦ Our Store</div>
-          <h2 className="section-title">Browse Our <span>Products</span></h2>
+          <div className="products-header-left">
+            <span className="section-tag">✦ Our Store</span>
+            <h2 className="section-title">Featured <span>Products</span></h2>
+          </div>
+          <a href="/products" className="view-all-link">View All Products →</a>
         </div>
 
         <div className="products-grid">
@@ -199,7 +189,7 @@ export default function Home() {
           ) : products.length === 0 ? (
             <div className="loading">No products found.</div>
           ) : (
-            products.map((p) => (
+            products.slice(0, 8).map((p) => (
               <div className="product-card" key={p.id}>
                 <div className="product-image">
                   {p.badge && (
@@ -235,6 +225,32 @@ export default function Home() {
               </div>
             ))
           )}
+        </div>
+
+        <div className="view-all-wrap">
+          <a href="/products" className="view-all-btn">View All Products →</a>
+        </div>
+
+        {/* HERO — below products */}
+        <div className="hero">
+          <div className="hero-content">
+            <span className="hero-tag">✦ UK&apos;s #1 Firestick Service</span>
+            <h1 className="hero-title">
+              {sec.home_hero?.title?.split(' ').slice(0,-2).join(' ') || "Best Firestick"}<br/>
+              <span>{sec.home_hero?.title?.split(' ').slice(-2).join(' ') || "Service in UK"}</span>
+            </h1>
+            <p className="hero-subtitle">{sec.home_hero?.subtitle || "Premium IPTV & Streaming Solutions for the whole UK. Fast delivery, easy setup, real support."}</p>
+            <div className="hero-btns">
+              <a href={sec.home_hero?.button_link||"/products"} className="hero-btn-primary">{sec.home_hero?.button_text||"Shop Now"} →</a>
+              <a href={sec.home_hero?.secondary_button_link||"/about"} className="hero-btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>
+            </div>
+            <div className="hero-stats">
+              <div className="stat-item"><span className="stat-num">500+</span><span className="stat-label">Happy Customers</span></div>
+              <div className="stat-item"><span className="stat-num">4.9★</span><span className="stat-label">Average Rating</span></div>
+              <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
+            </div>
+          </div>
+          <div className="hero-visual">📺</div>
         </div>
 
         {/* Features — from DB */}
