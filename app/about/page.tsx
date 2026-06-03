@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -145,6 +145,11 @@ const styles = `
 
 export default function AboutPage() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sc, setSc] = useState<Record<string,string>>({});
+
+  useEffect(() => {
+    fetch("/api/site-content?page=about").then(r=>r.json()).then(d=>{ if(d&&typeof d==="object") setSc(d); }).catch(()=>{});
+  }, []);
 
   return (
     <>
@@ -173,7 +178,7 @@ export default function AboutPage() {
           <div className="section-tag">✦ Our Story</div>
           <h1 className="page-title">The UK&apos;s Most Trusted<br /><span>Tech Store</span></h1>
           <p className="hero-text">
-            We started Firestick44UK with one goal — to make premium streaming devices and subscription plans accessible, affordable, and hassle-free for everyone in the UK.
+            {sc.about_description || "We started Firestick4UK with one goal — to make premium streaming devices and subscription plans accessible, affordable, and hassle-free for everyone in the UK."}
           </p>
         </div>
 
@@ -199,7 +204,7 @@ export default function AboutPage() {
             <div className="section-tag">✦ Who We Are</div>
             <h2 className="story-title">Built on <span>Trust</span></h2>
             <p className="story-para">
-              Firestick44UK was founded by a team of tech enthusiasts who were frustrated with overpriced, complicated streaming setups. We wanted something simple — great devices, fair prices, and real human support.
+              {sc.about_mission || "Firestick4UK was founded by a team of tech enthusiasts who were frustrated with overpriced, complicated streaming setups. We wanted something simple — great devices, fair prices, and real human support."}
             </p>
             <p className="story-para">
               Today, we serve hundreds of customers across the United Kingdom, offering carefully selected Firestick devices, powerful Android boxes, and flexible subscription plans — all backed by our dedicated WhatsApp support team.

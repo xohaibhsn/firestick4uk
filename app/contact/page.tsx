@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -162,8 +162,12 @@ export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
-
   const [submitting, setSubmitting] = useState(false);
+  const [sc, setSc] = useState<Record<string,string>>({});
+
+  useEffect(() => {
+    fetch("/api/site-content?page=contact").then(r=>r.json()).then(d=>{ if(d&&typeof d==="object") setSc(d); }).catch(()=>{});
+  }, []);
 
   const handleSubmit = async () => {
     if (!form.name || !form.email || !form.message) return;
@@ -220,28 +224,28 @@ export default function ContactPage() {
 
         {/* CONTACT CARDS */}
         <div className="contact-cards">
-          <a href="https://wa.me/447934519060" className="contact-card" target="_blank" rel="noopener noreferrer">
+          <a href={`https://wa.me/${sc.contact_whatsapp||"447934519060"}`} className="contact-card" target="_blank" rel="noopener noreferrer">
             <span className="contact-card-icon">💬</span>
             <div className="contact-card-title">WhatsApp</div>
-            <div className="contact-card-value">+44 7934 519060</div>
+            <div className="contact-card-value">{sc.contact_phone||"+44 7934 519060"}</div>
             <div className="contact-card-sub">Fastest response</div>
           </a>
-          <a href="mailto:support@firestick44uk.com" className="contact-card">
+          <a href={`mailto:${sc.contact_email||"support@firestick4uk.com"}`} className="contact-card">
             <span className="contact-card-icon">📧</span>
             <div className="contact-card-title">Email</div>
-            <div className="contact-card-value">support@firestick44uk.com</div>
+            <div className="contact-card-value">{sc.contact_email||"support@firestick4uk.com"}</div>
             <div className="contact-card-sub">Reply within 24 hours</div>
           </a>
           <div className="contact-card">
             <span className="contact-card-icon">🕐</span>
             <div className="contact-card-title">Support Hours</div>
-            <div className="contact-card-value">9AM – 10PM</div>
+            <div className="contact-card-value">{sc.contact_hours||"9AM – 10PM"}</div>
             <div className="contact-card-sub">7 days a week</div>
           </div>
           <div className="contact-card">
             <span className="contact-card-icon">📍</span>
             <div className="contact-card-title">Based In</div>
-            <div className="contact-card-value">United Kingdom</div>
+            <div className="contact-card-value">{sc.contact_address||"United Kingdom"}</div>
             <div className="contact-card-sub">UK orders only</div>
           </div>
         </div>
@@ -309,7 +313,7 @@ export default function ContactPage() {
                 <strong>Fastest way to reach us</strong>
                 Send us a message on WhatsApp for instant support. We typically reply within minutes during business hours.
               </div>
-              <a href="https://wa.me/447934519060" className="info-card-link" target="_blank" rel="noopener noreferrer">
+              <a href={`https://wa.me/${sc.contact_whatsapp||"447934519060"}`} className="info-card-link" target="_blank" rel="noopener noreferrer">
                 Chat Now on WhatsApp →
               </a>
             </div>
@@ -371,7 +375,7 @@ export default function ContactPage() {
         </footer>
       </div>
 
-      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
+      <a href={`https://wa.me/${sc.contact_whatsapp||"447934519060"}`} className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
     </>
   );
 }

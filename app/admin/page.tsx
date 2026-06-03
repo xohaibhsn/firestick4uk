@@ -226,7 +226,7 @@ const demoCustomers = [
   { name:"Emma Wilson", email:"emma@example.com", phone:"+44 7444 444444", orders:1, spent:"£9.99", joined:"May 2026" },
 ];
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"blog";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"blog"|"settings"|"pages";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
 
@@ -252,6 +252,13 @@ export default function AdminPage() {
   const editorRef = useRef<HTMLDivElement>(null);
   const defaultBlog = { title:"", slug:"", excerpt:"", content:"", category:"Guides", emoji:"📝", badge:"guide", badgeText:"Guide", featured_image:"", meta_title:"", meta_description:"", focus_keyword:"", status:"published" as "published"|"draft", featured:false, canonical_url:"", faqs:[] as Array<{question:string;answer:string}> };
   const [editBlog, setEditBlog] = useState<typeof defaultBlog>(defaultBlog);
+
+  // Site Content
+  const [siteContent, setSiteContent] = useState<Record<string,string>>({});
+  const [contentSaving, setContentSaving] = useState(false);
+  const [contentMsg, setContentMsg] = useState("");
+  const [activePage, setActivePage] = useState("home");
+  const [faviconUploading, setFaviconUploading] = useState(false);
 
   useEffect(() => {
     if (localStorage.getItem("adminLoggedIn") === "true") setLoggedIn(true);
@@ -303,7 +310,32 @@ export default function AdminPage() {
         }
       })
       .catch(() => {});
+    fetch("/api/site-content?page=all")
+      .then(r => r.json())
+      .then(d => { if (d && typeof d === "object") setSiteContent(d); })
+      .catch(() => {});
   }, [loggedIn]);
+
+  const saveContent = async (keys: string[]) => {
+    setContentSaving(true); setContentMsg("");
+    const updates = keys.map(k => ({ key: k, value: siteContent[k] || "" }));
+    const res = await fetch("/api/site-content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ updates }) }).then(r => r.json()).catch(() => ({}));
+    setContentSaving(false);
+    setContentMsg(res.success ? "✅ Saved!" : "❌ Save failed");
+    setTimeout(() => setContentMsg(""), 3000);
+  };
+
+  const uploadFaviconAdmin = async (file: File) => {
+    setFaviconUploading(true);
+    try {
+      const base64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(file); });
+      const data = await fetch("/api/upload-favicon", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file: base64, name: file.name }) }).then(r => r.json());
+      if (data.url) setSiteContent(s => ({ ...s, favicon_url: data.url }));
+      setContentMsg("✅ Favicon uploaded!");
+    } catch { setContentMsg("❌ Upload failed"); }
+    setFaviconUploading(false);
+    setTimeout(() => setContentMsg(""), 3000);
+  };
 
   const handleLogin = async () => {
     try {
@@ -733,6 +765,8 @@ export default function AdminPage() {
               { id:"products", icon:"📦", label:"Products" },
               { id:"customers", icon:"👥", label:"Customers" },
               { id:"blog", icon:"📝", label:"Blog" },
+              { id:"pages", icon:"📄", label:"Pages" },
+              { id:"settings", icon:"⚙️", label:"Site Settings" },
             ] as const).map(item => (
               <button key={item.id} className={`nav-item ${tab===item.id?"active":""}`} onClick={() => { setTab(item.id); setSidebarOpen(false); }}>
                 <span className="nav-icon">{item.icon}</span>
@@ -761,6 +795,8 @@ export default function AdminPage() {
                 {tab==="products" && <>Manage <span>Products</span></>}
                 {tab==="customers" && <>Customer <span>Data</span></>}
                 {tab==="blog" && <>Manage <span>Blog</span></>}
+                {tab==="pages" && <>Page <span>Editor</span></>}
+                {tab==="settings" && <>Site <span>Settings</span></>}
               </h1>
             </div>
             <div className="top-right">
@@ -960,6 +996,97 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* ⚙️ SITE SETTINGS */}
+          {tab==="settings" && (
+            <div className="section-card" style={{padding:28}}>
+              <div className="section-header" style={{marginBottom:24}}>
+                <div className="section-title">Site Settings</div>
+                {contentMsg && <span style={{fontSize:13,color:contentMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{contentMsg}</span>}
+              </div>
+
+              <div style={{maxWidth:600}}>
+                <div className="modal-field"><label>Website Title</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_title||""} onChange={e=>setSiteContent(s=>({...s,site_title:e.target.value}))} placeholder="Firestick4UK" /></div>
+                <div className="modal-field"><label>Website Tagline</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_tagline||""} onChange={e=>setSiteContent(s=>({...s,site_tagline:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
+
+                <div className="modal-field">
+                  <label>Favicon</label>
+                  <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap",marginTop:8}}>
+                    {siteContent.favicon_url && <img src={siteContent.favicon_url} alt="favicon" style={{width:32,height:32,borderRadius:4,border:"1px solid rgba(139,0,255,0.3)",objectFit:"contain",background:"rgba(255,255,255,0.05)"}} />}
+                    <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"var(--purple-glow)"}}>
+                      {faviconUploading ? "Uploading..." : "Upload Favicon (.ico/.png/.svg)"}
+                      <input type="file" accept=".ico,.png,.jpg,.svg" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&uploadFaviconAdmin(e.target.files[0])} disabled={faviconUploading} />
+                    </label>
+                    {siteContent.favicon_url && <span style={{fontSize:12,color:"rgba(255,255,255,0.35)"}}>{siteContent.favicon_url}</span>}
+                  </div>
+                </div>
+
+                <button className="btn-primary" style={{marginTop:8}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline"])}>
+                  {contentSaving?"Saving...":"💾 Save Settings"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 📄 PAGES EDITOR */}
+          {tab==="pages" && (
+            <div>
+              {contentMsg && <div style={{marginBottom:16,padding:"10px 16px",background:contentMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${contentMsg.startsWith("✅")?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,borderRadius:10,fontSize:13,color:contentMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{contentMsg}</div>}
+
+              <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
+                {[["home","🏠 Home"],["about","ℹ️ About"],["contact","📞 Contact"],["footer","🔻 Footer"]].map(([k,l])=>(
+                  <button key={k} className={`action-btn ${activePage===k?"btn-verify":"btn-view"}`} style={{padding:"10px 20px",fontSize:13}} onClick={()=>setActivePage(k)}>{l}</button>
+                ))}
+              </div>
+
+              {/* HOME */}
+              {activePage==="home" && (
+                <div className="section-card" style={{padding:24}}>
+                  <div className="section-header" style={{marginBottom:20}}><div className="section-title">🏠 Home Page Content</div></div>
+                  <div className="modal-field"><label>Hero Title</label><input style={{width:"100%"}} value={siteContent.home_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_hero_title:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
+                  <div className="modal-field"><label>Hero Subtitle</label><textarea rows={2} style={{width:"100%",resize:"vertical"}} value={siteContent.home_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_hero_subtitle:e.target.value}))} placeholder="Premium IPTV & Streaming Solutions" /></div>
+                  <div className="modal-field"><label>Tagline</label><input style={{width:"100%"}} value={siteContent.home_tagline||""} onChange={e=>setSiteContent(s=>({...s,home_tagline:e.target.value}))} placeholder="Fast. Reliable. Affordable." /></div>
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["home_hero_title","home_hero_subtitle","home_tagline"])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
+                </div>
+              )}
+
+              {/* ABOUT */}
+              {activePage==="about" && (
+                <div className="section-card" style={{padding:24}}>
+                  <div className="section-header" style={{marginBottom:20}}><div className="section-title">ℹ️ About Page Content</div></div>
+                  <div className="modal-field"><label>Page Title</label><input style={{width:"100%"}} value={siteContent.about_title||""} onChange={e=>setSiteContent(s=>({...s,about_title:e.target.value}))} /></div>
+                  <div className="modal-field"><label>Main Description</label><textarea rows={4} style={{width:"100%",resize:"vertical"}} value={siteContent.about_description||""} onChange={e=>setSiteContent(s=>({...s,about_description:e.target.value}))} /></div>
+                  <div className="modal-field"><label>Mission Statement</label><textarea rows={3} style={{width:"100%",resize:"vertical"}} value={siteContent.about_mission||""} onChange={e=>setSiteContent(s=>({...s,about_mission:e.target.value}))} /></div>
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["about_title","about_description","about_mission"])}>{contentSaving?"Saving...":"💾 Save About"}</button>
+                </div>
+              )}
+
+              {/* CONTACT */}
+              {activePage==="contact" && (
+                <div className="section-card" style={{padding:24}}>
+                  <div className="section-header" style={{marginBottom:20}}><div className="section-title">📞 Contact Page Content</div></div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+                    <div className="modal-field"><label>Phone Number</label><input style={{width:"100%"}} value={siteContent.contact_phone||""} onChange={e=>setSiteContent(s=>({...s,contact_phone:e.target.value}))} /></div>
+                    <div className="modal-field"><label>Email Address</label><input style={{width:"100%"}} value={siteContent.contact_email||""} onChange={e=>setSiteContent(s=>({...s,contact_email:e.target.value}))} /></div>
+                    <div className="modal-field"><label>WhatsApp (numbers only)</label><input style={{width:"100%"}} value={siteContent.contact_whatsapp||""} onChange={e=>setSiteContent(s=>({...s,contact_whatsapp:e.target.value}))} placeholder="447934519060" /></div>
+                    <div className="modal-field"><label>Business Hours</label><input style={{width:"100%"}} value={siteContent.contact_hours||""} onChange={e=>setSiteContent(s=>({...s,contact_hours:e.target.value}))} /></div>
+                    <div className="modal-field"><label>Address</label><input style={{width:"100%"}} value={siteContent.contact_address||""} onChange={e=>setSiteContent(s=>({...s,contact_address:e.target.value}))} /></div>
+                  </div>
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["contact_phone","contact_email","contact_whatsapp","contact_hours","contact_address"])}>{contentSaving?"Saving...":"💾 Save Contact"}</button>
+                </div>
+              )}
+
+              {/* FOOTER */}
+              {activePage==="footer" && (
+                <div className="section-card" style={{padding:24}}>
+                  <div className="section-header" style={{marginBottom:20}}><div className="section-title">🔻 Footer Content</div></div>
+                  <div className="modal-field"><label>Footer Text (copyright)</label><input style={{width:"100%"}} value={siteContent.footer_text||""} onChange={e=>setSiteContent(s=>({...s,footer_text:e.target.value}))} /></div>
+                  <div className="modal-field"><label>Footer Tagline</label><input style={{width:"100%"}} value={siteContent.footer_tagline||""} onChange={e=>setSiteContent(s=>({...s,footer_tagline:e.target.value}))} /></div>
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["footer_text","footer_tagline"])}>{contentSaving?"Saving...":"💾 Save Footer"}</button>
+                </div>
+              )}
             </div>
           )}
         </main>
