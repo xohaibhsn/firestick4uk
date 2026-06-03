@@ -7,3 +7,231 @@
 html {
   scroll-behavior: smooth;
 }
+
+:root {
+  --color-bg: #FFFFFF;
+  --color-text: #111111;
+  --color-purple: #5B21B6;
+  --color-purple-dark: #4C1D95;
+  --color-black: #1A1A1A;
+  --color-border: #E5E5E5;
+  --color-gray-bg: #F5F5F5;
+  --color-gray-text: #666666;
+  --color-white: #FFFFFF;
+}
+
+/* ── Base ─────────────────────────────── */
+html body {
+  background-color: #FFFFFF !important;
+  color: #111111 !important;
+}
+
+/* Remove dark overlay backgrounds */
+.bg-fixed,
+.bg-animated {
+  background: #FFFFFF !important;
+  display: none !important;
+}
+
+.star { display: none !important; }
+
+/* ── Navigation ───────────────────────── */
+html body nav {
+  background: #FFFFFF !important;
+  backdrop-filter: none !important;
+  border-bottom: 1px solid #E5E5E5 !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
+}
+
+html body .nav-logo {
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: #111111 !important;
+  color: #111111 !important;
+  font-weight: 900 !important;
+}
+
+html body .nav-links a {
+  color: #111111 !important;
+}
+html body .nav-links a:hover {
+  color: #5B21B6 !important;
+}
+html body .nav-cta,
+html body .nav-cta:not([class*="hover"]) {
+  background: #5B21B6 !important;
+  color: #FFFFFF !important;
+  border-radius: 30px !important;
+}
+html body .nav-cta:hover {
+  background: #1A1A1A !important;
+}
+
+/* Mobile nav open overlay */
+html body .nav-links.open {
+  background: #FFFFFF !important;
+}
+html body .nav-links.open a {
+  color: #111111 !important;
+  font-size: 18px;
+}
+html body .nav-links.open a:hover {
+  color: #5B21B6 !important;
+}
+
+/* Hamburger */
+html body .hamburger span {
+  background: #111111 !important;
+}
+
+/* ── Headings & Text ─────────────────── */
+html body h1, html body h2, html body h3,
+html body h4, html body h5, html body h6 {
+  color: #111111 !important;
+}
+
+html body .section-tag {
+  color: #5B21B6 !important;
+}
+
+html body .page-title span,
+html body .section-title span,
+html body .page-heading span {
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: #5B21B6 !important;
+  color: #5B21B6 !important;
+}
+
+/* ── Buttons — Global ────────────────── */
+html body .btn-primary,
+html body button.btn-primary,
+html body a.btn-primary {
+  background: #5B21B6 !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  border-radius: 8px !important;
+}
+html body .btn-primary:hover,
+html body button.btn-primary:hover,
+html body a.btn-primary:hover {
+  background: #1A1A1A !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+html body .btn-secondary,
+html body button.btn-secondary,
+html body a.btn-secondary {
+  background: #1A1A1A !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  border-radius: 8px !important;
+}
+html body .btn-secondary:hover {
+  background: #5B21B6 !important;
+}
+
+html body .btn-outline,
+html body button.btn-outline,
+html body a.btn-outline {
+  border: 2px solid #111111 !important;
+  background: transparent !important;
+  color: #111111 !important;
+}
+html body .btn-outline:hover {
+  border-color: #5B21B6 !important;
+  color: #5B21B6 !important;
+}
+
+/* ── Page Wrappers ───────────────────── */
+html body .page-wrapper,
+html body .wrap,
+html body .page-wrap {
+  background: #FFFFFF !important;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Cards & Sections ───────────────── */
+html body .section-card,
+html body .erp-card {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E5E5 !important;
+  color: #111111 !important;
+}
+
+/* ── Tables ─────────────────────────── */
+html body th {
+  color: #111111 !important;
+  border-bottom: 1px solid #E5E5E5 !important;
+  background: #F5F5F5 !important;
+}
+html body td {
+  color: #333333 !important;
+  border-bottom: 1px solid #F0F0F0 !important;
+}
+html body tr:hover td {
+  background: #F9F9F9 !important;
+}
+
+/* ── Forms ───────────────────────────── */
+html body input:not([type="checkbox"]):not([type="radio"]),
+html body textarea,
+html body select {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E5E5 !important;
+  color: #111111 !important;
+  border-radius: 8px !important;
+}
+html body input:focus,
+html body textarea:focus,
+html body select:focus {
+  border-color: #5B21B6 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(91,33,182,0.1) !important;
+}
+html body input::placeholder,
+html body textarea::placeholder {
+  color: #999999 !important;
+}
+html body label {
+  color: #111111 !important;
+}
+html body select option {
+  background: #FFFFFF !important;
+  color: #111111 !important;
+}
+
+/* ── Footer ──────────────────────────── */
+html body footer {
+  background: #111111 !important;
+  border-top: 1px solid rgba(255,255,255,0.1) !important;
+}
+html body .footer-logo {
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+  color: #FFFFFF !important;
+}
+html body .footer-links a {
+  color: rgba(255,255,255,0.7) !important;
+}
+html body .footer-links a:hover {
+  color: #FFFFFF !important;
+}
+html body .footer-copy {
+  color: rgba(255,255,255,0.5) !important;
+}
+
+/* ── WhatsApp Float ─────────────────── */
+html body .whatsapp-btn {
+  background: linear-gradient(135deg,#25d366,#128c7e) !important;
+}
+
+/* ── Badges ──────────────────────────── */
+html body .badge-green  { background: rgba(22,163,74,0.1)  !important; border-color: rgba(22,163,74,0.3)  !important; color: #16a34a !important; }
+html body .badge-red    { background: rgba(220,38,38,0.1)  !important; border-color: rgba(220,38,38,0.25) !important; color: #dc2626 !important; }
+html body .badge-orange { background: rgba(234,88,12,0.1)  !important; border-color: rgba(234,88,12,0.25) !important; color: #ea580c !important; }
+html body .badge-blue   { background: rgba(37,99,235,0.1)  !important; border-color: rgba(37,99,235,0.25) !important; color: #2563eb !important; }
+html body .badge-purple { background: rgba(91,33,182,0.1)  !important; border-color: rgba(91,33,182,0.25) !important; color: #5B21B6 !important; }
