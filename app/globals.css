@@ -292,9 +292,10 @@ html body .blog-card { background: #FFFFFF !important; border-color: #E5E5E5 !im
 html body .card-title { color: #111111 !important; }
 html body .card-excerpt { color: #555555 !important; }
 html body .card-meta { color: #666666 !important; }
-html body .featured-title { color: #111111 !important; }
-html body .featured-excerpt { color: #555555 !important; }
-html body .post-meta { color: #666666 !important; }
+/* Featured card has DARK bg — force WHITE text */
+html body .featured-title { color: #FFFFFF !important; }
+html body .featured-excerpt { color: #DDDDDD !important; }
+html body .post-meta { color: #BBBBBB !important; }
 
 /* ── Blog post content ──────────────────── */
 html body .post-title { color: #111111 !important; }
