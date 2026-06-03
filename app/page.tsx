@@ -90,26 +90,29 @@ export default function Home() {
         .search-btn { background:#5B21B6; color:#FFFFFF; border:none; border-radius:50px; padding:12px 28px; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap; font-family:'Raleway',sans-serif; }
         .search-btn:hover { background:#1A1A1A; }
         .products-grid { max-width:1300px; margin:0 auto; padding:0 60px 20px; display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:22px; }
-        .view-all-wrap { max-width:1300px; margin:0 auto; padding:20px 60px 60px; text-align:center; border-bottom:1px solid #E5E5E5; }
+        .view-all-wrap { max-width:1300px; margin:0 auto; padding:20px 60px 50px; text-align:center; }
         .view-all-btn { display:inline-block; background:#111111; color:#FFFFFF; padding:14px 40px; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; transition:all 0.2s; }
         .view-all-btn:hover { background:#5B21B6; transform:translateY(-1px); }
-        /* HERO */
-        .hero { background:#FFFFFF; padding:60px 60px 70px; max-width:1300px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center; }
+        /* HERO — DARK SECTION */
+        .hero-outer { background:#111111; }
+        .hero { background:transparent; padding:70px 60px 80px; max-width:1300px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center; }
         .hero-content {}
-        .hero-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:16px; display:block; font-weight:600; }
-        .hero-title { font-family:'Cinzel',serif; font-size:clamp(28px,4vw,52px); font-weight:900; color:#111111; line-height:1.15; margin-bottom:20px; }
-        .hero-title span { color:#5B21B6; }
-        .hero-subtitle { font-size:17px; color:#555555; line-height:1.8; margin-bottom:36px; max-width:480px; }
+        .hero-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#BF7FFF; margin-bottom:16px; display:block; font-weight:600; }
+        .hero-title { font-family:'Cinzel',serif; font-size:clamp(28px,4vw,52px); font-weight:900; color:#FFFFFF; line-height:1.15; margin-bottom:20px; }
+        .hero-title span { color:#BF7FFF; }
+        .hero-subtitle { font-size:17px; color:rgba(255,255,255,0.62); line-height:1.8; margin-bottom:36px; max-width:480px; }
         .hero-btns { display:flex; gap:14px; flex-wrap:wrap; }
         .hero-btn-primary { background:#5B21B6; color:#FFFFFF; padding:16px 36px; border-radius:8px; font-size:15px; font-weight:700; text-decoration:none; transition:all 0.2s; display:inline-block; letter-spacing:0.5px; }
-        .hero-btn-primary:hover { background:#4C1D95; transform:translateY(-2px); box-shadow:0 6px 20px rgba(91,33,182,0.35); }
-        .hero-btn-secondary { background:#111111; color:#FFFFFF; padding:16px 36px; border-radius:8px; font-size:15px; font-weight:600; text-decoration:none; transition:all 0.2s; display:inline-block; }
-        .hero-btn-secondary:hover { background:#5B21B6; transform:translateY(-2px); }
-        .hero-visual { background:linear-gradient(135deg,#EDE9FE,#F5F3FF); border-radius:24px; aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; font-size:80px; border:1px solid #DDD6FE; }
-        .hero-stats { display:flex; gap:32px; margin-top:40px; padding-top:32px; border-top:1px solid #E5E5E5; }
+        .hero-btn-primary:hover { background:#7C3AED; transform:translateY(-2px); box-shadow:0 6px 20px rgba(91,33,182,0.5); }
+        .hero-btn-secondary { background:transparent; color:#FFFFFF; padding:16px 36px; border-radius:8px; font-size:15px; font-weight:600; text-decoration:none; transition:all 0.2s; display:inline-block; border:2px solid rgba(255,255,255,0.35); }
+        .hero-btn-secondary:hover { background:rgba(255,255,255,0.08); border-color:#FFFFFF; transform:translateY(-2px); }
+        .hero-visual { background:linear-gradient(135deg,#2D1B69,#1A0A3E); border-radius:24px; aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; font-size:80px; border:1px solid rgba(139,0,255,0.3); }
+        .hero-stats { display:flex; gap:32px; margin-top:40px; padding-top:32px; border-top:1px solid rgba(255,255,255,0.1); }
         .stat-item {}
-        .stat-num { font-family:'Cinzel',serif; font-size:28px; font-weight:900; color:#111111; display:block; }
-        .stat-label { font-size:12px; color:#888888; letter-spacing:1px; text-transform:uppercase; }
+        .stat-num { font-family:'Cinzel',serif; font-size:28px; font-weight:900; color:#FFFFFF; display:block; }
+        .stat-label { font-size:12px; color:rgba(255,255,255,0.45); letter-spacing:1px; text-transform:uppercase; }
+        /* FEATURES — LIGHT SECTION */
+        .features-outer { background:#F5F5F5; }
         .product-card { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:12px; overflow:hidden; transition:all 0.3s; cursor:pointer; position:relative; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
         .product-card:hover { transform:translateY(-4px); box-shadow:0 8px 24px rgba(0,0,0,0.12); border-color:#5B21B6; }
         .product-image { width:100%; aspect-ratio:1/1; background:#F5F5F5; border-bottom:1px solid #E5E5E5; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
@@ -130,7 +133,7 @@ export default function Home() {
         .add-btn:hover { background:#1A1A1A; transform:translateY(-1px); }
         .add-btn.added { background:#16A34A; }
         .loading { text-align:center; padding:60px; color:#666666; font-size:18px; }
-        .features-section { max-width:1300px; margin:0 auto; padding:60px 60px 70px; border-top:1px solid #E5E5E5; background:#F5F5F5; }
+        .features-section { max-width:1300px; margin:0 auto; padding:60px 60px 70px; background:transparent; }
         .features-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-top:40px; }
         .feature-item { padding:28px 24px; border-radius:12px; background:#FFFFFF; border:1px solid #E5E5E5; transition:all 0.3s; }
         .feature-item:hover { box-shadow:0 4px 16px rgba(0,0,0,0.08); transform:translateY(-2px); border-color:#5B21B6; }
@@ -166,9 +169,10 @@ export default function Home() {
           .search-btn{padding:11px 20px;font-size:13px;}
           .products-grid{padding:0 24px 16px;}
           .view-all-wrap{padding:16px 24px 40px;}
-          .hero{grid-template-columns:1fr;padding:40px 24px 40px;gap:32px;}
+          .hero{grid-template-columns:1fr;padding:48px 24px 52px;gap:32px;}
           .hero-visual{display:none;}
           .hero-stats{gap:20px;}
+          .features-section{padding:40px 24px 50px;}
           .features-section{padding:40px 24px 50px;}
           .cta-section{margin:0 24px 60px;padding:50px 24px;}
           footer{padding:36px 24px;flex-direction:column;text-align:center;}
@@ -262,58 +266,61 @@ export default function Home() {
           <a href="/products" className="view-all-btn">View All Products →</a>
         </div>
 
-        {/* HERO — below products */}
-        <div className="hero">
-          <div className="hero-content">
-            <span className="hero-tag">✦ UK&apos;s #1 Firestick Service</span>
-            <h1 className="hero-title">
-              {sec.home_hero?.title?.split(' ').slice(0,-2).join(' ') || "Best Firestick"}<br/>
-              <span>{sec.home_hero?.title?.split(' ').slice(-2).join(' ') || "Service in UK"}</span>
-            </h1>
-            <p className="hero-subtitle">{sec.home_hero?.subtitle || "Premium IPTV & Streaming Solutions for the whole UK. Fast delivery, easy setup, real support."}</p>
-            <div className="hero-btns">
-              <a href={sec.home_hero?.button_link||"/products"} className="hero-btn-primary">{sec.home_hero?.button_text||"Shop Now"} →</a>
-              <a href={sec.home_hero?.secondary_button_link||"/about"} className="hero-btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>
-            </div>
-            <div className="hero-stats">
-              <div className="stat-item"><span className="stat-num">500+</span><span className="stat-label">Happy Customers</span></div>
-              <div className="stat-item"><span className="stat-num">4.9★</span><span className="stat-label">Average Rating</span></div>
-              <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
-            </div>
-          </div>
-          <div className="hero-visual">📺</div>
-        </div>
-
-        {/* Features — from DB */}
-        <div className="features-section">
-          <div className="section-tag">✦ Why Choose Us</div>
-          <h2 className="section-title">{sec.home_features?.title || "Why Choose Us"}</h2>
-          <div className="features-grid">
-            {(sec.home_features?.items || []).map((f:any,i:number)=>(
-              <div className="feature-item" key={i}>
-                <span className="feature-icon">{f.icon}</span>
-                <div className="feature-title">{f.title}</div>
-                <div className="feature-desc">{f.description}</div>
+        {/* HERO — DARK section */}
+        {/* HERO — DARK section */}
+        <div className="hero-outer">
+          <div className="hero">
+            <div className="hero-content">
+              <span className="hero-tag">✦ UK&apos;s #1 Firestick Service</span>
+              <h1 className="hero-title">
+                {sec.home_hero?.title?.split(' ').slice(0,-2).join(' ') || "Best Firestick"}<br/>
+                <span>{sec.home_hero?.title?.split(' ').slice(-2).join(' ') || "Service in UK"}</span>
+              </h1>
+              <p className="hero-subtitle">{sec.home_hero?.subtitle || "Premium IPTV & Streaming Solutions for the whole UK. Fast delivery, easy setup, real support."}</p>
+              <div className="hero-btns">
+                <a href={sec.home_hero?.button_link||"/products"} className="hero-btn-primary">{sec.home_hero?.button_text||"Shop Now"} →</a>
+                <a href={sec.home_hero?.secondary_button_link||"/about"} className="hero-btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>
               </div>
-            ))}
+              <div className="hero-stats">
+                <div className="stat-item"><span className="stat-num">500+</span><span className="stat-label">Happy Customers</span></div>
+                <div className="stat-item"><span className="stat-num">4.9★</span><span className="stat-label">Average Rating</span></div>
+                <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
+              </div>
+            </div>
+            <div className="hero-visual">📺</div>
           </div>
         </div>
 
-        {/* Testimonials — from DB */}
-        {sec.home_testimonials?.items?.length > 0 && (
-          <div className="features-section" style={{paddingTop:0}}>
-            <h2 className="section-title" style={{marginBottom:32}}>{sec.home_testimonials.title || "What Our Customers Say"}</h2>
+        {/* Features + Testimonials — LIGHT section */}
+        <div className="features-outer">
+          <div className="features-section">
+            <div className="section-tag">✦ Why Choose Us</div>
+            <h2 className="section-title">{sec.home_features?.title || "Why Choose Us"}</h2>
             <div className="features-grid">
-              {sec.home_testimonials.items.map((t:any,i:number)=>(
+              {(sec.home_features?.items || []).map((f:any,i:number)=>(
                 <div className="feature-item" key={i}>
-                  <div style={{fontSize:20,marginBottom:8}}>{"⭐".repeat(t.rating||5)}</div>
-                  <div className="feature-desc" style={{marginBottom:10}}>"{t.text}"</div>
-                  <div className="feature-title" style={{fontSize:14}}>— {t.name}</div>
+                  <span className="feature-icon">{f.icon}</span>
+                  <div className="feature-title">{f.title}</div>
+                  <div className="feature-desc">{f.description}</div>
                 </div>
               ))}
             </div>
           </div>
-        )}
+          {sec.home_testimonials?.items?.length > 0 && (
+            <div className="features-section" style={{paddingTop:0}}>
+              <h2 className="section-title" style={{marginBottom:32}}>{sec.home_testimonials.title || "What Our Customers Say"}</h2>
+              <div className="features-grid">
+                {sec.home_testimonials.items.map((t:any,i:number)=>(
+                  <div className="feature-item" key={i}>
+                    <div style={{fontSize:20,marginBottom:8}}>{"⭐".repeat(t.rating||5)}</div>
+                    <div className="feature-desc" style={{marginBottom:10}}>"{t.text}"</div>
+                    <div className="feature-title" style={{fontSize:14}}>— {t.name}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* CTA — from DB */}
         <div className="cta-section">
