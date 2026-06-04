@@ -233,7 +233,7 @@ export default function Home() {
             <div className="loading">No products found.</div>
           ) : (
             products.slice(0, 8).map((p) => (
-              <div className="product-card" key={p.id}>
+              <div className="product-card" key={p.id} style={{cursor:"pointer"}} onClick={()=>window.location.href=`/products/${p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`}>
                 <div className="product-image">
                   {p.badge && (
                     <span className={`badge ${p.badge==="BEST VALUE"?"gold":p.badge==="NEW"?"new":p.badge==="BUNDLE"?"bundle":""}`}>
