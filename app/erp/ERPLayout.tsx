@@ -90,7 +90,8 @@ export const erpStyles = `
   .erp-clock-in:hover{background:#15803D;transform:translateY(-1px);}
   .erp-clock-out{background:#DC2626;color:#FFFFFF !important;}
   .erp-clock-out:hover{background:#B91C1C;transform:translateY(-1px);}
-  .erp-hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:6px;margin-right:10px;}
+  .erp-hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:#111111;border:none;padding:10px;margin-right:10px;border-radius:8px;min-width:44px;min-height:44px;align-items:center;justify-content:center;}
+  .erp-hamburger:hover{background:#5B21B6;}
   .erp-hamburger span{display:block;width:22px;height:2px;background:#FFFFFF;border-radius:2px;transition:all 0.2s;}
   .erp-sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:49;}
   @media(max-width:900px){

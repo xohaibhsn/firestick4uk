@@ -159,8 +159,9 @@ const styles = `
   /* CUSTOMERS */
   .customer-avatar { width:36px; height:36px; border-radius:50%; background:#5B21B6; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:#FFFFFF; }
 
-  .sidebar-hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:6px;margin-right:12px;}
-  .sidebar-hamburger span{display:block;width:22px;height:2px;background:rgba(255,255,255,0.7);border-radius:2px;transition:all 0.2s;}
+  .sidebar-hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:#111111;border:none;padding:10px;margin-right:12px;border-radius:8px;min-width:44px;min-height:44px;align-items:center;justify-content:center;}
+  .sidebar-hamburger:hover{background:#5B21B6;}
+  .sidebar-hamburger span{display:block;width:22px;height:2px;background:#FFFFFF;border-radius:2px;transition:all 0.2s;}
   .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:49;}
   @media(max-width:900px){
     .sidebar{transform:translateX(-100%);transition:transform 0.28s ease;z-index:50;}
