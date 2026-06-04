@@ -83,7 +83,7 @@ function ExpContent({ user, currency }: { user: any; currency: string }) {
         <div className="erp-card" style={{marginBottom:20}}>
           <div style={{fontWeight:700,fontSize:15,marginBottom:16}}>New Expense Claim</div>
           <div className="erp-grid-2">
-            <div className="erp-field"><label>Amount ({currency==="PKR"?"PKR":"£"}) *</label><input type="number" step="0.01" className="erp-input" placeholder="0.00" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} /></div>
+            <div className="erp-field"><label>Amount ({currency==="PKR"?"PKR":"Rs. "}) *</label><input type="number" step="0.01" className="erp-input" placeholder="0.00" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} /></div>
             <div className="erp-field"><label>Category</label><select className="erp-select" value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>{cats.map(c=><option key={c}>{c}</option>)}</select></div>
           </div>
           <div className="erp-field"><label>Description</label><textarea className="erp-textarea" rows={2} placeholder="What was this expense for?" value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} /></div>

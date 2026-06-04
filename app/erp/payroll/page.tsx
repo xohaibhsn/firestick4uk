@@ -15,7 +15,10 @@ function PayrollContent({ user, currency }: { user: any; currency: string }) {
 
   const load = () => {
     setLoading(true);
-    const url = user.role==="manager"
+    // Fix 3 — manager sees their team, not just themselves
+    const url = user.role === "manager"
+      ? `/api/erp/payroll?month=${month}&manager_id=${user.id}`
+      : user.role === "employee"
       ? `/api/erp/payroll?month=${month}&employee_id=${user.id}`
       : `/api/erp/payroll?month=${month}`;
     fetch(url).then(r=>r.json()).then(d=>{ setPayroll(Array.isArray(d)?d:[]); setLoading(false); }).catch(()=>setLoading(false));

@@ -22,9 +22,9 @@ function MyLedgerContent({ user, currency: _c }: { user: any; currency: string }
         const emp = await fetch(`/api/erp/employees?id=${user.id}`).then(r=>r.json());
         setEmpData(emp);
 
-        // Get ledger account and transactions
-        const accounts: any[] = await fetch("/api/erp/ledger").then(r=>r.json());
-        const own = accounts.find(a => Number(a.reference_id) === Number(user.id) && a.type === "employee");
+        // Fix 2 — fetch only own account server-side (privacy fix)
+        const accounts: any[] = await fetch(`/api/erp/ledger?self=1&user_id=${user.id}&user_role=${user.role}`).then(r=>r.json());
+        const own = Array.isArray(accounts) ? accounts[0] : null;
         if (own) {
           setAccount(own);
           const data = await fetch(`/api/erp/ledger?account_id=${own.id}`).then(r=>r.json());

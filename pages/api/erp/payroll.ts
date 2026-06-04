@@ -4,14 +4,50 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
 
+    // Fix 1A — ensure every active employee has a ledger account
+    try {
+      await pool.query(`
+        INSERT IGNORE INTO erp_accounts (name, type, reference_id, opening_balance)
+        SELECT name, 'employee', id, 0.00 FROM erp_users WHERE active=1
+      `);
+    } catch (_) {}
+
+    // Fix 1B — create erp_payroll table for permanent salary records
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS erp_payroll (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        employee_id INT NOT NULL,
+        month_year VARCHAR(7) NOT NULL,
+        base_salary DECIMAL(10,2) DEFAULT 0,
+        total_expenses DECIMAL(10,2) DEFAULT 0,
+        advances DECIMAL(10,2) DEFAULT 0,
+        net_pay DECIMAL(10,2) DEFAULT 0,
+        status ENUM('pending','credited','partial') DEFAULT 'pending',
+        credited_at DATETIME DEFAULT NULL,
+        credited_by INT DEFAULT NULL,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_payroll (employee_id, month_year)
+      )
+    `);
+
     if (req.method === 'GET') {
       const month = String(req.query.month || new Date().toISOString().slice(0,7));
-      const { employee_id } = req.query;
+      const { employee_id, manager_id } = req.query;
 
-      const empQuery = employee_id
-        ? 'SELECT id,name,department,salary,role FROM erp_users WHERE active=1 AND id=?'
-        : 'SELECT id,name,department,salary,role FROM erp_users WHERE active=1 ORDER BY name';
-      const empParams = employee_id ? [employee_id] : [];
+      // Fix 3 — manager sees team (employees reporting to them)
+      let empQuery: string;
+      let empParams: any[];
+      if (manager_id) {
+        empQuery = 'SELECT id,name,department,salary,role FROM erp_users WHERE active=1 AND reports_to=? ORDER BY name';
+        empParams = [manager_id];
+      } else if (employee_id) {
+        empQuery = 'SELECT id,name,department,salary,role FROM erp_users WHERE active=1 AND id=?';
+        empParams = [employee_id];
+      } else {
+        empQuery = 'SELECT id,name,department,salary,role FROM erp_users WHERE active=1 ORDER BY name';
+        empParams = [];
+      }
       const [employees]: any = await pool.query(empQuery, empParams);
 
       const payroll = await Promise.all(employees.map(async (emp: any) => {
@@ -62,6 +98,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           await pool.query('INSERT INTO erp_transactions (account_id,type,amount,description,reference_type,created_by) VALUES (?,?,?,?,?,?)',
             [accountId,'credit',emp.salary,`Monthly salary — ${m}`,'salary',created_by||null]
           );
+          // Fix 1B — persist salary record in erp_payroll
+          await pool.query(`
+            INSERT INTO erp_payroll (employee_id,month_year,base_salary,net_pay,status,credited_at,credited_by)
+            VALUES (?,?,?,?,'credited',NOW(),?)
+            ON DUPLICATE KEY UPDATE status='credited', credited_at=NOW(), credited_by=?, base_salary=?, net_pay=?
+          `, [emp.id, m, emp.salary, emp.salary, created_by||null, created_by||null, emp.salary, emp.salary]);
           credited++;
         }
       }

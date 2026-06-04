@@ -3,6 +3,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
+    // Fix 1C — add missing columns
+    for (const sql of [
+      "ALTER TABLE erp_expenses ADD COLUMN approved_by_role VARCHAR(20)",
+      "ALTER TABLE erp_expenses ADD COLUMN rejection_reason TEXT",
+    ]) { try { await pool.query(sql); } catch (_) {} }
 
     if (req.method === 'GET') {
       const { employee_id, notifications } = req.query;
@@ -37,20 +42,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PATCH') {
-      const { id, status, admin_note, approved_by } = req.body;
+      const { id, status, admin_note, approved_by, approver_role, rejection_reason } = req.body;
       if (!id || !status) return res.status(400).json({ error: 'Missing fields' });
+
+      // Fix 4 — role check: only admin or manager can approve/reject
+      if (approver_role && !['admin', 'manager'].includes(approver_role)) {
+        return res.status(403).json({ error: 'Forbidden: Only Admin or Manager can approve expenses' });
+      }
 
       const [expRows]: any = await pool.query('SELECT * FROM erp_expenses WHERE id=?', [id]);
       if (!expRows.length) return res.status(404).json({ error: 'Expense not found' });
       const expense = expRows[0];
 
       await pool.query(
-        'UPDATE erp_expenses SET status=?,admin_note=?,approved_by=?,approved_at=NOW() WHERE id=?',
-        [status, admin_note||'', approved_by||null, id]
+        'UPDATE erp_expenses SET status=?,admin_note=?,approved_by=?,approved_at=NOW(),approved_by_role=?,rejection_reason=? WHERE id=?',
+        [status, admin_note||'', approved_by||null, approver_role||null, rejection_reason||null, id]
       );
 
+      // Fix 4 — audit log for BOTH approve AND reject
       await pool.query('INSERT INTO erp_audit_log (user_id,action,details) VALUES (?,?,?)',
-        [approved_by, `EXPENSE_${status.toUpperCase()}`, `Expense #${id} £${expense.amount} — ${admin_note||'no note'}`]
+        [approved_by, `EXPENSE_${status.toUpperCase()}`, `Expense #${id} Rs.${expense.amount} — ${status==='rejected'?(rejection_reason||admin_note||'no reason'):(admin_note||'approved')}`]
       ).catch(()=>{});
 
       if (status === 'approved') {

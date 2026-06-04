@@ -5,7 +5,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
 
     if (req.method === 'GET') {
-      const { account_id } = req.query;
+      const { account_id, self, user_id, user_role } = req.query;
 
       if (account_id) {
         const [txns] = await pool.query(
@@ -21,6 +21,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json({ transactions: Array.isArray(txns)?txns:[], balance: Number(openingBalance) + Number(bal[0]?.balance || 0) });
       }
 
+      // Fix 2 — employee sees ONLY their own account server-side
+      if (self === '1' || user_role === 'employee') {
+        if (!user_id) return res.status(400).json({ error: 'user_id required' });
+        const [accounts] = await pool.query(`
+          SELECT a.*,
+            COALESCE(a.opening_balance,0) + COALESCE(SUM(CASE WHEN t.type='credit' THEN t.amount WHEN t.type='debit' THEN -t.amount ELSE 0 END),0) as balance
+          FROM erp_accounts a
+          LEFT JOIN erp_transactions t ON a.id=t.account_id
+          WHERE a.reference_id=? AND a.type='employee'
+          GROUP BY a.id
+        `, [user_id]);
+        return res.status(200).json(Array.isArray(accounts)?accounts:[]);
+      }
+
+      // Admin / Manager — see all accounts
       const [accounts] = await pool.query(`
         SELECT a.*,
           COALESCE(a.opening_balance,0) + COALESCE(SUM(CASE WHEN t.type='credit' THEN t.amount WHEN t.type='debit' THEN -t.amount ELSE 0 END),0) as balance

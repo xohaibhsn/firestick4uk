@@ -65,7 +65,7 @@ function LedgerContent({ user, currency }: { user: any; currency: string }) {
             <div style={{marginBottom:14,padding:"14px",background:"rgba(139,0,255,0.05)",borderRadius:10,border:"1px solid rgba(139,0,255,0.15)"}}>
               <div className="erp-field"><label>Name</label><input className="erp-input" placeholder="Account name" value={accForm.name} onChange={e=>setAccForm(f=>({...f,name:e.target.value}))} /></div>
               <div className="erp-field"><label>Type</label><select className="erp-select" value={accForm.type} onChange={e=>setAccForm(f=>({...f,type:e.target.value}))}><option value="employee">Employee</option><option value="vendor">Vendor</option><option value="client">Client</option></select></div>
-              <div className="erp-field"><label>Opening Balance (£)</label><input className="erp-input" type="number" placeholder="0.00" value={accForm.opening_balance} onChange={e=>setAccForm(f=>({...f,opening_balance:e.target.value}))} /></div>
+              <div className="erp-field"><label>Opening Balance (Rs. )</label><input className="erp-input" type="number" placeholder="0.00" value={accForm.opening_balance} onChange={e=>setAccForm(f=>({...f,opening_balance:e.target.value}))} /></div>
               <button className="erp-btn erp-btn-primary" style={{width:"100%"}} onClick={addAccount}>Create Account</button>
             </div>
           )}
@@ -75,7 +75,9 @@ function LedgerContent({ user, currency }: { user: any; currency: string }) {
                 <div><div style={{fontSize:13,fontWeight:600}}>{a.name}</div><span className={`badge ${typeColor[a.type]||"badge-purple"}`} style={{marginTop:3,display:"inline-block"}}>{a.type}</span></div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:14,fontWeight:700,color:Number(a.balance)>=0?"#00c864":"#ff6666"}}>{fmt(Number(a.balance||0))}</div>
-                  <div style={{fontSize:10,color:Number(a.balance)>=0?"rgba(0,200,100,0.6)":"rgba(255,68,68,0.6)"}}>{Number(a.balance)>=0?"Company owes":"Employee owes"}</div>
+                  <div style={{fontSize:10,color:Number(a.balance)>=0?"rgba(0,200,100,0.6)":"rgba(255,68,68,0.6)"}}>
+                    {a.type==="employee"?(Number(a.balance)>=0?"Co. owes":"Emp. owes"):a.type==="vendor"?(Number(a.balance)>=0?"We owe":"Vendor credit"):a.type==="client"?(Number(a.balance)>=0?"Client owes":"We owe"):""}
+                  </div>
                 </div>
               </div>
             </div>
@@ -98,7 +100,9 @@ function LedgerContent({ user, currency }: { user: any; currency: string }) {
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:11,color:"rgba(255,255,255,0.35)",letterSpacing:"1px",textTransform:"uppercase"}}>Running Balance</div>
                   <div style={{fontSize:28,fontWeight:900,fontFamily:"'Cinzel',serif",color:balance>=0?"#00c864":"#ff6666"}}>{fmt(balance)}</div>
-                  <div style={{fontSize:11,marginTop:2,color:balance>=0?"rgba(0,200,100,0.6)":"rgba(255,68,68,0.6)"}}>{balance>=0?"Company owes this account":"Account owes company"}</div>
+                  <div style={{fontSize:11,marginTop:2,color:balance>=0?"rgba(0,200,100,0.6)":"rgba(255,68,68,0.6)"}}>
+                    {selected?.type==="employee"?(balance>=0?"Company owes employee":"Employee owes company"):selected?.type==="vendor"?(balance>=0?"We owe vendor":"Vendor credit"):selected?.type==="client"?(balance>=0?"Client owes us":"We owe client"):(balance>=0?"In credit":"In debit")}
+                  </div>
                 </div>
               </div>
               <hr style={{border:"none",borderTop:"1px solid rgba(139,0,255,0.12)",margin:"16px 0"}} />
@@ -109,7 +113,7 @@ function LedgerContent({ user, currency }: { user: any; currency: string }) {
                     <option value="credit">Credit</option><option value="debit">Debit</option>
                   </select>
                 </div>
-                <div className="erp-field" style={{margin:0,flex:"0 0 120px"}}><label>Amount (£)</label><input className="erp-input" type="number" placeholder="0.00" value={entryForm.amount} onChange={e=>setEntryForm(f=>({...f,amount:e.target.value}))} style={{padding:"8px 10px"}} /></div>
+                <div className="erp-field" style={{margin:0,flex:"0 0 120px"}}><label>Amount (Rs. )</label><input className="erp-input" type="number" placeholder="0.00" value={entryForm.amount} onChange={e=>setEntryForm(f=>({...f,amount:e.target.value}))} style={{padding:"8px 10px"}} /></div>
                 <div className="erp-field" style={{margin:0,flex:1}}><label>Description</label><input className="erp-input" placeholder="Entry description" value={entryForm.description} onChange={e=>setEntryForm(f=>({...f,description:e.target.value}))} style={{padding:"8px 10px"}} /></div>
                 <button className="erp-btn erp-btn-primary" onClick={addEntry} style={{height:38,whiteSpace:"nowrap"}}>Add Entry</button>
               </div>
