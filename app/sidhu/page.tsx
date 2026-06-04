@@ -245,6 +245,7 @@ export default function AdminPage() {
   const [contentMsg, setContentMsg] = useState("");
   const [activePage, setActivePage] = useState("home");
   const [faviconUploading, setFaviconUploading] = useState(false);
+  const [ogImgUploading, setOgImgUploading] = useState(false);
 
   // Page Builder
   type SectionItem = { key:string; label:string; page:string; order:number; visible:boolean; data:any; };
@@ -1321,7 +1322,36 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <button className="btn-primary" style={{marginTop:8}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline"])}>
+                <div className="modal-field" style={{marginTop:8}}>
+                  <label>Default Share Image (OG Image)</label>
+                  <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
+                    📐 Recommended: <strong>1200×630px</strong> — shown when sharing homepage on WhatsApp/Facebook
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+                    {siteContent.og_default_image && <img src={siteContent.og_default_image} alt="OG preview" style={{width:120,height:63,borderRadius:6,border:"1px solid #E5E5E5",objectFit:"cover"}} />}
+                    <label style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}>
+                      {ogImgUploading ? "⏳ Uploading..." : "📷 Upload OG Image"}
+                      <input type="file" accept="image/*" style={{display:"none"}} disabled={ogImgUploading} onChange={async(e)=>{
+                        const file=e.target.files?.[0]; if(!file) return;
+                        setOgImgUploading(true);
+                        try {
+                          const base64=await new Promise<string>((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result as string); r.onerror=rej; r.readAsDataURL(file); });
+                          const data=await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file:base64,name:file.name,folder:"firestick4uk/og"})}).then(r=>r.json());
+                          if(data.path){
+                            setSiteContent(s=>({...s,og_default_image:data.path}));
+                            await fetch("/api/site-content",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:"og_default_image",value:data.path})});
+                            setContentMsg("✅ OG image saved!");
+                          }
+                        } catch { setContentMsg("❌ Upload failed"); }
+                        setOgImgUploading(false);
+                        setTimeout(()=>setContentMsg(""),3000);
+                      }} />
+                    </label>
+                    {siteContent.og_default_image && <button type="button" style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:12}} onClick={()=>{setSiteContent(s=>({...s,og_default_image:""}));saveContent(["og_default_image"]);}}>✕ Remove</button>}
+                  </div>
+                </div>
+
+                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline"])}>
                   {contentSaving?"Saving...":"💾 Save Settings"}
                 </button>
               </div>

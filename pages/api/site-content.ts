@@ -5,6 +5,7 @@ const DEFAULTS = [
   ['site_title','Firestick4UK','text','settings','Website Title'],
   ['site_tagline','Best Firestick Service in UK','text','settings','Website Tagline'],
   ['favicon_url','/favicon.ico','image','settings','Favicon URL'],
+  ['og_default_image','','image','settings','Default OG Share Image'],
   ['home_hero_title','Best Firestick Service in UK','text','home','Hero Title'],
   ['home_hero_subtitle','Premium IPTV & Streaming Solutions for the UK','textarea','home','Hero Subtitle'],
   ['home_tagline','Fast. Reliable. Affordable.','text','home','Tagline'],
