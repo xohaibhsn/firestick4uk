@@ -665,21 +665,26 @@ export default function AdminPage() {
             {/* Rich Text Editor */}
             <div className="modal-field">
               <label>Content</label>
-              <div className="editor-toolbar">
-                {[["bold","B"],["italic","I"]].map(([cmd,lbl])=><button type="button" key={cmd} className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd(cmd);}}><strong>{lbl}</strong></button>)}
+              <div className="editor-toolbar" onMouseDown={e=>e.preventDefault()}>
+                {[["bold","B"],["italic","I"]].map(([cmd,lbl])=>(
+                  <button type="button" key={cmd} className="tool-btn"
+                    onClick={e=>{e.preventDefault();e.stopPropagation();execCmd(cmd);}}>
+                    <strong>{lbl}</strong>
+                  </button>
+                ))}
                 <div className="tool-sep"/>
-                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","h2");}}>H2</button>
-                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","h3");}}>H3</button>
-                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","p");}}>P</button>
+                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","h2");}}>H2</button>
+                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","h3");}}>H3</button>
+                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","p");}}>P</button>
                 <div className="tool-sep"/>
-                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("insertUnorderedList");}}>• List</button>
-                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("insertOrderedList");}}>1. List</button>
-                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","blockquote");}}>❝</button>
+                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("insertUnorderedList");}}>• List</button>
+                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("insertOrderedList");}}>1. List</button>
+                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","blockquote");}}>❝</button>
                 <div className="tool-sep"/>
-                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();const url=prompt("URL:");if(url)execCmd("createLink",url);}}>🔗</button>
-                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("removeFormat");}}>✕ Clear</button>
+                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();const url=prompt("URL:");if(url)execCmd("createLink",url);}}>🔗</button>
+                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("removeFormat");}}>✕ Clear</button>
               </div>
-              <div ref={editorRef} className="rich-editor" contentEditable suppressContentEditableWarning onInput={e=>{ const html = e.currentTarget.innerHTML; setEditBlog(p=>({...p,content:html})); }} />
+              <div ref={editorRef} className="rich-editor" contentEditable suppressContentEditableWarning onInput={()=>{ const html = editorRef.current?.innerHTML ?? ""; setEditBlog(p=>({...p,content:html})); }} />
             </div>
 
             {/* Excerpt */}
