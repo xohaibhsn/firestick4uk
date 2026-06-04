@@ -13,8 +13,9 @@ const styles = `
   .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.3s; }
   .nav-links a:hover { color:#5B21B6; }
   .nav-cta { background:#5B21B6 !important; color:#FFFFFF !important; padding:10px 24px !important; border-radius:30px !important; font-weight:600 !important; }
-  .hamburger { display:none; flex-direction:column; gap:5px; cursor:pointer; background:none; border:none; padding:5px; z-index:101; }
-  .hamburger span { display:block; width:25px; height:2px; background:#111111; border-radius:2px; }
+  .hamburger { display:none; flex-direction:column; gap:5px; cursor:pointer; background:#111111; border:none; padding:10px; z-index:101; border-radius:8px; min-width:44px; min-height:44px; align-items:center; justify-content:center; }
+  .hamburger:hover { background:#5B21B6; }
+  .hamburger span { display:block; width:22px; height:2px; background:#FFFFFF; border-radius:2px; }
   @media(max-width:768px){
     nav{padding:16px 24px;}
     .nav-links{display:none;}
@@ -181,15 +182,6 @@ export default function OrderTrackingPage() {
   return (
     <>
       <style>{styles}</style>
-      <div className="bg-fixed">
-        {Array.from({ length: 50 }).map((_, i) => (
-          <div key={i} className="star" style={{
-            left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`,
-            "--dur": `${2 + Math.random() * 4}s`, "--op": `${0.2 + Math.random() * 0.5}`,
-            animationDelay: `${Math.random() * 5}s`
-          } as React.CSSProperties} />
-        ))}
-      </div>
 
       <nav>
         <a href="/" className="nav-logo">FIRESTICK4UK</a>
