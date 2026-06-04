@@ -36,7 +36,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       "ALTER TABLE blog_posts ADD COLUMN featured TINYINT(1) DEFAULT 0",
       "ALTER TABLE blog_posts ADD COLUMN canonical_url VARCHAR(500)",
       "ALTER TABLE blog_posts ADD COLUMN faqs TEXT",
+      "ALTER TABLE blog_posts ADD COLUMN active TINYINT(1) DEFAULT 1",
+      "ALTER TABLE blog_posts ADD COLUMN badgeText VARCHAR(50) DEFAULT 'Guide'",
+      "ALTER TABLE blog_posts ADD COLUMN emoji VARCHAR(10) DEFAULT '📝'",
     ]) { try { await pool.query(col); } catch (_) {} }
+
+    // Activate any existing posts that have NULL active (added before column existed)
+    try { await pool.query("UPDATE blog_posts SET active=1 WHERE active IS NULL"); } catch (_) {}
 
     if (req.method === 'GET') {
       const { slug, id } = req.query;
