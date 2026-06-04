@@ -104,7 +104,7 @@ function ApprovalsContent({ user, currency: _c }: { user: any; currency: string 
       )}
 
       {noteModal&&(
-        <div className="erp-modal-overlay" onMouseDown={(e)=>{if(e.target===e.currentTarget)setNoteModal(null)}}>
+        <div className="erp-modal-overlay">
           <div className="erp-modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="erp-modal-title">{noteModal.action==="approved"?"✅ Approve Expense":"❌ Reject Expense"}</div>
             <div className="erp-field"><label>Note for employee</label><textarea className="erp-textarea" placeholder="Optional note..." value={note} onChange={e=>setNote(e.target.value)} /></div>

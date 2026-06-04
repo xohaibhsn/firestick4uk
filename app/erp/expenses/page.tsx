@@ -143,7 +143,7 @@ function ExpContent({ user, currency }: { user: any; currency: string }) {
       </div>
 
       {noteModal&&(
-        <div className="erp-modal-overlay" onMouseDown={(e)=>{if(e.target===e.currentTarget)setNoteModal(null)}}>
+        <div className="erp-modal-overlay">
           <div className="erp-modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="erp-modal-title">{noteModal.label||(noteModal.action==="approved"?"✅ Approve Expense":"❌ Reject Expense")}</div>
             {noteModal.requireNote&&<div style={{marginBottom:12,padding:"8px 12px",background:"rgba(255,68,68,0.08)",border:"1px solid rgba(255,68,68,0.25)",borderRadius:8,fontSize:12,color:"#ff8888"}}>⚠️ Admin override: reason is mandatory</div>}

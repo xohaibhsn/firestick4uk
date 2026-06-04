@@ -345,7 +345,7 @@ function AttContent({ user, currency: _c }: { user: any; currency: string }) {
 
       {/* ── Edit Modal ─────────────────────────────────────────────────── */}
       {editModal&&(
-        <div className="erp-modal-overlay" onMouseDown={(e)=>{if(e.target===e.currentTarget)setEditModal(null)}}>
+        <div className="erp-modal-overlay">
           <div className="erp-modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="erp-modal-title">Edit Attendance — {editModal.employee_name} / {editModal.date}</div>
             {editMsg&&<div style={{marginBottom:12,color:"#ff8888",fontSize:13}}>{editMsg}</div>}
