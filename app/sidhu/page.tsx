@@ -513,8 +513,8 @@ export default function AdminPage() {
 
       {/* RECEIPT MODAL */}
       {receiptModal && (
-        <div className="modal-overlay" onClick={() => setReceiptModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onMouseDown={(e)=>{if(e.target===e.currentTarget)setReceiptModal(null)}}>
+          <div className="modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="modal-title">Payment Receipt — {receiptModal}</div>
             {(() => { const o = orders.find(x => x.id === receiptModal); const path = (o as any)?.receipt_path; return path ? (
               <img src={path} alt="Receipt" style={{width:"100%",borderRadius:12,marginBottom:16,border:"1px solid rgba(139,0,255,0.3)"}} />
@@ -531,8 +531,8 @@ export default function AdminPage() {
 
       {/* ORDER MODAL */}
       {orderModal && (
-        <div className="modal-overlay" onClick={() => setOrderModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onMouseDown={(e)=>{if(e.target===e.currentTarget)setOrderModal(null)}}>
+          <div className="modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="modal-title">Order — {orderModal.id}</div>
             <div className="modal-field"><label>Customer</label><input readOnly value={orderModal.customer} /></div>
             <div className="modal-field"><label>Email</label><input readOnly value={orderModal.email} /></div>
@@ -560,8 +560,8 @@ export default function AdminPage() {
 
       {/* PRODUCT MODAL */}
       {productModal && (
-        <div className="modal-overlay" onClick={() => setProductModal(null)}>
-          <div className="modal modal-product" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onMouseDown={(e)=>{if(e.target===e.currentTarget)setProductModal(null)}}>
+          <div className="modal modal-product" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="modal-title">{productModal === "new" ? "Add New Product" : "Edit Product"}</div>
 
             {/* Basic Info */}
@@ -642,8 +642,8 @@ export default function AdminPage() {
 
       {/* BLOG MODAL — Rich Editor */}
       {blogModal && (
-        <div className="modal-overlay" onClick={() => setBlogModal(null)}>
-          <div className="modal modal-blog" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onMouseDown={(e)=>{if(e.target===e.currentTarget)setBlogModal(null)}}>
+          <div className="modal modal-blog" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="modal-title">{blogModal==="new"?"New Blog Post":"Edit Blog Post"}</div>
 
             {/* Title + Slug */}
@@ -821,7 +821,7 @@ export default function AdminPage() {
                 👤 Admin <span style={{fontSize:10,color:"#888888"}}>{adminDropOpen?"▲":"▼"}</span>
               </button>
               {adminDropOpen && (
-                <div className="admin-dropdown" onClick={e => e.stopPropagation()}>
+                <div className="admin-dropdown" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
                   <div className="admin-dropdown-header">
                     <div className="admin-dropdown-name">Admin</div>
                     <div className="admin-dropdown-role">Administrator</div>
@@ -1142,7 +1142,7 @@ export default function AdminPage() {
 
           {/* Section Edit Modal */}
           {sectionModal && (
-            <div className="modal-overlay" onClick={()=>setSectionModal(null)}>
+            <div className="modal-overlay" onMouseDown={(e)=>{if(e.target===e.currentTarget)setSectionModal(null)}}>
               <div className="modal" style={{maxWidth:600,width:"96vw"}} onClick={e=>e.stopPropagation()}>
                 <div className="modal-title">Edit: {sectionModal.label}</div>
 
@@ -1273,7 +1273,7 @@ export default function AdminPage() {
 
           {/* FAQ Modal */}
           {faqModal && (
-            <div className="modal-overlay" onClick={()=>setFaqModal(null)}>
+            <div className="modal-overlay" onMouseDown={(e)=>{if(e.target===e.currentTarget)setFaqModal(null)}}>
               <div className="modal" onClick={e=>e.stopPropagation()}>
                 <div className="modal-title">{faqModal==="new"?"Add New FAQ":"Edit FAQ"}</div>
                 <div className="modal-field"><label>Category</label><select value={editFaq.category} onChange={e=>setEditFaq(f=>({...f,category:e.target.value}))}><option>Orders & Payment</option><option>Delivery & Shipping</option><option>Products & Setup</option><option>Returns & Refunds</option><option>General</option></select></div>
