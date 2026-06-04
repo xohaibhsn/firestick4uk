@@ -14,8 +14,9 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
   const [product, setProduct] = useState<Product | null>(initialProduct);
   const [loading, setLoading] = useState(!initialProduct);
   const [added, setAdded] = useState(false);
+  const [hovering, setHovering] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { addToCart, cart } = useCart();
+  const { addToCart, removeFromCart, cart } = useCart();
 
   useEffect(() => {
     if (initialProduct) return;
@@ -143,11 +144,13 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
                   <span className="meta-pill">✅ UK Based</span>
                 </div>
                 <button
-                  className={`add-btn ${(isInCart || added) ? "added" : ""}`}
-                  style={(isInCart || added) ? {cursor:"default"} : {}}
-                  onClick={handleAdd}
+                  className="add-btn"
+                  style={{background: isInCart ? (hovering ? "#DC2626" : "#16A34A") : "#5B21B6", cursor: isInCart && !hovering ? "default" : "pointer", transform: "none"}}
+                  onMouseEnter={() => isInCart && setHovering(true)}
+                  onMouseLeave={() => setHovering(false)}
+                  onClick={() => isInCart ? removeFromCart(product!.id) : handleAdd()}
                 >
-                  {(isInCart || added) ? "✅ Added to Cart!" : "Add to Cart →"}
+                  {isInCart ? (hovering ? "✕ Remove from Cart" : "✅ Added to Cart!") : "Add to Cart →"}
                 </button>
                 <a href="/cart" className="cart-link">View Cart & Checkout →</a>
               </div>

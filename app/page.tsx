@@ -18,7 +18,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [added, setAdded] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const { addToCart, cart } = useCart();
+  const [hoveringId, setHoveringId] = useState<number | null>(null);
+  const { addToCart, removeFromCart, cart } = useCart();
 
   const handleSearch = () => {
     const q = searchTerm.trim();
@@ -257,15 +258,21 @@ export default function Home() {
                   <div className="product-desc">{p.description}</div>
                   <div className="product-footer">
                     <div className="product-price">£{Number(p.price).toFixed(2)}</div>
-                    {(() => { const inCart = cart.some(i => i.id === p.id); return (
-                    <button
-                      className={`add-btn ${(inCart || added === p.id) ? "added" : ""}`}
-                      style={(inCart || added === p.id) ? {cursor:"default"} : {}}
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!inCart) handleAddToCart(p); }}
-                    >
-                      {(inCart || added === p.id) ? "✅ Added!" : "Add to Cart →"}
-                    </button>
-                    ); })()}
+                    {(() => {
+                      const inCart = cart.some(i => i.id === p.id);
+                      const hovering = hoveringId === p.id;
+                      return (
+                      <button
+                        className="add-btn"
+                        style={{background: inCart ? (hovering ? "#DC2626" : "#16A34A") : "#5B21B6", cursor: inCart && !hovering ? "default" : "pointer"}}
+                        onMouseEnter={() => inCart && setHoveringId(p.id)}
+                        onMouseLeave={() => setHoveringId(null)}
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); inCart ? removeFromCart(p.id) : handleAddToCart(p); }}
+                      >
+                        {inCart ? (hovering ? "✕ Remove" : "✅ Added!") : "Add to Cart →"}
+                      </button>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

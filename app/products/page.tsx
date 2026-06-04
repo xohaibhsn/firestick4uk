@@ -26,6 +26,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [added, setAdded] = useState<number | null>(null);
+  const [hoveringId, setHoveringId] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [filter, setFilter] = useState("All");
   const [sort, setSort] = useState("featured");
@@ -37,7 +38,7 @@ export default function ProductsPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
-  const { addToCart, cart } = useCart();
+  const { addToCart, removeFromCart, cart } = useCart();
 
   const fetchProducts = useCallback((cat = filter, s = sort, mn = minPrice, mx = maxPrice) => {
     setLoading(true);
@@ -262,15 +263,21 @@ export default function ProductsPage() {
                   <div className="product-desc">{p.description}</div>
                   <div className="product-footer">
                     <div className="product-price">£{Number(p.price).toFixed(2)}</div>
-                    {(()=>{const inCart=cart.some(i=>i.id===p.id); return(
-                    <button
-                      className={`add-btn ${(inCart||added===p.id)?"added":""}`}
-                      style={(inCart||added===p.id)?{cursor:"default"}:{}}
-                      onClick={e=>{e.stopPropagation();e.preventDefault();if(!inCart)handleAddToCart(p);}}
-                    >
-                      {(inCart||added===p.id)?"✅ Added!":"Add to Cart →"}
-                    </button>
-                    );})()}
+                    {(()=>{
+                      const inCart=cart.some(i=>i.id===p.id);
+                      const hovering=hoveringId===p.id;
+                      return(
+                      <button
+                        className="add-btn"
+                        style={{background:inCart?(hovering?"#DC2626":"#16A34A"):"#5B21B6",cursor:inCart&&!hovering?"default":"pointer"}}
+                        onMouseEnter={()=>inCart&&setHoveringId(p.id)}
+                        onMouseLeave={()=>setHoveringId(null)}
+                        onClick={e=>{e.stopPropagation();e.preventDefault();inCart?removeFromCart(p.id):handleAddToCart(p);}}
+                      >
+                        {inCart?(hovering?"✕ Remove":"✅ Added!"):"Add to Cart →"}
+                      </button>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
