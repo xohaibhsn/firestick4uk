@@ -17,8 +17,8 @@ const navStyles = `
   .nav-links a:hover { color:#5B21B6; }
   .nav-cta { background:#5B21B6 !important; color:#FFFFFF !important; padding:10px 24px !important; border-radius:30px !important; font-weight:600 !important; }
   .nav-cta:hover { background:#4C1D95 !important; }
-  .hamburger { display:none; flex-direction:column; gap:5px; cursor:pointer; background:#111111; border:none; padding:10px; z-index:101; border-radius:8px; min-width:44px; min-height:44px; align-items:center; justify-content:center; }
-  .hamburger span { display:block; width:22px; height:2px; background:#FFFFFF; border-radius:2px; }
+  .hamburger { display:none; flex-direction:column; gap:5px; cursor:pointer; background:none; border:none; padding:6px; z-index:101; }
+  .hamburger span { display:block; width:25px; height:2px; background:#111111; border-radius:2px; }
   @media(max-width:768px){
     nav{padding:16px 24px;}
     .nav-links{display:none;}
