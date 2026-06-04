@@ -40,6 +40,14 @@ const styles = `
     text-align:center; transition:all 0.2s; text-decoration:none; display:block;
     box-shadow:0 2px 8px rgba(0,0,0,0.05); }
   .contact-card:hover { transform:translateY(-4px); border-color:#5B21B6; box-shadow:0 8px 24px rgba(91,33,182,0.12); }
+  /* Featured WhatsApp card */
+  .contact-card-featured { background:#F5F3FF; border:2px solid #5B21B6; border-radius:16px; padding:28px 22px;
+    text-align:center; transition:all 0.2s; text-decoration:none; display:block;
+    box-shadow:0 4px 16px rgba(91,33,182,0.15); }
+  .contact-card-featured:hover { transform:translateY(-4px); box-shadow:0 10px 28px rgba(91,33,182,0.25); }
+  .contact-card-featured .contact-card-title { color:#5B21B6; }
+  .contact-card-featured .contact-card-value { color:#111111; font-size:17px; font-weight:800; letter-spacing:0.5px; }
+  .contact-card-featured .contact-card-sub { color:#5B21B6; font-weight:600; }
   .contact-card-icon { font-size:38px; margin-bottom:12px; display:block; }
   .contact-card-title { font-family:'Cinzel',serif; font-size:15px; font-weight:700; color:#111111; margin-bottom:7px; }
   .contact-card-value { font-size:14px; color:#5B21B6; font-weight:600; }
@@ -199,11 +207,11 @@ export default function ContactPage() {
 
         {/* CONTACT CARDS */}
         <div className="contact-cards">
-          <a href={`https://wa.me/${sc.contact_whatsapp||"447934519060"}`} className="contact-card" target="_blank" rel="noopener noreferrer">
+          <a href={`https://wa.me/${sc.contact_whatsapp||"447934519060"}`} className="contact-card-featured" target="_blank" rel="noopener noreferrer">
             <span className="contact-card-icon">💬</span>
             <div className="contact-card-title">WhatsApp</div>
             <div className="contact-card-value">{sc.contact_phone||"+44 7934 519060"}</div>
-            <div className="contact-card-sub">Fastest response</div>
+            <div className="contact-card-sub">✦ Fastest response</div>
           </a>
           <a href={`mailto:${sc.contact_email||"firestick4uk@gmail.com"}`} className="contact-card">
             <span className="contact-card-icon">📧</span>
