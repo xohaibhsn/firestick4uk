@@ -261,7 +261,7 @@ export default function AboutPage() {
           <h2 className="section-title">How We <span>Grew</span></h2>
           <div className="timeline">
             {[
-              { year: "2022", icon: "🚀", title: "Founded", desc: "Firestick44UK launched with a small range of Firestick devices and a big ambition to serve UK customers better." },
+              { year: "2022", icon: "🚀", title: "Founded", desc: "Firestick4UK launched with a small range of Firestick devices and a big ambition to serve UK customers better." },
               { year: "2023", icon: "📦", title: "Expanded Products", desc: "Added Android boxes and flexible subscription plans to our catalogue based on customer demand." },
               { year: "2024", icon: "💬", title: "WhatsApp Support Launched", desc: "Introduced dedicated WhatsApp support, making us one of the most responsive tech stores in the UK." },
               { year: "2025", icon: "🌟", title: "500+ Happy Customers", desc: "Reached a major milestone of 500 satisfied customers with a 99% satisfaction rate." },

@@ -143,7 +143,7 @@ export default function PrivacyPolicyPage() {
             <div className="policy-section" id="overview">
               <h2>1. Overview</h2>
               <div className="highlight-box">
-                <p>Firestick44UK (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) is committed to protecting your personal data. This Privacy Policy explains how we collect, use, and safeguard information when you use our website firestick44uk.com.</p>
+                <p>Firestick4UK (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) is committed to protecting your personal data. This Privacy Policy explains how we collect, use, and safeguard information when you use our website firestick4uk.com.</p>
               </div>
               <p>By placing an order or using our website, you agree to the collection and use of information as described in this policy. We comply with the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018.</p>
             </div>
@@ -228,7 +228,7 @@ export default function PrivacyPolicyPage() {
               <div className="highlight-box">
                 <p>📧 Email: firestick4uk@gmail.com<br />
                 💬 WhatsApp: +447934519060<br />
-                🌐 Website: firestick44uk.com</p>
+                🌐 Website: firestick4uk.com</p>
               </div>
               <p>You also have the right to lodge a complaint with the Information Commissioner&apos;s Office (ICO) at ico.org.uk if you believe your data has been mishandled.</p>
             </div>

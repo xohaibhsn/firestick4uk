@@ -110,14 +110,14 @@ export default function TermsPage() {
             <div className="policy-section" id="agreement">
               <h2>1. Agreement to Terms</h2>
               <div className="highlight-box">
-                <p>By accessing or placing an order on firestick44uk.com, you agree to be bound by these Terms & Conditions. Please read them carefully before making a purchase.</p>
+                <p>By accessing or placing an order on firestick4uk.com, you agree to be bound by these Terms & Conditions. Please read them carefully before making a purchase.</p>
               </div>
-              <p>These terms apply to all visitors, users, and customers of Firestick44UK. We reserve the right to update these terms at any time. Continued use of our website after changes constitutes acceptance of the new terms.</p>
+              <p>These terms apply to all visitors, users, and customers of Firestick4UK. We reserve the right to update these terms at any time. Continued use of our website after changes constitutes acceptance of the new terms.</p>
             </div>
 
             <div className="policy-section" id="products">
               <h2>2. Products & Services</h2>
-              <p>Firestick44UK sells physical streaming devices (Firestick, Android Boxes) and digital subscription plans. All products are subject to availability.</p>
+              <p>Firestick4UK sells physical streaming devices (Firestick, Android Boxes) and digital subscription plans. All products are subject to availability.</p>
               <ul>
                 <li>Product descriptions and images are for illustrative purposes. Actual products may vary slightly.</li>
                 <li>We reserve the right to modify or discontinue any product or service without prior notice.</li>
@@ -171,7 +171,7 @@ export default function TermsPage() {
 
             <div className="policy-section" id="intellectual">
               <h2>7. Intellectual Property</h2>
-              <p>All content on firestick44uk.com — including text, images, logos, and design — is the property of Firestick44UK and is protected by UK copyright law.</p>
+              <p>All content on firestick4uk.com — including text, images, logos, and design — is the property of Firestick4UK and is protected by UK copyright law.</p>
               <ul>
                 <li>You may not reproduce, distribute, or use our content without prior written permission.</li>
                 <li>Our brand name and logo may not be used without explicit consent.</li>
@@ -180,7 +180,7 @@ export default function TermsPage() {
 
             <div className="policy-section" id="liability">
               <h2>8. Limitation of Liability</h2>
-              <p>To the fullest extent permitted by law, Firestick44UK shall not be liable for:</p>
+              <p>To the fullest extent permitted by law, Firestick4UK shall not be liable for:</p>
               <ul>
                 <li>Any indirect, incidental, or consequential damages arising from use of our products or website.</li>
                 <li>Loss of data, revenue, or profits.</li>
@@ -200,7 +200,7 @@ export default function TermsPage() {
               <div className="highlight-box">
                 <p>📧 Email: firestick4uk@gmail.com<br />
                 💬 WhatsApp: +447934519060<br />
-                🌐 Website: firestick44uk.com</p>
+                🌐 Website: firestick4uk.com</p>
               </div>
             </div>
           </div>

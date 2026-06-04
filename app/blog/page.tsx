@@ -166,13 +166,13 @@ const posts = [
   },
   {
     id: 6, emoji: "📺", badge: "news", badgeText: "News",
-    title: "What's New at Firestick44UK — May 2026 Update",
+    title: "What's New at Firestick4UK — May 2026 Update",
     excerpt: "We've added new products, improved our order tracking system, and launched our brand new website. Here's everything that's changed this month.",
     date: "10 May 2026", readTime: "2 min read", category: "News",
   },
   {
     id: 7, emoji: "🛒", badge: "guide", badgeText: "Guide",
-    title: "How to Place an Order on Firestick44UK",
+    title: "How to Place an Order on Firestick4UK",
     excerpt: "New to our store? This quick guide walks you through exactly how to browse products, add them to your cart, and complete your order in minutes.",
     date: "5 May 2026", readTime: "3 min read", category: "Guides",
   },

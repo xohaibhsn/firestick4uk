@@ -151,7 +151,7 @@ export default function RefundPolicyPage() {
               <div className="highlight-box">
                 <p>We want you to be completely satisfied with your purchase. If you are not happy with your order, please contact us within the timeframes outlined below and we will do our best to resolve the issue.</p>
               </div>
-              <p>This Refund Policy applies to all purchases made on firestick44uk.com. By placing an order, you agree to the terms set out in this policy.</p>
+              <p>This Refund Policy applies to all purchases made on firestick4uk.com. By placing an order, you agree to the terms set out in this policy.</p>
             </div>
 
             <div className="policy-section" id="physical">
@@ -236,7 +236,7 @@ export default function RefundPolicyPage() {
               <div className="highlight-box">
                 <p>📧 Email: firestick4uk@gmail.com<br />
                 💬 WhatsApp: +447934519060<br />
-                🌐 Website: firestick44uk.com</p>
+                🌐 Website: firestick4uk.com</p>
               </div>
               <p>We aim to respond to all refund and return enquiries within 24 hours during business hours.</p>
             </div>
