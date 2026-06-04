@@ -25,8 +25,10 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
       .catch(() => setLoading(false));
   }, [slug, initialProduct]);
 
+  const isInCart = product ? cart.some(i => i.id === product.id) : false;
+
   const handleAdd = () => {
-    if (!product) return;
+    if (!product || isInCart) return;
     addToCart({ id: product.id, name: product.name, price: Number(product.price), qty: 1 });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -140,8 +142,12 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
                   <span className="meta-pill">🚚 Fast Delivery</span>
                   <span className="meta-pill">✅ UK Based</span>
                 </div>
-                <button className={`add-btn ${added ? "added" : ""}`} onClick={handleAdd}>
-                  {added ? "✓ Added to Cart!" : "Add to Cart →"}
+                <button
+                  className={`add-btn ${(isInCart || added) ? "added" : ""}`}
+                  style={(isInCart || added) ? {cursor:"default"} : {}}
+                  onClick={handleAdd}
+                >
+                  {(isInCart || added) ? "✅ Added to Cart!" : "Add to Cart →"}
                 </button>
                 <a href="/cart" className="cart-link">View Cart & Checkout →</a>
               </div>

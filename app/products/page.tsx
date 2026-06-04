@@ -262,12 +262,15 @@ export default function ProductsPage() {
                   <div className="product-desc">{p.description}</div>
                   <div className="product-footer">
                     <div className="product-price">£{Number(p.price).toFixed(2)}</div>
+                    {(()=>{const inCart=cart.some(i=>i.id===p.id); return(
                     <button
-                      className={`add-btn ${added===p.id?"added":""}`}
-                      onClick={e=>{e.stopPropagation();handleAddToCart(p);}}
+                      className={`add-btn ${(inCart||added===p.id)?"added":""}`}
+                      style={(inCart||added===p.id)?{cursor:"default"}:{}}
+                      onClick={e=>{e.stopPropagation();e.preventDefault();if(!inCart)handleAddToCart(p);}}
                     >
-                      {added===p.id?"✓ Added!":"Add to Cart"}
+                      {(inCart||added===p.id)?"✅ Added!":"Add to Cart →"}
                     </button>
+                    );})()}
                   </div>
                 </div>
               </div>
