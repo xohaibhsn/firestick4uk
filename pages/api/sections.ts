@@ -14,10 +14,38 @@ const DEFAULTS = [
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    for (const col of [
+    // Create table if it doesn't exist yet
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS site_content (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        content_key VARCHAR(100) UNIQUE NOT NULL,
+        content_value TEXT,
+        content_type ENUM('text','textarea','image','url','json') DEFAULT 'text',
+        page_name VARCHAR(50),
+        label VARCHAR(100),
+        section_order INT DEFAULT 0,
+        is_visible TINYINT(1) DEFAULT 1,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Add missing columns + extend ENUM to include 'json'
+    for (const sql of [
       "ALTER TABLE site_content ADD COLUMN section_order INT DEFAULT 0",
       "ALTER TABLE site_content ADD COLUMN is_visible TINYINT(1) DEFAULT 1",
-    ]) { try { await pool.query(col); } catch (_) {} }
+      "ALTER TABLE site_content MODIFY COLUMN content_type ENUM('text','textarea','image','url','json') DEFAULT 'text'",
+    ]) { try { await pool.query(sql); } catch (_) {} }
+
+    // Fix rows that have empty content_type due to old ENUM missing 'json'
+    const sectionKeys = DEFAULTS.map(d => d[0]);
+    if (sectionKeys.length) {
+      try {
+        await pool.query(
+          `UPDATE site_content SET content_type='json' WHERE content_key IN (${sectionKeys.map(()=>'?').join(',')}) AND (content_type='' OR content_type IS NULL)`,
+          sectionKeys
+        );
+      } catch (_) {}
+    }
 
     for (const [key,val,type,page,label,order,vis] of DEFAULTS) {
       try {
