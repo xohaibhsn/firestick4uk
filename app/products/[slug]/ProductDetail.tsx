@@ -55,7 +55,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
         .product-category{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--purple-glow);margin-bottom:12px;}
         .product-name{font-family:'Cinzel',serif;font-size:clamp(22px,3vw,34px);font-weight:700;color:white;margin-bottom:12px;line-height:1.25;}
         .product-short-desc{color:rgba(255,255,255,0.65);font-size:15px;line-height:1.8;margin-bottom:18px;}
-        .product-price{font-family:'Cinzel',serif;font-size:36px;font-weight:900;background:linear-gradient(135deg,var(--purple-glow),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:22px;}
+        .product-price{font-family:'Cinzel',serif;font-size:36px;font-weight:900;color:#5B21B6;-webkit-text-fill-color:#5B21B6;margin-bottom:22px;}
         .badge-tag{display:inline-block;background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright));color:white;font-size:12px;font-weight:700;padding:4px 14px;border-radius:20px;letter-spacing:1px;margin-bottom:14px;}
         .add-btn{width:100%;background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright));color:white;border:none;padding:18px;border-radius:50px;font-size:16px;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.3s;box-shadow:0 0 30px rgba(139,0,255,0.4);}
         .add-btn:hover{box-shadow:0 0 50px rgba(139,0,255,0.7);transform:translateY(-2px);}
