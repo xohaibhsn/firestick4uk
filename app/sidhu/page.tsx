@@ -389,10 +389,9 @@ export default function AdminPage() {
   const execCmd = useCallback((cmd: string, val?: string) => {
     try {
       document.execCommand(cmd, false, val ?? undefined);
-      if (editorRef.current) setEditBlog(p=>({...p, content: editorRef.current!.innerHTML}));
-    } catch (_) {
-      if (editorRef.current) setEditBlog(p=>({...p, content: editorRef.current!.innerHTML}));
-    }
+    } catch (_) {}
+    const html = editorRef.current?.innerHTML ?? "";
+    if (html) setEditBlog(p=>({...p, content: html}));
   }, []);
 
   const saveBlog = async () => {
@@ -680,7 +679,7 @@ export default function AdminPage() {
                 <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();const url=prompt("URL:");if(url)execCmd("createLink",url);}}>🔗</button>
                 <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("removeFormat");}}>✕ Clear</button>
               </div>
-              <div ref={editorRef} className="rich-editor" contentEditable suppressContentEditableWarning onInput={e=>setEditBlog(p=>({...p,content:e.currentTarget.innerHTML}))} />
+              <div ref={editorRef} className="rich-editor" contentEditable suppressContentEditableWarning onInput={e=>{ const html = e.currentTarget.innerHTML; setEditBlog(p=>({...p,content:html})); }} />
             </div>
 
             {/* Excerpt */}
