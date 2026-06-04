@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import BlogPostClient from "./BlogPostClient";
+import pool from "../../../lib/db";
 
 interface Post {
   id: number; title: string; slug: string; content: string; excerpt: string;
@@ -11,23 +12,10 @@ interface Post {
 
 async function getPost(slug: string): Promise<Post | null> {
   try {
-    const mysql = require("mysql2/promise");
-    const conn = await Promise.race([
-      mysql.createConnection({
-        host: process.env.DB_HOST || "srv497.hstgr.io",
-        user: process.env.DB_USER || "u992747032_firestick4uk",
-        password: process.env.DB_PASSWORD || "Firestick@2026",
-        database: process.env.DB_NAME || "u992747032_firestick4uk",
-        port: Number(process.env.DB_PORT) || 3306,
-        connectTimeout: 5000,
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 6000)),
-    ]) as any;
-    const [rows]: any = await conn.query(
+    const [rows]: any = await pool.query(
       'SELECT * FROM blog_posts WHERE slug = ? AND status = "published" AND active = 1 LIMIT 1',
       [slug]
     );
-    await conn.end();
     return rows[0] || null;
   } catch {
     return null;
