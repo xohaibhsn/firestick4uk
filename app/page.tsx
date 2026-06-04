@@ -259,7 +259,7 @@ export default function Home() {
                     <div className="product-price">£{Number(p.price).toFixed(2)}</div>
                     <button
                       className={`add-btn ${added === p.id ? "added" : ""}`}
-                      onClick={() => handleAddToCart(p)}
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleAddToCart(p); }}
                     >
                       {added === p.id ? "✓ Added!" : "Add to Cart"}
                     </button>

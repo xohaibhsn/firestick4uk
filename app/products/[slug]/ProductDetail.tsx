@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCart } from "../../lib/cartContext";
 
+
 interface Product {
   id: number; name: string; description: string;
   price: number; badge: string | null; image: string | null; category: string; stock: string;
@@ -13,7 +14,8 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
   const [product, setProduct] = useState<Product | null>(initialProduct);
   const [loading, setLoading] = useState(!initialProduct);
   const [added, setAdded] = useState(false);
-  const { addToCart } = useCart();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { addToCart, cart } = useCart();
 
   useEffect(() => {
     if (initialProduct) return;
@@ -39,44 +41,73 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
-        :root{--purple-mid:#4a0080;--purple-bright:#8b00ff;--purple-glow:#bf5fff;--gold:#ffd700;}
-        body{background:#0a0010;color:#fff;font-family:'Raleway',sans-serif;}
-        .hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:5px;z-index:101;}
-        .hamburger span{display:block;width:25px;height:2px;background:var(--purple-glow);}
-        nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 60px;display:flex;align-items:center;justify-content:space-between;background:rgba(13,0,16,0.96);backdrop-filter:blur(20px);border-bottom:1px solid rgba(139,0,255,0.2);}
-        .nav-logo{font-family:'Cinzel',serif;font-size:20px;font-weight:900;background:linear-gradient(135deg,var(--purple-glow),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none;letter-spacing:2px;}
-        .back-link{color:rgba(255,255,255,0.5);text-decoration:none;font-size:14px;display:inline-flex;align-items:center;gap:6px;margin-bottom:24px;transition:color 0.2s;}
-        .back-link:hover{color:var(--purple-glow);}
-        .page-wrap{position:relative;z-index:1;padding:120px 60px 80px;max-width:1100px;margin:0 auto;}
+        body{background:#FFFFFF;color:#111111;font-family:'Raleway',sans-serif;}
+        nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 60px;display:flex;align-items:center;justify-content:space-between;background:#FFFFFF;border-bottom:1px solid #E5E5E5;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+        .nav-logo{font-family:'Cinzel',serif;font-size:20px;font-weight:900;color:#111111;text-decoration:none;letter-spacing:2px;}
+        .nav-links{display:flex;gap:36px;list-style:none;}
+        .nav-links a{color:#111111;text-decoration:none;font-size:13px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;transition:color 0.2s;}
+        .nav-links a:hover{color:#5B21B6;}
+        .nav-cta{background:#5B21B6 !important;color:#FFFFFF !important;padding:10px 24px !important;border-radius:30px !important;font-weight:600 !important;}
+        .nav-cta:hover{background:#4C1D95 !important;}
+        .hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:6px;z-index:101;}
+        .hamburger span{display:block;width:25px;height:2px;background:#111111;border-radius:2px;}
+        @media(max-width:768px){
+          nav{padding:16px 24px;}
+          .nav-links{display:none;}
+          .nav-links.open{display:flex;flex-direction:column;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#FFFFFF;align-items:center;justify-content:center;gap:28px;z-index:9999;margin:0;padding:0;}
+          .nav-links.open a{color:#111111;font-size:18px;}
+          .hamburger{display:flex;}
+        }
+        .back-link{color:#666666;text-decoration:none;font-size:14px;display:inline-flex;align-items:center;gap:6px;margin-bottom:24px;transition:color 0.2s;}
+        .back-link:hover{color:#5B21B6;}
+        .page-wrap{padding:110px 60px 80px;max-width:1100px;margin:0 auto;}
         .product-layout{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:start;}
-        .product-img-box{background:linear-gradient(135deg,rgba(74,0,128,0.2),rgba(26,0,37,0.9));border:1px solid rgba(139,0,255,0.2);border-radius:24px;overflow:hidden;aspect-ratio:1;display:flex;align-items:center;justify-content:center;}
+        .product-img-box{background:#F5F5F5;border:1px solid #E5E5E5;border-radius:20px;overflow:hidden;aspect-ratio:1;display:flex;align-items:center;justify-content:center;}
         .product-img-box img{width:100%;height:100%;object-fit:cover;}
         .placeholder-img{font-size:80px;text-align:center;}
-        .product-category{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--purple-glow);margin-bottom:12px;}
-        .product-name{font-family:'Cinzel',serif;font-size:clamp(22px,3vw,34px);font-weight:700;color:white;margin-bottom:12px;line-height:1.25;}
-        .product-short-desc{color:rgba(255,255,255,0.65);font-size:15px;line-height:1.8;margin-bottom:18px;}
+        .product-category{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#5B21B6;margin-bottom:12px;font-weight:600;}
+        .product-name{font-family:'Cinzel',serif;font-size:clamp(22px,3vw,34px);font-weight:700;color:#111111;margin-bottom:12px;line-height:1.25;}
+        .product-short-desc{color:#555555;font-size:15px;line-height:1.8;margin-bottom:18px;}
         .product-price{font-family:'Cinzel',serif;font-size:36px;font-weight:900;color:#5B21B6;-webkit-text-fill-color:#5B21B6;margin-bottom:22px;}
-        .badge-tag{display:inline-block;background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright));color:white;font-size:12px;font-weight:700;padding:4px 14px;border-radius:20px;letter-spacing:1px;margin-bottom:14px;}
-        .add-btn{width:100%;background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright));color:white;border:none;padding:18px;border-radius:50px;font-size:16px;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.3s;box-shadow:0 0 30px rgba(139,0,255,0.4);}
-        .add-btn:hover{box-shadow:0 0 50px rgba(139,0,255,0.7);transform:translateY(-2px);}
-        .add-btn.added{background:linear-gradient(135deg,#00a050,#00c864);}
-        .meta-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px;}
-        .meta-pill{background:rgba(139,0,255,0.1);border:1px solid rgba(139,0,255,0.25);border-radius:20px;padding:6px 14px;font-size:13px;color:rgba(255,255,255,0.7);}
-        .cart-link{display:block;text-align:center;margin-top:14px;color:rgba(255,255,255,0.5);font-size:13px;text-decoration:none;}
-        .cart-link:hover{color:var(--purple-glow);}
-        .loading-state{text-align:center;padding:120px 24px;color:rgba(255,255,255,0.4);font-size:18px;}
+        .badge-tag{display:inline-block;background:#5B21B6;color:#FFFFFF;font-size:12px;font-weight:700;padding:4px 14px;border-radius:20px;letter-spacing:1px;margin-bottom:14px;}
+        .add-btn{width:100%;background:#5B21B6;color:#FFFFFF;border:none;padding:18px;border-radius:9px;font-size:16px;font-weight:700;letter-spacing:0.5px;cursor:pointer;transition:all 0.2s;}
+        .add-btn:hover{background:#4C1D95;transform:translateY(-1px);box-shadow:0 4px 16px rgba(91,33,182,0.35);}
+        .add-btn.added{background:#16A34A;}
+        .meta-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px;}
+        .meta-pill{background:#F5F5F5;border:1px solid #E5E5E5;border-radius:20px;padding:6px 14px;font-size:13px;color:#555555;}
+        .cart-link{display:block;text-align:center;margin-top:14px;color:#5B21B6;font-size:13px;text-decoration:none;font-weight:600;}
+        .cart-link:hover{color:#4C1D95;}
+        .loading-state{text-align:center;padding:120px 24px;color:#888888;font-size:18px;}
         .product-sections{max-width:1100px;margin:0 auto;padding:0 60px 80px;}
-        .section-block{background:linear-gradient(135deg,rgba(74,0,128,0.12),rgba(26,0,37,0.8));border:1px solid rgba(139,0,255,0.15);border-radius:20px;padding:32px;margin-bottom:20px;}
-        .section-heading{font-family:'Cinzel',serif;font-size:18px;font-weight:700;color:white;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(139,0,255,0.12);}
-        .full-desc{color:rgba(255,255,255,0.65);font-size:15px;line-height:1.9;}
+        .section-block{background:#F9F9F9;border:1px solid #E5E5E5;border-radius:16px;padding:30px;margin-bottom:18px;}
+        .section-heading{font-family:'Cinzel',serif;font-size:17px;font-weight:700;color:#111111;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #E5E5E5;}
+        .full-desc{color:#444444;font-size:15px;line-height:1.9;}
         .feature-list{list-style:none;display:flex;flex-direction:column;gap:10px;}
-        .feature-list li{display:flex;align-items:center;gap:12px;color:rgba(255,255,255,0.75);font-size:15px;}
+        .feature-list li{display:flex;align-items:center;gap:12px;color:#444444;font-size:15px;}
         .feature-list li::before{content:"✅";flex-shrink:0;}
-        @media(max-width:768px){nav{padding:16px 24px;}.page-wrap{padding:100px 24px 40px;}.product-sections{padding:0 24px 60px;}.product-layout{grid-template-columns:1fr;gap:28px;}.hamburger{display:flex;}}
+        footer{background:#111111;padding:40px 60px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;}
+        .footer-logo{font-family:'Cinzel',serif;font-size:16px;font-weight:900;color:#FFFFFF;}
+        .footer-copy{font-size:12px;color:rgba(255,255,255,0.4);}
+        .whatsapp-btn{position:fixed;bottom:30px;right:30px;z-index:999;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,#25d366,#128c7e);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 25px rgba(37,211,102,0.5);text-decoration:none;font-size:26px;transition:all 0.3s;}
+        .whatsapp-btn:hover{transform:scale(1.1);}
+        @media(max-width:768px){.page-wrap{padding:90px 16px 40px;}.product-sections{padding:0 16px 60px;}.product-layout{grid-template-columns:1fr;gap:24px;}footer{padding:30px 24px;flex-direction:column;text-align:center;}}
       `}</style>
 
       <nav>
         <a href="/" className="nav-logo">FIRESTICK4UK</a>
+        <ul className={`nav-links ${menuOpen ? "open" : ""}`}>
+          <li><a href="/" onClick={() => setMenuOpen(false)}>Home</a></li>
+          <li><a href="/products" onClick={() => setMenuOpen(false)}>Products</a></li>
+          <li><a href="/order-tracking" onClick={() => setMenuOpen(false)}>Track Order</a></li>
+          <li><a href="/blog" onClick={() => setMenuOpen(false)}>Blog</a></li>
+          <li><a href="/contact" onClick={() => setMenuOpen(false)}>Contact</a></li>
+          <li><a href="/cart" className="nav-cta" onClick={() => setMenuOpen(false)}>
+            🛒 Cart{cart.length > 0 ? ` (${cart.length})` : ""}
+          </a></li>
+        </ul>
+        <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">
+          <span/><span/><span/>
+        </button>
       </nav>
 
       <div className="page-wrap">
@@ -140,7 +171,12 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
         </div>
       )}
 
-      <a href="https://wa.me/447934519060" style={{position:"fixed",bottom:30,right:30,zIndex:999,width:58,height:58,borderRadius:"50%",background:"linear-gradient(135deg,#25d366,#128c7e)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 25px rgba(37,211,102,0.5)",textDecoration:"none",fontSize:26}} target="_blank" rel="noopener noreferrer">💬</a>
+      <footer>
+        <div className="footer-logo">FIRESTICK4UK</div>
+        <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
+      </footer>
+
+      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
     </>
   );
 }
