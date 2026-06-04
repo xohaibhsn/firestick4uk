@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "firestick4uk.com" },
       { protocol: "https", hostname: "srv497.hstgr.io" },
+      { protocol: "https", hostname: "res.cloudinary.com" },
     ],
   },
   compress: true,
