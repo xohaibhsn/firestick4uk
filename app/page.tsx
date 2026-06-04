@@ -294,7 +294,12 @@ export default function Home() {
                 <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
               </div>
             </div>
-            <div className="hero-visual">📺</div>
+            <div className="hero-visual">
+            {sec.home_hero?.hero_image
+              ? <img src={sec.home_hero.hero_image} alt="Hero" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:24}} />
+              : <span style={{fontSize:80}}>📺</span>
+            }
+          </div>
           </div>
         </div>
 

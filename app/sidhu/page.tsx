@@ -227,6 +227,7 @@ export default function AdminPage() {
   const [productModal, setProductModal] = useState<typeof demoProducts[0]|null|"new">(null);
   const [editProduct, setEditProduct] = useState({ name:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"" });
   const [imageUploading, setImageUploading] = useState(false);
+  const [heroImgUploading, setHeroImgUploading] = useState(false);
   const [customers, setCustomers] = useState(demoCustomers);
   const [coupons, setCoupons] = useState<any[]>([]);
   const [couponForm, setCouponForm] = useState({ code:"", type:"percentage", value:"", minimum_order:"0", usage_limit:"", expires_at:"" });
@@ -1086,16 +1087,25 @@ export default function AdminPage() {
             <div>
               {sectionMsg && <div style={{marginBottom:14,padding:"10px 14px",background:sectionMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:sectionMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{sectionMsg}</div>}
               {/* Page selector */}
-              <div style={{display:"flex",gap:10,marginBottom:20}}>
+              <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap",alignItems:"center"}}>
                 {[["home","🏠 Home"],["about","ℹ️ About"]].map(([k,l])=>(
                   <button key={k} className={`action-btn ${builderPage===k?"btn-verify":"btn-view"}`} style={{padding:"10px 20px",fontSize:13}} onClick={()=>{
                     setBuilderPage(k);
-                    fetch(`/api/sections?page=${k}&all=1`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); }).catch(()=>{});
+                    fetch(`/api/sections?page=${k}&all=1`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); else setSections([]); }).catch(()=>setSections([]));
                   }}>{l}</button>
                 ))}
+                <button className="action-btn btn-view" style={{padding:"10px 16px",fontSize:13,marginLeft:"auto"}} onClick={()=>fetch(`/api/sections?page=${builderPage}&all=1`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); }).catch(()=>{})}>🔄 Refresh</button>
               </div>
               {/* Sections list */}
               <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                {sections.filter(s=>s.page===builderPage).length===0 && (
+                  <div style={{textAlign:"center",padding:"40px",background:"#F9F9F9",borderRadius:12,border:"1px solid #E5E5E5",color:"#888888"}}>
+                    <div style={{fontSize:32,marginBottom:12}}>📋</div>
+                    <div style={{fontWeight:600,marginBottom:6}}>No sections found for {builderPage} page</div>
+                    <div style={{fontSize:13,marginBottom:16}}>Click Refresh or visit the live website first to auto-create sections.</div>
+                    <button className="add-btn" onClick={()=>fetch(`/api/sections?page=${builderPage}&all=1`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); }).catch(()=>{})}>🔄 Load Sections</button>
+                  </div>
+                )}
                 {sections.filter(s=>s.page===builderPage).sort((a,b)=>a.order-b.order).map((sec,i,arr)=>(
                   <div key={sec.key} className="section-card" style={{padding:"16px 20px",display:"flex",alignItems:"center",gap:14}}>
                     {/* Reorder arrows */}
@@ -1145,6 +1155,30 @@ export default function AdminPage() {
                     <div className="modal-field"><label>Primary Button Link</label><input value={sectionEditing.button_link||""} onChange={e=>setSectionEditing((p:any)=>({...p,button_link:e.target.value}))} /></div>
                     <div className="modal-field"><label>Secondary Button Text</label><input value={sectionEditing.secondary_button_text||""} onChange={e=>setSectionEditing((p:any)=>({...p,secondary_button_text:e.target.value}))} /></div>
                     <div className="modal-field"><label>Secondary Button Link</label><input value={sectionEditing.secondary_button_link||""} onChange={e=>setSectionEditing((p:any)=>({...p,secondary_button_link:e.target.value}))} /></div>
+                    {/* Hero Image Upload */}
+                    <div className="modal-field">
+                      <label>Hero Visual Image</label>
+                      <div style={{fontSize:11,color:"#888",marginBottom:8}}>📐 Recommended: <strong>800×600px</strong> (4:3 ratio) — JPG or PNG, max 5MB</div>
+                      <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                        {sectionEditing.hero_image && (
+                          <img src={sectionEditing.hero_image} alt="Hero preview" style={{width:120,height:80,objectFit:"cover",borderRadius:8,border:"1px solid #E5E5E5"}} />
+                        )}
+                        <label style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600,display:"inline-block"}}>
+                          {heroImgUploading?"⏳ Uploading...":"📷 Upload Image"}
+                          <input type="file" accept="image/*" style={{display:"none"}} disabled={heroImgUploading} onChange={async(e)=>{
+                            const file=e.target.files?.[0]; if(!file) return;
+                            setHeroImgUploading(true);
+                            try {
+                              const base64=await new Promise<string>((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result as string); r.onerror=rej; r.readAsDataURL(file); });
+                              const data=await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file:base64,name:file.name})}).then(r=>r.json());
+                              if(data.path) setSectionEditing((p:any)=>({...p,hero_image:data.path}));
+                            } catch {}
+                            setHeroImgUploading(false);
+                          }} />
+                        </label>
+                        {sectionEditing.hero_image && <button type="button" style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:12}} onClick={()=>setSectionEditing((p:any)=>({...p,hero_image:""}))}>✕ Remove</button>}
+                      </div>
+                    </div>
                   </div>
                 )}
 
