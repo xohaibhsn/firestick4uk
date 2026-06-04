@@ -49,7 +49,7 @@ const styles = `
   .contact-card-featured .contact-card-value { color:#111111; font-size:17px; font-weight:800; letter-spacing:0.5px; }
   .contact-card-featured .contact-card-sub { color:#5B21B6; font-weight:600; }
   .contact-card-icon { font-size:38px; margin-bottom:12px; display:block; }
-  .contact-card-title { font-family:'Cinzel',serif; font-size:15px; font-weight:700; color:#111111; margin-bottom:7px; }
+  .contact-card-title { font-family:'Cinzel',serif; font-size:15px; font-weight:700; color:#5B21B6; margin-bottom:7px; }
   .contact-card-value { font-size:14px; color:#5B21B6; font-weight:600; }
   .contact-card-sub { font-size:12px; color:#888888; margin-top:4px; }
 
@@ -94,7 +94,7 @@ const styles = `
   .info-card:hover { border-color:#5B21B6; box-shadow:0 4px 14px rgba(91,33,182,0.08); }
   .info-card-header { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
   .info-card-icon { font-size:26px; }
-  .info-card-title { font-family:'Cinzel',serif; font-size:15px; font-weight:700; color:#111111; }
+  .info-card-title { font-family:'Cinzel',serif; font-size:15px; font-weight:700; color:#5B21B6; }
   .info-card-body { font-size:14px; color:#555555; line-height:1.7; }
   .info-card-body strong { color:#111111; display:block; margin-bottom:4px; font-weight:700; }
   .info-card-link { display:inline-block; margin-top:12px; color:#5B21B6;
