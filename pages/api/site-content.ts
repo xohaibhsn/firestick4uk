@@ -12,7 +12,7 @@ const DEFAULTS = [
   ['about_description','We started Firestick4UK with one goal — to make premium streaming devices and subscription plans accessible, affordable, and hassle-free for everyone in the UK.','textarea','about','Main Description'],
   ['about_mission','Our mission is to deliver the best streaming experience at fair prices, with real human support that actually helps.','textarea','about','Mission Statement'],
   ['contact_phone','+44 7934 519060','text','contact','Phone Number'],
-  ['contact_email','support@firestick4uk.com','text','contact','Email Address'],
+  ['contact_email','firestick4uk@gmail.com','text','contact','Email Address'],
   ['contact_hours','9AM – 10PM, 7 days a week','text','contact','Business Hours'],
   ['contact_address','United Kingdom','text','contact','Address'],
   ['contact_whatsapp','447934519060','text','contact','WhatsApp Number'],
@@ -42,6 +42,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
       } catch (_) {}
     }
+
+    // Migrate old email addresses to new one
+    try {
+      await pool.query(
+        "UPDATE site_content SET content_value='firestick4uk@gmail.com' WHERE content_key='contact_email' AND content_value LIKE '%@firestick4uk.com%'"
+      );
+    } catch (_) {}
 
     if (req.method === 'GET') {
       const { page } = req.query;

@@ -214,7 +214,7 @@ export default function PrivacyPolicyPage() {
                 <li><strong>Right to data portability</strong> — request your data in a machine-readable format.</li>
                 <li><strong>Right to object</strong> — object to processing of your data in certain circumstances.</li>
               </ul>
-              <p>To exercise any of these rights, please contact us at support@firestick44uk.com.</p>
+              <p>To exercise any of these rights, please contact us at firestick4uk@gmail.com.</p>
             </div>
 
             <div className="policy-section" id="retention">
@@ -226,7 +226,7 @@ export default function PrivacyPolicyPage() {
               <h2>9. Contact Us</h2>
               <p>If you have any questions about this Privacy Policy or how we handle your data, please contact us:</p>
               <div className="highlight-box">
-                <p>📧 Email: support@firestick44uk.com<br />
+                <p>📧 Email: firestick4uk@gmail.com<br />
                 💬 WhatsApp: +447934519060<br />
                 🌐 Website: firestick44uk.com</p>
               </div>

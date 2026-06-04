@@ -230,10 +230,10 @@ export default function ContactPage() {
             <div className="contact-card-value">{sc.contact_phone||"+44 7934 519060"}</div>
             <div className="contact-card-sub">Fastest response</div>
           </a>
-          <a href={`mailto:${sc.contact_email||"support@firestick4uk.com"}`} className="contact-card">
+          <a href={`mailto:${sc.contact_email||"firestick4uk@gmail.com"}`} className="contact-card">
             <span className="contact-card-icon">📧</span>
             <div className="contact-card-title">Email</div>
-            <div className="contact-card-value">{sc.contact_email||"support@firestick4uk.com"}</div>
+            <div className="contact-card-value">{sc.contact_email||"firestick4uk@gmail.com"}</div>
             <div className="contact-card-sub">Reply within 24 hours</div>
           </a>
           <div className="contact-card">

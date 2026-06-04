@@ -198,7 +198,7 @@ export default function TermsPage() {
               <h2>10. Contact Us</h2>
               <p>If you have any questions about these Terms & Conditions, please contact us:</p>
               <div className="highlight-box">
-                <p>📧 Email: support@firestick44uk.com<br />
+                <p>📧 Email: firestick4uk@gmail.com<br />
                 💬 WhatsApp: +447934519060<br />
                 🌐 Website: firestick44uk.com</p>
               </div>
