@@ -224,6 +224,8 @@ export default function AdminPage() {
   const [orders, setOrders] = useState(demoOrders);
   const [products, setProducts] = useState(demoProducts);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [ordersPage, setOrdersPage] = useState(1);
+  const ORDERS_PER_PAGE = 20;
   const [receiptModal, setReceiptModal] = useState<string|null>(null);
   const [orderModal, setOrderModal] = useState<typeof demoOrders[0]|null>(null);
   const [productModal, setProductModal] = useState<typeof demoProducts[0]|null|"new">(null);
@@ -270,11 +272,14 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!loggedIn) return;
-    fetch("/api/admin-products")
+    // Fix 2 — include session header for admin API auth
+    const session = localStorage.getItem("sAdminSession") || "";
+    const adminHeaders = { "x-admin-session": session };
+    fetch("/api/admin-products", { headers: adminHeaders })
       .then(r => r.json())
       .then(data => { if (Array.isArray(data) && data.length > 0) setProducts(data); })
       .catch(() => {});
-    fetch("/api/admin-orders")
+    fetch("/api/admin-orders", { headers: adminHeaders })
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -300,7 +305,7 @@ export default function AdminPage() {
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setBlogPosts(data); })
       .catch(() => {});
-    fetch("/api/admin-orders?customers=1")
+    fetch("/api/admin-orders?customers=1", { headers: adminHeaders })
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -372,7 +377,7 @@ export default function AdminPage() {
   const updateStatus = (id: string, status: OrderStatus) => {
     fetch("/api/admin-orders", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
       body: JSON.stringify({ order_id: id, status }),
     }).catch(() => {});
     setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
@@ -418,7 +423,7 @@ export default function AdminPage() {
   };
 
   const deleteProduct = (id: number) => {
-    fetch(`/api/admin-products?id=${id}`, { method: "DELETE" }).catch(() => {});
+    fetch(`/api/admin-products?id=${id}`, { method: "DELETE", headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"" } }).catch(() => {});
     setProducts(products.filter(p => p.id !== id));
   };
 
@@ -458,10 +463,11 @@ export default function AdminPage() {
       meta_description: editProduct.meta_description || "",
       focus_keyword: editProduct.focus_keyword || "",
     };
+    const adminSess = localStorage.getItem("sAdminSession")||"";
     if (productModal === "new") {
       const res = await fetch("/api/admin-products", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-admin-session": adminSess },
         body: JSON.stringify(payload),
       }).then(r => r.json()).catch(() => ({}));
       const newId = res.id || Date.now();
@@ -469,7 +475,7 @@ export default function AdminPage() {
     } else if (productModal) {
       await fetch("/api/admin-products", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-admin-session": adminSess },
         body: JSON.stringify({ ...payload, id: productModal.id, active: 1 }),
       }).catch(() => {});
       setProducts(products.map(p => p.id === productModal.id ? { ...p, ...editProduct } : p));
@@ -490,6 +496,10 @@ export default function AdminPage() {
 
   const filteredOrders = statusFilter === "all" ? orders : orders.filter(o => o.status === statusFilter);
   const pendingCount = orders.filter(o => o.status === "pending").length;
+  // Fix 1 — dynamic dashboard stats from real data
+  const revenueOrders = orders.filter(o => ["confirmed","dispatched","delivered"].includes(o.status));
+  const totalRevenue = revenueOrders.reduce((s, o) => s + parseFloat((o.total||"0").replace("£","").replace(",","")), 0);
+  const deliveredCount = orders.filter(o => o.status === "delivered").length;
 
   const statusClass = (s: string) => `status-badge status-${s}`;
 
@@ -831,12 +841,12 @@ export default function AdminPage() {
             <>
               <div className="stats-grid">
                 {[
-                  { icon:"🛒", label:"Total Orders", value:orders.length, trend:"+3 today" },
+                  { icon:"🛒", label:"Total Orders", value:orders.length, trend:"All time" },
                   { icon:"⏳", label:"Pending Orders", value:pendingCount, trend:"Needs action" },
-                  { icon:"💰", label:"Total Revenue", value:"£408.93", trend:"This month" },
-                  { icon:"👥", label:"Customers", value:demoCustomers.length, trend:"+2 this week" },
+                  { icon:"💰", label:"Total Revenue", value:`£${totalRevenue.toFixed(2)}`, trend:"Confirmed only" },
+                  { icon:"👥", label:"Customers", value:customers.length, trend:"Unique" },
                   { icon:"📦", label:"Products", value:products.length, trend:"Active" },
-                  { icon:"✅", label:"Delivered", value:orders.filter(o=>o.status==="delivered").length, trend:"All time" },
+                  { icon:"✅", label:"Delivered", value:deliveredCount, trend:"All time" },
                 ].map((s,i) => (
                   <div className="stat-card" key={i}>
                     <div className="stat-card-top">
@@ -859,7 +869,7 @@ export default function AdminPage() {
                   <table>
                     <thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Action</th></tr></thead>
                     <tbody>
-                      {orders.slice(0,4).map(o => (
+                      {orders.slice(0,10).map(o => (
                         <tr key={o.id}>
                           <td style={{fontFamily:"monospace",color:"var(--purple-glow)"}}>{o.id}</td>
                           <td>{o.customer}</td>
@@ -877,12 +887,17 @@ export default function AdminPage() {
           )}
 
           {/* ORDERS */}
-          {tab==="orders" && (
+          {tab==="orders" && (() => {
+            const totalOrderPages = Math.ceil(filteredOrders.length / ORDERS_PER_PAGE);
+            const pagedOrders = filteredOrders.slice((ordersPage-1)*ORDERS_PER_PAGE, ordersPage*ORDERS_PER_PAGE);
+            const from = filteredOrders.length === 0 ? 0 : (ordersPage-1)*ORDERS_PER_PAGE+1;
+            const to = Math.min(ordersPage*ORDERS_PER_PAGE, filteredOrders.length);
+            return (
             <div className="section-card">
               <div className="section-header">
                 <div className="section-title">All Orders ({filteredOrders.length})</div>
                 <div className="section-actions">
-                  <select className="filter-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                  <select className="filter-select" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setOrdersPage(1); }}>
                     <option value="all">All Status</option>
                     <option value="pending">Pending</option>
                     <option value="confirmed">Confirmed</option>
@@ -891,11 +906,27 @@ export default function AdminPage() {
                   </select>
                 </div>
               </div>
+              {/* Pagination info */}
+              {filteredOrders.length > 0 && (
+                <div style={{padding:"8px 20px",fontSize:12,color:"#888888",borderBottom:"1px solid #F0F0F0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span>Showing {from}–{to} of {filteredOrders.length} orders</span>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <button className="action-btn btn-view" disabled={ordersPage===1} onClick={()=>setOrdersPage(p=>p-1)} style={{opacity:ordersPage===1?0.4:1}}>← Prev</button>
+                    {Array.from({length:totalOrderPages},(_,i)=>i+1).filter(p=>p===1||p===totalOrderPages||Math.abs(p-ordersPage)<=1).map((p,i,arr)=>(
+                      <span key={p}>
+                        {i>0 && arr[i-1]!==p-1 && <span style={{color:"#888",padding:"0 2px"}}>…</span>}
+                        <button className={`action-btn ${p===ordersPage?"btn-verify":"btn-view"}`} onClick={()=>setOrdersPage(p)} style={{minWidth:32}}>{p}</button>
+                      </span>
+                    ))}
+                    <button className="action-btn btn-view" disabled={ordersPage===totalOrderPages} onClick={()=>setOrdersPage(p=>p+1)} style={{opacity:ordersPage===totalOrderPages?0.4:1}}>Next →</button>
+                  </div>
+                </div>
+              )}
               <div className="table-wrap">
                 <table>
                   <thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Date</th><th>Payment</th><th>Receipt</th><th>Status</th><th>Actions</th></tr></thead>
                   <tbody>
-                    {filteredOrders.map(o => (
+                    {pagedOrders.map(o => (
                       <tr key={o.id}>
                         <td style={{fontFamily:"monospace",color:"var(--purple-glow)",whiteSpace:"nowrap"}}>{o.id}</td>
                         <td style={{whiteSpace:"nowrap"}}>{o.customer}</td>
@@ -925,7 +956,8 @@ export default function AdminPage() {
                 </table>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* PRODUCTS */}
           {tab==="products" && (

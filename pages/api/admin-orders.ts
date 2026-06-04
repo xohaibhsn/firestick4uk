@@ -1,7 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
 
+function checkAdminAuth(req: NextApiRequest): boolean {
+  const session = req.headers['x-admin-session'] || req.cookies?.sAdminSession;
+  return !!session;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!checkAdminAuth(req)) return res.status(403).json({ error: 'Forbidden' });
   try {
     if (req.method === 'GET') {
       if (req.query.customers === '1') {
