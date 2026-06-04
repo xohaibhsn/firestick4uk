@@ -189,8 +189,8 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
 
       {/* Edit Modal */}
       {editModal&&(
-        <div className="erp-modal-overlay" onClick={()=>setEditModal(null)}>
-          <div className="erp-modal" onClick={e=>e.stopPropagation()}>
+        <div className="erp-modal-overlay" onMouseDown={(e)=>{if(e.target===e.currentTarget)setEditModal(null)}}>
+          <div className="erp-modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="erp-modal-title">Edit Office Expense</div>
             <div className="erp-grid-2">
               <div className="erp-field"><label>Date</label><input type="date" className="erp-input" value={editModal.date} onChange={e=>setEditModal((m:any)=>({...m,date:e.target.value}))} /></div>

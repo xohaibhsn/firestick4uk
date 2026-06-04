@@ -81,8 +81,8 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
       </div>
 
       {modal && (
-        <div className="erp-modal-overlay" onClick={()=>setModal(null)}>
-          <div className="erp-modal" onClick={e=>e.stopPropagation()}>
+        <div className="erp-modal-overlay" onMouseDown={(e)=>{if(e.target===e.currentTarget)setModal(null)}}>
+          <div className="erp-modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="erp-modal-title">{modal==="new"?"Add Employee":"Edit Employee"}</div>
             {msg && <div style={{marginBottom:12,color:"#ff8888",fontSize:13}}>{msg}</div>}
             <div className="erp-grid-2">
