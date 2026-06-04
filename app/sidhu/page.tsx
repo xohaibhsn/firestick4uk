@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
+import dynamic from "next/dynamic";
+const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -668,29 +670,14 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Rich Text Editor */}
+            {/* Rich Text Editor — TipTap */}
             <div className="modal-field">
               <label>Content</label>
-              <div className="editor-toolbar" onMouseDown={e=>e.preventDefault()}>
-                {[["bold","B"],["italic","I"]].map(([cmd,lbl])=>(
-                  <button type="button" key={cmd} className="tool-btn"
-                    onClick={e=>{e.preventDefault();e.stopPropagation();execCmd(cmd);}}>
-                    <strong>{lbl}</strong>
-                  </button>
-                ))}
-                <div className="tool-sep"/>
-                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","h2");}}>H2</button>
-                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","h3");}}>H3</button>
-                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","p");}}>P</button>
-                <div className="tool-sep"/>
-                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("insertUnorderedList");}}>• List</button>
-                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("insertOrderedList");}}>1. List</button>
-                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","blockquote");}}>❝</button>
-                <div className="tool-sep"/>
-                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();const url=prompt("URL:");if(url)execCmd("createLink",url);}}>🔗</button>
-                <button type="button" className="tool-btn" onClick={e=>{e.preventDefault();e.stopPropagation();execCmd("removeFormat");}}>✕ Clear</button>
-              </div>
-              <div ref={editorRef} className="rich-editor" contentEditable suppressContentEditableWarning onInput={()=>{ const html = editorRef.current?.innerHTML ?? ""; setEditBlog(p=>({...p,content:html})); }} />
+              <TipTapEditor
+                content={editBlog.content}
+                onChange={(html) => setEditBlog(p => ({ ...p, content: html }))}
+                placeholder="Write your blog post here... Paste from Word/Google Docs supported!"
+              />
             </div>
 
             {/* Excerpt */}
