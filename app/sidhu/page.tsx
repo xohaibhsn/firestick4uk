@@ -387,8 +387,12 @@ export default function AdminPage() {
   };
 
   const execCmd = useCallback((cmd: string, val?: string) => {
-    document.execCommand(cmd, false, val);
-    if (editorRef.current) setEditBlog(p=>({...p,content:editorRef.current!.innerHTML}));
+    try {
+      document.execCommand(cmd, false, val ?? undefined);
+      if (editorRef.current) setEditBlog(p=>({...p, content: editorRef.current!.innerHTML}));
+    } catch (_) {
+      if (editorRef.current) setEditBlog(p=>({...p, content: editorRef.current!.innerHTML}));
+    }
   }, []);
 
   const saveBlog = async () => {
@@ -655,7 +659,7 @@ export default function AdminPage() {
                   {featImgUploading?"Uploading...":"Upload Image"}
                   <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&handleFeatImg(e.target.files[0])} disabled={featImgUploading} />
                 </label>
-                {editBlog.featured_image && <button style={{background:"none",border:"none",color:"rgba(255,100,100,0.7)",cursor:"pointer",fontSize:12}} onClick={()=>setEditBlog(p=>({...p,featured_image:""}))}>Remove</button>}
+                {editBlog.featured_image && <button type="button" style={{background:"none",border:"none",color:"rgba(255,100,100,0.7)",cursor:"pointer",fontSize:12}} onClick={()=>setEditBlog(p=>({...p,featured_image:""}))}>Remove</button>}
               </div>
             </div>
 
@@ -663,18 +667,18 @@ export default function AdminPage() {
             <div className="modal-field">
               <label>Content</label>
               <div className="editor-toolbar">
-                {[["bold","B"],["italic","I"]].map(([cmd,lbl])=><button key={cmd} className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd(cmd);}}><strong>{lbl}</strong></button>)}
+                {[["bold","B"],["italic","I"]].map(([cmd,lbl])=><button type="button" key={cmd} className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd(cmd);}}><strong>{lbl}</strong></button>)}
                 <div className="tool-sep"/>
-                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("formatBlock","h2");}}>H2</button>
-                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("formatBlock","h3");}}>H3</button>
-                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("formatBlock","p");}}>P</button>
+                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","h2");}}>H2</button>
+                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","h3");}}>H3</button>
+                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","p");}}>P</button>
                 <div className="tool-sep"/>
-                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("insertUnorderedList");}}>• List</button>
-                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("insertOrderedList");}}>1. List</button>
-                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("formatBlock","blockquote");}}>❝</button>
+                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("insertUnorderedList");}}>• List</button>
+                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("insertOrderedList");}}>1. List</button>
+                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("formatBlock","blockquote");}}>❝</button>
                 <div className="tool-sep"/>
-                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();const url=prompt("URL:");if(url)execCmd("createLink",url);}}>🔗</button>
-                <button className="tool-btn" onMouseDown={e=>{e.preventDefault();execCmd("removeFormat");}}>✕ Clear</button>
+                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();const url=prompt("URL:");if(url)execCmd("createLink",url);}}>🔗</button>
+                <button type="button" className="tool-btn" onMouseDown={e=>{e.preventDefault();e.stopPropagation();execCmd("removeFormat");}}>✕ Clear</button>
               </div>
               <div ref={editorRef} className="rich-editor" contentEditable suppressContentEditableWarning onInput={e=>setEditBlog(p=>({...p,content:e.currentTarget.innerHTML}))} />
             </div>
@@ -717,13 +721,13 @@ export default function AdminPage() {
                 <div key={i} style={{marginBottom:10,padding:"12px",background:"rgba(139,0,255,0.05)",border:"1px solid rgba(139,0,255,0.12)",borderRadius:8}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                     <span style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>FAQ #{i+1}</span>
-                    <button style={{background:"none",border:"none",color:"rgba(255,100,100,0.6)",cursor:"pointer",fontSize:12}} onClick={()=>setEditBlog(p=>({...p,faqs:p.faqs.filter((_,j)=>j!==i)}))}>Remove</button>
+                    <button type="button" style={{background:"none",border:"none",color:"rgba(255,100,100,0.6)",cursor:"pointer",fontSize:12}} onClick={()=>setEditBlog(p=>({...p,faqs:p.faqs.filter((_,j)=>j!==i)}))}>Remove</button>
                   </div>
                   <input className="modal-field" style={{width:"100%",background:"rgba(139,0,255,0.07)",border:"1px solid rgba(139,0,255,0.2)",borderRadius:8,padding:"8px 12px",color:"white",fontSize:13,marginBottom:6,outline:"none"}} placeholder="Question" value={faq.question} onChange={e=>setEditBlog(p=>({...p,faqs:p.faqs.map((f,j)=>j===i?{...f,question:e.target.value}:f)}))} />
                   <textarea style={{width:"100%",background:"rgba(139,0,255,0.07)",border:"1px solid rgba(139,0,255,0.2)",borderRadius:8,padding:"8px 12px",color:"white",fontSize:13,resize:"vertical",outline:"none",minHeight:60,fontFamily:"inherit"}} placeholder="Answer" value={faq.answer} onChange={e=>setEditBlog(p=>({...p,faqs:p.faqs.map((f,j)=>j===i?{...f,answer:e.target.value}:f)}))} />
                 </div>
               ))}
-              <button className="erp-btn" style={{background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",color:"var(--purple-glow)",padding:"7px 16px",borderRadius:8,cursor:"pointer",fontSize:13}} onClick={()=>setEditBlog(p=>({...p,faqs:[...p.faqs,{question:"",answer:""}]}))}>+ Add FAQ</button>
+              <button type="button" className="erp-btn" style={{background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",color:"var(--purple-glow)",padding:"7px 16px",borderRadius:8,cursor:"pointer",fontSize:13}} onClick={()=>setEditBlog(p=>({...p,faqs:[...p.faqs,{question:"",answer:""}]}))}>+ Add FAQ</button>
             </div>
 
             {/* Status + Featured toggles */}
