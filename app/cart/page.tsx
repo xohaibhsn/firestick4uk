@@ -195,8 +195,7 @@ export default function CartPage() {
   };
 
   const handleOrder = async () => {
-    if (!form.name || !form.email || !form.phone || !form.address) return;
-    if (paymentMethod === "bank" && !receiptFile) return;
+    if (cart.length === 0) return;
     setPlacing(true);
     setOrderError("");
 
@@ -432,10 +431,10 @@ export default function CartPage() {
                 <div className="form-section">
                   <h3>Your Details</h3>
                   {[
-                    {label:"Full Name *", key:"name", type:"text", placeholder:"John Smith"},
-                    {label:"Email Address *", key:"email", type:"email", placeholder:"john@example.com"},
-                    {label:"WhatsApp / Phone *", key:"phone", type:"tel", placeholder:"+447934519060"},
-                    {label:"Delivery Address *", key:"address", type:"text", placeholder:"123 High Street"},
+                    {label:"Full Name", key:"name", type:"text", placeholder:"John Smith"},
+                    {label:"Email Address", key:"email", type:"email", placeholder:"john@example.com"},
+                    {label:"WhatsApp / Phone", key:"phone", type:"tel", placeholder:"+447934519060"},
+                    {label:"Delivery Address", key:"address", type:"text", placeholder:"123 High Street"},
                   ].map(f => (
                     <div className="form-group" key={f.key}>
                       <label>{f.label}</label>
@@ -490,7 +489,7 @@ export default function CartPage() {
                         <div className="bank-row"><span>Amount</span><span>£{grandTotal.toFixed(2)}</span></div>
                       </div>
                       <div className="form-group">
-                        <label>Upload Payment Receipt *</label>
+                        <label>Upload Payment Receipt</label>
                         <div className={`upload-area ${receiptFile ? "has-file" : ""}`}>
                           <span className="upload-icon">{receiptFile ? "✅" : "📎"}</span>
                           <div className="upload-text">
@@ -519,7 +518,7 @@ export default function CartPage() {
                   </div>
 
                   <button className="place-order-btn"
-                    disabled={placing || !form.name || !form.email || !form.phone || !form.address || (paymentMethod === "bank" && !receiptFile)}
+                    disabled={placing || cart.length === 0}
                     onClick={handleOrder}>
                     {placing ? "Placing Order..." : "Place Order →"}
                   </button>
