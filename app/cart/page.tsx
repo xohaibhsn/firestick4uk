@@ -212,7 +212,7 @@ export default function CartPage() {
         const uploadRes = await fetch("/api/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ file: base64, name: receiptFile.name }),
+          body: JSON.stringify({ file: base64, name: receiptFile.name, folder: "firestick4uk/receipts" }),
         });
         const uploadData = await uploadRes.json();
         receiptPath = uploadData.path || "";
