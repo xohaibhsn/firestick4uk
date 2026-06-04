@@ -224,7 +224,39 @@ export default function CartPage() {
 
       const data = await res.json();
       if (data.order_id) {
-        setOrderId(data.order_id);
+        const oid = data.order_id;
+        setOrderId(oid);
+
+        // Build WhatsApp message
+        const itemsList = cart.map(i => `• ${i.name} x${i.qty} — £${(i.price * i.qty).toFixed(2)}`).join('\n');
+        const fullAddress = [form.address, form.city, form.postcode].filter(Boolean).join(', ');
+        const lines = [
+          '🛍️ *NEW ORDER — firestick4uk.com*',
+          '',
+          `📋 *Order ID:* ${oid}`,
+          `👤 *Name:* ${form.name}`,
+          `📧 *Email:* ${form.email}`,
+          `📱 *Phone:* ${form.phone}`,
+          `📍 *Address:* ${fullAddress}`,
+          form.notes ? `📝 *Notes:* ${form.notes}` : null,
+          '',
+          '🛒 *Items:*',
+          itemsList,
+          '',
+          `💰 *Subtotal:* £${subtotal.toFixed(2)}`,
+          `🚚 *Shipping:* ${shipping === 0 ? 'Free' : '£' + shipping.toFixed(2)}`,
+          `🧾 *VAT (20%):* £${vatAmount.toFixed(2)}`,
+          couponApplied ? `🎟️ *Discount (${couponApplied.code}):* -£${discountAmount.toFixed(2)}` : null,
+          `💵 *Total: £${grandTotal.toFixed(2)}*`,
+          '',
+          `💳 *Payment:* ${paymentMethod === 'bank' ? 'Bank Transfer' : 'Cash on Delivery'}`,
+          paymentMethod === 'bank' ? '✅ Payment receipt uploaded' : '',
+          '',
+          '📦 *Status:* Pending ⏳',
+          '— Sent from firestick4uk.com',
+        ].filter(l => l !== null).join('\n');
+
+        window.open(`https://wa.me/447934519060?text=${encodeURIComponent(lines)}`, '_blank');
         clearCart();
         setStep("success");
       } else {
@@ -251,17 +283,33 @@ export default function CartPage() {
           </ul>
         </nav>
         <div className="success-screen">
-          <span className="success-icon">✅</span>
+          <span className="success-icon">🎉</span>
           <h2 className="success-title">Order Placed!</h2>
-          <p className="success-sub">Thank you! We received your order and will verify payment shortly.</p>
           <div className="order-id-box">Order ID: {orderId}</div>
+
+          {/* WhatsApp CTA */}
+          <div style={{background:"rgba(37,211,102,0.12)",border:"1px solid rgba(37,211,102,0.35)",borderRadius:16,padding:"20px 24px",margin:"20px 0",textAlign:"left"}}>
+            <div style={{fontSize:22,marginBottom:8}}>💬 WhatsApp opened!</div>
+            <p style={{color:"rgba(255,255,255,0.85)",fontSize:14,lineHeight:1.7,marginBottom:14}}>
+              Your order details have been pre-filled in WhatsApp.<br/>
+              <strong style={{color:"#25d366"}}>Please tap Send to confirm your order with us.</strong>
+            </p>
+            <a
+              href={`https://wa.me/447934519060`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{display:"inline-flex",alignItems:"center",gap:8,background:"linear-gradient(135deg,#25d366,#128c7e)",color:"white",padding:"12px 24px",borderRadius:50,fontSize:14,fontWeight:700,textDecoration:"none",boxShadow:"0 4px 16px rgba(37,211,102,0.4)"}}>
+              💬 Open WhatsApp Again
+            </a>
+          </div>
+
           <div className="status-box">
             {[
-              {label:"Order Received", sub:"Just now", active:true},
+              {label:"Order Received", sub:"Just now ✅", active:true},
+              {label:"Send WhatsApp Message", sub:"Tap the button above to confirm", active:true},
               {label:"Payment Verification", sub:"Within 2 hours", active:false},
               {label:"Order Confirmed", sub:"After payment verified", active:false},
               {label:"Dispatched / Activated", sub:"Within 24 hours", active:false},
-              {label:"Delivered", sub:"2–3 working days", active:false},
             ].map((s,i) => (
               <div className="status-step" key={i}>
                 <div className={`step-dot ${s.active?"active":"inactive"}`} />
@@ -269,7 +317,7 @@ export default function CartPage() {
               </div>
             ))}
           </div>
-          <a href="/order-tracking" className="btn-primary">Track My Order</a>
+          <a href="/order-tracking" className="btn-primary">Track My Order →</a>
         </div>
         <footer>
           <div className="footer-logo">FIRESTICK4UK</div>
