@@ -165,6 +165,7 @@ export default function CartPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"bank" | "cod">("bank");
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [paymentReference, setPaymentReference] = useState("");
   const [placing, setPlacing] = useState(false);
   const [orderId, setOrderId] = useState("");
   const [orderError, setOrderError] = useState("");
@@ -230,6 +231,7 @@ export default function CartPage() {
           notes: form.notes,
           payment_method: paymentMethod,
           receipt_path: receiptPath,
+          payment_reference: paymentReference || null,
           items: cart,
           total: grandTotal,
           coupon_code: couponApplied?.code || null,
@@ -267,6 +269,7 @@ export default function CartPage() {
           '',
           `💳 *Payment:* ${paymentMethod === 'bank' ? 'Bank Transfer' : 'Cash on Delivery'}`,
           paymentMethod === 'bank' ? '✅ Payment receipt uploaded' : '',
+          paymentReference ? `🏷️ *Payment Reference:* ${paymentReference}` : '💳 *Payment Reference:* Not provided',
           '',
           '📦 *Status:* Pending ⏳',
           '— Sent from firestick4uk.com',
@@ -489,13 +492,25 @@ export default function CartPage() {
                         <div className="bank-row"><span>Amount</span><span>£{grandTotal.toFixed(2)}</span></div>
                       </div>
                       <div className="form-group">
-                        <label>Upload Payment Receipt</label>
+                        <label>Upload Payment Receipt (Optional)</label>
                         <div className={`upload-area ${receiptFile ? "has-file" : ""}`}>
                           <span className="upload-icon">{receiptFile ? "✅" : "📎"}</span>
                           <div className="upload-text">
                             {receiptFile ? <strong>{receiptFile.name}</strong> : <><strong>Click to upload</strong> your receipt</>}
                           </div>
                           <input type="file" accept="image/*,.pdf" onChange={e => setReceiptFile(e.target.files?.[0] || null)} />
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label>Payment Reference</label>
+                        <input
+                          type="text"
+                          placeholder="Enter your first name as payment reference"
+                          value={paymentReference}
+                          onChange={e => setPaymentReference(e.target.value)}
+                        />
+                        <div style={{fontSize:12,color:"#666666",marginTop:6,lineHeight:1.5}}>
+                          💡 Use your first name as the payment reference when making the bank transfer — this helps us identify your payment quickly!
                         </div>
                       </div>
                     </>

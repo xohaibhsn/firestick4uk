@@ -13,16 +13,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       "ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(50)",
       "ALTER TABLE orders ADD COLUMN discount_amount DECIMAL(10,2) DEFAULT 0",
       "ALTER TABLE orders ADD COLUMN vat_amount DECIMAL(10,2) DEFAULT 0",
+      "ALTER TABLE orders ADD COLUMN payment_reference VARCHAR(255)",
     ]) { try { await pool.query(col); } catch (_) {} }
 
     const { customer_name, customer_email, customer_phone, delivery_address, city, postcode, notes,
-      payment_method, receipt_path, items, total, coupon_code, discount_amount, vat_amount } = req.body;
+      payment_method, receipt_path, items, total, coupon_code, discount_amount, vat_amount,
+      payment_reference } = req.body;
 
     const order_id = 'ORD-' + Date.now();
 
     await pool.query(
-      'INSERT INTO orders (order_id,customer_name,customer_email,customer_phone,delivery_address,city,postcode,notes,payment_method,receipt_path,total,coupon_code,discount_amount,vat_amount,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [order_id, customer_name, customer_email, customer_phone, delivery_address, city, postcode, notes||'', payment_method, receipt_path||'', total, coupon_code||null, discount_amount||0, vat_amount||0, 'pending']
+      'INSERT INTO orders (order_id,customer_name,customer_email,customer_phone,delivery_address,city,postcode,notes,payment_method,receipt_path,total,coupon_code,discount_amount,vat_amount,payment_reference,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [order_id, customer_name, customer_email, customer_phone, delivery_address, city, postcode, notes||'', payment_method, receipt_path||'', total, coupon_code||null, discount_amount||0, vat_amount||0, payment_reference||null, 'pending']
     );
 
     for (const item of items) {

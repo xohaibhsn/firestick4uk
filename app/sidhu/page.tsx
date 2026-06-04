@@ -288,6 +288,7 @@ export default function AdminPage() {
             receipt_path: o.receipt_path || "",
             address: [o.delivery_address, o.city, o.postcode].filter(Boolean).join(", "),
             payment: o.payment_method || "",
+            payment_reference: o.payment_reference || "",
           })));
         }
       })
@@ -540,6 +541,9 @@ export default function AdminPage() {
             <div className="modal-field"><label>Items</label><input readOnly value={orderModal.items} /></div>
             <div className="modal-field"><label>Delivery Address</label><input readOnly value={(orderModal as any).address || "—"} /></div>
             <div className="modal-field"><label>Payment Method</label><input readOnly value={(orderModal as any).payment || "—"} /></div>
+            {(orderModal as any).payment_reference && (
+              <div className="modal-field"><label>Payment Reference</label><input readOnly value={(orderModal as any).payment_reference} style={{background:"#F5F3FF",borderColor:"#DDD6FE",fontWeight:600}} /></div>
+            )}
             <div className="modal-field"><label>Total</label><input readOnly value={orderModal.total} /></div>
             <div className="modal-field">
               <label>Update Status</label>
