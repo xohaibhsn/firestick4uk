@@ -199,7 +199,7 @@ export default function RefundPolicyPage() {
               <h2>5. How to Return an Item</h2>
               <p>To initiate a return, please follow these steps:</p>
               <ul>
-                <li>Contact us via WhatsApp (+44 7000 000000) or email (support@firestick44uk.com) with your Order ID and reason for return.</li>
+                <li>Contact us via WhatsApp (+447934519060) or email (support@firestick44uk.com) with your Order ID and reason for return.</li>
                 <li>Wait for our team to confirm your return request and provide return instructions.</li>
                 <li>Package the item securely in its original packaging.</li>
                 <li>Send the item to the address provided by our team.</li>
@@ -235,7 +235,7 @@ export default function RefundPolicyPage() {
               <p>If you have any questions about our refund policy or wish to initiate a return, please get in touch:</p>
               <div className="highlight-box">
                 <p>📧 Email: support@firestick44uk.com<br />
-                💬 WhatsApp: +44 7000 000000<br />
+                💬 WhatsApp: +447934519060<br />
                 🌐 Website: firestick44uk.com</p>
               </div>
               <p>We aim to respond to all refund and return enquiries within 24 hours during business hours.</p>

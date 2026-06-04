@@ -276,7 +276,7 @@ export default function ContactPage() {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Phone / WhatsApp</label>
-                    <input type="tel" placeholder="+44 7000 000000" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                    <input type="tel" placeholder="+447934519060" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                   </div>
                   <div className="form-group">
                     <label>Subject</label>

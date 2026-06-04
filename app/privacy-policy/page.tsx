@@ -227,7 +227,7 @@ export default function PrivacyPolicyPage() {
               <p>If you have any questions about this Privacy Policy or how we handle your data, please contact us:</p>
               <div className="highlight-box">
                 <p>📧 Email: support@firestick44uk.com<br />
-                💬 WhatsApp: +44 7000 000000<br />
+                💬 WhatsApp: +447934519060<br />
                 🌐 Website: firestick44uk.com</p>
               </div>
               <p>You also have the right to lodge a complaint with the Information Commissioner&apos;s Office (ICO) at ico.org.uk if you believe your data has been mishandled.</p>

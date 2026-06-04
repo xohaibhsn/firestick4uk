@@ -199,7 +199,7 @@ export default function TermsPage() {
               <p>If you have any questions about these Terms & Conditions, please contact us:</p>
               <div className="highlight-box">
                 <p>📧 Email: support@firestick44uk.com<br />
-                💬 WhatsApp: +44 7000 000000<br />
+                💬 WhatsApp: +447934519060<br />
                 🌐 Website: firestick44uk.com</p>
               </div>
             </div>

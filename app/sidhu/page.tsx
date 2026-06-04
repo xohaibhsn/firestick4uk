@@ -181,7 +181,7 @@ const styles = `
 
 // DEMO DATA
 const demoOrders = [
-  { id:"FK44-62305", customer:"John Smith", email:"john@example.com", phone:"+44 7000 000000", items:"B1G 6 Month Plan + Firestick 4K", total:"£89.98", status:"confirmed", date:"30 May 2026", receipt:true },
+  { id:"FK44-62305", customer:"John Smith", email:"john@example.com", phone:"+447934519060", items:"B1G 6 Month Plan + Firestick 4K", total:"£89.98", status:"confirmed", date:"30 May 2026", receipt:true },
   { id:"FK44-22222", customer:"Ali Hassan", email:"ali@example.com", phone:"+44 7222 222222", items:"B1G 1 Year Plan", total:"£79.99", status:"pending", date:"30 May 2026", receipt:true },
   { id:"FK44-11111", customer:"Sarah Jones", email:"sarah@example.com", phone:"+44 7111 111111", items:"Android Box Ultra", total:"£73.98", status:"dispatched", date:"28 May 2026", receipt:true },
   { id:"FK44-33333", customer:"David Brown", email:"david@example.com", phone:"+44 7333 333333", items:"Firestick 4K Max", total:"£54.99", status:"delivered", date:"25 May 2026", receipt:false },
@@ -200,7 +200,7 @@ const demoProducts = [
 ];
 
 const demoCustomers = [
-  { name:"John Smith", email:"john@example.com", phone:"+44 7000 000000", orders:3, spent:"£219.96", joined:"Jan 2026" },
+  { name:"John Smith", email:"john@example.com", phone:"+447934519060", orders:3, spent:"£219.96", joined:"Jan 2026" },
   { name:"Sarah Jones", email:"sarah@example.com", phone:"+44 7111 111111", orders:2, spent:"£123.97", joined:"Feb 2026" },
   { name:"Ali Hassan", email:"ali@example.com", phone:"+44 7222 222222", orders:1, spent:"£79.99", joined:"May 2026" },
   { name:"David Brown", email:"david@example.com", phone:"+44 7333 333333", orders:4, spent:"£189.95", joined:"Dec 2025" },

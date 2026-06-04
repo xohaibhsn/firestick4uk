@@ -417,7 +417,7 @@ export default function CartPage() {
                   {[
                     {label:"Full Name *", key:"name", type:"text", placeholder:"John Smith"},
                     {label:"Email Address *", key:"email", type:"email", placeholder:"john@example.com"},
-                    {label:"WhatsApp / Phone *", key:"phone", type:"tel", placeholder:"+44 7000 000000"},
+                    {label:"WhatsApp / Phone *", key:"phone", type:"tel", placeholder:"+447934519060"},
                     {label:"Delivery Address *", key:"address", type:"text", placeholder:"123 High Street"},
                   ].map(f => (
                     <div className="form-group" key={f.key}>
