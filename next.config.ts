@@ -13,10 +13,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   generateEtags: false,
   images: {
-    unoptimized: true,
+    unoptimized: false,
     remotePatterns: [
-      { protocol: "https", hostname: "firestick4uk.com" },
-      { protocol: "https", hostname: "srv497.hstgr.io" },
       { protocol: "https", hostname: "res.cloudinary.com" },
     ],
   },
