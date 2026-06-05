@@ -45,14 +45,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { id, status, admin_note, approved_by, approver_role, rejection_reason } = req.body;
       if (!id || !status) return res.status(400).json({ error: 'Missing fields' });
 
-      // Fix 4 — role check: only admin or manager can approve/reject
-      if (approver_role && !['admin', 'manager'].includes(approver_role)) {
-        return res.status(403).json({ error: 'Forbidden: Only Admin or Manager can approve expenses' });
+      // Tier 1: role must be admin or manager
+      if (!approver_role || !['admin', 'manager'].includes(approver_role)) {
+        return res.status(403).json({ success:false, message: 'Forbidden: Only Admin or Manager can approve expenses' });
       }
 
       const [expRows]: any = await pool.query('SELECT * FROM erp_expenses WHERE id=?', [id]);
       if (!expRows.length) return res.status(404).json({ error: 'Expense not found' });
       const expense = expRows[0];
+
+      // Tier 2: manager cannot self-approve their own expense claim
+      if (approver_role === 'manager' && Number(approved_by) === Number(expense.employee_id)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized: Managers are restricted from self-approving expense claims.',
+        });
+      }
+
+      // Tier 3: employee can never approve (already blocked by Tier 1)
 
       await pool.query(
         'UPDATE erp_expenses SET status=?,admin_note=?,approved_by=?,approved_at=NOW(),approved_by_role=?,rejection_reason=? WHERE id=?',

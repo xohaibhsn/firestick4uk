@@ -46,7 +46,15 @@ function ExpContent({ user, currency }: { user: any; currency: string }) {
   };
 
   const decide = async (id:number, status:string) => {
-    await fetch("/api/erp/expenses",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status,admin_note:note,approved_by:user.id})});
+    const res = await fetch("/api/erp/expenses",{
+      method:"PATCH",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({id,status,admin_note:note,approved_by:user.id,approver_role:user.role}),
+    }).then(r=>r.json()).catch(()=>({}));
+    if (res.error || res.message) {
+      alert(res.message || res.error);
+      return;
+    }
     setNoteModal(null); setNote(""); load();
   };
 
@@ -125,15 +133,34 @@ function ExpContent({ user, currency }: { user: any; currency: string }) {
                   <td><span className={`badge ${statusColor[e.status]}`}>{e.status}</span></td>
                   <td style={{fontSize:11,color:"rgba(255,255,255,0.4)",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.admin_note||"—"}</td>
                   {(user.role==="admin"||user.role==="manager")&&<td>
-                    {e.status==="pending"&&<div style={{display:"flex",gap:6}}>
-                      <button className="erp-btn erp-btn-green erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"approved"});setNote("");}}>Approve</button>
-                      <button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"rejected",requireNote:false});setNote("");}}>Reject</button>
-                    </div>}
-                    {user.role==="admin"&&e.status==="approved"&&(
-                      <button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"rejected",requireNote:true,label:"Admin Override Reject"});setNote("");}}>
-                        🔄 Override Reject
-                      </button>
-                    )}
+                    {(() => {
+                      // Fix 1 — strict 3-tier authorization
+                      // Admin: can approve/reject anything (including own)
+                      // Manager: can approve/reject ONLY if expense is NOT their own
+                      // Employee: never shown (handled by outer condition)
+                      const canAct = user.role === "admin"
+                        ? true
+                        : user.role === "manager" && Number(e.employee_id) !== Number(user.id);
+
+                      return (
+                        <>
+                          {e.status==="pending" && canAct && (
+                            <div style={{display:"flex",gap:6}}>
+                              <button className="erp-btn erp-btn-green erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"approved"});setNote("");}}>Approve</button>
+                              <button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"rejected",requireNote:false});setNote("");}}>Reject</button>
+                            </div>
+                          )}
+                          {e.status==="pending" && !canAct && (
+                            <span style={{fontSize:11,color:"#AAAAAA",fontStyle:"italic"}}>Self-claim</span>
+                          )}
+                          {user.role==="admin" && e.status==="approved" && (
+                            <button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"rejected",requireNote:true,label:"Admin Override Reject"});setNote("");}}>
+                              🔄 Override Reject
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </td>}
                 </tr>
               ))}
