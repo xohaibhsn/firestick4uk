@@ -1,5 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../../lib/db';
+import { createHash } from 'crypto';
+
+function hashPw(pw: string) { return createHash('sha256').update(pw).digest('hex'); }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -19,9 +22,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       "ALTER TABLE erp_expenses ADD COLUMN month_year VARCHAR(7)",
     ]) { try { await pool.query(sql); } catch (_) {} }
 
+    const adminHash = hashPw('erp123');
     const [existing]: any = await pool.query('SELECT id FROM erp_users WHERE email = ?', ['admin@firestick4uk.com']);
     if (!existing.length) {
-      await pool.query(`INSERT INTO erp_users (name,email,password,role) VALUES ('Admin','admin@firestick4uk.com','erp123','admin')`);
+      await pool.query(`INSERT INTO erp_users (name,email,password,role) VALUES ('Admin','admin@firestick4uk.com',?,'admin')`, [adminHash]);
+    } else {
+      // Migrate legacy plain-text default password to hashed on first boot after this deploy
+      await pool.query(`UPDATE erp_users SET password=? WHERE email='admin@firestick4uk.com' AND password='erp123'`, [adminHash]).catch(()=>{});
     }
 
     const { email, password } = req.body;
@@ -29,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Fix blank roles in DB before login query
     await pool.query(`UPDATE erp_users SET role='employee' WHERE (role IS NULL OR role='' OR role NOT IN ('admin','manager','employee','vendor'))`).catch(()=>{});
-    const [rows]: any = await pool.query('SELECT id,name,email,role,department FROM erp_users WHERE email=? AND password=? AND active=1', [email, password]);
+    const [rows]: any = await pool.query('SELECT id,name,email,role,department FROM erp_users WHERE email=? AND password=? AND active=1', [email, hashPw(password)]);
     if (!rows.length) {
       await pool.query('INSERT INTO erp_audit_log (action,details,ip_address) VALUES (?,?,?)', ['LOGIN_FAILED', `Failed login for ${email}`, req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown']).catch(()=>{});
       return res.status(401).json({ error: 'Invalid credentials' });

@@ -1,5 +1,8 @@
 import pool from '../../../lib/db';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { createHash } from 'crypto';
+
+function hashPw(pw: string) { return createHash('sha256').update(pw).digest('hex'); }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -47,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!name || !email || !password) return res.status(400).json({ error: 'Name, email and password required' });
       const [result]: any = await pool.query(
         'INSERT INTO erp_users (name,email,password,role,department,salary,joining_date,reports_to) VALUES (?,?,?,?,?,?,?,?)',
-        [name, email, password, (role||'employee').toLowerCase().trim(), department||'', salary||0, joining_date||null, reports_to||null]
+        [name, email, hashPw(password), (role||'employee').toLowerCase().trim(), department||'', salary||0, joining_date||null, reports_to||null]
       );
       // Step 3: vendor role maps to 'vendor' account type, all others map to 'employee'
       const accountType = (role === 'vendor') ? 'vendor' : 'employee';
@@ -56,11 +59,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PUT') {
-      const { id, name, email, role, department, salary, joining_date, active, reports_to } = req.body;
-      await pool.query(
-        'UPDATE erp_users SET name=?,email=?,role=?,department=?,salary=?,joining_date=?,active=?,reports_to=? WHERE id=?',
-        [name, email, (role||'employee').toLowerCase().trim(), department||'', salary||0, joining_date||null, active??1, reports_to||null, id]
-      );
+      const { id, name, email, role, department, salary, joining_date, active, reports_to, password } = req.body;
+      if (password) {
+        await pool.query(
+          'UPDATE erp_users SET name=?,email=?,role=?,department=?,salary=?,joining_date=?,active=?,reports_to=?,password=? WHERE id=?',
+          [name, email, (role||'employee').toLowerCase().trim(), department||'', salary||0, joining_date||null, active??1, reports_to||null, hashPw(password), id]
+        );
+      } else {
+        await pool.query(
+          'UPDATE erp_users SET name=?,email=?,role=?,department=?,salary=?,joining_date=?,active=?,reports_to=? WHERE id=?',
+          [name, email, (role||'employee').toLowerCase().trim(), department||'', salary||0, joining_date||null, active??1, reports_to||null, id]
+        );
+      }
       return res.status(200).json({ success: true });
     }
 
