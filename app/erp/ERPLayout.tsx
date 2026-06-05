@@ -148,6 +148,7 @@ const adminNav = [
   { href:"/erp/employees", icon:"👥", label:"Users", key:"employees" },
   { href:"/erp/ledger", icon:"📒", label:"Ledger", key:"ledger" },
   { href:"/erp/payroll", icon:"💰", label:"Payroll", key:"payroll" },
+  { href:"/erp/iptv-hub", icon:"📡", label:"IPTV Hub", key:"iptv-hub" },
   { href:"/erp/audit", icon:"🔍", label:"Audit Log", key:"audit" },
 ];
 
@@ -165,6 +166,7 @@ const routeRoles: Record<string, string[]> = {
   "/erp/my-payroll":    ["admin","manager","employee"],
   "/erp/my-ledger":     ["admin","manager","employee","vendor"],
   "/erp/audit":         ["admin"],
+  "/erp/iptv-hub":      ["admin"],
   "/erp/office-expenses": ["admin","manager"],
   "/erp/attendance":    ["admin","manager","employee"],
   "/erp/leaves":        ["admin","manager","employee"],
