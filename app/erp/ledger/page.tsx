@@ -50,23 +50,35 @@ function LedgerContent({ user }: { user: any }) {
     }).catch(()=>{});
   }, []);
 
-  const loadEmployee = (empId: string) => {
+  const loadEmployee = async (empId: string) => {
     setSelectedEmpId(empId);
     if (!empId) { setSelected(null); setTxns([]); return; }
-    const acc = accounts.find((a:any) => String(a.reference_id) === String(empId) && a.type === "employee");
+
+    // Fetch employee's account directly by user_id — don't rely on pre-loaded accounts cache
+    // (avoids race condition where accounts haven't loaded yet)
+    const accsData: any[] = await fetch(
+      `/api/erp/ledger?self=1&user_id=${empId}&user_role=admin`
+    ).then(r=>r.json()).catch(()=>[]);
+
+    const acc = Array.isArray(accsData) && accsData.length ? accsData[0] : null;
+
     if (acc) {
       setSelected(acc);
+      setOpeningBal(Number(acc.opening_balance || 0));
       fetch(`/api/erp/ledger?account_id=${acc.id}`).then(r=>r.json()).then(d=>{
-        setTxns(d.transactions||[]);
-        setOpeningBal(Number(acc.opening_balance||0));
+        setTxns(d.transactions || []);
       }).catch(()=>{});
     } else {
-      setSelected(null); setTxns([]);
+      // Account doesn't exist yet — show empty state with message
+      setSelected({ name: employees.find((e:any)=>String(e.id)===empId)?.name || empId, type:"employee", id:null });
+      setTxns([]);
+      setMsg("⚠️ No ledger account found for this employee. Credit a salary to auto-create their account.");
+      setTimeout(()=>setMsg(""),5000);
     }
   };
 
   const submit = async () => {
-    if (!form.amount || !form.description || !selected) return;
+    if (!form.amount || !form.description || !selected || !selected.id) return;
     setSaving(true);
     const res = await fetch("/api/erp/ledger", {
       method:"POST", headers:{"Content-Type":"application/json"},

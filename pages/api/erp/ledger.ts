@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      // Employee self-view — own account only (privacy fix)
+      // Account lookup by user_id — used by employee self-view AND admin looking up specific employee
       if (self === '1' || user_role === 'employee') {
         if (!user_id) return res.status(400).json({ error: 'user_id required' });
         const [accounts] = await pool.query(`
