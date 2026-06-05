@@ -39,6 +39,15 @@ function LeavesContent({ user, currency: _currency }: { user: any; currency: str
     return isNaN(d)||d<0 ? "—" : `${d}d`;
   };
 
+  // Fix 2 — format ISO date strings to DD/MM/YYYY
+  const fmtDate = (d: string) => {
+    if (!d) return "—";
+    const s = String(d).slice(0,10); // take YYYY-MM-DD
+    const [y,m,day] = s.split("-");
+    if (!y||!m||!day) return s;
+    return `${day}/${m}/${y}`;
+  };
+
   const statusColor: any = {pending:"badge-orange",approved:"badge-green",rejected:"badge-red"};
   const typeColor: any = {sick:"badge-red",annual:"badge-green",emergency:"badge-orange",unpaid:"badge-purple"};
 
@@ -48,15 +57,16 @@ function LeavesContent({ user, currency: _currency }: { user: any; currency: str
       {balance && (
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:14,marginBottom:20}}>
           {[
-            {label:"Annual Leave",taken:balance.annual_taken,limit:14,color:"#00c864"},
-            {label:"Sick Leave",taken:balance.sick_taken,limit:10,color:"#6699ff"},
-            {label:"Emergency",taken:balance.emergency_taken,limit:3,color:"#ff8c00"},
+            {label:"Annual Leave",taken:balance.annual_taken,limit:14,color:"#16A34A"},
+            {label:"Sick Leave",taken:balance.sick_taken,limit:10,color:"#2563EB"},
+            {label:"Emergency",taken:balance.emergency_taken,limit:3,color:"#D97706"},
           ].map(b=>(
             <div key={b.label} className="erp-stat" style={{textAlign:"center"}}>
-              <div style={{fontSize:11,color:"rgba(255,255,255,0.4)",letterSpacing:"1px",textTransform:"uppercase",marginBottom:8}}>{b.label}</div>
-              <div style={{fontFamily:"'Cinzel',serif",fontSize:24,fontWeight:700,color:b.color}}>{b.limit-b.taken}</div>
-              <div style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginTop:4}}>of {b.limit} remaining</div>
-              <div style={{marginTop:8,height:4,background:"rgba(255,255,255,0.08)",borderRadius:4}}>
+              {/* Fix 1 — high-contrast dark text on white card background */}
+              <div style={{fontSize:11,color:"#1e293b",fontWeight:700,letterSpacing:"1px",textTransform:"uppercase",marginBottom:8}}>{b.label}</div>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:28,fontWeight:800,color:b.color}}>{b.limit-b.taken}</div>
+              <div style={{fontSize:11,color:"#64748b",fontWeight:500,marginTop:4}}>of {b.limit} remaining</div>
+              <div style={{marginTop:8,height:5,background:"#E5E5E5",borderRadius:4}}>
                 <div style={{height:"100%",width:`${Math.min(100,(b.taken/b.limit)*100)}%`,background:b.color,borderRadius:4,transition:"width 0.5s"}} />
               </div>
             </div>
@@ -101,8 +111,8 @@ function LeavesContent({ user, currency: _currency }: { user: any; currency: str
                   <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{new Date(l.created_at).toLocaleDateString("en-GB")}</td>
                   {(user.role==="admin"||user.role==="manager")&&<td style={{fontWeight:600}}>{l.employee_name}</td>}
                   <td><span className={`badge ${typeColor[l.leave_type]||"badge-purple"}`}>{l.leave_type}</span></td>
-                  <td style={{fontSize:13}}>{l.from_date}</td>
-                  <td style={{fontSize:13}}>{l.to_date}</td>
+                  <td style={{fontSize:13}}>{fmtDate(l.from_date)}</td>
+                  <td style={{fontSize:13}}>{fmtDate(l.to_date)}</td>
                   <td style={{fontWeight:600,color:"var(--pg)"}}>{days(l.from_date,l.to_date)}</td>
                   <td style={{maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:12,color:"rgba(255,255,255,0.5)"}}>{l.reason||"—"}</td>
                   <td><span className={`badge ${statusColor[l.status]}`}>{l.status}</span></td>
