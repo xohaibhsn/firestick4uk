@@ -158,7 +158,7 @@ const routeRoles: Record<string, string[]> = {
   "/erp/attendance":    ["admin","manager","employee"],
   "/erp/leaves":        ["admin","manager","employee"],
   "/erp/expenses":      ["admin","manager","employee","vendor"],
-  "/erp/dashboard":     ["admin","manager","employee"],
+  "/erp/dashboard":     ["admin","manager","employee","vendor"],
 };
 
 export default function ERPLayout({ children, title, active }: ERPLayoutProps) {

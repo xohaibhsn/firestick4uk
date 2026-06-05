@@ -7,9 +7,17 @@ export default function ERPLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const roleHome = (role: string) =>
+    role === "vendor" ? "/erp/my-ledger" : "/erp/dashboard";
+
   useEffect(() => {
     const s = localStorage.getItem("erp_session");
-    if (s) window.location.href = "/erp/dashboard";
+    if (s) {
+      try {
+        const u = JSON.parse(s);
+        window.location.href = roleHome(u.role || "employee");
+      } catch { window.location.href = "/erp/dashboard"; }
+    }
   }, []);
 
   const handleLogin = async () => {
@@ -19,7 +27,7 @@ export default function ERPLoginPage() {
       const res = await fetch("/api/erp/login", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email,password}) }).then(r=>r.json());
       if (res.success) {
         localStorage.setItem("erp_session", JSON.stringify(res.user));
-        window.location.href = "/erp/dashboard";
+        window.location.href = roleHome(res.user.role || "employee");
       } else {
         setError(res.error || "Invalid credentials");
       }

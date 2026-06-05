@@ -10,7 +10,26 @@ export default function ERPDashboard() {
   );
 }
 
+function VendorDashboard({ user }: { user: any }) {
+  return (
+    <div>
+      <div className="erp-card" style={{marginBottom:16,textAlign:"center",padding:"40px 24px"}}>
+        <div style={{fontSize:40,marginBottom:12}}>🏢</div>
+        <div style={{fontSize:18,fontWeight:700,color:"#111",marginBottom:6}}>Welcome, {user.name}</div>
+        <div style={{fontSize:13,color:"#888",marginBottom:24}}>Vendor Portal · {user.email}</div>
+        <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
+          <a href="/erp/my-ledger" className="erp-btn erp-btn-primary" style={{textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6}}>📒 My Ledger</a>
+          <a href="/erp/expenses" className="erp-btn erp-btn-outline" style={{textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6}}>🧾 Bill Submissions</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DashboardContent({ user, currency }: { user: any; currency: string }) {
+  // Fix 3: vendor bypasses full dashboard to prevent rendering crashes
+  if (user.role === "vendor") return <VendorDashboard user={user} />;
+
   const fmt = (n: number) => `Rs. ${Math.round(n).toLocaleString()}`;
   const [stats, setStats] = useState({ employees:0, pendingExpenses:0, pendingLeaves:0, todayAttendance:0 });
   const [officeExpSummary, setOfficeExpSummary] = useState<any>({ total:0, categories:[] });
