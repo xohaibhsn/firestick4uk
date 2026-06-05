@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
 export default function ERPAudit() {
-  return <ERPLayout title="Audit Log" active="audit">{(user, currency) => user.role==="admin" ? <AuditContent user={user} currency={currency} /> : <div style={{padding:40,textAlign:"center",color:"rgba(255,255,255,0.35)"}}>⛔ Admin access only</div>}</ERPLayout>;
+  return <ERPLayout title="Audit Log" active="audit">{(user, currency) => user.role==="admin" ? <AuditContent user={user} currency={currency} /> : <div style={{padding:40,textAlign:"center",color:"#777777"}}>⛔ Admin access only</div>}</ERPLayout>;
 }
 
 function AuditContent({ user: _u, currency: _c }: { user: any; currency: string }) {
@@ -47,14 +47,14 @@ function AuditContent({ user: _u, currency: _c }: { user: any; currency: string 
             <table>
               <thead><tr><th>Date & Time</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr></thead>
               <tbody>
-                {logs.length===0&&<tr><td colSpan={5} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No audit logs found</td></tr>}
+                {logs.length===0&&<tr><td colSpan={5} style={{textAlign:"center",color:"#999999",padding:24}}>No audit logs found</td></tr>}
                 {logs.map((l:any)=>(
                   <tr key={l.id}>
-                    <td style={{fontSize:11,color:"rgba(255,255,255,0.4)",whiteSpace:"nowrap"}}>{new Date(l.created_at).toLocaleString("en-GB")}</td>
-                    <td style={{fontSize:12,fontWeight:500}}>{l.user_name||<span style={{color:"rgba(255,255,255,0.25)"}}>System</span>}</td>
+                    <td style={{fontSize:11,color:"#666666",whiteSpace:"nowrap"}}>{new Date(l.created_at).toLocaleString("en-GB")}</td>
+                    <td style={{fontSize:12,fontWeight:500}}>{l.user_name||<span style={{color:"#999999"}}>System</span>}</td>
                     <td><span className={`badge ${actionColor[l.action]||"badge-orange"}`} style={{fontSize:10}}>{l.action}</span></td>
-                    <td style={{fontSize:12,color:"rgba(255,255,255,0.6)",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.details||"—"}</td>
-                    <td style={{fontSize:11,color:"rgba(255,255,255,0.25)"}}>{l.ip_address||"—"}</td>
+                    <td style={{fontSize:12,color:"#444444",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.details||"—"}</td>
+                    <td style={{fontSize:11,color:"#999999"}}>{l.ip_address||"—"}</td>
                   </tr>
                 ))}
               </tbody>

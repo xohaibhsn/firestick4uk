@@ -65,13 +65,13 @@ function MyPayrollContent({ user, currency: _c }: { user: any; currency: string 
                   ["Advances / Deductions",`- ${fmt(Number(data.advances||0))}`],
                 ].map(([label,val])=>(
                   <tr key={label as string}>
-                    <td style={{color:"rgba(255,255,255,0.45)",fontSize:13,padding:"10px 14px",width:"45%",borderBottom:"1px solid rgba(139,0,255,0.07)"}}>{label}</td>
+                    <td style={{color:"#666666",fontSize:13,padding:"10px 14px",width:"45%",borderBottom:"1px solid rgba(139,0,255,0.07)"}}>{label}</td>
                     <td style={{fontWeight:600,padding:"10px 14px",borderBottom:"1px solid rgba(139,0,255,0.07)"}}>{val}</td>
                   </tr>
                 ))}
                 <tr>
                   <td style={{padding:"14px",fontWeight:700,fontSize:15}}>Net Pay</td>
-                  <td style={{padding:"14px",fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:900,color:"var(--pg)"}}>{fmt(Number(data.net_pay||0))}</td>
+                  <td style={{padding:"14px",fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:900,color:"#5B21B6"}}>{fmt(Number(data.net_pay||0))}</td>
                 </tr>
               </tbody>
             </table>

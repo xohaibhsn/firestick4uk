@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
 export default function ERPEmployees() {
-  return <ERPLayout title="Users" active="employees">{(user, currency) => user.role==="admin" ? <EmpContent user={user} currency={currency} /> : <div style={{padding:40,textAlign:"center",color:"rgba(255,255,255,0.35)"}}>⛔ Admin access only</div>}</ERPLayout>;
+  return <ERPLayout title="Users" active="employees">{(user, currency) => user.role==="admin" ? <EmpContent user={user} currency={currency} /> : <div style={{padding:40,textAlign:"center",color:"#777777"}}>⛔ Admin access only</div>}</ERPLayout>;
 }
 
 function EmpContent({ user, currency }: { user: any; currency: string }) {
@@ -80,17 +80,17 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
           <table>
             <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Reports To</th><th>Salary</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
-              {employees.length===0 && <tr><td colSpan={10} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No employees found</td></tr>}
+              {employees.length===0 && <tr><td colSpan={10} style={{textAlign:"center",color:"#999999",padding:24}}>No employees found</td></tr>}
               {employees.map((e:any)=>(
                 <tr key={e.id}>
-                  <td style={{color:"rgba(255,255,255,0.35)",fontSize:12}}>#{e.id}</td>
+                  <td style={{color:"#777777",fontSize:12}}>#{e.id}</td>
                   <td style={{fontWeight:600}}>{e.name}</td>
-                  <td style={{fontSize:12,color:"rgba(255,255,255,0.5)"}}>{e.email}</td>
+                  <td style={{fontSize:12,color:"#555555"}}>{e.email}</td>
                   <td><span className={`badge ${roleColor[e.role]||"badge-purple"}`}>{e.role}</span></td>
                   <td style={{fontSize:12}}>{e.department||"—"}</td>
                   <td style={{fontSize:12,color:e.reports_to_name?"rgba(255,255,255,0.8)":"rgba(255,255,255,0.25)"}}>{e.reports_to_name||"—"}</td>
-                  <td style={{fontWeight:600,color:"var(--pg)"}}>{e.salary>0?fmt(Number(e.salary)):"—"}</td>
-                  <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{e.joining_date||"—"}</td>
+                  <td style={{fontWeight:600,color:"#5B21B6"}}>{e.salary>0?fmt(Number(e.salary)):"—"}</td>
+                  <td style={{fontSize:12,color:"#666666"}}>{e.joining_date||"—"}</td>
                   <td><span className={`badge ${e.active?"badge-green":"badge-red"}`}>{e.active?"Active":"Inactive"}</span></td>
                   <td style={{whiteSpace:"nowrap"}}>
                     <button className="erp-btn erp-btn-outline erp-btn-sm" style={{marginRight:6}} onClick={()=>openEdit(e)}>Edit</button>

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
 export default function ERPApprovals() {
-  return <ERPLayout title="Approvals" active="approvals">{(user, currency) => (user.role==="admin"||user.role==="manager") ? <ApprovalsContent user={user} currency={currency} /> : <div style={{padding:40,textAlign:"center",color:"rgba(255,255,255,0.35)"}}>⛔ Access restricted</div>}</ERPLayout>;
+  return <ERPLayout title="Approvals" active="approvals">{(user, currency) => (user.role==="admin"||user.role==="manager") ? <ApprovalsContent user={user} currency={currency} /> : <div style={{padding:40,textAlign:"center",color:"#777777"}}>⛔ Access restricted</div>}</ERPLayout>;
 }
 
 function ApprovalsContent({ user, currency: _c }: { user: any; currency: string }) {
@@ -53,15 +53,15 @@ function ApprovalsContent({ user, currency: _c }: { user: any; currency: string 
             <table>
               <thead><tr><th>Date</th><th>Employee</th><th>Amount</th><th>Category</th><th>Description</th><th>Receipt</th><th>Actions</th></tr></thead>
               <tbody>
-                {expenses.length===0&&<tr><td colSpan={7} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No pending expenses ✅</td></tr>}
+                {expenses.length===0&&<tr><td colSpan={7} style={{textAlign:"center",color:"#999999",padding:24}}>No pending expenses ✅</td></tr>}
                 {expenses.map((e:any)=>(
                   <tr key={e.id}>
-                    <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{new Date(e.created_at).toLocaleDateString("en-GB")}</td>
+                    <td style={{fontSize:12,color:"#666666"}}>{new Date(e.created_at).toLocaleDateString("en-GB")}</td>
                     <td style={{fontWeight:600}}>{e.employee_name}</td>
-                    <td style={{fontWeight:700,color:"var(--pg)"}}>{fmt(Number(e.amount))}</td>
+                    <td style={{fontWeight:700,color:"#5B21B6"}}>{fmt(Number(e.amount))}</td>
                     <td><span className="badge badge-purple">{e.category}</span></td>
                     <td style={{maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:12}}>{e.description||"—"}</td>
-                    <td>{e.receipt_path?<a href={e.receipt_path} target="_blank" rel="noreferrer" style={{color:"var(--pg)",fontSize:12}}>📎 View</a>:<span style={{color:"rgba(255,255,255,0.2)",fontSize:12}}>—</span>}</td>
+                    <td>{e.receipt_path?<a href={e.receipt_path} target="_blank" rel="noreferrer" style={{color:"#5B21B6",fontSize:12}}>📎 View</a>:<span style={{color:"#AAAAAA",fontSize:12}}>—</span>}</td>
                     <td><div style={{display:"flex",gap:6}}>
                       <button className="erp-btn erp-btn-green erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"approved"});setNote("");}}>✅ Approve</button>
                       <button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>{setNoteModal({id:e.id,action:"rejected"});setNote("");}}>❌ Reject</button>
@@ -81,16 +81,16 @@ function ApprovalsContent({ user, currency: _c }: { user: any; currency: string 
             <table>
               <thead><tr><th>Filed</th><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Actions</th></tr></thead>
               <tbody>
-                {leaves.length===0&&<tr><td colSpan={8} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No pending leaves ✅</td></tr>}
+                {leaves.length===0&&<tr><td colSpan={8} style={{textAlign:"center",color:"#999999",padding:24}}>No pending leaves ✅</td></tr>}
                 {leaves.map((l:any)=>(
                   <tr key={l.id}>
-                    <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{new Date(l.created_at).toLocaleDateString("en-GB")}</td>
+                    <td style={{fontSize:12,color:"#666666"}}>{new Date(l.created_at).toLocaleDateString("en-GB")}</td>
                     <td style={{fontWeight:600}}>{l.employee_name}</td>
                     <td><span className={`badge ${{sick:"badge-red",annual:"badge-green",emergency:"badge-orange",unpaid:"badge-purple"}[l.leave_type as string]||"badge-purple"}`}>{l.leave_type}</span></td>
                     <td style={{fontSize:13}}>{l.from_date}</td>
                     <td style={{fontSize:13}}>{l.to_date}</td>
-                    <td style={{fontWeight:600,color:"var(--pg)"}}>{Math.round((new Date(l.to_date).getTime()-new Date(l.from_date).getTime())/(86400000))+1}d</td>
-                    <td style={{fontSize:12,maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"rgba(255,255,255,0.5)"}}>{l.reason||"—"}</td>
+                    <td style={{fontWeight:600,color:"#5B21B6"}}>{Math.round((new Date(l.to_date).getTime()-new Date(l.from_date).getTime())/(86400000))+1}d</td>
+                    <td style={{fontSize:12,maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"#555555"}}>{l.reason||"—"}</td>
                     <td><div style={{display:"flex",gap:6}}>
                       <button className="erp-btn erp-btn-green erp-btn-sm" onClick={()=>decideLeave(l.id,"approved")}>✅</button>
                       <button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>decideLeave(l.id,"rejected")}>❌</button>

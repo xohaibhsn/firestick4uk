@@ -63,15 +63,15 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
       {/* Clock In/Out */}
       <div className="erp-card" style={{marginBottom:24,display:"flex",alignItems:"center",gap:28,flexWrap:"wrap"}}>
         <div style={{flex:1}}>
-          <div style={{fontSize:13,color:"rgba(255,255,255,0.4)",marginBottom:4}}>Today — {new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+          <div style={{fontSize:13,color:"#666666",marginBottom:4}}>Today — {new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
           {todayStatus ? (
             <div style={{display:"flex",gap:20,flexWrap:"wrap",marginTop:8}}>
-              <div><div style={{fontSize:11,color:"rgba(255,255,255,0.35)",letterSpacing:"1px",textTransform:"uppercase"}}>Clock In</div><div style={{fontSize:15,fontWeight:600}}>{todayStatus.time_in ? new Date(todayStatus.time_in).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "—"}</div></div>
-              <div><div style={{fontSize:11,color:"rgba(255,255,255,0.35)",letterSpacing:"1px",textTransform:"uppercase"}}>Clock Out</div><div style={{fontSize:15,fontWeight:600}}>{todayStatus.time_out ? new Date(todayStatus.time_out).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "—"}</div></div>
-              <div><div style={{fontSize:11,color:"rgba(255,255,255,0.35)",letterSpacing:"1px",textTransform:"uppercase"}}>Hours</div><div style={{fontSize:15,fontWeight:600}}>{todayStatus.working_hours || "—"}</div></div>
+              <div><div style={{fontSize:11,color:"#777777",letterSpacing:"1px",textTransform:"uppercase"}}>Clock In</div><div style={{fontSize:15,fontWeight:600}}>{todayStatus.time_in ? new Date(todayStatus.time_in).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "—"}</div></div>
+              <div><div style={{fontSize:11,color:"#777777",letterSpacing:"1px",textTransform:"uppercase"}}>Clock Out</div><div style={{fontSize:15,fontWeight:600}}>{todayStatus.time_out ? new Date(todayStatus.time_out).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "—"}</div></div>
+              <div><div style={{fontSize:11,color:"#777777",letterSpacing:"1px",textTransform:"uppercase"}}>Hours</div><div style={{fontSize:15,fontWeight:600}}>{todayStatus.working_hours || "—"}</div></div>
               <div style={{display:"flex",alignItems:"center"}}><span className={statusBadge(todayStatus.status)}>{todayStatus.status}</span></div>
             </div>
-          ) : <div style={{color:"rgba(255,255,255,0.35)",fontSize:13,marginTop:8}}>Not clocked in today</div>}
+          ) : <div style={{color:"#777777",fontSize:13,marginTop:8}}>Not clocked in today</div>}
           {clockMsg && <div style={{marginTop:10,fontSize:13,color:clockMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{clockMsg}</div>}
         </div>
         <div style={{display:"flex",gap:12}}>
@@ -108,13 +108,13 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
                 <div style={{fontSize:13,fontWeight:700}}>🏢 This Month Office Expenses</div>
                 <div style={{fontFamily:"'Cinzel',serif",fontSize:22,fontWeight:900,color:"#ff8c00",marginTop:4}}>{fmt(officeExpSummary.total||0)}</div>
               </div>
-              <a href="/erp/office-expenses" style={{color:"var(--pg)",fontSize:12,textDecoration:"none"}}>View All →</a>
+              <a href="/erp/office-expenses" style={{color:"#5B21B6",fontSize:12,textDecoration:"none"}}>View All →</a>
             </div>
             {(officeExpSummary.categories||[]).length > 0 && (
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 {(officeExpSummary.categories||[]).slice(0,3).map((c:any)=>(
                   <div key={c.category} style={{flex:1,minWidth:100,background:"rgba(255,140,0,0.08)",border:"1px solid rgba(255,140,0,0.2)",borderRadius:10,padding:"8px 12px"}}>
-                    <div style={{fontSize:12,color:"rgba(255,255,255,0.5)",marginBottom:2}}>{c.category}</div>
+                    <div style={{fontSize:12,color:"#555555",marginBottom:2}}>{c.category}</div>
                     <div style={{fontWeight:700,color:"#ff8c00"}}>{fmt(Number(c.total))}</div>
                   </div>
                 ))}
@@ -125,7 +125,10 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
             <div className="erp-section-header"><div className="erp-section-title">Quick Actions</div></div>
             <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
               {[{href:"/erp/employees",label:"👥 Manage Users"},{href:"/erp/expenses",label:"💸 Review Expenses"},{href:"/erp/leaves",label:"🌿 Review Leaves"},{href:"/erp/attendance",label:"⏰ View Attendance"},{href:"/erp/ledger",label:"📒 Open Ledger"}].map(a=>(
-                <a key={a.href} href={a.href} style={{padding:"10px 18px",background:"rgba(139,0,255,0.12)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:10,color:"rgba(255,255,255,0.8)",textDecoration:"none",fontSize:13,transition:"all 0.2s"}}>{a.label}</a>
+                <a key={a.href} href={a.href} style={{padding:"10px 18px",background:"#111111",border:"1px solid #111111",borderRadius:10,color:"#FFFFFF",textDecoration:"none",fontSize:13,fontWeight:600,transition:"all 0.2s"}}
+                  onMouseEnter={e=>(e.currentTarget.style.background="#5B21B6")}
+                  onMouseLeave={e=>(e.currentTarget.style.background="#111111")}
+                >{a.label}</a>
               ))}
             </div>
           </div>
@@ -133,19 +136,19 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
       ) : (
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
           <div className="erp-card">
-            <div className="erp-section-header"><div className="erp-section-title">My Expenses</div><a href="/erp/expenses" style={{color:"var(--pg)",fontSize:12,textDecoration:"none"}}>View All →</a></div>
+            <div className="erp-section-header"><div className="erp-section-title">My Expenses</div><a href="/erp/expenses" style={{color:"#5B21B6",fontSize:12,textDecoration:"none"}}>View All →</a></div>
             {myExpenses.length===0 ? <div className="erp-empty">No expenses yet</div> : myExpenses.map((e:any)=>(
               <div key={e.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid rgba(139,0,255,0.07)"}}>
-                <div><div style={{fontSize:13,fontWeight:600}}>{fmt(Number(e.amount))}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.35)"}}>{e.category}</div></div>
+                <div><div style={{fontSize:13,fontWeight:600}}>{fmt(Number(e.amount))}</div><div style={{fontSize:11,color:"#777777"}}>{e.category}</div></div>
                 <span className={statusBadge(e.status)}>{e.status}</span>
               </div>
             ))}
           </div>
           <div className="erp-card">
-            <div className="erp-section-header"><div className="erp-section-title">My Leaves</div><a href="/erp/leaves" style={{color:"var(--pg)",fontSize:12,textDecoration:"none"}}>View All →</a></div>
+            <div className="erp-section-header"><div className="erp-section-title">My Leaves</div><a href="/erp/leaves" style={{color:"#5B21B6",fontSize:12,textDecoration:"none"}}>View All →</a></div>
             {myLeaves.length===0 ? <div className="erp-empty">No leave requests</div> : myLeaves.map((l:any)=>(
               <div key={l.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid rgba(139,0,255,0.07)"}}>
-                <div><div style={{fontSize:13,fontWeight:600}}>{l.leave_type}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.35)"}}>{l.from_date} → {l.to_date}</div></div>
+                <div><div style={{fontSize:13,fontWeight:600}}>{l.leave_type}</div><div style={{fontSize:11,color:"#777777"}}>{l.from_date} → {l.to_date}</div></div>
                 <span className={statusBadge(l.status)}>{l.status}</span>
               </div>
             ))}

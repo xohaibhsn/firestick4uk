@@ -146,12 +146,12 @@ function AttContent({ user, currency: _c }: { user: any; currency: string }) {
         <div style={{flex:1}}>
           <div style={{fontWeight:600,marginBottom:4}}>Today — {new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
           {todayStatus
-            ? <div style={{fontSize:13,color:"rgba(255,255,255,0.5)"}}>
+            ? <div style={{fontSize:13,color:"#555555"}}>
                 In: {todayStatus.time_in?new Date(todayStatus.time_in).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"—"}
                 &nbsp;|&nbsp;Out: {todayStatus.time_out?new Date(todayStatus.time_out).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"—"}
                 &nbsp;|&nbsp;<span className={`badge ${STATUS_COLOR[todayStatus.status]||"badge-purple"}`}>{todayStatus.status}</span>
               </div>
-            : <div style={{fontSize:13,color:"rgba(255,255,255,0.35)"}}>Not clocked in yet</div>
+            : <div style={{fontSize:13,color:"#777777"}}>Not clocked in yet</div>
           }
           {clockMsg&&<div style={{marginTop:8,fontSize:13,color:clockMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{clockMsg}</div>}
         </div>
@@ -209,9 +209,9 @@ function AttContent({ user, currency: _c }: { user: any; currency: string }) {
                     const isWarn = remaining <= 0;
                     return (
                       <div key={b.label} style={{padding:"6px 12px",background:isWarn?"rgba(255,68,68,0.1)":"rgba(139,0,255,0.08)",border:`1px solid ${isWarn?"rgba(255,68,68,0.3)":"rgba(139,0,255,0.2)"}`,borderRadius:8,fontSize:12}}>
-                        <span style={{color:"rgba(255,255,255,0.5)"}}>{b.label}: </span>
+                        <span style={{color:"#555555"}}>{b.label}: </span>
                         <strong style={{color:isWarn?"#ff6666":"#00c864"}}>{remaining}</strong>
-                        <span style={{color:"rgba(255,255,255,0.3)"}}> / {b.limit}</span>
+                        <span style={{color:"#888888"}}> / {b.limit}</span>
                         {isWarn&&<span style={{color:"#ff6666",marginLeft:4}}>⚠️ Exceeded</span>}
                       </div>
                     );
@@ -253,7 +253,7 @@ function AttContent({ user, currency: _c }: { user: any; currency: string }) {
                   <tbody>
                     {bulkRecords.map((rec,i)=>(
                       <tr key={rec.employee_id}>
-                        <td style={{color:"rgba(255,255,255,0.3)",fontSize:12}}>{i+1}</td>
+                        <td style={{color:"#888888",fontSize:12}}>{i+1}</td>
                         <td style={{fontWeight:600}}>{rec.name}</td>
                         <td>
                           <select className="erp-select" style={{padding:"5px 8px",fontSize:12}} value={rec.status} onChange={e=>setBulkRecords(r=>r.map((x,j)=>j===i?{...x,status:e.target.value}:x))}>
@@ -293,7 +293,7 @@ function AttContent({ user, currency: _c }: { user: any; currency: string }) {
           ].map(s=>(
             <div key={s.label} className="erp-stat" style={{padding:"12px 10px",textAlign:"center"}}>
               <div style={{fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:700,color:s.color}}>{s.val}</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",letterSpacing:"0.5px",textTransform:"uppercase",marginTop:3}}>{s.label}</div>
+              <div style={{fontSize:10,color:"#666666",letterSpacing:"0.5px",textTransform:"uppercase",marginTop:3}}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -320,7 +320,7 @@ function AttContent({ user, currency: _c }: { user: any; currency: string }) {
             <table>
               <thead><tr><th>Date</th>{isAdmin&&<th>Employee</th>}<th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Status</th><th>Notes</th>{isAdmin&&<th>Marked By</th>}<th>Actions</th></tr></thead>
               <tbody>
-                {records.length===0&&<tr><td colSpan={9} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No records found</td></tr>}
+                {records.length===0&&<tr><td colSpan={9} style={{textAlign:"center",color:"#999999",padding:24}}>No records found</td></tr>}
                 {records.map((r:any)=>(
                   <tr key={r.id}>
                     <td style={{fontWeight:500}}>{r.date}</td>
@@ -336,8 +336,8 @@ function AttContent({ user, currency: _c }: { user: any; currency: string }) {
                       {/* Night shift badge */}
                       {r.shift_type==="night"&&<span style={{marginLeft:4,background:"#EDE9FE",color:"#5B21B6",padding:"2px 7px",borderRadius:12,fontSize:10,fontWeight:700}}>🌙 Night</span>}
                     </td>
-                    <td style={{fontSize:11,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"rgba(255,255,255,0.4)"}}>{r.admin_note||"—"}</td>
-                    {isAdmin&&<td style={{fontSize:11,color:"rgba(255,255,255,0.35)"}}>{r.marked_by_name||<span style={{color:"rgba(255,255,255,0.2)"}}>Self</span>}</td>}
+                    <td style={{fontSize:11,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"#666666"}}>{r.admin_note||"—"}</td>
+                    {isAdmin&&<td style={{fontSize:11,color:"#777777"}}>{r.marked_by_name||<span style={{color:"#AAAAAA"}}>Self</span>}</td>}
                     <td>{isAdmin&&(user.role==="admin"||(user.role==="manager"&&employees.some(e=>e.employee_id===r.employee_id||e.id===r.employee_id)))&&<button className="erp-btn erp-btn-outline erp-btn-sm" onClick={()=>openEdit(r)}>Edit</button>}</td>
                   </tr>
                 ))}

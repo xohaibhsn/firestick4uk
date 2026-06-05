@@ -89,9 +89,9 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
         {(summary.categories||[]).slice(0,4).map((c:any)=>(
           <div key={c.category} className="erp-stat" style={{padding:"14px 12px"}}>
             <div style={{fontSize:22,marginBottom:6}}>{catIcon(c.category)}</div>
-            <div style={{fontWeight:700,color:"var(--pg)",fontSize:15}}>{fmt(Number(c.total))}</div>
+            <div style={{fontWeight:700,color:"#5B21B6",fontSize:15}}>{fmt(Number(c.total))}</div>
             <div className="erp-stat-label">{c.category}</div>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:2}}>{c.count} entries</div>
+            <div style={{fontSize:10,color:"#888888",marginTop:2}}>{c.count} entries</div>
           </div>
         ))}
       </div>
@@ -133,7 +133,7 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
               <label>Receipt</label>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 {form.receipt_path && <span style={{fontSize:12,color:"#00c864"}}>✅ Uploaded</span>}
-                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",padding:"7px 14px",borderRadius:8,fontSize:12,color:"var(--pg)"}}>
+                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",padding:"7px 14px",borderRadius:8,fontSize:12,color:"#5B21B6"}}>
                   {uploading?"Uploading...":"📎 Upload Receipt"}
                   <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&uploadReceipt(e.target.files[0])} disabled={uploading} />
                 </label>
@@ -158,17 +158,17 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
           <table>
             <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Paid By</th><th>Receipt</th><th>Notes</th><th>Added By</th>{isAdmin&&<th>Actions</th>}</tr></thead>
             <tbody>
-              {expenses.length===0&&<tr><td colSpan={9} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No expenses found for this period</td></tr>}
+              {expenses.length===0&&<tr><td colSpan={9} style={{textAlign:"center",color:"#999999",padding:24}}>No expenses found for this period</td></tr>}
               {expenses.map((e:any)=>(
                 <tr key={e.id}>
-                  <td style={{fontSize:12,color:"rgba(255,255,255,0.5)",whiteSpace:"nowrap"}}>{e.date}</td>
-                  <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 9px",borderRadius:10,fontSize:12}}>{catIcon(e.category)} {e.category}</span></td>
+                  <td style={{fontSize:12,color:"#555555",whiteSpace:"nowrap"}}>{e.date}</td>
+                  <td><span style={{background:"#111111",border:"1px solid #E5E5E5",padding:"3px 9px",borderRadius:10,fontSize:12}}>{catIcon(e.category)} {e.category}</span></td>
                   <td style={{maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:13}}>{e.description||"—"}</td>
                   <td style={{fontWeight:700,color:"#ff8c00"}}>{fmt(Number(e.amount))}</td>
                   <td style={{fontSize:12}}>{e.paid_by||"—"}</td>
-                  <td>{e.receipt_path?<a href={e.receipt_path} target="_blank" rel="noreferrer" style={{color:"var(--pg)",fontSize:12}}>📎 View</a>:<span style={{color:"rgba(255,255,255,0.2)",fontSize:12}}>—</span>}</td>
-                  <td style={{fontSize:11,color:"rgba(255,255,255,0.4)",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.notes||"—"}</td>
-                  <td style={{fontSize:11,color:"rgba(255,255,255,0.35)"}}>{e.added_by||"—"}</td>
+                  <td>{e.receipt_path?<a href={e.receipt_path} target="_blank" rel="noreferrer" style={{color:"#5B21B6",fontSize:12}}>📎 View</a>:<span style={{color:"#AAAAAA",fontSize:12}}>—</span>}</td>
+                  <td style={{fontSize:11,color:"#666666",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.notes||"—"}</td>
+                  <td style={{fontSize:11,color:"#777777"}}>{e.added_by||"—"}</td>
                   {isAdmin&&<td style={{whiteSpace:"nowrap"}}>
                     <button className="erp-btn erp-btn-outline erp-btn-sm" style={{marginRight:4}} onClick={()=>setEditModal({...e})}>Edit</button>
                     <button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>del(e.id)}>Del</button>
@@ -177,7 +177,7 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
               ))}
               {expenses.length>0&&(
                 <tr style={{borderTop:"2px solid rgba(139,0,255,0.2)"}}>
-                  <td colSpan={3} style={{fontWeight:700,fontSize:12,color:"rgba(255,255,255,0.5)",padding:"12px 14px",textTransform:"uppercase",letterSpacing:"1px"}}>Total</td>
+                  <td colSpan={3} style={{fontWeight:700,fontSize:12,color:"#555555",padding:"12px 14px",textTransform:"uppercase",letterSpacing:"1px"}}>Total</td>
                   <td style={{fontWeight:900,color:"#ff8c00",fontFamily:"'Cinzel',serif",fontSize:16,padding:"12px 14px"}}>{fmt(totalFiltered)}</td>
                   <td colSpan={isAdmin?5:4}/>
                 </tr>
@@ -204,8 +204,8 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
             <div className="erp-field">
               <label>Receipt</label>
               <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                {editModal.receipt_path&&<a href={editModal.receipt_path} target="_blank" rel="noreferrer" style={{color:"var(--pg)",fontSize:12}}>📎 Current</a>}
-                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",padding:"6px 12px",borderRadius:8,fontSize:12,color:"var(--pg)"}}>
+                {editModal.receipt_path&&<a href={editModal.receipt_path} target="_blank" rel="noreferrer" style={{color:"#5B21B6",fontSize:12}}>📎 Current</a>}
+                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",padding:"6px 12px",borderRadius:8,fontSize:12,color:"#5B21B6"}}>
                   {uploading?"Uploading...":"Change Receipt"}
                   <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&uploadReceipt(e.target.files[0])} disabled={uploading} />
                 </label>

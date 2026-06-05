@@ -84,7 +84,7 @@ function ExpContent({ user, currency }: { user: any; currency: string }) {
       <div style={{marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
           {pending>0&&<span className="badge badge-orange">{pending} Pending</span>}
-          {(user.role==="admin"||user.role==="manager")&&pending>0&&<span style={{fontSize:13,color:"rgba(255,255,255,0.5)"}}>Total: {fmt(totalPending)}</span>}
+          {(user.role==="admin"||user.role==="manager")&&pending>0&&<span style={{fontSize:13,color:"#555555"}}>Total: {fmt(totalPending)}</span>}
         </div>
         {user.role!=="admin"&&<button className="erp-btn erp-btn-primary" onClick={()=>setShowForm(!showForm)}>{isVendor ? "🧾 Submit Bill / Invoice" : "+ Submit Expense"}</button>}
       </div>
@@ -104,7 +104,7 @@ function ExpContent({ user, currency }: { user: any; currency: string }) {
             <div style={{display:"flex",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}>
               {previewImg&&<img src={previewImg} alt="receipt" style={{width:80,height:80,objectFit:"cover",borderRadius:8,border:"1px solid rgba(139,0,255,0.3)"}} />}
               <div>
-                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"var(--pg)",display:"inline-block"}}>
+                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",display:"inline-block"}}>
                   {uploading?"Uploading...":form.receipt_path?"✅ Change Receipt":"📎 Upload Receipt"}
                   <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&uploadReceipt(e.target.files[0])} disabled={uploading} />
                 </label>
@@ -125,17 +125,17 @@ function ExpContent({ user, currency }: { user: any; currency: string }) {
           <table>
             <thead><tr><th>Date</th>{(user.role==="admin"||user.role==="manager")&&<th>Employee</th>}<th>Amount</th><th>Category</th><th>Description</th><th>Receipt</th><th>Status</th><th>Note</th>{(user.role==="admin"||user.role==="manager")&&<th>Actions</th>}</tr></thead>
             <tbody>
-              {expenses.length===0&&<tr><td colSpan={9} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No expenses found</td></tr>}
+              {expenses.length===0&&<tr><td colSpan={9} style={{textAlign:"center",color:"#999999",padding:24}}>No expenses found</td></tr>}
               {expenses.map((e:any)=>(
                 <tr key={e.id}>
-                  <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{new Date(e.created_at).toLocaleDateString("en-GB")}</td>
+                  <td style={{fontSize:12,color:"#666666"}}>{new Date(e.created_at).toLocaleDateString("en-GB")}</td>
                   {(user.role==="admin"||user.role==="manager")&&<td style={{fontWeight:600}}>{e.employee_name}</td>}
-                  <td style={{fontWeight:700,color:"var(--pg)"}}>{fmt(Number(e.amount))}</td>
+                  <td style={{fontWeight:700,color:"#5B21B6"}}>{fmt(Number(e.amount))}</td>
                   <td><span className="badge badge-purple">{e.category}</span></td>
                   <td style={{maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.description||"—"}</td>
-                  <td>{e.receipt_path ? <a href={e.receipt_path} target="_blank" rel="noreferrer" style={{color:"var(--pg)",fontSize:12}}>📎 View</a> : <span style={{color:"rgba(255,255,255,0.2)",fontSize:12}}>—</span>}</td>
+                  <td>{e.receipt_path ? <a href={e.receipt_path} target="_blank" rel="noreferrer" style={{color:"#5B21B6",fontSize:12}}>📎 View</a> : <span style={{color:"#AAAAAA",fontSize:12}}>—</span>}</td>
                   <td><span className={`badge ${statusColor[e.status]}`}>{e.status}</span></td>
-                  <td style={{fontSize:11,color:"rgba(255,255,255,0.4)",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.admin_note||"—"}</td>
+                  <td style={{fontSize:11,color:"#666666",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.admin_note||"—"}</td>
                   {(user.role==="admin"||user.role==="manager")&&<td>
                     {(() => {
                       // Fix 1 — strict 3-tier authorization

@@ -105,16 +105,16 @@ function LeavesContent({ user, currency: _currency }: { user: any; currency: str
           <table>
             <thead><tr><th>Date Filed</th>{(user.role==="admin"||user.role==="manager")&&<th>Employee</th>}<th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Status</th>{(user.role==="admin"||user.role==="manager")&&<th>Actions</th>}</tr></thead>
             <tbody>
-              {leaves.length===0&&<tr><td colSpan={9} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No leave requests found</td></tr>}
+              {leaves.length===0&&<tr><td colSpan={9} style={{textAlign:"center",color:"#999999",padding:24}}>No leave requests found</td></tr>}
               {leaves.map((l:any)=>(
                 <tr key={l.id}>
-                  <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{new Date(l.created_at).toLocaleDateString("en-GB")}</td>
+                  <td style={{fontSize:12,color:"#666666"}}>{new Date(l.created_at).toLocaleDateString("en-GB")}</td>
                   {(user.role==="admin"||user.role==="manager")&&<td style={{fontWeight:600}}>{l.employee_name}</td>}
                   <td><span className={`badge ${typeColor[l.leave_type]||"badge-purple"}`}>{l.leave_type}</span></td>
                   <td style={{fontSize:13}}>{fmtDate(l.from_date)}</td>
                   <td style={{fontSize:13}}>{fmtDate(l.to_date)}</td>
-                  <td style={{fontWeight:600,color:"var(--pg)"}}>{days(l.from_date,l.to_date)}</td>
-                  <td style={{maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:12,color:"rgba(255,255,255,0.5)"}}>{l.reason||"—"}</td>
+                  <td style={{fontWeight:600,color:"#5B21B6"}}>{days(l.from_date,l.to_date)}</td>
+                  <td style={{maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:12,color:"#555555"}}>{l.reason||"—"}</td>
                   <td><span className={`badge ${statusColor[l.status]}`}>{l.status}</span></td>
                   {(user.role==="admin"||user.role==="manager")&&<td>{l.status==="pending"&&<div style={{display:"flex",gap:6}}><button className="erp-btn erp-btn-green erp-btn-sm" onClick={()=>decide(l.id,"approved")}>Approve</button><button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>decide(l.id,"rejected")}>Reject</button></div>}</td>}
                 </tr>
