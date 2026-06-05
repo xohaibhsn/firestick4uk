@@ -38,6 +38,10 @@ async function bootstrap() {
       created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  // Idempotent column migrations — ignored if already present
+  try { await pool.query(`ALTER TABLE erp_iptv_purchase_orders ADD COLUMN vendor_id INT NULL`); } catch (_) {}
+  try { await pool.query(`ALTER TABLE erp_iptv_purchase_orders ADD COLUMN payment_voucher_ref VARCHAR(60) NULL`); } catch (_) {}
+
   // Seed default servers (idempotent — skip names already present)
   const [existing]: any = await pool.query('SELECT server_name FROM erp_iptv_servers');
   const seen = new Set((Array.isArray(existing) ? existing : []).map((r: any) => r.server_name));
@@ -72,9 +76,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'GET') {
       const [servers]: any = await pool.query('SELECT * FROM erp_iptv_servers ORDER BY server_name');
       const [orders]: any  = await pool.query(`
-        SELECT p.*, s.server_name
+        SELECT p.*, s.server_name, u.name AS vendor_name
         FROM erp_iptv_purchase_orders p
         JOIN erp_iptv_servers s ON p.server_id = s.id
+        LEFT JOIN erp_users u ON u.id = p.vendor_id
         ORDER BY p.created_at DESC
         LIMIT 150
       `);
@@ -86,32 +91,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // ── POST — record new purchase payable ───────────────────────────────────
     if (req.method === 'POST') {
-      const { server_id, credits_purchased, cost_per_credit, vendor_description } = req.body;
+      const { server_id, credits_purchased, cost_per_credit, vendor_description, vendor_id } = req.body;
       if (!server_id || !credits_purchased || !cost_per_credit) {
         return res.status(400).json({ error: 'server_id, credits_purchased, cost_per_credit are required' });
       }
 
-      const credits    = parseInt(String(credits_purchased), 10);
-      const costPer    = parseFloat(String(cost_per_credit));
+      const credits     = parseInt(String(credits_purchased), 10);
+      const costPer     = parseFloat(String(cost_per_credit));
       const totalAmount = Math.round(credits * costPer * 100) / 100;
       const voucherRef  = `IPTV-PO-${Date.now()}`;
       const memo        = vendor_description || `IPTV bulk purchase — ${credits} credits`;
 
-      // 1. Insert purchase order (pending)
       const [poResult]: any = await pool.query(
         `INSERT INTO erp_iptv_purchase_orders
-         (server_id,credits_purchased,cost_per_credit,total_amount,status,voucher_ref,vendor_description)
-         VALUES (?,?,?,?,'pending_payable',?,?)`,
-        [server_id, credits, costPer, totalAmount, voucherRef, vendor_description || null]
+         (server_id,credits_purchased,cost_per_credit,total_amount,status,voucher_ref,vendor_description,vendor_id)
+         VALUES (?,?,?,?,'pending_payable',?,?,?)`,
+        [server_id, credits, costPer, totalAmount, voucherRef, vendor_description || null, vendor_id || null]
       );
 
-      // 2. Add credits to live inventory
       await pool.query(
         'UPDATE erp_iptv_servers SET available_credits = available_credits + ? WHERE id = ?',
         [credits, server_id]
       );
 
-      // 3. Double-entry: DR IPTV Credit Purchases (expense) + CR IPTV Vendor Payable (liability)
+      // DR IPTV Credit Purchases (expense↑) + CR IPTV Vendor Payable (liability↑)
       const drAccId = await getOrCreateAccount('IPTV Credit Purchases');
       const crAccId = await getOrCreateAccount('IPTV Vendor Payable');
       const drCoaId = await getOrCreateCOA('IPTV Credit Purchases', 'expense');
@@ -129,6 +132,90 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
 
       return res.status(200).json({ success: true, id: poResult.insertId, voucherRef, totalAmount });
+    }
+
+    // ── PATCH — edit pending order ───────────────────────────────────────────
+    if (req.method === 'PATCH') {
+      const { id, credits_purchased, cost_per_credit, vendor_id, vendor_description } = req.body;
+      if (!id) return res.status(400).json({ error: 'id required' });
+
+      const [orderRows]: any = await pool.query(
+        'SELECT * FROM erp_iptv_purchase_orders WHERE id=? LIMIT 1', [id]
+      );
+      if (!Array.isArray(orderRows) || !orderRows.length)
+        return res.status(404).json({ error: 'Order not found' });
+      const order = orderRows[0];
+      if (order.status === 'paid')
+        return res.status(400).json({ error: 'Paid orders cannot be edited' });
+
+      const oldCredits  = Number(order.credits_purchased);
+      const newCredits  = credits_purchased ? parseInt(String(credits_purchased), 10) : oldCredits;
+      const newRate     = cost_per_credit   ? parseFloat(String(cost_per_credit))     : Number(order.cost_per_credit);
+      const newTotal    = Math.round(newCredits * newRate * 100) / 100;
+      const creditDelta = newCredits - oldCredits;
+
+      // Update both transaction rows to the revised amount
+      await pool.query(
+        `UPDATE erp_transactions SET amount=? WHERE voucher_ref=? AND type='debit'`,
+        [newTotal, order.voucher_ref]
+      );
+      await pool.query(
+        `UPDATE erp_transactions SET amount=? WHERE voucher_ref=? AND type='credit'`,
+        [newTotal, order.voucher_ref]
+      );
+
+      // Adjust live inventory by the credit delta
+      if (creditDelta !== 0) {
+        await pool.query(
+          'UPDATE erp_iptv_servers SET available_credits = available_credits + ? WHERE id = ?',
+          [creditDelta, order.server_id]
+        );
+      }
+
+      await pool.query(
+        `UPDATE erp_iptv_purchase_orders
+         SET credits_purchased=?, cost_per_credit=?, total_amount=?, vendor_id=?, vendor_description=?
+         WHERE id=?`,
+        [
+          newCredits, newRate, newTotal,
+          vendor_id !== undefined ? (vendor_id || null) : order.vendor_id,
+          vendor_description !== undefined ? (vendor_description || null) : order.vendor_description,
+          id,
+        ]
+      );
+
+      return res.status(200).json({ success: true });
+    }
+
+    // ── DELETE — full ledger rollback ────────────────────────────────────────
+    if (req.method === 'DELETE') {
+      const orderId = req.query.id as string;
+      if (!orderId) return res.status(400).json({ error: 'id required' });
+
+      const [orderRows]: any = await pool.query(
+        'SELECT * FROM erp_iptv_purchase_orders WHERE id=? LIMIT 1', [orderId]
+      );
+      if (!Array.isArray(orderRows) || !orderRows.length)
+        return res.status(404).json({ error: 'Order not found' });
+      const order = orderRows[0];
+
+      // Reverse purchase double-entry (DR expense + CR liability)
+      await pool.query('DELETE FROM erp_transactions WHERE voucher_ref=?', [order.voucher_ref]);
+
+      // If already paid, also reverse the payment double-entry (DR liability + CR asset)
+      if (order.status === 'paid' && order.payment_voucher_ref) {
+        await pool.query('DELETE FROM erp_transactions WHERE voucher_ref=?', [order.payment_voucher_ref]);
+      }
+
+      // Restore server inventory
+      await pool.query(
+        'UPDATE erp_iptv_servers SET available_credits = available_credits - ? WHERE id = ?',
+        [Number(order.credits_purchased), order.server_id]
+      );
+
+      await pool.query('DELETE FROM erp_iptv_purchase_orders WHERE id=?', [orderId]);
+
+      return res.status(200).json({ success: true });
     }
 
     // ── PUT — settle / mark purchase order as paid ───────────────────────────
@@ -151,7 +238,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const finalAmt = parseFloat(order.total_amount);
 
-      // Resolve payment source COA
       let paymentSourceName = 'Cash In Hand';
       if (payment_coa_id) {
         const [coaRow]: any = await pool.query(
@@ -181,7 +267,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const payVoucher = `IPTV-PAY-${id}-${Date.now()}`;
       const memo = order.vendor_description || `PO #${id} vendor payment — ${order.server_name}`;
 
-      // DR IPTV Vendor Payable (liability settles / decreases) + CR Cash/Bank (asset decreases)
+      // DR IPTV Vendor Payable (liability↓) + CR Cash/Bank (asset↓)
       const drAccId = await getOrCreateAccount('IPTV Vendor Payable');
       const crAccId = await getOrCreateAccount(paymentSourceName);
       const drCoaId = await getOrCreateCOA('IPTV Vendor Payable', 'liability');
@@ -198,7 +284,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         [crAccId, 'credit', finalAmt, `CR ${paymentSourceName} — ${memo}`, 'iptv_payment', crCoaId, payVoucher]
       );
 
-      await pool.query(`UPDATE erp_iptv_purchase_orders SET status='paid' WHERE id=?`, [id]);
+      await pool.query(
+        `UPDATE erp_iptv_purchase_orders SET status='paid', payment_voucher_ref=? WHERE id=?`,
+        [payVoucher, id]
+      );
 
       return res.status(200).json({ success: true, payVoucher });
     }

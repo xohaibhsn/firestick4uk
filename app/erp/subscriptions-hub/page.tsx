@@ -3,8 +3,13 @@ import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
 interface Server        { id:number; server_name:string; available_credits:number; }
-interface PurchaseOrder { id:number; server_id:number; server_name:string; credits_purchased:number; cost_per_credit:number; total_amount:number; status:'pending_payable'|'paid'; voucher_ref:string; vendor_description:string; created_at:string; }
-interface SaleLog       { id:number; server_id:number; server_name:string; employee_id:number; employee_name:string; credits_sold:number; price_per_credit:number; total_revenue:number; voucher_ref:string; created_at:string; }
+interface PurchaseOrder {
+  id:number; server_id:number; server_name:string;
+  credits_purchased:number; cost_per_credit:number; total_amount:number;
+  status:'pending_payable'|'paid'; voucher_ref:string; vendor_description:string;
+  vendor_id:number|null; vendor_name:string|null; created_at:string;
+}
+interface SaleLog { id:number; server_id:number; server_name:string; employee_id:number; employee_name:string; credits_sold:number; price_per_credit:number; total_revenue:number; voucher_ref:string; created_at:string; }
 
 const fmt  = (n:number) => `Rs. ${Math.abs(Math.round(n)).toLocaleString("en-PK")}`;
 const fmtD = (s:string) => new Date(s).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
@@ -17,26 +22,27 @@ const SERVER_COLORS = [
   {bg:"#DBEAFE",border:"#BFDBFE",text:"#1E3A8A",accent:"#2563EB"},
 ];
 
-export default function IptvHubPage() {
+export default function SubscriptionsHubPage() {
   return (
-    <ERPLayout title="📡 IPTV Hub" active="iptv-hub">
+    <ERPLayout title="📡 Subscriptions Hub" active="subscriptions-hub">
       {(user) => user.role === "admin"
-        ? <IptvHubContent user={user} />
+        ? <SubscriptionsHubContent user={user} />
         : <div style={{padding:40,textAlign:"center",color:"#888"}}>⛔ Admin access only</div>}
     </ERPLayout>
   );
 }
 
-function IptvHubContent({ user }: { user:any }) {
-  const [servers,    setServers]    = useState<Server[]>([]);
-  const [orders,     setOrders]     = useState<PurchaseOrder[]>([]);
-  const [salesLogs,  setSalesLogs]  = useState<SaleLog[]>([]);
-  const [employees,  setEmployees]  = useState<any[]>([]);
+function SubscriptionsHubContent({ user }: { user:any }) {
+  const [servers,       setServers]       = useState<Server[]>([]);
+  const [orders,        setOrders]        = useState<PurchaseOrder[]>([]);
+  const [salesLogs,     setSalesLogs]     = useState<SaleLog[]>([]);
+  const [employees,     setEmployees]     = useState<any[]>([]);
+  const [vendors,       setVendors]       = useState<any[]>([]);
   const [assetAccounts, setAssetAccounts] = useState<any[]>([]);
   const [msg, setMsg] = useState("");
 
   // ── Purchase form ──────────────────────────────────────────────────────────
-  const [pForm, setPForm] = useState({ server_id:"", credits_purchased:"", cost_per_credit:"", vendor_description:"" });
+  const [pForm, setPForm] = useState({ server_id:"", credits_purchased:"", cost_per_credit:"", vendor_description:"", vendor_id:"" });
   const [pSaving, setPSaving] = useState(false);
 
   // ── Sales form ─────────────────────────────────────────────────────────────
@@ -49,6 +55,12 @@ function IptvHubContent({ user }: { user:any }) {
   const [payCoaId,    setPayCoaId]    = useState("");
   const [paySaving,   setPaySaving]   = useState(false);
   const [payErr,      setPayErr]      = useState("");
+
+  // ── Edit order modal ───────────────────────────────────────────────────────
+  const [editOrder,   setEditOrder]   = useState<PurchaseOrder|null>(null);
+  const [editForm,    setEditForm]    = useState({ credits_purchased:"", cost_per_credit:"", vendor_id:"", vendor_description:"" });
+  const [editSaving,  setEditSaving]  = useState(false);
+  const [editErr,     setEditErr]     = useState("");
 
   // ── Active table view ──────────────────────────────────────────────────────
   const [tableView, setTableView] = useState<"orders"|"sales">("orders");
@@ -63,8 +75,10 @@ function IptvHubContent({ user }: { user:any }) {
     setServers(inv.servers||[]);
     setOrders(inv.orders||[]);
     setSalesLogs(sl.logs||[]);
-    if (Array.isArray(emps)) setEmployees(emps.filter((e:any)=>e.active));
-    if (Array.isArray(coa))  setAssetAccounts(coa);
+    const allEmps = Array.isArray(emps) ? emps : [];
+    setEmployees(allEmps.filter((e:any) => e.active && e.role !== 'vendor'));
+    setVendors(allEmps.filter((e:any) => e.role === 'vendor'));
+    if (Array.isArray(coa)) setAssetAccounts(coa);
   };
 
   useEffect(()=>{ load(); },[]);
@@ -82,6 +96,11 @@ function IptvHubContent({ user }: { user:any }) {
     return (isNaN(c)||isNaN(p)||c<=0||p<=0) ? null : Math.round(c*p);
   })();
 
+  const editTotal = (() => {
+    const c=parseFloat(editForm.credits_purchased), p=parseFloat(editForm.cost_per_credit);
+    return (isNaN(c)||isNaN(p)||c<=0||p<=0) ? null : Math.round(c*p);
+  })();
+
   const selectedSaleServer = servers.find(s=>String(s.id)===sForm.server_id);
 
   // ── Actions ────────────────────────────────────────────────────────────────
@@ -91,7 +110,7 @@ function IptvHubContent({ user }: { user:any }) {
     const res = await fetch('/api/erp/iptv/purchases',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pForm)}).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
       flash(`✅ Payable recorded — ${fmt(res.totalAmount)} due (${res.voucherRef})`);
-      setPForm({server_id:'',credits_purchased:'',cost_per_credit:'',vendor_description:''});
+      setPForm({server_id:'',credits_purchased:'',cost_per_credit:'',vendor_description:'',vendor_id:''});
       load();
     } else { flash(`❌ ${res.error||'Failed to record'}`); }
     setPSaving(false);
@@ -121,9 +140,38 @@ function IptvHubContent({ user }: { user:any }) {
     setPaySaving(false);
   };
 
-  const pendingCount   = orders.filter(o=>o.status==='pending_payable').length;
-  const totalRevenue   = salesLogs.reduce((s,l)=>s+Number(l.total_revenue),0);
-  const totalPending   = orders.filter(o=>o.status==='pending_payable').reduce((s,o)=>s+Number(o.total_amount),0);
+  const submitEdit = async () => {
+    if (!editOrder) return;
+    setEditSaving(true); setEditErr('');
+    const res = await fetch('/api/erp/iptv/purchases',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      id: editOrder.id,
+      credits_purchased: editForm.credits_purchased || undefined,
+      cost_per_credit:   editForm.cost_per_credit   || undefined,
+      vendor_id:         editForm.vendor_id          || null,
+      vendor_description: editForm.vendor_description,
+    })}).then(r=>r.json()).catch(()=>({}));
+    if (res.success) {
+      flash(`✅ Order #${editOrder.id} updated`);
+      setEditOrder(null); setEditErr(''); load();
+    } else { setEditErr(res.error||'Update failed'); }
+    setEditSaving(false);
+  };
+
+  const submitDelete = async (order: PurchaseOrder) => {
+    const warn = order.status === 'paid'
+      ? ' This will also reverse the payment entry from the ledger.'
+      : ' This will reverse the payable entry from the ledger.';
+    if (!window.confirm(`Delete PO #${order.id} (${order.server_name} — ${fmt(Number(order.total_amount))})?${warn}`)) return;
+    const res = await fetch(`/api/erp/iptv/purchases?id=${order.id}`,{method:'DELETE'}).then(r=>r.json()).catch(()=>({}));
+    if (res.success) {
+      flash(`✅ Order #${order.id} deleted — ledger entries reversed`);
+      load();
+    } else { flash(`❌ ${res.error||'Delete failed'}`); }
+  };
+
+  const pendingCount = orders.filter(o=>o.status==='pending_payable').length;
+  const totalRevenue = salesLogs.reduce((s,l)=>s+Number(l.total_revenue),0);
+  const totalPending = orders.filter(o=>o.status==='pending_payable').reduce((s,o)=>s+Number(o.total_amount),0);
 
   return (
     <div style={{paddingBottom:60}}>
@@ -197,6 +245,16 @@ function IptvHubContent({ user }: { user:any }) {
             <select className="erp-select" value={pForm.server_id} onChange={e=>setPForm(f=>({...f,server_id:e.target.value}))}>
               <option value="">— Select server —</option>
               {servers.map(s=><option key={s.id} value={s.id}>{s.server_name} ({s.available_credits.toLocaleString()} in stock)</option>)}
+            </select>
+          </div>
+
+          <div className="erp-field">
+            <label>Vendor (Optional)</label>
+            <select className="erp-select" value={pForm.vendor_id} onChange={e=>setPForm(f=>({...f,vendor_id:e.target.value}))}>
+              <option value="">— No vendor assigned —</option>
+              {vendors.length === 0
+                ? <option disabled value="">No vendor accounts registered</option>
+                : vendors.map((v:any)=><option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </div>
 
@@ -278,7 +336,6 @@ function IptvHubContent({ user }: { user:any }) {
             </select>
           </div>
 
-          {/* Projection preview */}
           {sTotal !== null && sForm.destination_account_id && (
             <div style={{marginBottom:14,padding:"12px 14px",background:"rgba(22,163,74,0.05)",border:"1px solid rgba(22,163,74,0.2)",borderRadius:9}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
@@ -350,7 +407,7 @@ function IptvHubContent({ user }: { user:any }) {
             : <div className="erp-table-wrap">
                 <table>
                   <thead><tr>
-                    <th>Date</th><th>Server</th><th>Credits</th>
+                    <th>Date</th><th>Server</th><th>Vendor</th><th>Credits</th>
                     <th>Rate</th><th>Total</th><th>Status</th><th>Voucher</th><th>Action</th>
                   </tr></thead>
                   <tbody>
@@ -358,6 +415,7 @@ function IptvHubContent({ user }: { user:any }) {
                       <tr key={o.id}>
                         <td style={{color:"#888",fontSize:12}}>{fmtD(o.created_at)}</td>
                         <td style={{fontWeight:600}}>{o.server_name}</td>
+                        <td style={{color:o.vendor_name?"#333":"#BBB",fontSize:12}}>{o.vendor_name||"—"}</td>
                         <td style={{fontWeight:700,color:"#5B21B6"}}>{Number(o.credits_purchased).toLocaleString()}</td>
                         <td style={{color:"#888"}}>Rs. {Number(o.cost_per_credit).toLocaleString()}</td>
                         <td style={{fontWeight:700}}>{fmt(Number(o.total_amount))}</td>
@@ -368,12 +426,28 @@ function IptvHubContent({ user }: { user:any }) {
                         </td>
                         <td style={{fontFamily:"monospace",fontSize:10,color:"#AAA"}}>{o.voucher_ref}</td>
                         <td>
-                          {o.status==="pending_payable"&&(
+                          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                            {o.status==="pending_payable" && (
+                              <button
+                                onClick={()=>{setPayingOrder(o);setPayCoaId('');setPayErr('');}}
+                                style={{background:"#DCFCE7",border:"1px solid #BBF7D0",color:"#166534",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}
+                              >💳 Pay</button>
+                            )}
+                            {o.status==="pending_payable" && (
+                              <button
+                                onClick={()=>{
+                                  setEditOrder(o);
+                                  setEditForm({credits_purchased:String(o.credits_purchased),cost_per_credit:String(o.cost_per_credit),vendor_id:o.vendor_id?String(o.vendor_id):'',vendor_description:o.vendor_description||''});
+                                  setEditErr('');
+                                }}
+                                style={{background:"#EDE9FE",border:"1px solid #DDD6FE",color:"#5B21B6",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}
+                              >✏️ Edit</button>
+                            )}
                             <button
-                              onClick={()=>{setPayingOrder(o);setPayCoaId('');setPayErr('');}}
-                              style={{background:"#DCFCE7",border:"1px solid #BBF7D0",color:"#166534",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}
-                            >💳 Pay</button>
-                          )}
+                              onClick={()=>submitDelete(o)}
+                              style={{background:"#FEE2E2",border:"1px solid #FECACA",color:"#DC2626",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}
+                            >🗑️</button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -410,7 +484,7 @@ function IptvHubContent({ user }: { user:any }) {
         )}
       </div>
 
-      {/* ── PAY ORDER MODAL ─────────────────────────────────────────────────────── */}
+      {/* ── PAY ORDER MODAL ────────────────────────────────────────────────────── */}
       {payingOrder && (
         <div className="erp-modal-overlay" onClick={()=>{setPayingOrder(null);setPayErr('');}}>
           <div className="erp-modal" onClick={e=>e.stopPropagation()}>
@@ -420,7 +494,8 @@ function IptvHubContent({ user }: { user:any }) {
               <div style={{fontSize:11,color:"#888",marginBottom:4}}>Order #{payingOrder.id} · {payingOrder.server_name} · {fmtD(payingOrder.created_at)}</div>
               <div style={{fontFamily:"'Cinzel',serif",fontSize:24,fontWeight:900,color:"#5B21B6"}}>{fmt(Number(payingOrder.total_amount))}</div>
               <div style={{fontSize:10,color:"#AAA",marginTop:4,fontFamily:"monospace"}}>{payingOrder.voucher_ref}</div>
-              {payingOrder.vendor_description && <div style={{fontSize:12,color:"#666",marginTop:5}}>{payingOrder.vendor_description}</div>}
+              {payingOrder.vendor_name && <div style={{fontSize:12,color:"#5B21B6",marginTop:5,fontWeight:600}}>Vendor: {payingOrder.vendor_name}</div>}
+              {payingOrder.vendor_description && <div style={{fontSize:12,color:"#666",marginTop:3}}>{payingOrder.vendor_description}</div>}
             </div>
 
             <div className="erp-field">
@@ -449,6 +524,66 @@ function IptvHubContent({ user }: { user:any }) {
                 style={{background:"#16A34A",color:"#fff",border:"none",borderRadius:8,padding:"10px 20px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",opacity:(paySaving||!payCoaId)?0.5:1}}
               >
                 {paySaving?"Processing…":"✓ Confirm Payment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── EDIT ORDER MODAL ───────────────────────────────────────────────────── */}
+      {editOrder && (
+        <div className="erp-modal-overlay" onClick={()=>{setEditOrder(null);setEditErr('');}}>
+          <div className="erp-modal" onClick={e=>e.stopPropagation()}>
+            <div className="erp-modal-title">✏️ Edit Purchase Order</div>
+
+            <div style={{marginBottom:18,padding:"12px 14px",background:"#F9F9F9",border:"1px solid #E5E5E5",borderRadius:10}}>
+              <div style={{fontSize:11,color:"#888"}}>PO #{editOrder.id} · {editOrder.server_name}</div>
+              <div style={{fontSize:10,color:"#AAA",marginTop:3,fontFamily:"monospace"}}>{editOrder.voucher_ref}</div>
+            </div>
+
+            <div className="erp-grid-2">
+              <div className="erp-field">
+                <label>Credits Purchased *</label>
+                <input type="number" className="erp-input" min="1" value={editForm.credits_purchased} onChange={e=>setEditForm(f=>({...f,credits_purchased:e.target.value}))} />
+              </div>
+              <div className="erp-field">
+                <label>Cost / Credit (Rs.) *</label>
+                <input type="number" className="erp-input" step="0.01" min="0.01" value={editForm.cost_per_credit} onChange={e=>setEditForm(f=>({...f,cost_per_credit:e.target.value}))} />
+              </div>
+            </div>
+
+            {editTotal !== null && (
+              <div style={{marginBottom:14,padding:"10px 14px",background:"rgba(91,33,182,0.05)",border:"1px solid rgba(91,33,182,0.18)",borderRadius:9,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:12,color:"#5B21B6",fontWeight:600}}>New Total</span>
+                <span style={{fontFamily:"'Cinzel',serif",fontSize:19,fontWeight:900,color:"#5B21B6"}}>{fmt(editTotal)}</span>
+              </div>
+            )}
+
+            <div className="erp-field">
+              <label>Vendor (Optional)</label>
+              <select className="erp-select" value={editForm.vendor_id} onChange={e=>setEditForm(f=>({...f,vendor_id:e.target.value}))}>
+                <option value="">— No vendor assigned —</option>
+                {vendors.map((v:any)=><option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </div>
+
+            <div className="erp-field">
+              <label>Vendor Note</label>
+              <input type="text" className="erp-input" value={editForm.vendor_description} onChange={e=>setEditForm(f=>({...f,vendor_description:e.target.value}))} />
+            </div>
+
+            {editErr && (
+              <div style={{marginBottom:12,padding:"10px 13px",background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:9,fontSize:13,color:"#DC2626",fontWeight:500}}>{editErr}</div>
+            )}
+
+            <div className="erp-modal-actions">
+              <button onClick={()=>{setEditOrder(null);setEditErr('');}} className="erp-btn erp-btn-outline">Cancel</button>
+              <button
+                onClick={submitEdit}
+                disabled={editSaving||!editForm.credits_purchased||!editForm.cost_per_credit}
+                style={{background:"#5B21B6",color:"#fff",border:"none",borderRadius:8,padding:"10px 20px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",opacity:(editSaving||!editForm.credits_purchased||!editForm.cost_per_credit)?0.5:1}}
+              >
+                {editSaving?"Saving…":"✓ Save Changes"}
               </button>
             </div>
           </div>
