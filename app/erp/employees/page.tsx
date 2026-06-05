@@ -12,6 +12,7 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
   const [managers, setManagers] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
   const [modal, setModal] = useState<any>(null);
+  const [vendorMode, setVendorMode] = useState(false);
   const [form, setForm] = useState({ name:"", email:"", password:"", role:"employee", department:"", salary:"", joining_date:"", reports_to:"" });
   const [msg, setMsg] = useState("");
 
@@ -22,10 +23,21 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
   };
   useEffect(()=>{ load(); },[]);
 
-  const openNew = () => { setForm({name:"",email:"",password:"",role:"employee",department:"",salary:"",joining_date:"",reports_to:""}); setModal("new"); setMsg(""); };
-  const openEdit = (e:any) => { setForm({name:e.name,email:e.email,password:"",role:e.role,department:e.department||"",salary:e.salary||"",joining_date:e.joining_date||"",reports_to:e.reports_to||""}); setModal(e); setMsg(""); };
+  const openNew = () => { setForm({name:"",email:"",password:"",role:"employee",department:"",salary:"",joining_date:"",reports_to:""}); setModal("new"); setVendorMode(false); setMsg(""); };
+  const openEdit = (e:any) => { setForm({name:e.name,email:e.email,password:"",role:e.role,department:e.department||"",salary:e.salary||"",joining_date:e.joining_date||"",reports_to:e.reports_to||""}); setModal(e); setVendorMode(false); setMsg(""); };
 
   const save = async () => {
+    if (modal === "new" && vendorMode) {
+      if (!form.name || !form.email || !form.password) { setMsg("❌ Name, email and password required"); return; }
+      const res = await fetch("/api/erp/employees", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ name: form.name, email: form.email, password: form.password, role: "vendor", department:"", salary:"0", joining_date:"", reports_to:"" })
+      }).then(r=>r.json()).catch(()=>({}));
+      if (res.success) { setModal(null); setVendorMode(false); load(); }
+      else setMsg(`❌ ${res.error||"Failed"}`);
+      return;
+    }
     if (!form.name||!form.email) { setMsg("❌ Name and email required"); return; }
     let res;
     if (modal==="new") {
@@ -34,7 +46,7 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
     } else {
       res = await fetch("/api/erp/employees",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,id:modal.id,active:1})}).then(r=>r.json()).catch(()=>({}));
     }
-    if (res.success) { setModal(null); load(); } else setMsg(`❌ ${res.error||"Failed"}`);
+    if (res.success) { setModal(null); setVendorMode(false); load(); } else setMsg(`❌ ${res.error||"Failed"}`);
   };
 
   const deactivate = async (id:number) => {
@@ -87,44 +99,72 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
         <div className="erp-modal-overlay">
           <div className="erp-modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="erp-modal-title">{modal==="new"?"Add User":"Edit User"}</div>
-            {msg && <div style={{marginBottom:12,color:"#ff8888",fontSize:13}}>{msg}</div>}
-            <div className="erp-grid-2">
-              <div className="erp-field"><label>Full Name *</label><input className="erp-input" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="John Smith" /></div>
-              <div className="erp-field"><label>Email *</label><input className="erp-input" type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="john@example.com" /></div>
-            </div>
-            <div className="erp-grid-2">
-              <div className="erp-field"><label>{modal==="new"?"Password *":"New Password (leave blank)"}</label><input className="erp-input" type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder="Password" /></div>
-              <div className="erp-field">
-                <label>Role</label>
-                <select className="erp-select" value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value,reports_to:""}))}>
-                  <option value="employee">Employee</option>
-                  <option value="manager">Manager</option>
-                  <option value="admin">Admin</option>
-                  <option value="vendor">Vendor</option>
-                </select>
+            {modal === "new" && (
+              <div style={{display:"flex",gap:8,marginBottom:16}}>
+                <button
+                  type="button"
+                  onClick={()=>{ setVendorMode(false); setMsg(""); }}
+                  style={{flex:1,padding:"8px 0",borderRadius:6,border:"none",cursor:"pointer",fontWeight:600,fontSize:13,background:!vendorMode?"#5B21B6":"#F5F5F5",color:!vendorMode?"#fff":"#222"}}
+                >👥 Staff / Employee</button>
+                <button
+                  type="button"
+                  onClick={()=>{ setVendorMode(true); setMsg(""); }}
+                  style={{flex:1,padding:"8px 0",borderRadius:6,border:"none",cursor:"pointer",fontWeight:600,fontSize:13,background:vendorMode?"#5B21B6":"#F5F5F5",color:vendorMode?"#fff":"#222"}}
+                >🏢 Vendor</button>
               </div>
-            </div>
-            <div className="erp-grid-2">
-              <div className="erp-field"><label>Department</label><select className="erp-select" value={form.department} onChange={e=>setForm(f=>({...f,department:e.target.value}))}>{depts.map(d=><option key={d} value={d}>{d||"— Select —"}</option>)}</select></div>
-              <div className="erp-field"><label>Monthly Salary (Rs.)</label><input className="erp-input" type="number" value={form.salary} onChange={e=>setForm(f=>({...f,salary:e.target.value}))} placeholder="0.00" /></div>
-            </div>
-            <div className="erp-grid-2">
-              <div className="erp-field"><label>Joining Date</label><input className="erp-input" type="date" value={form.joining_date} onChange={e=>setForm(f=>({...f,joining_date:e.target.value}))} /></div>
-              {form.role !== "admin" && (
-                <div className="erp-field">
-                  <label>Reports To {form.role==="manager"?"(Admin)":"(Manager/Admin)"}</label>
-                  <select className="erp-select" value={form.reports_to} onChange={e=>setForm(f=>({...f,reports_to:e.target.value}))}>
-                    <option value="">— None —</option>
-                    {reportsToOptions.map((m:any)=>(
-                      <option key={m.id} value={m.id}>{m.name} ({m.role})</option>
-                    ))}
-                  </select>
+            )}
+            {msg && <div style={{marginBottom:12,color:"#ff8888",fontSize:13}}>{msg}</div>}
+            {vendorMode && modal === "new" ? (
+              <>
+                <div className="erp-grid-2">
+                  <div className="erp-field"><label>Full Name *</label><input className="erp-input" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="John Smith" /></div>
+                  <div className="erp-field"><label>Email *</label><input className="erp-input" type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="john@example.com" /></div>
                 </div>
-              )}
-            </div>
+                <div className="erp-grid-2">
+                  <div className="erp-field"><label>Password *</label><input className="erp-input" type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder="Password" /></div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="erp-grid-2">
+                  <div className="erp-field"><label>Full Name *</label><input className="erp-input" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="John Smith" /></div>
+                  <div className="erp-field"><label>Email *</label><input className="erp-input" type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="john@example.com" /></div>
+                </div>
+                <div className="erp-grid-2">
+                  <div className="erp-field"><label>{modal==="new"?"Password *":"New Password (leave blank)"}</label><input className="erp-input" type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder="Password" /></div>
+                  <div className="erp-field">
+                    <label>Role</label>
+                    <select className="erp-select" value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value,reports_to:""}))}>
+                      <option value="employee">Employee</option>
+                      <option value="manager">Manager</option>
+                      <option value="admin">Admin</option>
+                      <option value="vendor">Vendor</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="erp-grid-2">
+                  <div className="erp-field"><label>Department</label><select className="erp-select" value={form.department} onChange={e=>setForm(f=>({...f,department:e.target.value}))}>{depts.map(d=><option key={d} value={d}>{d||"— Select —"}</option>)}</select></div>
+                  <div className="erp-field"><label>Monthly Salary (Rs.)</label><input className="erp-input" type="number" value={form.salary} onChange={e=>setForm(f=>({...f,salary:e.target.value}))} placeholder="0.00" /></div>
+                </div>
+                <div className="erp-grid-2">
+                  <div className="erp-field"><label>Joining Date</label><input className="erp-input" type="date" value={form.joining_date} onChange={e=>setForm(f=>({...f,joining_date:e.target.value}))} /></div>
+                  {form.role !== "admin" && (
+                    <div className="erp-field">
+                      <label>Reports To {form.role==="manager"?"(Admin)":"(Manager/Admin)"}</label>
+                      <select className="erp-select" value={form.reports_to} onChange={e=>setForm(f=>({...f,reports_to:e.target.value}))}>
+                        <option value="">— None —</option>
+                        {reportsToOptions.map((m:any)=>(
+                          <option key={m.id} value={m.id}>{m.name} ({m.role})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
             <div className="erp-modal-actions">
-              <button className="erp-btn erp-btn-outline" onClick={()=>setModal(null)}>Cancel</button>
-              <button className="erp-btn erp-btn-primary" onClick={save}>{modal==="new"?"Add User":"Save Changes"}</button>
+              <button className="erp-btn erp-btn-outline" onClick={()=>{ setModal(null); setVendorMode(false); }}>Cancel</button>
+              <button className="erp-btn erp-btn-primary" onClick={save}>{modal==="new" && vendorMode ? "Add Vendor" : modal==="new" ? "Add User" : "Save Changes"}</button>
             </div>
           </div>
         </div>
