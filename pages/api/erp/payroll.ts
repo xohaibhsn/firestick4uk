@@ -172,7 +172,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!existingTxn.length) {
         await pool.query(
           'INSERT INTO erp_transactions (account_id,type,amount,description,reference_type,reference_id,created_by) VALUES (?,?,?,?,?,?,?)',
-          [accountId, 'credit', pr.net_pay, `Salary for ${pr.month_year}`, 'payroll', id, created_by||null]
+          [accountId, 'credit', pr.net_pay, `Salary for ${pr.month_year} — (Accrued/Pending Payment)`, 'payroll', id, created_by||null]
         );
       }
 

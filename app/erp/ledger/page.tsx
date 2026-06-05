@@ -151,12 +151,12 @@ function LedgerContent({ user }: { user: any }) {
               <div style={{fontSize:10,color:"#EF4444",marginTop:2}}>Credit (Cr)</div>
             </div>
             <div style={{background:"#DCFCE7",border:"1px solid #BBF7D0",borderRadius:12,padding:"14px 16px"}}>
-              <div style={{fontSize:11,color:"#16A34A",fontWeight:600,letterSpacing:"0.5px",marginBottom:4}}>↓ TOTAL YOU GOT</div>
+              <div style={{fontSize:11,color:"#16A34A",fontWeight:600,letterSpacing:"0.5px",marginBottom:4}}>↓ TOTAL PAYABLE</div>
               <div style={{fontSize:18,fontWeight:800,color:"#16A34A"}}>{fmt(totalGot)}</div>
               <div style={{fontSize:10,color:"#22C55E",marginTop:2}}>Debit (Dr)</div>
             </div>
             <div style={{background:"#EDE9FE",border:"1px solid #DDD6FE",borderRadius:12,padding:"14px 16px"}}>
-              <div style={{fontSize:11,color:"#5B21B6",fontWeight:600,letterSpacing:"0.5px",marginBottom:4}}>⚖️ NET BALANCE</div>
+              <div style={{fontSize:11,color:"#5B21B6",fontWeight:600,letterSpacing:"0.5px",marginBottom:4}}>⚖️ NET PAYABLE</div>
               <div style={{fontSize:18,fontWeight:800,color:netBal>=0?"#16A34A":"#DC2626"}}>{fmt(Math.abs(netBal))}</div>
               <div style={{fontSize:10,color:netBal>=0?"#16A34A":"#DC2626",marginTop:2}}>{netBal>=0?"Co. owes employee":"Employee owes co."}</div>
             </div>
