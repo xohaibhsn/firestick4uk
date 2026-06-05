@@ -89,6 +89,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [crAccId, 'credit', finalAmt, `CR ${creditName} — ${memo}`, 'cash_injection', crCoaId, voucherRef]
     );
 
+    // Row 3 (loan only): mirror the loan into Zohaib's personal employee ledger so the
+    // amount shows in his individual profile statement as a credit the company owes him back
+    if (injection_type === 'loan') {
+      try {
+        const [zhUser]: any = await pool.query(
+          `SELECT id, name FROM erp_users
+           WHERE (name LIKE '%Zohaib%' OR email LIKE '%zohaib%') AND role='admin'
+           LIMIT 1`
+        );
+        if (Array.isArray(zhUser) && zhUser.length) {
+          const zhUserId: number = zhUser[0].id;
+          const zhName: string   = zhUser[0].name;
+
+          // Find or create the personal employee ledger account for Zohaib
+          const [zhAcc]: any = await pool.query(
+            `SELECT id FROM erp_accounts WHERE reference_id=? AND type='employee' LIMIT 1`,
+            [zhUserId]
+          );
+          let zhAccId: number;
+          if (Array.isArray(zhAcc) && zhAcc.length) {
+            zhAccId = zhAcc[0].id;
+          } else {
+            const [ins]: any = await pool.query(
+              `INSERT INTO erp_accounts (name, type, reference_id, opening_balance) VALUES (?, 'employee', ?, 0)`,
+              [zhName, zhUserId]
+            );
+            zhAccId = ins.insertId;
+          }
+
+          // Credit his ledger — the company now owes him this loan amount
+          await pool.query(
+            `INSERT INTO erp_transactions
+             (account_id,type,amount,description,reference_type,voucher_ref)
+             VALUES (?,?,?,?,?,?)`,
+            [zhAccId, 'credit', finalAmt,
+             memo || 'Director Capital Infusion / Operational Loan from Zohaib Hassan',
+             'cash_injection', voucherRef]
+          );
+        }
+      } catch (_) {
+        // Non-fatal: personal ledger mirror is best-effort; main COA entries already committed
+      }
+    }
+
     return res.status(200).json({ success: true, voucherRef });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
