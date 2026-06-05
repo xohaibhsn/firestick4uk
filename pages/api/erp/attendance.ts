@@ -7,18 +7,21 @@ const LEAVE_MAP: Record<string,string> = {
 const LEAVE_LIMITS: Record<string,number> = { sick:10, annual:14, emergency:3 };
 
 /**
- * When an admin changes attendance FROM a leave status to present/absent/weekly_off,
- * cancel the auto-created single-day leave record so quota is restored.
+ * Cancel ALL approved leave records that cover a specific date for an employee.
+ * This handles both:
+ *   (a) auto-created single-day leaves (from_date = to_date = date)
+ *   (b) employee-submitted leave requests approved via the Leave form
+ *
+ * Called when admin overrides attendance to weekly_off / present / absent,
+ * regardless of what the attendance row's previous status was.
  */
-async function cancelLeaveForDate(employee_id: number, date: string, old_status: string): Promise<void> {
-  const leaveType = LEAVE_MAP[old_status];
-  if (!leaveType) return; // old status wasn't a leave — nothing to cancel
-
-  // Only cancel single-day auto-created leaves (from_date = to_date = date)
+async function cancelLeaveForDate(employee_id: number, date: string, old_status?: string): Promise<void> {
+  // Cancel any approved leave where this date falls within the leave range
   await pool.query(
     `UPDATE erp_leaves SET status='cancelled'
-     WHERE employee_id=? AND leave_type=? AND from_date=? AND to_date=? AND status='approved'`,
-    [employee_id, leaveType, date, date]
+     WHERE employee_id=? AND status='approved'
+       AND from_date <= ? AND to_date >= ?`,
+    [employee_id, date, date]
   );
 }
 
@@ -183,13 +186,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           );
         }
 
-        // If overwriting an existing leave status with a non-leave status, cancel the leave
-        if (existing.length) {
-          const [prevRow]: any = await pool.query('SELECT status FROM erp_attendance WHERE id=?', [existing[0].id]);
-          const prevStatus = prevRow[0]?.status;
-          if (LEAVE_MAP[prevStatus] && !LEAVE_MAP[status]) {
-            await cancelLeaveForDate(Number(employee_id), date, prevStatus);
-          }
+        // If new status is non-leave, cancel any approved leave records for this date
+        // (covers both attendance-tagged leaves AND employee form-submitted approved leaves)
+        if (!LEAVE_MAP[status]) {
+          await cancelLeaveForDate(Number(employee_id), date);
         }
 
         const result = await handleLeaveQuota(Number(employee_id), date, status, admin_note||'');
@@ -218,13 +218,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               [rec.employee_id, date, rec.status, rec.admin_note||'', marked_by||null]
             );
           }
-          // Cancel leave if overwriting a leave status with non-leave
-          if (existing.length) {
-            const [prevRow]: any = await pool.query('SELECT status FROM erp_attendance WHERE id=?', [existing[0].id]);
-            const prevStatus = prevRow[0]?.status;
-            if (LEAVE_MAP[prevStatus] && !LEAVE_MAP[rec.status]) {
-              await cancelLeaveForDate(Number(rec.employee_id), date, prevStatus);
-            }
+          // Cancel any approved leave records if new status is non-leave
+          if (!LEAVE_MAP[rec.status]) {
+            await cancelLeaveForDate(Number(rec.employee_id), date);
           }
           const result = await handleLeaveQuota(rec.employee_id, date, rec.status, rec.admin_note||'');
           if (result.warning) warnings.push(`${rec.employee_id}: ${result.warning}`);
@@ -258,10 +254,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Status changed TO a leave type → create/update leave quota
           const result = await handleLeaveQuota(old.employee_id, old.date, status, admin_note||'');
           warning = result.warning;
-        } else if (LEAVE_MAP[old.status]) {
-          // Status changed FROM a leave type (→ present/absent/weekly_off etc.) → cancel leave & restore quota
-          await cancelLeaveForDate(old.employee_id, old.date, old.status);
-          warning = null;
+        } else {
+          // Status changed to a non-leave type (weekly_off, present, absent, etc.)
+          // Cancel ANY approved leave record covering this date — regardless of old attendance status.
+          // This covers both: attendance-tagged leaves AND employee-form-submitted approved leaves.
+          await cancelLeaveForDate(old.employee_id, old.date);
         }
       }
 
