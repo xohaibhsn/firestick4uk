@@ -192,6 +192,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (mark_paid) {
         const finalAmt = Number(amount) || 0;
+
+        // ── Step 1: resolve payment source BEFORE any writes ──────────────────
+        let paymentSourceName = 'Cash In Hand';
+        if (payment_coa_id) {
+          const [coaRow]: any = await pool.query(
+            `SELECT account_name FROM erp_chart_of_accounts WHERE id=? LIMIT 1`, [payment_coa_id]
+          );
+          if (Array.isArray(coaRow) && coaRow.length) paymentSourceName = coaRow[0].account_name;
+        }
+
+        // ── Step 2: real-time balance guard ───────────────────────────────────
+        const [srcBal]: any = await pool.query(`
+          SELECT COALESCE(a.opening_balance, 0) + COALESCE(
+            SUM(CASE WHEN t.type='debit' THEN t.amount WHEN t.type='credit' THEN -t.amount ELSE 0 END), 0
+          ) AS balance
+          FROM erp_chart_of_accounts c
+          LEFT JOIN erp_accounts a ON a.name = c.account_name AND a.type = 'company'
+          LEFT JOIN erp_transactions t ON t.coa_id = c.id
+          WHERE c.account_name = ?
+          GROUP BY c.id, a.opening_balance
+        `, [paymentSourceName]);
+        const availableBalance = Array.isArray(srcBal) && srcBal.length ? Number(srcBal[0]?.balance ?? 0) : 0;
+
+        if (availableBalance < finalAmt) {
+          return res.status(400).json({
+            error: `Insufficient Funds! ${paymentSourceName} has Rs. ${Math.round(availableBalance).toLocaleString()} available but Rs. ${Math.round(finalAmt).toLocaleString()} is required. Please inject funds (Sales/Loan) via the Ledger to process this payment.`,
+          });
+        }
+
+        // ── Step 3: mark paid + write double-entry ────────────────────────────
         await pool.query(
           `UPDATE erp_office_expenses SET status='paid', amount=?, paid_by=?, date=CURDATE() WHERE id=?`,
           [finalAmt, paid_by || '', id]
@@ -203,15 +233,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Resolve expense COA head from category
         const expenseHeadName = categoryToExpenseHead(exp.category || '');
-
-        // Resolve payment source from COA (defaults to Cash In Hand)
-        let paymentSourceName = 'Cash In Hand';
-        if (payment_coa_id) {
-          const [coaRow]: any = await pool.query(
-            `SELECT account_name FROM erp_chart_of_accounts WHERE id=? LIMIT 1`, [payment_coa_id]
-          );
-          if (Array.isArray(coaRow) && coaRow.length) paymentSourceName = coaRow[0].account_name;
-        }
 
         // Ensure erp_accounts + COA rows exist for each head
         const [drAccId, crAccId] = await Promise.all([

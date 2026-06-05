@@ -51,6 +51,42 @@ function LedgerContent({ user }: { user: any }) {
   const [pnl, setPnl] = useState<any>(null);
   const [pnlLoading, setPnlLoading] = useState(false);
 
+  // Inject Funds
+  const [injectModal, setInjectModal]   = useState(false);
+  const [injectForm, setInjectForm]     = useState({ amount:"", injection_type:"loan", destination_account_id:"", description:"" });
+  const [injectSaving, setInjectSaving] = useState(false);
+  const [assetAccounts, setAssetAccounts] = useState<any[]>([]);
+  const [loanBalance, setLoanBalance]   = useState<number | null>(null);
+
+  const loadLoanBalance = async () => {
+    const d = await fetch('/api/erp/coa?balances=1&type=liability').then(r=>r.json()).catch(()=>[]);
+    if (Array.isArray(d)) {
+      const loan = d.find((a: any) => a.account_name === 'Zohaib Hassan Loan Account');
+      setLoanBalance(loan ? Number(loan.balance ?? 0) : 0);
+    }
+  };
+
+  const submitInject = async () => {
+    if (!injectForm.amount || !injectForm.destination_account_id) return;
+    setInjectSaving(true);
+    const res = await fetch('/api/erp/ledger/inject-funds', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(injectForm),
+    }).then(r=>r.json()).catch(()=>({}));
+    if (res.success) {
+      setMsg('✅ Funds injected successfully');
+      setInjectModal(false);
+      setInjectForm({ amount:'', injection_type:'loan', destination_account_id:'', description:'' });
+      loadLoanBalance();
+      if (activeView === 'pnl') loadPnl();
+    } else {
+      setMsg(`❌ ${res.error || 'Injection failed'}`);
+    }
+    setInjectSaving(false);
+    setTimeout(() => setMsg(''), 5000);
+  };
+
   useEffect(() => {
     fetch("/api/erp/employees").then(r=>r.json()).then(d=>{
       if (Array.isArray(d)) setEmployees(d.filter((e:any)=>e.active));
@@ -58,6 +94,10 @@ function LedgerContent({ user }: { user: any }) {
     fetch("/api/erp/ledger").then(r=>r.json()).then(d=>{
       if (Array.isArray(d)) setAccounts(d);
     }).catch(()=>{});
+    fetch('/api/erp/coa?type=asset').then(r=>r.json()).then((d:any[]) => {
+      if (Array.isArray(d)) setAssetAccounts(d);
+    }).catch(()=>{});
+    loadLoanBalance();
   }, []);
 
   const loadEmployee = async (empId: string) => {
@@ -194,17 +234,38 @@ function LedgerContent({ user }: { user: any }) {
 
       <div style={{paddingBottom:90}}>
 
-      {/* ── View Tabs ─────────────────────────────────────────────────────────── */}
-      <div style={{display:"flex",gap:3,background:"#EBEBEB",padding:3,borderRadius:10,marginBottom:16,width:"fit-content"}}>
-        <button
-          style={{padding:"8px 18px",borderRadius:7,border:"none",background:activeView==="ledger"?"#111111":"transparent",color:activeView==="ledger"?"#FFFFFF":"#666666",fontWeight:600,fontSize:13,cursor:"pointer",transition:"all 0.15s"}}
-          onClick={()=>setActiveView("ledger")}
-        >📒 Employee Ledger</button>
-        <button
-          style={{padding:"8px 18px",borderRadius:7,border:"none",background:activeView==="pnl"?"#111111":"transparent",color:activeView==="pnl"?"#FFFFFF":"#666666",fontWeight:600,fontSize:13,cursor:"pointer",transition:"all 0.15s"}}
-          onClick={()=>{ setActiveView("pnl"); if(!pnl) loadPnl(); }}
-        >📈 P&amp;L Statement</button>
+      {/* ── View Tabs + Inject Funds ─────────────────────────────────────────── */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:16}}>
+        <div style={{display:"flex",gap:3,background:"#EBEBEB",padding:3,borderRadius:10}}>
+          <button
+            style={{padding:"8px 18px",borderRadius:7,border:"none",background:activeView==="ledger"?"#111111":"transparent",color:activeView==="ledger"?"#FFFFFF":"#666666",fontWeight:600,fontSize:13,cursor:"pointer",transition:"all 0.15s"}}
+            onClick={()=>setActiveView("ledger")}
+          >📒 Employee Ledger</button>
+          <button
+            style={{padding:"8px 18px",borderRadius:7,border:"none",background:activeView==="pnl"?"#111111":"transparent",color:activeView==="pnl"?"#FFFFFF":"#666666",fontWeight:600,fontSize:13,cursor:"pointer",transition:"all 0.15s"}}
+            onClick={()=>{ setActiveView("pnl"); if(!pnl) loadPnl(); }}
+          >📈 P&amp;L Statement</button>
+        </div>
+        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          {loanBalance !== null && loanBalance > 0 && (
+            <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(234,179,8,0.08)",border:"1px solid rgba(234,179,8,0.3)",borderRadius:10,padding:"7px 14px"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#92400E",letterSpacing:"0.5px",textTransform:"uppercase",whiteSpace:"nowrap"}}>💳 Owed to Zohaib</div>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:15,fontWeight:800,color:"#92400E",whiteSpace:"nowrap"}}>Rs.&nbsp;{Math.round(loanBalance).toLocaleString()}</div>
+            </div>
+          )}
+          <button
+            onClick={()=>setInjectModal(true)}
+            style={{background:"#111111",color:"#FFFFFF",border:"none",borderRadius:9,padding:"9px 18px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",transition:"background 0.15s"}}
+            onMouseEnter={e=>(e.currentTarget.style.background="#5B21B6")}
+            onMouseLeave={e=>(e.currentTarget.style.background="#111111")}
+          >➕ Inject Funds / Capital</button>
+        </div>
       </div>
+
+      {/* ── Global message (inject result, etc.) ────────────────────────────── */}
+      {msg && activeView === "pnl" && (
+        <div style={{marginBottom:12,padding:"10px 14px",background:msg.startsWith("✅")?"#DCFCE7":"#FEE2E2",borderRadius:10,fontSize:13,color:msg.startsWith("✅")?"#166534":"#DC2626",border:`1px solid ${msg.startsWith("✅")?"#BBF7D0":"#FECACA"}`}}>{msg}</div>
+      )}
 
       {/* ── P&L Panel ─────────────────────────────────────────────────────────── */}
       {activeView === "pnl" && <PnLPanel pnl={pnl} loading={pnlLoading} onRefresh={loadPnl} />}
@@ -433,6 +494,72 @@ function LedgerContent({ user }: { user: any }) {
         </div>
       )}
     </>}
+
+      {/* ── Inject Funds Modal ───────────────────────────────────────────────── */}
+      {injectModal && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setInjectModal(false)}>
+          <div style={{background:"#fff",borderRadius:16,maxWidth:460,width:"100%",padding:"28px 24px",boxShadow:"0 12px 40px rgba(0,0,0,0.22)"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontWeight:800,fontSize:17,color:"#111",marginBottom:4}}>➕ Inject Funds / Capital</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:20}}>Inject cash into company accounts via a director loan or sales revenue conversion</div>
+
+            {/* Injection Purpose Toggle */}
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:11,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",color:"#666",marginBottom:8}}>Injection Purpose *</div>
+              <div style={{display:"flex",gap:3,background:"#EBEBEB",padding:3,borderRadius:10}}>
+                <button
+                  style={{flex:1,padding:"10px 12px",borderRadius:7,border:"none",background:injectForm.injection_type==="loan"?"#111111":"transparent",color:injectForm.injection_type==="loan"?"#FFFFFF":"#666666",fontWeight:600,fontSize:12,cursor:"pointer",transition:"all 0.15s",lineHeight:1.4}}
+                  onClick={()=>setInjectForm(f=>({...f,injection_type:"loan"}))}
+                >🤝 Company Loan<br/><span style={{fontSize:10,opacity:0.75}}>Udhaar from Zohaib</span></button>
+                <button
+                  style={{flex:1,padding:"10px 12px",borderRadius:7,border:"none",background:injectForm.injection_type==="sales"?"#111111":"transparent",color:injectForm.injection_type==="sales"?"#FFFFFF":"#666666",fontWeight:600,fontSize:12,cursor:"pointer",transition:"all 0.15s",lineHeight:1.4}}
+                  onClick={()=>setInjectForm(f=>({...f,injection_type:"sales"}))}
+                >💰 Website Sales<br/><span style={{fontSize:10,opacity:0.75}}>PKR Revenue Conversion</span></button>
+              </div>
+              <div style={{marginTop:8,padding:"8px 12px",background:injectForm.injection_type==="loan"?"rgba(234,179,8,0.07)":"rgba(22,163,74,0.06)",border:`1px solid ${injectForm.injection_type==="loan"?"rgba(234,179,8,0.28)":"rgba(22,163,74,0.2)"}`,borderRadius:8,fontSize:11,color:injectForm.injection_type==="loan"?"#92400E":"#166534",fontFamily:"monospace"}}>
+                {injectForm.injection_type==="loan"
+                  ? "DR Cash/Bank ↑  ·  CR Zohaib Hassan Loan Account ↑ (Liability)"
+                  : "DR Cash/Bank ↑  ·  CR IPTV Manual Sales Revenue ↑ (P&L Revenue)"}
+              </div>
+            </div>
+
+            {/* Amount */}
+            <div style={{marginBottom:14}}>
+              <label style={{fontSize:11,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",color:"#666",display:"block",marginBottom:6}}>Amount (Rs.) *</label>
+              <input autoFocus type="number" className="erp-input" placeholder="0.00" value={injectForm.amount} onChange={e=>setInjectForm(f=>({...f,amount:e.target.value}))} style={{width:"100%",fontSize:16,fontWeight:700}} />
+            </div>
+
+            {/* Destination */}
+            <div style={{marginBottom:14}}>
+              <label style={{fontSize:11,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",color:"#666",display:"block",marginBottom:6}}>Deposit Into *</label>
+              <select className="erp-select" value={injectForm.destination_account_id} onChange={e=>setInjectForm(f=>({...f,destination_account_id:e.target.value}))} style={{width:"100%"}}>
+                <option value="">— Select account —</option>
+                {assetAccounts.map((a:any)=>(
+                  <option key={a.id} value={a.id}>{a.account_name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Description */}
+            <div style={{marginBottom:22}}>
+              <label style={{fontSize:11,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",color:"#666",display:"block",marginBottom:6}}>Description (Optional)</label>
+              <input type="text" className="erp-input" placeholder={injectForm.injection_type==="loan"?"e.g. June loan from Zohaib":"e.g. Website sales PKR conversion Jun 2026"} value={injectForm.description} onChange={e=>setInjectForm(f=>({...f,description:e.target.value}))} style={{width:"100%"}} />
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setInjectModal(false)} style={{background:"#F5F5F5",color:"#555",border:"none",borderRadius:9,padding:"13px",fontSize:14,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button
+                onClick={submitInject}
+                disabled={injectSaving||!injectForm.amount||!injectForm.destination_account_id}
+                style={{background:"#111111",color:"#fff",border:"none",borderRadius:9,padding:"13px",fontSize:14,fontWeight:700,cursor:"pointer",opacity:(injectSaving||!injectForm.amount||!injectForm.destination_account_id)?0.45:1,transition:"background 0.15s"}}
+                onMouseEnter={e=>{ if(!injectSaving&&injectForm.amount&&injectForm.destination_account_id) e.currentTarget.style.background="#16A34A"; }}
+                onMouseLeave={e=>e.currentTarget.style.background="#111111"}
+              >
+                {injectSaving ? "Injecting…" : "💉 Inject Funds"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </>
   );

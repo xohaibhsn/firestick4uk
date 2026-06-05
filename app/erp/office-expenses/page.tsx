@@ -117,7 +117,7 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
       setPaymentSources(ps => { const n = { ...ps }; delete n[expense.id]; return n; });
       load();
     }
-    else alert(res.error || "Failed to mark as paid");
+    else { setMsg(`❌ ${res.error || "Failed to mark as paid"}`); setTimeout(() => setMsg(""), 8000); }
   };
 
   const paidExpenses = expenses.filter(e => e.status === "paid");
@@ -138,6 +138,12 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
 
   return (
     <div>
+      {/* ── Global message banner (insufficient funds, etc.) ───────────────────── */}
+      {msg && !showForm && (
+        <div style={{marginBottom:14,padding:"12px 16px",background:msg.startsWith("✅")?"#DCFCE7":"#FEE2E2",borderRadius:10,fontSize:13,color:msg.startsWith("✅")?"#166534":"#DC2626",border:`1px solid ${msg.startsWith("✅")?"#BBF7D0":"#FECACA"}`,lineHeight:1.5}}>
+          {msg}
+        </div>
+      )}
       {/* ── Summary Cards ──────────────────────────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 12, marginBottom: 20 }}>
         <div className="erp-stat">

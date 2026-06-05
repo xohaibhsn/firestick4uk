@@ -2,16 +2,18 @@ import pool from '../../../lib/db';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 const SEED: { name: string; type: string }[] = [
-  { name: 'Cash In Hand',              type: 'asset'   },
-  { name: 'Main Bank Account',         type: 'asset'   },
-  { name: 'Office Rent Expense',       type: 'expense' },
-  { name: 'Utility Bills',             type: 'expense' },
-  { name: 'Online Subscriptions',      type: 'expense' },
-  { name: 'Salary Expense',            type: 'expense' },
-  { name: 'Building Maintenance',      type: 'expense' },
-  { name: 'General Office Expense',    type: 'expense' },
-  { name: 'IPTV Sales Revenue',        type: 'revenue' },
-  { name: 'Corporate Service Revenue', type: 'revenue' },
+  { name: 'Cash In Hand',                type: 'asset'     },
+  { name: 'Main Bank Account',           type: 'asset'     },
+  { name: 'Office Rent Expense',         type: 'expense'   },
+  { name: 'Utility Bills',               type: 'expense'   },
+  { name: 'Online Subscriptions',        type: 'expense'   },
+  { name: 'Salary Expense',              type: 'expense'   },
+  { name: 'Building Maintenance',        type: 'expense'   },
+  { name: 'General Office Expense',      type: 'expense'   },
+  { name: 'IPTV Sales Revenue',          type: 'revenue'   },
+  { name: 'Corporate Service Revenue',   type: 'revenue'   },
+  { name: 'Zohaib Hassan Loan Account',  type: 'liability' },
+  { name: 'IPTV Manual Sales Revenue',   type: 'revenue'   },
 ];
 
 async function bootstrap() {
@@ -33,6 +35,21 @@ async function bootstrap() {
       ).catch(() => {});
     }
   }
+  // Ensure critical accounts always exist (idempotent — handles pre-existing installations)
+  const CRITICAL = [
+    { name: 'Zohaib Hassan Loan Account', type: 'liability' },
+    { name: 'IPTV Manual Sales Revenue',  type: 'revenue'   },
+  ];
+  for (const c of CRITICAL) {
+    const [chk]: any = await pool.query(
+      'SELECT id FROM erp_chart_of_accounts WHERE account_name=? LIMIT 1', [c.name]
+    );
+    if (!Array.isArray(chk) || !chk.length) {
+      await pool.query(
+        'INSERT INTO erp_chart_of_accounts (account_name,account_type) VALUES (?,?)', [c.name, c.type]
+      ).catch(() => {});
+    }
+  }
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -42,20 +59,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'GET') {
       const { type, balances, pnl } = req.query;
 
-      // Asset account balances: opening + DR - CR (assets increase on debit)
+      // Account balances with correct normal-balance sign per account type
       if (balances) {
+        const acctType = String(type || 'asset');
+        // Assets increase on debit; Liabilities/Revenue/Equity increase on credit
+        const drFactor = acctType === 'asset' ? 1 : -1;
+        const crFactor = acctType === 'asset' ? -1 : 1;
         const [rows]: any = await pool.query(`
           SELECT c.id, c.account_name, c.account_type,
             COALESCE(a.opening_balance, 0) + COALESCE(
-              SUM(CASE WHEN t.type='debit' THEN t.amount WHEN t.type='credit' THEN -t.amount ELSE 0 END), 0
+              SUM(CASE WHEN t.type='debit' THEN t.amount * ? WHEN t.type='credit' THEN t.amount * ? ELSE 0 END), 0
             ) AS balance
           FROM erp_chart_of_accounts c
           LEFT JOIN erp_accounts a ON a.name = c.account_name AND a.type = 'company'
           LEFT JOIN erp_transactions t ON t.coa_id = c.id
-          WHERE c.account_type = 'asset'
+          WHERE c.account_type = ?
           GROUP BY c.id, c.account_name, c.account_type, a.opening_balance
           ORDER BY c.account_name
-        `);
+        `, [drFactor, crFactor, acctType]);
         return res.status(200).json(Array.isArray(rows) ? rows : []);
       }
 
