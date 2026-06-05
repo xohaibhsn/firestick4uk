@@ -1,6 +1,39 @@
 import pool from '../../../lib/db';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+// Maps office expense categories to their COA expense head names
+const CATEGORY_COA: Record<string, string> = {
+  'Rent':                         'Office Rent Expense',
+  'Utilities':                    'Utility Bills',
+  'Online Subscriptions':         'Online Subscriptions',
+  'Building Maintenance Charges': 'Building Maintenance',
+};
+const categoryToExpenseHead = (cat: string): string => CATEGORY_COA[cat] ?? 'General Office Expense';
+
+// Find-or-create an erp_accounts row (type='company') keyed by name
+async function getOrCreateAccount(name: string): Promise<number> {
+  const [r]: any = await pool.query(
+    `SELECT id FROM erp_accounts WHERE name=? AND type='company' LIMIT 1`, [name]
+  );
+  if (Array.isArray(r) && r.length) return r[0].id;
+  const [ins]: any = await pool.query(
+    `INSERT INTO erp_accounts (name,type,opening_balance) VALUES (?,'company',0)`, [name]
+  );
+  return ins.insertId;
+}
+
+// Find-or-create a COA row keyed by name
+async function getOrCreateCOA(name: string, type: string): Promise<number> {
+  const [r]: any = await pool.query(
+    `SELECT id FROM erp_chart_of_accounts WHERE account_name=? LIMIT 1`, [name]
+  );
+  if (Array.isArray(r) && r.length) return r[0].id;
+  const [ins]: any = await pool.query(
+    `INSERT INTO erp_chart_of_accounts (account_name,account_type) VALUES (?,?)`, [name, type]
+  );
+  return ins.insertId;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
 
@@ -29,6 +62,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `ALTER TABLE erp_office_expenses ADD COLUMN billing_month VARCHAR(7) NULL`,
       `ALTER TABLE erp_accounts MODIFY COLUMN type ENUM('employee','vendor','client','company') NOT NULL`,
       `ALTER TABLE erp_office_expenses MODIFY COLUMN status ENUM('due','paid','overdue','dismissed') NOT NULL DEFAULT 'due'`,
+    ]) { try { await pool.query(sql); } catch (_) {} }
+
+    // COA table (idempotent — coa.ts also creates this)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS erp_chart_of_accounts (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        account_name VARCHAR(100) NOT NULL,
+        account_type ENUM('asset','liability','equity','revenue','expense') NOT NULL,
+        code         VARCHAR(20) UNIQUE NULL,
+        created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {});
+
+    // Double-entry tracking columns on erp_transactions
+    for (const sql of [
+      `ALTER TABLE erp_transactions ADD COLUMN coa_id INT NULL`,
+      `ALTER TABLE erp_transactions ADD COLUMN voucher_ref VARCHAR(60) NULL`,
     ]) { try { await pool.query(sql); } catch (_) {} }
 
     const curMonth = new Date().toISOString().slice(0, 7);
@@ -137,7 +187,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'PUT') {
       const { id, date, category, description, amount, paid_by, receipt_path, notes,
               expense_type, status, due_date, billing_cycle,
-              mark_paid, paid_by_user_id } = req.body;
+              mark_paid, paid_by_user_id, payment_coa_id } = req.body;
       if (!id) return res.status(400).json({ error: 'ID required' });
 
       if (mark_paid) {
@@ -147,31 +197,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           [finalAmt, paid_by || '', id]
         );
 
-        // Fetch row for ledger description
+        // Fetch expense row for category / description
         const [expRow]: any = await pool.query(`SELECT * FROM erp_office_expenses WHERE id=?`, [id]);
         const exp = expRow[0] || {};
 
-        // Find or create "Office Expenses Account" of type 'company'
-        const [compAccs]: any = await pool.query(
-          `SELECT id FROM erp_accounts WHERE type='company' AND name='Office Expenses Account' LIMIT 1`
-        );
-        let accountId: number;
-        if (Array.isArray(compAccs) && compAccs.length) {
-          accountId = compAccs[0].id;
-        } else {
-          const [ins]: any = await pool.query(
-            `INSERT INTO erp_accounts (name,type,opening_balance) VALUES ('Office Expenses Account','company',0)`
+        // Resolve expense COA head from category
+        const expenseHeadName = categoryToExpenseHead(exp.category || '');
+
+        // Resolve payment source from COA (defaults to Cash In Hand)
+        let paymentSourceName = 'Cash In Hand';
+        if (payment_coa_id) {
+          const [coaRow]: any = await pool.query(
+            `SELECT account_name FROM erp_chart_of_accounts WHERE id=? LIMIT 1`, [payment_coa_id]
           );
-          accountId = ins.insertId;
+          if (Array.isArray(coaRow) && coaRow.length) paymentSourceName = coaRow[0].account_name;
         }
 
-        // Debit the company account — keeps global ledger balances current
+        // Ensure erp_accounts + COA rows exist for each head
+        const [drAccId, crAccId] = await Promise.all([
+          getOrCreateAccount(expenseHeadName),
+          getOrCreateAccount(paymentSourceName),
+        ]);
+        const [drCoaId, crCoaId] = await Promise.all([
+          getOrCreateCOA(expenseHeadName, 'expense'),
+          getOrCreateCOA(paymentSourceName, 'asset'),
+        ]);
+
+        const voucherRef = `OE-${id}-${Date.now()}`;
+        const memo = `${exp.description || exp.category || 'Office Expense'} (${curMonth})`;
+
+        // DR: expense head increases (asset/expense increases on debit)
         await pool.query(
-          `INSERT INTO erp_transactions (account_id,type,amount,description,reference_type,reference_id,created_by)
-           VALUES (?,?,?,?,?,?,?)`,
-          [accountId, 'debit', finalAmt,
-           `${exp.category || 'Office Expense'} — ${exp.description || ''} (${curMonth})`,
-           'office_expense', id, paid_by_user_id || null]
+          `INSERT INTO erp_transactions
+           (account_id,type,amount,description,reference_type,reference_id,created_by,coa_id,voucher_ref)
+           VALUES (?,?,?,?,?,?,?,?,?)`,
+          [drAccId, 'debit', finalAmt, `DR ${expenseHeadName} — ${memo}`,
+           'office_expense', id, paid_by_user_id || null, drCoaId, voucherRef]
+        );
+        // CR: asset account decreases (asset decreases on credit)
+        await pool.query(
+          `INSERT INTO erp_transactions
+           (account_id,type,amount,description,reference_type,reference_id,created_by,coa_id,voucher_ref)
+           VALUES (?,?,?,?,?,?,?,?,?)`,
+          [crAccId, 'credit', finalAmt, `CR ${paymentSourceName} — ${memo}`,
+           'office_expense', id, paid_by_user_id || null, crCoaId, voucherRef]
         );
         return res.status(200).json({ success: true });
       }

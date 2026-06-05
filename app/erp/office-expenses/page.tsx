@@ -37,6 +37,8 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
   const [msg, setMsg] = useState("");
   const [varAmounts, setVarAmounts] = useState<Record<number, string>>({});
   const [markingPaid, setMarkingPaid] = useState<number | null>(null);
+  const [coaAssets, setCoaAssets] = useState<any[]>([]);
+  const [paymentSources, setPaymentSources] = useState<Record<number, string>>({});
 
   const initForm = {
     date: today, category: "Rent", description: "", amount: "",
@@ -51,7 +53,10 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
     fetch(url).then(r => r.json()).then(d => setExpenses(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`/api/erp/office-expenses?summary=1&month=${filterMonth}`).then(r => r.json()).then(d => setSummary(d || { categories: [], total: 0 })).catch(() => {});
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    fetch('/api/erp/coa?type=asset').then(r => r.json()).then(d => setCoaAssets(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
 
   const uploadReceipt = async (file: File, target: "form" | "edit") => {
     setUploading(true);
@@ -104,10 +109,14 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
     setMarkingPaid(expense.id);
     const res = await fetch("/api/erp/office-expenses", {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: expense.id, amount: finalAmount, paid_by: user.name, mark_paid: true, paid_by_user_id: user.id, category: expense.category, description: expense.description }),
+      body: JSON.stringify({ id: expense.id, amount: finalAmount, paid_by: user.name, mark_paid: true, paid_by_user_id: user.id, category: expense.category, description: expense.description, payment_coa_id: paymentSources[expense.id] || null }),
     }).then(r => r.json()).catch(() => ({}));
     setMarkingPaid(null);
-    if (res.success) { setVarAmounts(v => { const n = { ...v }; delete n[expense.id]; return n; }); load(); }
+    if (res.success) {
+      setVarAmounts(v => { const n = { ...v }; delete n[expense.id]; return n; });
+      setPaymentSources(ps => { const n = { ...ps }; delete n[expense.id]; return n; });
+      load();
+    }
     else alert(res.error || "Failed to mark as paid");
   };
 
@@ -315,16 +324,29 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
                       <td>{statusBadge(e.status)}</td>
                       {isAdmin && (
                         <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                             {e.expense_type === "recurring_variable" && (
                               <input
                                 type="number"
                                 className="erp-input"
                                 placeholder="Enter amount"
-                                style={{ width: 120, padding: "5px 10px", fontSize: 12 }}
+                                style={{ width: 110, padding: "5px 10px", fontSize: 12 }}
                                 value={varAmounts[e.id] || ""}
                                 onChange={ev => setVarAmounts(va => ({ ...va, [e.id]: ev.target.value }))}
                               />
+                            )}
+                            {coaAssets.length > 0 && (
+                              <select
+                                className="erp-select"
+                                style={{ width: 160, padding: "5px 10px", fontSize: 12 }}
+                                value={paymentSources[e.id] || ""}
+                                onChange={ev => setPaymentSources(ps => ({ ...ps, [e.id]: ev.target.value }))}
+                              >
+                                <option value="">💳 Pay From…</option>
+                                {coaAssets.map((a: any) => (
+                                  <option key={a.id} value={a.id}>{a.account_name}</option>
+                                ))}
+                              </select>
                             )}
                             <button
                               className="erp-btn erp-btn-sm"
