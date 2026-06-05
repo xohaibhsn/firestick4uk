@@ -162,37 +162,46 @@ const routeRoles: Record<string, string[]> = {
 };
 
 export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
-  const [user, setUser] = useState<ERPUser | null>(null);
+  // Synchronously initialise user from localStorage to eliminate white flash
+  const [user, setUser] = useState<ERPUser | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const s = localStorage.getItem("erp_session");
+      if (!s) return null;
+      return JSON.parse(s) as ERPUser;
+    } catch { return null; }
+  });
   const currency = "PKR";
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userDropOpen, setUserDropOpen] = useState(false);
 
+  // Auth + route-guard effect (runs once after mount to validate & redirect if needed)
   useEffect(() => {
     const s = localStorage.getItem("erp_session");
     if (!s) { window.location.href = "/erp"; return; }
     try {
-      const u = JSON.parse(s);
+      const u = JSON.parse(s) as ERPUser;
       const path = window.location.pathname;
       const allowed = routeRoles[path];
       if (allowed && !allowed.includes(u.role)) {
-        // Vendor can't access most pages — redirect to their ledger
         window.location.href = u.role === "vendor" ? "/erp/my-ledger" : "/erp/dashboard";
         return;
       }
+      // Refresh user in case session changed
       setUser(u);
     } catch { window.location.href = "/erp"; }
   }, []);
 
-  const [userDropOpen, setUserDropOpen] = useState(false);
-
-  // Fix 4 — auto clock-out sweeper: runs every 15 min silently
+  // Sweeper — only run when user is confirmed valid, never fire for null/redirecting state
   useEffect(() => {
+    if (!user) return;
     const runSweeper = () => fetch('/api/erp/attendance-sweeper').catch(()=>{});
     runSweeper();
     const interval = setInterval(runSweeper, 15 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.id]);
 
-  if (!user) return <><style>{erpStyles}</style><div style={{minHeight:"100vh",background:"#F5F5F5"}} /></>;
+  if (!user) return <><style>{erpStyles}</style><div style={{minHeight:"100vh",background:"#F5F5F5",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{color:"#888",fontSize:14}}>Loading...</div></div></>;
 
   const logout = () => { localStorage.removeItem("erp_session"); window.location.href = "/erp"; };
 
