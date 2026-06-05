@@ -54,6 +54,7 @@ function MyPayrollContent({ user, currency: _c }: { user: any; currency: string 
           </div>
           <div className="erp-card">
             <div className="erp-section-title" style={{marginBottom:14}}>Payroll Breakdown — {month}</div>
+            <div className="erp-table-wrap">
             <table>
               <tbody>
                 {[
@@ -75,6 +76,7 @@ function MyPayrollContent({ user, currency: _c }: { user: any; currency: string 
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
         </>
       )}

@@ -134,7 +134,7 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
           </div>
         </>
       ) : (
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+        <div className="erp-grid-2" style={{gap:20}}>
           <div className="erp-card">
             <div className="erp-section-header"><div className="erp-section-title">My Expenses</div><a href="/erp/expenses" style={{color:"#5B21B6",fontSize:12,textDecoration:"none"}}>View All →</a></div>
             {myExpenses.length===0 ? <div className="erp-empty">No expenses yet</div> : myExpenses.map((e:any)=>(

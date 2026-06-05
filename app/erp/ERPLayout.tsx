@@ -46,7 +46,10 @@ export const erpStyles = `
   .erp-stat-icon{font-size:26px;margin-bottom:8px;}
   .erp-stat-val{font-family:'Cinzel',serif;font-size:26px;font-weight:700;color:#111111 !important;}
   .erp-stat-label{font-size:11px;color:#666666 !important;letter-spacing:1px;text-transform:uppercase;margin-top:3px;}
-  .erp-table-wrap{overflow-x:auto;}
+  .erp-table-wrap,.chunks-scrollbar{overflow-x:auto;width:100%;-webkit-overflow-scrolling:touch;}
+  .erp-table-wrap::-webkit-scrollbar,.chunks-scrollbar::-webkit-scrollbar{height:4px;}
+  .erp-table-wrap::-webkit-scrollbar-track,.chunks-scrollbar::-webkit-scrollbar-track{background:rgba(0,0,0,0.04);}
+  .erp-table-wrap::-webkit-scrollbar-thumb,.chunks-scrollbar::-webkit-scrollbar-thumb{background:rgba(91,33,182,0.3);border-radius:2px;}
   table{width:100%;border-collapse:collapse;}
   th{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#666666 !important;font-weight:600;padding:10px 14px;text-align:left;border-bottom:1px solid #E5E5E5;background:#F9F9F9;}
   td{padding:11px 14px;font-size:13px;color:#333333 !important;border-bottom:1px solid #F0F0F0;}
@@ -94,14 +97,22 @@ export const erpStyles = `
   .erp-hamburger:hover{background:#5B21B6;}
   .erp-hamburger span{display:block;width:22px;height:2px;background:#FFFFFF;border-radius:2px;transition:all 0.2s;}
   .erp-sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:49;}
+  .erp-sidebar-close{display:none;position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#FFFFFF !important;width:32px;height:32px;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;line-height:1;transition:background 0.15s;}
+  .erp-sidebar-close:hover{background:rgba(255,255,255,0.28);}
   @media(max-width:900px){
     .erp-sidebar{transform:translateX(-100%);transition:transform 0.28s ease;}
     .erp-sidebar.open{transform:translateX(0);}
     .erp-sidebar-overlay{display:block;}
     .erp-hamburger{display:flex;}
-    .erp-main{margin-left:0;}
+    .erp-main{margin-left:0;padding:16px;}
     .erp-stat-grid{grid-template-columns:1fr 1fr;}
     .erp-grid-2,.erp-grid-3{grid-template-columns:1fr;}
+    .erp-sidebar-close{display:flex;}
+    .erp-header{position:sticky;top:0;z-index:40;background:#F5F5F5;padding:12px 0;margin-bottom:16px;}
+  }
+  @media(max-width:480px){
+    .erp-stat-grid{grid-template-columns:1fr;}
+    .erp-main{padding:12px;}
   }
 `;
 
@@ -217,6 +228,7 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
       {sidebarOpen && <div className="erp-sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <div className="erp-layout">
         <aside className={`erp-sidebar ${sidebarOpen ? "open" : ""}`}>
+          <button className="erp-sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar">✕</button>
           <div className="erp-logo">
             <div className="erp-logo-text">FIRESTICK4UK</div>
             <div className="erp-logo-sub">ERP System</div>
