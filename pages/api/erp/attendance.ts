@@ -6,6 +6,22 @@ const LEAVE_MAP: Record<string,string> = {
 };
 const LEAVE_LIMITS: Record<string,number> = { sick:10, annual:14, emergency:3 };
 
+/**
+ * When an admin changes attendance FROM a leave status to present/absent/weekly_off,
+ * cancel the auto-created single-day leave record so quota is restored.
+ */
+async function cancelLeaveForDate(employee_id: number, date: string, old_status: string): Promise<void> {
+  const leaveType = LEAVE_MAP[old_status];
+  if (!leaveType) return; // old status wasn't a leave — nothing to cancel
+
+  // Only cancel single-day auto-created leaves (from_date = to_date = date)
+  await pool.query(
+    `UPDATE erp_leaves SET status='cancelled'
+     WHERE employee_id=? AND leave_type=? AND from_date=? AND to_date=? AND status='approved'`,
+    [employee_id, leaveType, date, date]
+  );
+}
+
 async function handleLeaveQuota(employee_id:number, date:string, status:string, admin_note:string) {
   const leaveType = LEAVE_MAP[status];
   if (!leaveType) return { warning: null };
@@ -167,7 +183,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           );
         }
 
-        const result = await handleLeaveQuota(employee_id, date, status, admin_note||'');
+        // If overwriting an existing leave status with a non-leave status, cancel the leave
+        if (existing.length) {
+          const [prevRow]: any = await pool.query('SELECT status FROM erp_attendance WHERE id=?', [existing[0].id]);
+          const prevStatus = prevRow[0]?.status;
+          if (LEAVE_MAP[prevStatus] && !LEAVE_MAP[status]) {
+            await cancelLeaveForDate(Number(employee_id), date, prevStatus);
+          }
+        }
+
+        const result = await handleLeaveQuota(Number(employee_id), date, status, admin_note||'');
         warning = result.warning;
 
         await pool.query('INSERT INTO erp_audit_log (user_id,action,details) VALUES (?,?,?)',
@@ -192,6 +217,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               'INSERT INTO erp_attendance (employee_id,date,status,admin_note,marked_by,is_manual) VALUES (?,?,?,?,?,1)',
               [rec.employee_id, date, rec.status, rec.admin_note||'', marked_by||null]
             );
+          }
+          // Cancel leave if overwriting a leave status with non-leave
+          if (existing.length) {
+            const [prevRow]: any = await pool.query('SELECT status FROM erp_attendance WHERE id=?', [existing[0].id]);
+            const prevStatus = prevRow[0]?.status;
+            if (LEAVE_MAP[prevStatus] && !LEAVE_MAP[rec.status]) {
+              await cancelLeaveForDate(Number(rec.employee_id), date, prevStatus);
+            }
           }
           const result = await handleLeaveQuota(rec.employee_id, date, rec.status, rec.admin_note||'');
           if (result.warning) warnings.push(`${rec.employee_id}: ${result.warning}`);
@@ -219,18 +252,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         [status, time_in||'', time_out||'', admin_note||'', marked_by||null, id]
       );
 
-      // Handle leave quota if new status is leave type
       let warning = null;
-      if (LEAVE_MAP[status] && status !== old.status) {
-        const result = await handleLeaveQuota(old.employee_id, old.date, status, admin_note||'');
-        warning = result.warning;
+      if (status !== old.status) {
+        if (LEAVE_MAP[status]) {
+          // Status changed TO a leave type → create/update leave quota
+          const result = await handleLeaveQuota(old.employee_id, old.date, status, admin_note||'');
+          warning = result.warning;
+        } else if (LEAVE_MAP[old.status]) {
+          // Status changed FROM a leave type (→ present/absent/weekly_off etc.) → cancel leave & restore quota
+          await cancelLeaveForDate(old.employee_id, old.date, old.status);
+          warning = null;
+        }
       }
 
       await pool.query('INSERT INTO erp_audit_log (user_id,action,details) VALUES (?,?,?)',
         [marked_by,'ATTENDANCE_EDIT',`Edited emp#${old.employee_id} att#${id}: ${old.status}→${status} on ${old.date}`]
       ).catch(()=>{});
 
-      return res.status(200).json({ success:true, warning });
+      return res.status(200).json({ success:true, warning, leave_cancelled: LEAVE_MAP[old.status] && !LEAVE_MAP[status] });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
