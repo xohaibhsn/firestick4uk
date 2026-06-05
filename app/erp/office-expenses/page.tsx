@@ -85,8 +85,13 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
 
   const del = async (id: number) => {
     if (!confirm("Delete this expense?")) return;
-    await fetch(`/api/erp/office-expenses?id=${id}`, { method: "DELETE" });
-    load();
+    const res = await fetch(`/api/erp/office-expenses?id=${id}`, { method: "DELETE" })
+      .then(r => r.json()).catch(() => ({}));
+    if (res.success) {
+      // Instant local removal — no re-fetch so the generation hook cannot
+      // immediately re-insert a just-deleted due instance.
+      setExpenses(prev => prev.filter(e => e.id !== id));
+    }
   };
 
   const markPaid = async (expense: any) => {

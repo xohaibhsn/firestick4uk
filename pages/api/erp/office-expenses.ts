@@ -40,11 +40,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ─── Idempotent monthly recurring generation ───────────────────────────────
     // Templates: billing_cycle='monthly' AND billing_month IS NULL
     // Instances: billing_cycle='monthly' AND billing_month='YYYY-MM'
-    // one_time POSTs bypass this entirely — never gate a plain expense save on
-    // month-duplicate state. Only run for GET (page load) or recurring-type POSTs.
-    const isOneTimePost = req.method === 'POST' &&
-      (!req.body?.expense_type || req.body.expense_type === 'one_time');
-    if (!isOneTimePost) {
+    // Only run on GET (page load). Running on DELETE caused the generation hook to
+    // re-insert a just-deleted instance on the subsequent load() GET call.
+    if (req.method === 'GET') {
       // Fetch every registered recurring template
       const [templates]: any = await pool.query(
         `SELECT * FROM erp_office_expenses WHERE billing_cycle='monthly' AND billing_month IS NULL`
@@ -192,6 +190,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ─── DELETE ────────────────────────────────────────────────────────────────
     if (req.method === 'DELETE') {
       const { id } = req.query;
+      if (!id) return res.status(400).json({ error: 'ID required' });
       await pool.query('DELETE FROM erp_office_expenses WHERE id=?', [id]);
       return res.status(200).json({ success: true });
     }
