@@ -12,14 +12,12 @@ export default function ERPPayroll() {
   );
 }
 
-const NOW = new Date().toISOString().slice(0,7);
-const now = new Date();
-const PREV_MONTH = (() => {
-  const m = now.getMonth(); // 0-indexed
-  const y = now.getFullYear();
-  if (m === 0) return `${y-1}-12`;
-  return `${y}-${String(m).padStart(2,'0')}`;
-})();
+const _now = new Date();
+const NOW  = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}`;
+// Last completed month (same logic as lib/payrollUtils)
+const PREV_MONTH = _now.getMonth() === 0
+  ? `${_now.getFullYear()-1}-12`
+  : `${_now.getFullYear()}-${String(_now.getMonth()).padStart(2,'0')}`;
 
 const fmt  = (n: number) => `Rs. ${Math.abs(Math.round(n)).toLocaleString("en-PK")}`;
 const fmtD = (n: number) => `${n % 1 === 0 ? n : n.toFixed(1)} day${n !== 1 ? 's' : ''}`;
@@ -71,6 +69,19 @@ function PayrollContent({ user }: { user: any }) {
     else if (tab==="pending") loadPending();
     else loadCredited();
   }, [tab]);
+
+  // Fix 1 — May 2026 exception: full salary, no deductions
+  const generateMay2026 = async () => {
+    if (!confirm("Generate May 2026 payroll as an EXCEPTION?\n\nThis will set full salary for all employees with NO attendance deductions.")) return;
+    const res = await fetch("/api/erp/payroll-generate",{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ month_year: "2026-05", exception: true, created_by: user.id }),
+    }).then(r=>r.json()).catch(()=>({}));
+    if (res.success) {
+      showMsg(`✅ May 2026 exception payroll generated for ${res.generated} employees!`);
+      setTab("pending"); loadPending();
+    } else showMsg(`❌ ${res.error||"Failed"}`);
+  };
 
   const generatePayroll = async () => {
     const m = safeMonth(month);
@@ -139,6 +150,10 @@ function PayrollContent({ user }: { user: any }) {
             <button className="erp-btn" style={{background:"#5B21B6",color:"#fff",border:"none",fontWeight:700}}
               onClick={generatePayroll}>
               📊 Generate {month} Payroll
+            </button>
+            <button className="erp-btn" style={{background:"#EA580C",color:"#fff",border:"none",fontWeight:700}}
+              onClick={generateMay2026}>
+              🔄 May 2026 Exception
             </button>
             <button className="erp-btn erp-btn-green" onClick={bulkCredit}>💰 Credit All Salaries</button>
             <button className="erp-btn erp-btn-outline" onClick={()=>window.print()}>🖨 Print</button>

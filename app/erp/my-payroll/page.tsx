@@ -6,10 +6,16 @@ export default function MyPayroll() {
   return <ERPLayout title="My Payroll" active="my-payroll">{(user, currency) => <MyPayrollContent user={user} currency={currency} />}</ERPLayout>;
 }
 
+// Fix 2E: clamp to last completed month
+const _mp = new Date();
+const MP_CUTOFF = _mp.getMonth() === 0
+  ? `${_mp.getFullYear()-1}-12`
+  : `${_mp.getFullYear()}-${String(_mp.getMonth()).padStart(2,'0')}`;
+
 function MyPayrollContent({ user, currency: _c }: { user: any; currency: string }) {
   const fmt = (n: number) => `Rs. ${Math.round(n).toLocaleString()}`;
   const [data, setData] = useState<any>(null);
-  const [month, setMonth] = useState(new Date().toISOString().slice(0,7));
+  const [month, setMonth] = useState(MP_CUTOFF);
   const [loading, setLoading] = useState(false);
 
   const load = () => {
@@ -24,7 +30,7 @@ function MyPayrollContent({ user, currency: _c }: { user: any; currency: string 
   return (
     <div>
       <div style={{marginBottom:20,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-        <input type="month" className="erp-input" style={{width:"auto",padding:"8px 14px"}} value={month} onChange={e=>setMonth(e.target.value)} />
+        <input type="month" className="erp-input" style={{width:"auto",padding:"8px 14px"}} value={month} max={MP_CUTOFF} onChange={e=>setMonth(e.target.value > MP_CUTOFF ? MP_CUTOFF : e.target.value)} />
         <button className="erp-btn erp-btn-primary" onClick={load}>Load</button>
       </div>
 

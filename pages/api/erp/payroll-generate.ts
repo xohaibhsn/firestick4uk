@@ -1,5 +1,6 @@
 import pool from '../../../lib/db';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { getLastCompletedMonthYear } from '../../../lib/payrollUtils';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -15,31 +16,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ]) { try { await pool.query(sql); } catch (_) {} }
 
     // ── Determine target month ────────────────────────────────────────────
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1; // 1-indexed
+    const cutoff      = getLastCompletedMonthYear(); // e.g. '2026-05'
+    const nowDate     = new Date();
+    const nowMonthYear = `${nowDate.getFullYear()}-${String(nowDate.getMonth()+1).padStart(2,'0')}`;
 
-    // Previous month (auto target)
-    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    const prevYear  = currentMonth === 1 ? currentYear - 1 : currentYear;
-    const autoPrevMonthYear = `${prevYear}-${String(prevMonth).padStart(2,'0')}`;
-    const nowMonthYear = `${currentYear}-${String(currentMonth).padStart(2,'0')}`;
-
-    const { created_by, month_year: requestedMonth } = req.body;
+    const { created_by, month_year: requestedMonth, exception } = req.body;
 
     let targetMonth: string;
     if (requestedMonth) {
-      // Manual trigger: must be <= previous month (not current or future)
-      if (requestedMonth >= nowMonthYear) {
+      // Fix 2: block current or future months
+      if (requestedMonth > cutoff) {
+        const nextCutoffDate = (() => {
+          const [y, m] = requestedMonth.split('-').map(Number);
+          const d = new Date(y, m, 1); // 1st of next month
+          return d.toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+        })();
         return res.status(400).json({
-          error: `Cannot generate payroll for current or future months! Latest allowed: ${autoPrevMonthYear}`
+          error: `Cannot generate payroll for ${requestedMonth}. This will be available after ${nextCutoffDate}.`
         });
       }
       targetMonth = requestedMonth;
     } else {
-      // Auto trigger: always previous month
-      targetMonth = autoPrevMonthYear;
+      targetMonth = cutoff;
     }
+
+    // Fix 1: May 2026 exception flag
+    const isExceptionMonth = targetMonth === '2026-05' || exception === true;
 
     // ── Month metadata ────────────────────────────────────────────────────
     const [tYear, tMonth] = targetMonth.split('-').map(Number);
@@ -64,7 +66,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const results: any[] = [];
 
     for (const emp of employees) {
-      const baseSalary   = Number(emp.salary || 0);
+      const baseSalary = Number(emp.salary || 0);
+
+      // Always get approved expenses regardless of exception
+      const [expRowsEarly]: any = await pool.query(
+        `SELECT COALESCE(SUM(amount),0) as total FROM erp_expenses WHERE employee_id=? AND month_year=? AND status='approved'`,
+        [emp.id, targetMonth]
+      );
+      const approvedExpensesEarly = Number(expRowsEarly[0]?.total || 0);
+
+      // ── Fix 1: May 2026 exception — full salary, no deductions ──────────
+      if (isExceptionMonth) {
+        const netPayException = baseSalary + approvedExpensesEarly;
+        await pool.query(`
+          INSERT INTO erp_payroll
+            (employee_id, month_year, base_salary, deduction_days, daily_rate,
+             total_deductions, total_expenses, advances, net_pay,
+             deduction_details, status, generated_at)
+          VALUES (?,?,?,0,0,0,?,0,?,'Exception: Full salary — no attendance deduction','pending',NOW())
+          ON DUPLICATE KEY UPDATE
+            net_pay           = IF(status='pending', VALUES(net_pay),           net_pay),
+            total_expenses    = IF(status='pending', VALUES(total_expenses),    total_expenses),
+            deduction_details = IF(status='pending', VALUES(deduction_details), deduction_details),
+            generated_at      = IF(status='pending', NOW(),                     generated_at)
+        `, [emp.id, targetMonth, baseSalary, approvedExpensesEarly, netPayException]);
+        generated++;
+        results.push({ id: emp.id, name: emp.name, base_salary: baseSalary, deduction_days: 0, total_deductions: 0, approved_expenses: approvedExpensesEarly, net_pay: netPayException, exception: true });
+        continue; // skip normal attendance logic
+      }
+
       const dailyRate    = baseSalary / totalDaysInMonth;
       const weeklyOffDay = Number(emp.weekly_off_day ?? 0); // 0=Sun, 1=Mon…6=Sat
 
@@ -143,14 +173,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // ── STEP F: Deduction amount ─────────────────────────────────────────
       const totalDeductions = Math.round(deductionDays * dailyRate * 100) / 100;
 
-      // ── STEP G: Approved expenses ────────────────────────────────────────
-      const [expRows]: any = await pool.query(
-        `SELECT COALESCE(SUM(amount),0) as total
-         FROM erp_expenses
-         WHERE employee_id=? AND month_year=? AND status='approved'`,
-        [emp.id, targetMonth]
-      );
-      const approvedExpenses = Number(expRows[0]?.total || 0);
+      // ── STEP G: Approved expenses (reuse early query result) ─────────────
+      const approvedExpenses = approvedExpensesEarly;
 
       // ── STEP H: Advances ─────────────────────────────────────────────────
       const [advRows]: any = await pool.query(

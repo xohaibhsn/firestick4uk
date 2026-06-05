@@ -1,5 +1,6 @@
 import pool from '../../../lib/db';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { getLastCompletedMonthYear } from '../../../lib/payrollUtils';
 
 const currentMonthYear = () => new Date().toISOString().slice(0,7);
 
@@ -31,17 +32,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // ── GET — payroll summary ──────────────────────────────────────────────
     if (req.method === 'GET') {
-      const now = currentMonthYear();
-      const rawMonth = String(req.query.month || now);
-      // Fix 1: block future months
-      const month = rawMonth > now ? now : rawMonth;
+      const cutoff   = getLastCompletedMonthYear();
+      const rawMonth = String(req.query.month || cutoff);
+      // Block current and future months — clamp to last completed
+      const month    = rawMonth > cutoff ? cutoff : rawMonth;
 
       const { employee_id, manager_id, view } = req.query;
 
       // view=pending|credited — return erp_payroll records
       if (view) {
-        let q = `SELECT p.*, u.name, u.department FROM erp_payroll p JOIN erp_users u ON p.employee_id=u.id WHERE 1=1`;
-        const params: any[] = [];
+        const cutoff = getLastCompletedMonthYear();
+        let q = `SELECT p.*, u.name, u.department FROM erp_payroll p JOIN erp_users u ON p.employee_id=u.id WHERE p.month_year <= ?`;
+        const params: any[] = [cutoff];
         if (view === 'pending') { q += ' AND p.status="pending"'; }
         if (view === 'credited') { q += ' AND p.status="credited"'; }
         if (employee_id) { q += ' AND p.employee_id=?'; params.push(employee_id); }

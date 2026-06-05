@@ -2,6 +2,12 @@
 import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
+// Client-side last completed month (mirrors lib/payrollUtils)
+const _n = new Date();
+const LEDGER_CUTOFF = _n.getMonth() === 0
+  ? `${_n.getFullYear()-1}-12`
+  : `${_n.getFullYear()}-${String(_n.getMonth()).padStart(2,'0')}`;
+
 export default function MyLedger() {
   return (
     <ERPLayout title="My Ledger" active="my-ledger">
@@ -83,6 +89,9 @@ function MyLedgerContent({ user }: { user: any }) {
   };
 
   const filtered = txns.filter(t => {
+    // Fix 2D: exclude transactions from current/future months
+    const txMonth = String(t.created_at || "").slice(0, 7);
+    if (txMonth && txMonth > LEDGER_CUTOFF) return false;
     if (filterFrom && new Date(t.created_at) < new Date(filterFrom)) return false;
     if (filterTo && new Date(t.created_at) > new Date(filterTo+"T23:59:59")) return false;
     return true;
