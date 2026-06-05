@@ -7,14 +7,16 @@ export default function OfficeExpenses() {
 }
 
 const CATEGORIES = [
-  { value:"Rent",          icon:"🏢" },
-  { value:"Utilities",     icon:"💡" },
-  { value:"Stationary",    icon:"🖨️" },
-  { value:"Kitchen",       icon:"🍽️" },
-  { value:"Transport",     icon:"🚗" },
-  { value:"Maintenance",   icon:"🔧" },
-  { value:"Supplies",      icon:"📦" },
-  { value:"Miscellaneous", icon:"💼" },
+  { value:"Rent",                         icon:"🏢" },
+  { value:"Utilities",                    icon:"💡" },
+  { value:"Stationary",                   icon:"🖨️" },
+  { value:"Kitchen",                      icon:"🍽️" },
+  { value:"Transport",                    icon:"🚗" },
+  { value:"Maintenance",                  icon:"🔧" },
+  { value:"Supplies",                     icon:"📦" },
+  { value:"Building Maintenance Charges", icon:"🏗️" },
+  { value:"Online Subscriptions",         icon:"🌐" },
+  { value:"Miscellaneous",                icon:"💼" },
 ];
 const catIcon = (c: string) => CATEGORIES.find(x => x.value === c)?.icon || "💼";
 
