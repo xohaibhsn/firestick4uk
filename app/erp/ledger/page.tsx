@@ -36,10 +36,15 @@ function LedgerContent({ user }: { user: any }) {
   const [filterTo, setFilterTo] = useState("");
   const [msg, setMsg] = useState("");
 
-  // Modal state
+  // Add entry modal
   const [modal, setModal] = useState<"debit"|"credit"|null>(null);
   const [form, setForm] = useState({ amount:"", description:"", date:new Date().toISOString().slice(0,10), category:"Salary" });
   const [saving, setSaving] = useState(false);
+
+  // Edit/Delete transaction modal
+  const [editTxn, setEditTxn] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ type:"credit", amount:"", description:"" });
+  const [editSaving, setEditSaving] = useState(false);
 
   useEffect(() => {
     fetch("/api/erp/employees").then(r=>r.json()).then(d=>{
@@ -98,6 +103,46 @@ function LedgerContent({ user }: { user: any }) {
       loadEmployee(selectedEmpId);
     } else { setMsg(`❌ ${res.error||"Failed"}`); }
     setSaving(false);
+    setTimeout(()=>setMsg(""),3000);
+  };
+
+  const openEdit = (t: any) => {
+    setEditTxn(t);
+    setEditForm({ type: t.type, amount: String(t.amount), description: t.description||"" });
+  };
+
+  const saveEdit = async () => {
+    if (!editTxn || !editForm.amount) return;
+    setEditSaving(true);
+    const res = await fetch("/api/erp/ledger", {
+      method:"PUT", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        transaction_id: editTxn.id,
+        type: editForm.type,
+        amount: editForm.amount,
+        description: editForm.description,
+        created_by: user.id,
+      }),
+    }).then(r=>r.json()).catch(()=>({}));
+    if (res.success) {
+      setMsg("✅ Transaction updated");
+      setEditTxn(null);
+      loadEmployee(selectedEmpId);
+    } else { setMsg(`❌ ${res.error||"Failed"}`); }
+    setEditSaving(false);
+    setTimeout(()=>setMsg(""),3000);
+  };
+
+  const deleteTxn = async (t: any) => {
+    if (!confirm(`Permanently delete this entry?\n\n${t.type === "debit" ? "↑ Debit" : "↓ Credit"} ${fmt(Number(t.amount))} — ${t.description||"no description"}\n\nBalance will recalculate automatically.`)) return;
+    const res = await fetch("/api/erp/ledger", {
+      method:"DELETE", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ transaction_id: t.id, created_by: user.id }),
+    }).then(r=>r.json()).catch(()=>({}));
+    if (res.success) {
+      setMsg("✅ Transaction deleted — balance recalculated");
+      loadEmployee(selectedEmpId);
+    } else { setMsg(`❌ ${res.error||"Failed"}`); }
     setTimeout(()=>setMsg(""),3000);
   };
 
@@ -204,7 +249,7 @@ function LedgerContent({ user }: { user: any }) {
           {/* Transactions Table */}
           <div className="erp-card" style={{padding:0,overflow:"hidden"}}>
             {/* Table Header */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 90px 90px",gap:0,background:"#F9F9F9",borderBottom:"2px solid #E5E5E5",padding:"10px 14px"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 90px 90px 80px",gap:0,background:"#F9F9F9",borderBottom:"2px solid #E5E5E5",padding:"10px 14px"}}>
               <div style={{fontSize:11,fontWeight:700,color:"#555",letterSpacing:"1px",textTransform:"uppercase"}}>Date & Details</div>
               <div style={{fontSize:11,fontWeight:700,color:"#DC2626",textAlign:"right",letterSpacing:"0.5px"}}>
                 You Gave<br/><span style={{fontSize:9,opacity:0.7}}>Credit (Cr)</span>
@@ -212,6 +257,7 @@ function LedgerContent({ user }: { user: any }) {
               <div style={{fontSize:11,fontWeight:700,color:"#16A34A",textAlign:"right",letterSpacing:"0.5px"}}>
                 You Got<br/><span style={{fontSize:9,opacity:0.7}}>Debit (Dr)</span>
               </div>
+              <div style={{fontSize:11,fontWeight:700,color:"#888",textAlign:"center",letterSpacing:"1px",textTransform:"uppercase"}}>Actions</div>
             </div>
 
             {/* Rows */}
@@ -222,7 +268,7 @@ function LedgerContent({ user }: { user: any }) {
                 <div style={{fontSize:13,marginTop:4}}>Use the buttons below to add entries!</div>
               </div>
             ) : withBal.map((t:any, i:number) => (
-              <div key={t.id} style={{display:"grid",gridTemplateColumns:"1fr 90px 90px",gap:0,padding:"12px 14px",borderBottom:"1px solid #F5F5F5",background:i%2===0?"#FFFFFF":"#FAFAFA"}}>
+              <div key={t.id} style={{display:"grid",gridTemplateColumns:"1fr 90px 90px 80px",gap:0,padding:"12px 14px",borderBottom:"1px solid #F5F5F5",background:i%2===0?"#FFFFFF":"#FAFAFA"}}>
                 <div>
                   {/* Fix 4 — payroll shows its month, not physical created_at */}
                   <div style={{fontSize:11,color:"#888",marginBottom:2}}>
@@ -250,19 +296,56 @@ function LedgerContent({ user }: { user: any }) {
                     ? <span style={{color:"#16A34A",fontWeight:700,fontSize:14}}>{fmt(Number(t.amount))}</span>
                     : <span style={{color:"#CCCCCC",fontSize:14}}>—</span>}
                 </div>
+                {/* Actions */}
+                <div style={{display:"flex",gap:4,alignItems:"center",justifyContent:"center",paddingTop:2}} className="no-print">
+                  <button onClick={()=>openEdit(t)} title="Edit" style={{background:"#EDE9FE",border:"1px solid #DDD6FE",color:"#5B21B6",borderRadius:6,padding:"4px 8px",fontSize:11,fontWeight:700,cursor:"pointer"}}>✏️</button>
+                  <button onClick={()=>deleteTxn(t)} title="Delete" style={{background:"#FEE2E2",border:"1px solid #FECACA",color:"#DC2626",borderRadius:6,padding:"4px 8px",fontSize:11,fontWeight:700,cursor:"pointer"}}>🗑</button>
+                </div>
               </div>
             ))}
 
             {/* Total row */}
             {withBal.length > 0 && (
-              <div style={{display:"grid",gridTemplateColumns:"1fr 90px 90px",gap:0,padding:"12px 14px",background:"#F9F9F9",borderTop:"2px solid #E5E5E5"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 90px 90px 80px",gap:0,padding:"12px 14px",background:"#F9F9F9",borderTop:"2px solid #E5E5E5"}}>
                 <div style={{fontWeight:700,fontSize:13,color:"#111"}}>Total</div>
                 <div style={{textAlign:"right",fontWeight:800,color:"#DC2626",fontSize:14}}>{fmt(totalGave)}</div>
                 <div style={{textAlign:"right",fontWeight:800,color:"#16A34A",fontSize:14}}>{fmt(totalGot)}</div>
+                <div/>
               </div>
             )}
           </div>
         </>
+      )}
+
+      {/* Edit Transaction Modal */}
+      {editTxn && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"#fff",borderRadius:16,maxWidth:420,width:"100%",padding:"28px 24px",boxShadow:"0 8px 32px rgba(0,0,0,0.15)"}}>
+            <div style={{fontWeight:700,fontSize:16,color:"#111",marginBottom:4}}>✏️ Edit Transaction</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:18}}>ID #{editTxn.id} · Balance will recalculate automatically</div>
+            <div style={{marginBottom:14}}>
+              <label style={{fontSize:11,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",color:"#666",display:"block",marginBottom:6}}>Type</label>
+              <select className="erp-select" value={editForm.type} onChange={e=>setEditForm(f=>({...f,type:e.target.value}))} style={{width:"100%"}}>
+                <option value="credit">↓ Credit (You Got)</option>
+                <option value="debit">↑ Debit (You Gave)</option>
+              </select>
+            </div>
+            <div style={{marginBottom:14}}>
+              <label style={{fontSize:11,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",color:"#666",display:"block",marginBottom:6}}>Amount (Rs.) *</label>
+              <input type="number" className="erp-input" value={editForm.amount} onChange={e=>setEditForm(f=>({...f,amount:e.target.value}))} style={{width:"100%",fontSize:16,fontWeight:700,color:editForm.type==="debit"?"#DC2626":"#16A34A"}} />
+            </div>
+            <div style={{marginBottom:20}}>
+              <label style={{fontSize:11,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",color:"#666",display:"block",marginBottom:6}}>Description</label>
+              <input type="text" className="erp-input" value={editForm.description} onChange={e=>setEditForm(f=>({...f,description:e.target.value}))} style={{width:"100%"}} />
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setEditTxn(null)} style={{background:"#F5F5F5",color:"#555",border:"none",borderRadius:9,padding:"12px",fontSize:14,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={saveEdit} disabled={editSaving||!editForm.amount} style={{background:"#5B21B6",color:"#fff",border:"none",borderRadius:9,padding:"12px",fontSize:14,fontWeight:700,cursor:"pointer",opacity:(editSaving||!editForm.amount)?0.5:1}}>
+                {editSaving?"Saving...":"💾 Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Sticky Action Buttons — hidden on print */}

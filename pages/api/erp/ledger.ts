@@ -109,14 +109,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ success: true, id: result.insertId });
     }
 
+    // PUT — create new account (existing)
     if (req.method === 'PUT') {
-      const { name, type, opening_balance } = req.body;
-      if (!name || !type) return res.status(400).json({ error: 'Missing fields' });
+      const body = req.body;
+      // Detect: if body has 'transaction_id' it's an edit-transaction request
+      if (body.transaction_id) {
+        const { transaction_id, type, amount, description, created_by } = body;
+        if (!transaction_id) return res.status(400).json({ error: 'transaction_id required' });
+
+        // Fetch old transaction to calculate difference
+        const [oldRows]: any = await pool.query('SELECT * FROM erp_transactions WHERE id=?', [transaction_id]);
+        if (!oldRows.length) return res.status(404).json({ error: 'Transaction not found' });
+        const old = oldRows[0];
+
+        // Update the transaction
+        await pool.query(
+          'UPDATE erp_transactions SET type=?,amount=?,description=? WHERE id=?',
+          [type||old.type, amount||old.amount, description??old.description, transaction_id]
+        );
+
+        // Balance auto-syncs dynamically from SUM of transactions — no manual update needed
+        await pool.query('INSERT INTO erp_audit_log (user_id,action,details) VALUES (?,?,?)',
+          [created_by||null, 'LEDGER_TXN_EDIT',
+           `Transaction #${transaction_id} updated: ${old.type}/${old.amount} → ${type||old.type}/${amount||old.amount}`]
+        ).catch(()=>{});
+
+        return res.status(200).json({ success: true });
+      }
+
+      // Otherwise: create new account
+      const { name, type: acctType, opening_balance } = body;
+      if (!name || !acctType) return res.status(400).json({ error: 'Missing fields' });
       const [result]: any = await pool.query(
         'INSERT INTO erp_accounts (name,type,opening_balance) VALUES (?,?,?)',
-        [name, type, opening_balance||0]
+        [name, acctType, opening_balance||0]
       );
       return res.status(200).json({ success: true, id: result.insertId });
+    }
+
+    // DELETE — permanently remove a transaction
+    if (req.method === 'DELETE') {
+      const { transaction_id, created_by } = req.body;
+      if (!transaction_id) return res.status(400).json({ error: 'transaction_id required' });
+
+      const [oldRows]: any = await pool.query('SELECT * FROM erp_transactions WHERE id=?', [transaction_id]);
+      if (!oldRows.length) return res.status(404).json({ error: 'Transaction not found' });
+      const old = oldRows[0];
+
+      await pool.query('DELETE FROM erp_transactions WHERE id=?', [transaction_id]);
+
+      // Balance recalculates dynamically from erp_transactions SUM — no manual update needed
+      await pool.query('INSERT INTO erp_audit_log (user_id,action,details) VALUES (?,?,?)',
+        [created_by||null, 'LEDGER_TXN_DELETE',
+         `Transaction #${transaction_id} deleted: ${old.type} Rs.${old.amount} — ${old.description||''}`]
+      ).catch(()=>{});
+
+      return res.status(200).json({ success: true, deleted_type: old.type, deleted_amount: old.amount });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
