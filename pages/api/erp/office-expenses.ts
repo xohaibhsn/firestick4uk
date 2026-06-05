@@ -45,28 +45,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isOneTimePost = req.method === 'POST' &&
       (!req.body?.expense_type || req.body.expense_type === 'one_time');
     if (!isOneTimePost) {
-      const [genCheck]: any = await pool.query(
-        `SELECT COUNT(*) as cnt FROM erp_office_expenses WHERE billing_month=?`,
-        [curMonth]
+      // Fetch every registered recurring template
+      const [templates]: any = await pool.query(
+        `SELECT * FROM erp_office_expenses WHERE billing_cycle='monthly' AND billing_month IS NULL`
       );
-      if (Number(genCheck[0]?.cnt || 0) === 0) {
-        const [templates]: any = await pool.query(
-          `SELECT * FROM erp_office_expenses WHERE billing_cycle='monthly' AND billing_month IS NULL`
-        );
-        if (Array.isArray(templates) && templates.length > 0) {
-          const [yr, mo] = curMonth.split('-').map(Number);
-          const dueDate = new Date(yr, mo, 0).toISOString().slice(0, 10); // last day of month
-          for (const t of templates) {
-            // Fixed: copy baseline amount. Variable: start at 0 (pending input).
-            const amt = t.expense_type === 'recurring_variable' ? 0 : (Number(t.amount) || 0);
-            await pool.query(
-              `INSERT INTO erp_office_expenses
-               (date,category,description,amount,notes,added_by,expense_type,status,due_date,billing_cycle,billing_month)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-              [dueDate, t.category, t.description, amt, t.notes || '', t.added_by || '',
-               t.expense_type, 'due', dueDate, 'monthly', curMonth]
-            );
-          }
+      if (Array.isArray(templates) && templates.length > 0) {
+        const [yr, mo] = curMonth.split('-').map(Number);
+        const dueDate = new Date(yr, mo, 0).toISOString().slice(0, 10); // last day of month
+        for (const t of templates) {
+          // Per-template idempotency: check whether THIS template already has a
+          // generated instance for the current month. A blind total count was the
+          // previous bug — one existing instance blocked all remaining templates.
+          const [existing]: any = await pool.query(
+            `SELECT id FROM erp_office_expenses
+             WHERE billing_month=? AND billing_cycle='monthly' AND category=? AND description=?
+             LIMIT 1`,
+            [curMonth, t.category, t.description]
+          );
+          if (Array.isArray(existing) && existing.length > 0) continue; // already generated
+          // Fixed: copy baseline amount. Variable: start at Rs. 0 (pending admin input).
+          const amt = t.expense_type === 'recurring_variable' ? 0 : (Number(t.amount) || 0);
+          await pool.query(
+            `INSERT INTO erp_office_expenses
+             (date,category,description,amount,notes,added_by,expense_type,status,due_date,billing_cycle,billing_month)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+            [dueDate, t.category, t.description, amt, t.notes || '', t.added_by || '',
+             t.expense_type, 'due', dueDate, 'monthly', curMonth]
+          );
         }
       }
     }
