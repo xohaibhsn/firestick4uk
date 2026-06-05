@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ProductDetail from "./ProductDetail";
+import pool from "../../../lib/db";
 
 interface Product {
   id: number; name: string; description: string;
@@ -11,23 +12,10 @@ interface Product {
 
 async function getProduct(slug: string): Promise<Product | null> {
   try {
-    const mysql = require("mysql2/promise");
-    const conn = await Promise.race([
-      mysql.createConnection({
-        host: process.env.DB_HOST || "srv497.hstgr.io",
-        user: process.env.DB_USER || "u992747032_firestick4uk",
-        password: process.env.DB_PASSWORD || "Firestick@2026",
-        database: process.env.DB_NAME || "u992747032_firestick4uk",
-        port: Number(process.env.DB_PORT) || 3306,
-        connectTimeout: 5000,
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 6000)),
-    ]) as any;
-    const [rows]: any = await conn.query(
+    const [rows]: any = await pool.query(
       "SELECT * FROM products WHERE active = 1 AND LOWER(REPLACE(REPLACE(name, ' ', '-'), '/', '')) = ? LIMIT 1",
       [slug.toLowerCase()]
     );
-    await conn.end();
     return rows[0] || null;
   } catch {
     return null;

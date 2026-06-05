@@ -1,6 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
 
+function checkAdminAuth(req: any): boolean {
+  const session = req.headers['x-admin-session'] || req.cookies?.sAdminSession;
+  return !!session;
+}
+
+
+
 const DEFAULTS = [
   ['home_hero','{"title":"Best Firestick Service in UK","subtitle":"Premium IPTV & Streaming Solutions","button_text":"Shop Now","button_link":"/products","secondary_button_text":"Learn More","secondary_button_link":"/about"}','json','home','Hero Section',1,1],
   ['home_featured_products','{"title":"Our Products","subtitle":"Premium streaming solutions for every need","show_count":6}','json','home','Featured Products Section',2,1],
@@ -14,6 +21,8 @@ const DEFAULTS = [
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
+    if (req.method !== 'GET' && !checkAdminAuth(req)) return res.status(403).json({ error: 'Forbidden' });
+
     // Create table if it doesn't exist yet
     await pool.query(`
       CREATE TABLE IF NOT EXISTS site_content (

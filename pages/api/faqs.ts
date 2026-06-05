@@ -1,6 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
 
+function checkAdminAuth(req: any): boolean {
+  const session = req.headers['x-admin-session'] || req.cookies?.sAdminSession;
+  return !!session;
+}
+
+
+
 const DEFAULT_FAQS = [
   ['How do I place an order?','Browse our products, add items to your cart, fill in your delivery details, choose your payment method (bank transfer or cash on delivery), and click Place Order. You\'ll receive an Order ID instantly.','Orders & Payment',1],
   ['What payment methods do you accept?','We accept UK bank transfer and cash on delivery. For bank transfer, our account details are shown at checkout. Simply transfer the amount and upload your receipt — we verify it manually within a few hours.','Orders & Payment',2],
@@ -22,6 +29,8 @@ const DEFAULT_FAQS = [
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
+    if (req.method !== 'GET' && !checkAdminAuth(req)) return res.status(403).json({ error: 'Forbidden' });
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS faqs (
         id INT AUTO_INCREMENT PRIMARY KEY,

@@ -4,8 +4,16 @@ import cloudinary from '../../lib/cloudinary';
 
 export const config = { api: { bodyParser: { sizeLimit: '2mb' } } };
 
+function checkAdminAuth(req: any): boolean {
+  const session = req.headers['x-admin-session'] || req.cookies?.sAdminSession;
+  return !!session;
+}
+
+
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!checkAdminAuth(req)) return res.status(403).json({ error: 'Forbidden' });
   try {
     const { file, name } = req.body;
     if (!file || !name) return res.status(400).json({ error: 'No file provided' });

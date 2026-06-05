@@ -1,5 +1,25 @@
 "use client";
 import { useState } from "react";
+import xss from "xss";
+
+// Allowed HTML tags from TipTap editor output
+const xssOptions = {
+  whiteList: {
+    h1: [], h2: [], h3: [], h4: [],
+    p: ["style", "class"],
+    strong: [], em: [], u: [], s: [], b: [], i: [],
+    ul: [], ol: [], li: [],
+    blockquote: [],
+    a: ["href", "target", "rel"],
+    img: ["src", "alt", "width", "height", "class"],
+    br: [], hr: [],
+    span: ["style", "class"],
+    div: ["style", "class"],
+    pre: [], code: [],
+  } as Record<string, string[]>,
+  stripIgnoreTag: true,
+  stripIgnoreTagBody: ["script", "style", "iframe", "object", "embed"],
+};
 
 interface Post {
   id: number; title: string; slug: string; content: string; excerpt: string;
@@ -145,7 +165,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
             )}
             {post.excerpt && <div className="post-excerpt">{post.excerpt}</div>}
             {post.content && (
-              <div className="post-content" dangerouslySetInnerHTML={{ __html: post.content }} />
+              <div className="post-content" dangerouslySetInnerHTML={{ __html: xss(post.content || "", xssOptions) }} />
             )}
 
             {faqs.length > 0 && (

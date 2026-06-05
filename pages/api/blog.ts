@@ -1,8 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
 
+function checkAdminAuth(req: any): boolean {
+  const session = req.headers['x-admin-session'] || req.cookies?.sAdminSession;
+  return !!session;
+}
+
+
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
+    if (req.method !== 'GET' && !checkAdminAuth(req)) return res.status(403).json({ error: 'Forbidden' });
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS blog_posts (
         id INT AUTO_INCREMENT PRIMARY KEY,
