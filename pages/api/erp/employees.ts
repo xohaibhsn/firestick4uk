@@ -6,6 +6,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Auto-add reports_to column if not exists
     try { await pool.query('ALTER TABLE erp_users ADD COLUMN reports_to INT NULL'); } catch (_) {}
+    // Ensure 'vendor' is in the role ENUM (one-time migration, safe to re-run)
+    try { await pool.query(`ALTER TABLE erp_users MODIFY COLUMN role ENUM('admin','manager','employee','vendor') DEFAULT 'employee'`); } catch (_) {}
 
     if (req.method === 'GET') {
       const { role_filter, reports_to, id: emp_id } = req.query;
