@@ -60,10 +60,18 @@ function MyLedgerContent({ user }: { user: any }) {
   }, [user.id]);
 
   const filtered = txns.filter(t => {
+    // Payroll: use payroll_month not created_at for cutoff
     if (t.reference_type === 'payroll') {
       const pm = t.payroll_month || String(t.created_at||"").slice(0,7);
       if (pm > LEDGER_CUTOFF) return false;
-    } else {
+    }
+    // Fix 2: manual_entry / salary / advance / employee_request — NEVER apply month cutoff
+    // These are admin-initiated and can happen any time (current month is valid)
+    else if (['manual_entry','salary','advance','employee_request','expense'].includes(t.reference_type)) {
+      // No cutoff — always show
+    }
+    // Everything else: apply created_at cutoff
+    else {
       const txMonth = String(t.created_at || "").slice(0, 7);
       if (txMonth && txMonth > LEDGER_CUTOFF) return false;
     }
@@ -97,7 +105,7 @@ function MyLedgerContent({ user }: { user: any }) {
       {/* FIX 2B — Summary Cards with updated enterprise terminology */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
         <div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:12,padding:"12px 14px"}}>
-          <div style={{fontSize:10,color:"#DC2626",fontWeight:600,letterSpacing:"0.5px",marginBottom:3}}>↑ YOU GAVE</div>
+          <div style={{fontSize:10,color:"#DC2626",fontWeight:600,letterSpacing:"0.5px",marginBottom:3}}>↑ YOU RECEIVED (Cr)</div>
           <div style={{fontSize:16,fontWeight:800,color:"#DC2626"}}>{fmt(totalGave)}</div>
           <div style={{fontSize:9,color:"#EF4444",marginTop:1}}>Credit (Cr)</div>
         </div>
@@ -127,7 +135,7 @@ function MyLedgerContent({ user }: { user: any }) {
       <div className="erp-card" style={{padding:0,overflow:"hidden"}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 90px 90px",background:"#F9F9F9",borderBottom:"2px solid #E5E5E5",padding:"10px 14px"}}>
           <div style={{fontSize:11,fontWeight:700,color:"#555",letterSpacing:"1px",textTransform:"uppercase"}}>Date & Details</div>
-          <div style={{fontSize:11,fontWeight:700,color:"#DC2626",textAlign:"right"}}>You Gave<br/><span style={{fontSize:9,opacity:0.7}}>Credit (Cr)</span></div>
+          <div style={{fontSize:11,fontWeight:700,color:"#DC2626",textAlign:"right"}}>You Received<br/><span style={{fontSize:9,opacity:0.7}}>Credit (Cr)</span></div>
           <div style={{fontSize:11,fontWeight:700,color:"#16A34A",textAlign:"right"}}>You Will Get<br/><span style={{fontSize:9,opacity:0.7}}>Debit (Dr)</span></div>
         </div>
 
