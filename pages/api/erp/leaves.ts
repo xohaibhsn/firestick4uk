@@ -6,6 +6,24 @@ const LIMITS: Record<string,number> = { annual:14, sick:10, emergency:3 };
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
 
+    // Auto-fix: cancel any approved leave records where attendance was overridden
+    // to weekly_off, present, absent, or non-leave status on the same date.
+    // This retroactively fixes cases that occurred before the cancellation logic was deployed.
+    try {
+      await pool.query(`
+        UPDATE erp_leaves l
+        SET l.status = 'cancelled'
+        WHERE l.status = 'approved'
+          AND EXISTS (
+            SELECT 1 FROM erp_attendance a
+            WHERE a.employee_id = l.employee_id
+              AND a.date BETWEEN l.from_date AND l.to_date
+              AND a.status IN ('weekly_off','present','absent','half_day','late','public_holiday')
+              AND a.is_manual = 1
+          )
+      `);
+    } catch (_) {}
+
     if (req.method === 'GET') {
       const { employee_id, balance, year } = req.query;
 
