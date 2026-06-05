@@ -46,6 +46,11 @@ function LedgerContent({ user }: { user: any }) {
   const [editForm, setEditForm] = useState({ type:"credit", amount:"", description:"" });
   const [editSaving, setEditSaving] = useState(false);
 
+  // P&L tab
+  const [activeView, setActiveView] = useState<"ledger"|"pnl">("ledger");
+  const [pnl, setPnl] = useState<any>(null);
+  const [pnlLoading, setPnlLoading] = useState(false);
+
   useEffect(() => {
     fetch("/api/erp/employees").then(r=>r.json()).then(d=>{
       if (Array.isArray(d)) setEmployees(d.filter((e:any)=>e.active));
@@ -133,6 +138,13 @@ function LedgerContent({ user }: { user: any }) {
     setTimeout(()=>setMsg(""),3000);
   };
 
+  const loadPnl = async () => {
+    setPnlLoading(true);
+    const data = await fetch('/api/erp/coa?pnl=1').then(r=>r.json()).catch(()=>null);
+    if (data) setPnl(data);
+    setPnlLoading(false);
+  };
+
   const deleteTxn = async (t: any) => {
     if (!confirm(`Permanently delete this entry?\n\n${t.type === "debit" ? "↑ Debit" : "↓ Credit"} ${fmt(Number(t.amount))} — ${t.description||"no description"}\n\nBalance will recalculate automatically.`)) return;
     const res = await fetch("/api/erp/ledger", {
@@ -181,6 +193,24 @@ function LedgerContent({ user }: { user: any }) {
       `}</style>
 
       <div style={{paddingBottom:90}}>
+
+      {/* ── View Tabs ─────────────────────────────────────────────────────────── */}
+      <div style={{display:"flex",gap:3,background:"#EBEBEB",padding:3,borderRadius:10,marginBottom:16,width:"fit-content"}}>
+        <button
+          style={{padding:"8px 18px",borderRadius:7,border:"none",background:activeView==="ledger"?"#111111":"transparent",color:activeView==="ledger"?"#FFFFFF":"#666666",fontWeight:600,fontSize:13,cursor:"pointer",transition:"all 0.15s"}}
+          onClick={()=>setActiveView("ledger")}
+        >📒 Employee Ledger</button>
+        <button
+          style={{padding:"8px 18px",borderRadius:7,border:"none",background:activeView==="pnl"?"#111111":"transparent",color:activeView==="pnl"?"#FFFFFF":"#666666",fontWeight:600,fontSize:13,cursor:"pointer",transition:"all 0.15s"}}
+          onClick={()=>{ setActiveView("pnl"); if(!pnl) loadPnl(); }}
+        >📈 P&amp;L Statement</button>
+      </div>
+
+      {/* ── P&L Panel ─────────────────────────────────────────────────────────── */}
+      {activeView === "pnl" && <PnLPanel pnl={pnl} loading={pnlLoading} onRefresh={loadPnl} />}
+
+      {/* ── Employee Ledger ───────────────────────────────────────────────────── */}
+      {activeView === "ledger" && <>
       {/* Employee Selector + Export button */}
       <div className="erp-card no-print" style={{marginBottom:16}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
@@ -402,7 +432,139 @@ function LedgerContent({ user }: { user: any }) {
           </div>
         </div>
       )}
+    </>}
     </div>
     </>
+  );
+}
+
+// ── P&L Panel ─────────────────────────────────────────────────────────────────
+function PnLPanel({ pnl, loading, onRefresh }: { pnl: any; loading: boolean; onRefresh: () => void }) {
+  const fmt = (n: number) => `Rs. ${Math.abs(Math.round(n)).toLocaleString("en-PK")}`;
+
+  if (loading) {
+    return (
+      <div style={{textAlign:"center",padding:"80px 20px",color:"#888"}}>
+        <div style={{fontSize:32,marginBottom:12}}>⏳</div>
+        <div style={{fontWeight:600}}>Loading P&amp;L data…</div>
+      </div>
+    );
+  }
+
+  if (!pnl) {
+    return (
+      <div style={{textAlign:"center",padding:"80px 20px",color:"#888",background:"#FAFAFA",borderRadius:14,border:"1px solid #E5E5E5"}}>
+        <div style={{fontSize:36,marginBottom:12}}>📈</div>
+        <div style={{fontWeight:600,color:"#555",marginBottom:12}}>Profit &amp; Loss Statement</div>
+        <button onClick={onRefresh} style={{background:"#111111",color:"#fff",border:"none",borderRadius:9,padding:"12px 24px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+          Load P&amp;L Report
+        </button>
+      </div>
+    );
+  }
+
+  const net = Number(pnl.netProfit ?? 0);
+  const totalRev = Number(pnl.totalRevenue ?? 0);
+  const totalExp = Number(pnl.totalExpenses ?? 0);
+  const netPos = net >= 0;
+
+  return (
+    <div>
+      {/* Hero net profit card */}
+      <div style={{
+        background: netPos
+          ? "linear-gradient(135deg,#052e16 0%,#166534 100%)"
+          : "linear-gradient(135deg,#450a0a 0%,#991b1b 100%)",
+        borderRadius:16,padding:"32px 28px",marginBottom:20,
+        boxShadow:"0 8px 32px rgba(0,0,0,0.18)",position:"relative",overflow:"hidden"
+      }}>
+        <div style={{position:"absolute",top:-20,right:-20,fontSize:100,opacity:0.07,userSelect:"none"}}>{netPos?"📈":"📉"}</div>
+        <div style={{fontSize:12,letterSpacing:"2px",textTransform:"uppercase",color:"rgba(255,255,255,0.6)",marginBottom:8,fontWeight:600}}>
+          Net {netPos ? "Profit" : "Loss"}
+        </div>
+        <div style={{fontFamily:"'Cinzel',serif",fontSize:42,fontWeight:900,color:"#FFFFFF",lineHeight:1,marginBottom:10}}>
+          {netPos ? "" : "−"}{fmt(Math.abs(net))}
+        </div>
+        <div style={{display:"flex",gap:24,flexWrap:"wrap",marginTop:16}}>
+          <div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",letterSpacing:"1px",textTransform:"uppercase",marginBottom:2}}>Total Revenue</div>
+            <div style={{fontSize:18,fontWeight:700,color:"#4ADE80"}}>{fmt(totalRev)}</div>
+          </div>
+          <div style={{width:1,background:"rgba(255,255,255,0.15)"}}/>
+          <div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",letterSpacing:"1px",textTransform:"uppercase",marginBottom:2}}>Total Expenses</div>
+            <div style={{fontSize:18,fontWeight:700,color:"#FCA5A5"}}>{fmt(totalExp)}</div>
+          </div>
+        </div>
+        <button onClick={onRefresh} style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,0.12)",color:"#fff",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+          ↻ Refresh
+        </button>
+      </div>
+
+      {/* Revenue + Expenses side by side */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
+
+        {/* Revenue table */}
+        <div className="erp-card" style={{padding:0,overflow:"hidden"}}>
+          <div style={{padding:"14px 16px",background:"rgba(22,163,74,0.06)",borderBottom:"2px solid rgba(22,163,74,0.15)"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#16A34A",letterSpacing:"1.5px",textTransform:"uppercase"}}>💰 Revenue Streams</div>
+          </div>
+          {(pnl.revenues || []).length === 0
+            ? <div style={{padding:"28px 16px",textAlign:"center",color:"#AAA",fontSize:13}}>No revenue entries yet</div>
+            : (pnl.revenues || []).map((r: any) => (
+              <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 16px",borderBottom:"1px solid #F5F5F5"}}>
+                <div style={{fontSize:13,color:"#333",fontWeight:500}}>{r.account_name}</div>
+                <div style={{fontSize:14,fontWeight:700,color:"#16A34A"}}>{fmt(Number(r.total))}</div>
+              </div>
+            ))
+          }
+          <div style={{display:"flex",justifyContent:"space-between",padding:"12px 16px",background:"rgba(22,163,74,0.05)",borderTop:"2px solid rgba(22,163,74,0.15)"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#16A34A",letterSpacing:"0.5px",textTransform:"uppercase"}}>Total</div>
+            <div style={{fontSize:15,fontWeight:800,color:"#16A34A"}}>{fmt(totalRev)}</div>
+          </div>
+        </div>
+
+        {/* Expense table */}
+        <div className="erp-card" style={{padding:0,overflow:"hidden"}}>
+          <div style={{padding:"14px 16px",background:"rgba(220,38,38,0.06)",borderBottom:"2px solid rgba(220,38,38,0.15)"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#DC2626",letterSpacing:"1.5px",textTransform:"uppercase"}}>💸 Expense Heads</div>
+          </div>
+          {(pnl.expenses || []).length === 0
+            ? <div style={{padding:"28px 16px",textAlign:"center",color:"#AAA",fontSize:13}}>No expense entries yet</div>
+            : (pnl.expenses || []).map((e: any) => (
+              <div key={e.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 16px",borderBottom:"1px solid #F5F5F5"}}>
+                <div style={{fontSize:13,color:"#333",fontWeight:500}}>{e.account_name}</div>
+                <div style={{fontSize:14,fontWeight:700,color:"#DC2626"}}>{fmt(Number(e.total))}</div>
+              </div>
+            ))
+          }
+          <div style={{display:"flex",justifyContent:"space-between",padding:"12px 16px",background:"rgba(220,38,38,0.05)",borderTop:"2px solid rgba(220,38,38,0.15)"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#DC2626",letterSpacing:"0.5px",textTransform:"uppercase"}}>Total</div>
+            <div style={{fontSize:15,fontWeight:800,color:"#DC2626"}}>{fmt(totalExp)}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary footer */}
+      <div className="erp-card" style={{padding:0,overflow:"hidden"}}>
+        <div style={{padding:"12px 20px",background:"#F9F9F9",borderBottom:"1px solid #EEEEEE"}}>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:"1.5px",textTransform:"uppercase",color:"#555"}}>Summary</div>
+        </div>
+        {[
+          { label:"Total Revenue",  val:totalRev,        colour:"#16A34A" },
+          { label:"Total Expenses", val:totalExp,        colour:"#DC2626", minus:true },
+          { label:`Net ${netPos?"Profit":"Loss"}`, val:net, colour: netPos?"#16A34A":"#DC2626", bold:true },
+        ].map((row,i) => (
+          <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 20px",borderBottom:"1px solid #F5F5F5",background:row.bold?"#F9F9F9":"#FFFFFF"}}>
+            <div style={{fontSize:13,fontWeight:row.bold?700:500,color:row.bold?"#111":"#444"}}>
+              {row.minus ? "−  " : ""}{row.label}
+            </div>
+            <div style={{fontSize:row.bold?17:14,fontWeight:row.bold?800:600,color:row.colour,fontFamily:row.bold?"'Cinzel',serif":undefined}}>
+              {row.val < 0 ? "−" : ""}{fmt(Math.abs(row.val))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

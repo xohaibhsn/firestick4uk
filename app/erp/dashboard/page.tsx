@@ -23,6 +23,7 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
   const fmt = (n: number) => `Rs. ${Math.round(n).toLocaleString()}`;
   const [stats, setStats] = useState({ employees:0, pendingExpenses:0, pendingLeaves:0, todayAttendance:0 });
   const [officeExpSummary, setOfficeExpSummary] = useState<any>({ total:0, categories:[] });
+  const [cashBals, setCashBals] = useState<Record<string,number>>({});
   const [todayStatus, setTodayStatus] = useState<any>(null);
   const [myExpenses, setMyExpenses] = useState<any[]>([]);
   const [myLeaves, setMyLeaves] = useState<any[]>([]);
@@ -37,6 +38,13 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
       fetch("/api/erp/expenses").then(r=>r.json()).then(d=>setStats(s=>({...s,pendingExpenses:d.filter((e:any)=>e.status==="pending").length}))).catch(()=>{});
       fetch("/api/erp/leaves").then(r=>r.json()).then(d=>setStats(s=>({...s,pendingLeaves:d.filter((l:any)=>l.status==="pending").length}))).catch(()=>{});
       fetch(`/api/erp/office-expenses?summary=1&month=${curMonth}`).then(r=>r.json()).then(d=>setOfficeExpSummary(d||{total:0,categories:[]})).catch(()=>{});
+      fetch('/api/erp/coa?balances=1').then(r=>r.json()).then((d:any[]) => {
+        if (Array.isArray(d)) {
+          const m: Record<string,number> = {};
+          d.forEach(a => { m[a.account_name] = Number(a.balance ?? 0); });
+          setCashBals(m);
+        }
+      }).catch(()=>{});
     } else {
       fetch(`/api/erp/expenses?employee_id=${user.id}`).then(r=>r.json()).then(d=>setMyExpenses(d.slice(0,4))).catch(()=>{});
       fetch(`/api/erp/leaves?employee_id=${user.id}`).then(r=>r.json()).then(d=>setMyLeaves(d.slice(0,4))).catch(()=>{});
@@ -99,6 +107,26 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
                 </div>
               </a>
             ))}
+            {/* Cash & Bank live balance widgets */}
+            {[
+              { icon:"💵", label:"Cash In Hand",    key:"Cash In Hand",      accent:"#16A34A", bg:"rgba(22,163,74,0.05)",   border:"rgba(22,163,74,0.2)"   },
+              { icon:"🏦", label:"Main Bank Acct.", key:"Main Bank Account", accent:"#2563EB", bg:"rgba(37,99,235,0.05)",   border:"rgba(37,99,235,0.18)"  },
+            ].map(c => {
+              const bal = cashBals[c.key];
+              if (bal === undefined) return null;
+              const neg = bal < 0;
+              const colour = neg ? "#DC2626" : c.accent;
+              return (
+                <div key={c.key} className="erp-stat" style={{background:c.bg,border:`1px solid ${neg?"rgba(220,38,38,0.2)":c.border}`}}>
+                  <div className="erp-stat-icon">{c.icon}</div>
+                  <div style={{fontFamily:"'Cinzel',serif",fontSize:18,fontWeight:700,color:colour,lineHeight:1.2}}>
+                    {neg ? "−" : ""}Rs.&nbsp;{Math.abs(Math.round(bal)).toLocaleString()}
+                  </div>
+                  <div className="erp-stat-label">{c.label}</div>
+                  {neg && <div style={{fontSize:10,color:"#DC2626",marginTop:3}}>Net outflow</div>}
+                </div>
+              );
+            })}
           </div>
 
           {/* Office Expenses Summary */}

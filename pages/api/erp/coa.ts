@@ -40,7 +40,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await bootstrap();
 
     if (req.method === 'GET') {
-      const { type } = req.query;
+      const { type, balances, pnl } = req.query;
+
+      // Asset account balances: opening + DR - CR (assets increase on debit)
+      if (balances) {
+        const [rows]: any = await pool.query(`
+          SELECT c.id, c.account_name, c.account_type,
+            COALESCE(a.opening_balance, 0) + COALESCE(
+              SUM(CASE WHEN t.type='debit' THEN t.amount WHEN t.type='credit' THEN -t.amount ELSE 0 END), 0
+            ) AS balance
+          FROM erp_chart_of_accounts c
+          LEFT JOIN erp_accounts a ON a.name = c.account_name AND a.type = 'company'
+          LEFT JOIN erp_transactions t ON t.coa_id = c.id
+          WHERE c.account_type = 'asset'
+          GROUP BY c.id, c.account_name, c.account_type, a.opening_balance
+          ORDER BY c.account_name
+        `);
+        return res.status(200).json(Array.isArray(rows) ? rows : []);
+      }
+
+      // Profit & Loss: revenue credits vs expense debits
+      if (pnl) {
+        const [revRows]: any = await pool.query(`
+          SELECT c.id, c.account_name, COALESCE(SUM(t.amount), 0) AS total
+          FROM erp_chart_of_accounts c
+          LEFT JOIN erp_transactions t ON t.coa_id = c.id AND t.type = 'credit'
+          WHERE c.account_type = 'revenue'
+          GROUP BY c.id, c.account_name ORDER BY total DESC
+        `);
+        const [expRows]: any = await pool.query(`
+          SELECT c.id, c.account_name, COALESCE(SUM(t.amount), 0) AS total
+          FROM erp_chart_of_accounts c
+          LEFT JOIN erp_transactions t ON t.coa_id = c.id AND t.type = 'debit'
+          WHERE c.account_type = 'expense'
+          GROUP BY c.id, c.account_name ORDER BY total DESC
+        `);
+        const revenues = Array.isArray(revRows) ? revRows : [];
+        const expenses = Array.isArray(expRows) ? expRows : [];
+        const totalRevenue  = revenues.reduce((s: number, r: any) => s + Number(r.total || 0), 0);
+        const totalExpenses = expenses.reduce((s: number, e: any) => s + Number(e.total || 0), 0);
+        return res.status(200).json({ revenues, expenses, totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses });
+      }
+
       const [rows] = type
         ? await pool.query('SELECT * FROM erp_chart_of_accounts WHERE account_type=? ORDER BY account_name', [type])
         : await pool.query('SELECT * FROM erp_chart_of_accounts ORDER BY account_type, account_name');
