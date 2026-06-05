@@ -8,6 +8,11 @@ function checkAdminAuth(req: NextApiRequest): boolean {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!checkAdminAuth(req)) return res.status(403).json({ error: 'Forbidden' });
+  // Writers cannot mutate products
+  const role = req.headers['x-admin-role'] as string;
+  if (req.method !== 'GET' && role === 'writer') {
+    return res.status(403).json({ error: 'Forbidden: Writers cannot modify products' });
+  }
   try {
     for (const col of [
       "ALTER TABLE products ADD COLUMN short_description TEXT",

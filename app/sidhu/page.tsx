@@ -209,12 +209,19 @@ const demoCustomers = [
   { name:"Emma Wilson", email:"emma@example.com", phone:"+44 7444 444444", orders:1, spent:"£9.99", joined:"May 2026" },
 ];
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff";
+type AdminRole = "super_admin"|"manager"|"writer";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
 
 export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false);
+  const [adminRole, setAdminRole] = useState<AdminRole>("super_admin");
+  const [adminName, setAdminName] = useState("Admin");
+  const [staffUsers, setStaffUsers] = useState<any[]>([]);
+  const [staffForm, setStaffForm] = useState({ name:"", email:"", password:"", role:"writer" });
+  const [staffModal, setStaffModal] = useState<any>(null);
+  const [staffMsg, setStaffMsg] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -267,7 +274,11 @@ export default function AdminPage() {
   const [faqMsg, setFaqMsg] = useState("");
 
   useEffect(() => {
-    if (localStorage.getItem("sAdminSession") === "true") setLoggedIn(true);
+    if (localStorage.getItem("sAdminSession") === "true") {
+      setLoggedIn(true);
+      setAdminRole((localStorage.getItem("sAdminRole") || "super_admin") as AdminRole);
+      setAdminName(localStorage.getItem("sAdminName") || "Admin");
+    }
   }, []);
 
   useEffect(() => {
@@ -327,6 +338,10 @@ export default function AdminPage() {
       .catch(() => {});
     fetch("/api/sections?page=home&all=1").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); }).catch(()=>{});
     fetch("/api/faqs?admin=true").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setFaqs(d); }).catch(()=>{});
+    if (adminRole === "super_admin") {
+      fetch("/api/admin-staff", { headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"", "x-admin-role": "super_admin" } })
+        .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setStaffUsers(d); }).catch(()=>{});
+    }
   }, [loggedIn]);
 
   const saveContent = async (keys: string[]) => {
@@ -359,6 +374,10 @@ export default function AdminPage() {
       }).then(r => r.json());
       if (res.success) {
         localStorage.setItem("sAdminSession", "true");
+        localStorage.setItem("sAdminRole", res.role || "super_admin");
+        localStorage.setItem("sAdminName", res.name || "Admin");
+        setAdminRole((res.role || "super_admin") as AdminRole);
+        setAdminName(res.name || "Admin");
         setLoggedIn(true);
         setLoginError("");
       } else {
@@ -371,7 +390,38 @@ export default function AdminPage() {
 
   const handleLogout = () => {
     localStorage.removeItem("sAdminSession");
+    localStorage.removeItem("sAdminRole");
+    localStorage.removeItem("sAdminName");
     setLoggedIn(false);
+    setAdminRole("super_admin");
+  };
+
+  // Helper: pass role in all admin API headers (SSR-safe)
+  const getRoleHeaders = () => ({
+    "x-admin-session": typeof window !== "undefined" ? localStorage.getItem("sAdminSession")||"" : "",
+    "x-admin-role": adminRole,
+  });
+
+  const loadStaff = () => {
+    fetch("/api/admin-staff", { headers: getRoleHeaders() })
+      .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setStaffUsers(d); }).catch(()=>{});
+  };
+
+  const saveStaff = async () => {
+    if (!staffForm.name||!staffForm.email) { setStaffMsg("❌ Name and email required"); return; }
+    if (staffModal==="new" && !staffForm.password) { setStaffMsg("❌ Password required"); return; }
+    const method = staffModal==="new" ? "POST" : "PUT";
+    const body = staffModal==="new" ? staffForm : { ...staffForm, id: staffModal.id };
+    const res = await fetch("/api/admin-staff",{method,headers:{...getRoleHeaders(),"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json()).catch(()=>({}));
+    if (res.success) { setStaffMsg("✅ Saved!"); setStaffModal(null); loadStaff(); }
+    else setStaffMsg(`❌ ${res.error||"Failed"}`);
+    setTimeout(()=>setStaffMsg(""),3000);
+  };
+
+  const deleteStaff = async (id:number) => {
+    if (!confirm("Delete this staff user?")) return;
+    await fetch(`/api/admin-staff?id=${id}`,{method:"DELETE",headers:getRoleHeaders()});
+    loadStaff();
   };
 
   const updateStatus = (id: string, status: OrderStatus) => {
@@ -775,17 +825,18 @@ export default function AdminPage() {
           </div>
           <nav className="sidebar-nav">
             {([
-              { id:"dashboard", icon:"📊", label:"Dashboard" },
-              { id:"orders", icon:"🛒", label:"Orders", badge: pendingCount > 0 ? String(pendingCount) : null, badgeColor:"orange" },
-              { id:"products", icon:"📦", label:"Products" },
-              { id:"customers", icon:"👥", label:"Customers" },
-              { id:"blog", icon:"📝", label:"Blog" },
-              { id:"coupons", icon:"🎟️", label:"Coupons" },
-              { id:"builder", icon:"🎨", label:"Page Builder" },
-              { id:"faqadmin", icon:"❓", label:"FAQs" },
-              { id:"pages", icon:"📄", label:"Pages" },
-              { id:"settings", icon:"⚙️", label:"Site Settings" },
-            ] as const).map(item => (
+              { id:"dashboard", icon:"📊", label:"Dashboard", roles:["super_admin","manager","writer"] },
+              { id:"orders",    icon:"🛒", label:"Orders",       badge: pendingCount > 0 ? String(pendingCount) : null, badgeColor:"orange", roles:["super_admin","manager"] },
+              { id:"products",  icon:"📦", label:"Products",     roles:["super_admin","manager"] },
+              { id:"customers", icon:"👥", label:"Customers",    roles:["super_admin","manager"] },
+              { id:"blog",      icon:"📝", label:"Blog",         roles:["super_admin","manager","writer"] },
+              { id:"coupons",   icon:"🎟️", label:"Coupons",      roles:["super_admin"] },
+              { id:"builder",   icon:"🎨", label:"Page Builder", roles:["super_admin"] },
+              { id:"faqadmin",  icon:"❓", label:"FAQs",         roles:["super_admin","manager"] },
+              { id:"pages",     icon:"📄", label:"Pages",        roles:["super_admin"] },
+              { id:"staff",     icon:"👤", label:"Staff Users",  roles:["super_admin"] },
+              { id:"settings",  icon:"⚙️", label:"Site Settings",roles:["super_admin"] },
+            ] as const).filter(item => ([...item.roles] as string[]).includes(adminRole)).map(item => (
               <button key={item.id} className={`nav-item ${tab===item.id?"active":""}`} onClick={() => { setTab(item.id); setSidebarOpen(false); }}>
                 <span className="nav-icon">{item.icon}</span>
                 {item.label}
@@ -820,13 +871,13 @@ export default function AdminPage() {
             </div>
             <div className="top-right">
               <button className="admin-user-btn" onClick={() => setAdminDropOpen(o => !o)}>
-                👤 Admin <span style={{fontSize:10,color:"#888888"}}>{adminDropOpen?"▲":"▼"}</span>
+                👤 {adminName} <span style={{fontSize:10,color:"#888888"}}>{adminDropOpen?"▲":"▼"}</span>
               </button>
               {adminDropOpen && (
                 <div className="admin-dropdown" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
                   <div className="admin-dropdown-header">
-                    <div className="admin-dropdown-name">Admin</div>
-                    <div className="admin-dropdown-role">Administrator</div>
+                    <div className="admin-dropdown-name">{adminName}</div>
+                    <div className="admin-dropdown-role">{adminRole==="super_admin"?"Super Admin":adminRole==="manager"?"Manager":"Writer"}</div>
                   </div>
                   <button className="admin-dropdown-item danger" onClick={() => { setAdminDropOpen(false); handleLogout(); }}>
                     🚪 Logout
@@ -1314,6 +1365,71 @@ export default function AdminPage() {
                   }}>Save FAQ</button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* 👤 STAFF USERS */}
+          {tab==="staff" && adminRole==="super_admin" && (
+            <div>
+              {staffMsg && <div style={{marginBottom:14,padding:"10px 14px",background:staffMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:staffMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{staffMsg}</div>}
+              <div style={{marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:12,color:"#888",marginBottom:4}}>Role permissions: <strong>super_admin</strong> = full access · <strong>manager</strong> = products + blogs · <strong>writer</strong> = blogs only</div>
+                </div>
+                <button className="add-btn" onClick={()=>{ setStaffForm({name:"",email:"",password:"",role:"writer"}); setStaffModal("new"); setStaffMsg(""); }}>+ Add Staff</button>
+              </div>
+              <div className="section-card">
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {staffUsers.length===0&&<tr><td colSpan={7} style={{textAlign:"center",color:"#888",padding:24}}>No staff users yet. Add staff to delegate access.</td></tr>}
+                      {staffUsers.map((s:any)=>(
+                        <tr key={s.id}>
+                          <td style={{color:"#888",fontSize:12}}>#{s.id}</td>
+                          <td style={{fontWeight:600}}>{s.name}</td>
+                          <td style={{fontSize:12,color:"#888"}}>{s.email}</td>
+                          <td><span className={`status-badge ${s.role==="super_admin"?"status-confirmed":s.role==="manager"?"status-dispatched":"status-pending"}`}>{s.role}</span></td>
+                          <td><span className={`status-badge ${s.active?"status-delivered":"status-pending"}`}>{s.active?"Active":"Inactive"}</span></td>
+                          <td style={{fontSize:12,color:"#888"}}>{s.created_at ? new Date(s.created_at).toLocaleDateString("en-GB") : "—"}</td>
+                          <td style={{whiteSpace:"nowrap"}}>
+                            <button className="action-btn btn-edit" style={{marginRight:6}} onClick={()=>{ setStaffForm({name:s.name,email:s.email,password:"",role:s.role}); setStaffModal(s); setStaffMsg(""); }}>Edit</button>
+                            <button className="action-btn btn-delete" onClick={()=>deleteStaff(s.id)}>Delete</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {staffModal && (
+                <div className="modal-overlay">
+                  <div className="modal" onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+                    <div className="modal-title">{staffModal==="new"?"Add Staff User":"Edit Staff User"}</div>
+                    {staffMsg&&<div style={{marginBottom:10,color:staffMsg.startsWith("✅")?"#00c864":"#ff6666",fontSize:13}}>{staffMsg}</div>}
+                    <div className="modal-field"><label>Full Name *</label><input value={staffForm.name} onChange={e=>setStaffForm(f=>({...f,name:e.target.value}))} placeholder="Jane Smith" /></div>
+                    <div className="modal-field"><label>Email *</label><input type="email" value={staffForm.email} onChange={e=>setStaffForm(f=>({...f,email:e.target.value}))} placeholder="jane@example.com" /></div>
+                    <div className="modal-field"><label>{staffModal==="new"?"Password *":"New Password (leave blank to keep)"}</label><input type="password" value={staffForm.password} onChange={e=>setStaffForm(f=>({...f,password:e.target.value}))} placeholder="Password" /></div>
+                    <div className="modal-field">
+                      <label>Role *</label>
+                      <select value={staffForm.role} onChange={e=>setStaffForm(f=>({...f,role:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:"1px solid #E5E5E5",borderRadius:8,fontSize:14,background:"#fff",color:"#111"}}>
+                        <option value="writer">Writer — Blog access only</option>
+                        <option value="manager">Manager — Products + Blogs</option>
+                        <option value="super_admin">Super Admin — Full access</option>
+                      </select>
+                    </div>
+                    <div style={{fontSize:12,color:"#888",padding:"8px 0",lineHeight:1.6}}>
+                      🔒 <strong>writer</strong>: view/add/edit blogs only<br/>
+                      📦 <strong>manager</strong>: products, blogs, orders, customers<br/>
+                      ⚙️ <strong>super_admin</strong>: everything including staff and settings
+                    </div>
+                    <div className="modal-actions">
+                      <button className="modal-cancel" onClick={()=>setStaffModal(null)}>Cancel</button>
+                      <button className="modal-save" onClick={saveStaff}>{staffModal==="new"?"Add Staff":"Save Changes"}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
