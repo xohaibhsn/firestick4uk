@@ -1,18 +1,16 @@
 import pool from '../../../lib/db';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+const currentMonthYear = () => new Date().toISOString().slice(0,7);
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
 
-    // Fix 1A — ensure every active employee has a ledger account
+    // Ensure employee accounts + payroll table exist
     try {
-      await pool.query(`
-        INSERT IGNORE INTO erp_accounts (name, type, reference_id, opening_balance)
-        SELECT name, 'employee', id, 0.00 FROM erp_users WHERE active=1
-      `);
+      await pool.query(`INSERT IGNORE INTO erp_accounts (name,type,reference_id,opening_balance) SELECT name,'employee',id,0.00 FROM erp_users WHERE active=1`);
     } catch (_) {}
 
-    // Fix 1B — create erp_payroll table for permanent salary records
     await pool.query(`
       CREATE TABLE IF NOT EXISTS erp_payroll (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -31,11 +29,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       )
     `);
 
+    // ── GET — payroll summary ──────────────────────────────────────────────
     if (req.method === 'GET') {
-      const month = String(req.query.month || new Date().toISOString().slice(0,7));
-      const { employee_id, manager_id } = req.query;
+      const now = currentMonthYear();
+      const rawMonth = String(req.query.month || now);
+      // Fix 1: block future months
+      const month = rawMonth > now ? now : rawMonth;
 
-      // Fix 3 — manager sees team (employees reporting to them)
+      const { employee_id, manager_id, view } = req.query;
+
+      // view=pending|credited — return erp_payroll records
+      if (view) {
+        let q = `SELECT p.*, u.name, u.department FROM erp_payroll p JOIN erp_users u ON p.employee_id=u.id WHERE 1=1`;
+        const params: any[] = [];
+        if (view === 'pending') { q += ' AND p.status="pending"'; }
+        if (view === 'credited') { q += ' AND p.status="credited"'; }
+        if (employee_id) { q += ' AND p.employee_id=?'; params.push(employee_id); }
+        if (manager_id) { q += ' AND u.reports_to=?'; params.push(manager_id); }
+        q += ' ORDER BY p.month_year DESC, u.name ASC';
+        const [rows] = await pool.query(q, params);
+        return res.status(200).json(Array.isArray(rows)?rows:[]);
+      }
+
       let empQuery: string;
       let empParams: any[];
       if (manager_id) {
@@ -63,22 +78,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'SELECT COUNT(*) as days FROM erp_attendance WHERE employee_id=? AND date LIKE ? AND status="present"',
           [emp.id, `${month}%`]
         );
+        // Check if already credited this month
+        const [credited]: any = await pool.query(
+          'SELECT status,credited_at FROM erp_payroll WHERE employee_id=? AND month_year=?',
+          [emp.id, month]
+        );
         const base = Number(emp.salary || 0);
         const expenses = Number(expRows[0]?.total || 0);
         const advances = Number(advRows[0]?.total || 0);
         const net = base + expenses - advances;
-        return { ...emp, base_salary:base, approved_expenses:expenses, advances, net_pay:net, present_days:Number(attRows[0]?.days||0) };
+        return {
+          ...emp, base_salary:base, approved_expenses:expenses, advances, net_pay:net,
+          present_days:Number(attRows[0]?.days||0),
+          payroll_status: credited[0]?.status || 'not_generated',
+          credited_at: credited[0]?.credited_at || null,
+        };
       }));
 
       return res.status(200).json(payroll);
     }
 
-    // POST — bulk salary credit for all employees
+    // ── POST — bulk salary credit (legacy) ───────────────────────────────
     if (req.method === 'POST') {
       const { month, created_by } = req.body;
-      const m = month || new Date().toISOString().slice(0,7);
-      const [employees]: any = await pool.query('SELECT id,name,salary FROM erp_users WHERE active=1 AND salary>0');
+      const now = currentMonthYear();
+      const m = (month && month <= now) ? month : now;
+      // Fix 1: block future months
+      if (month && month > now) return res.status(400).json({ error: 'Cannot credit salary for future months' });
 
+      const [employees]: any = await pool.query('SELECT id,name,salary FROM erp_users WHERE active=1 AND salary>0');
       let credited = 0;
       for (const emp of employees) {
         const [accounts]: any = await pool.query('SELECT id FROM erp_accounts WHERE reference_id=? AND type="employee"', [emp.id]);
@@ -89,7 +117,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const [newAcc]: any = await pool.query('INSERT INTO erp_accounts (name,type,reference_id) VALUES (?,?,?)', [emp.name,'employee',emp.id]);
           accountId = newAcc.insertId;
         }
-        // Check if salary already credited this month
         const [existing]: any = await pool.query(
           'SELECT id FROM erp_transactions WHERE account_id=? AND reference_type="salary" AND created_at LIKE ?',
           [accountId, `${m}%`]
@@ -98,17 +125,65 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           await pool.query('INSERT INTO erp_transactions (account_id,type,amount,description,reference_type,created_by) VALUES (?,?,?,?,?,?)',
             [accountId,'credit',emp.salary,`Monthly salary — ${m}`,'salary',created_by||null]
           );
-          // Fix 1B — persist salary record in erp_payroll
           await pool.query(`
             INSERT INTO erp_payroll (employee_id,month_year,base_salary,net_pay,status,credited_at,credited_by)
             VALUES (?,?,?,?,'credited',NOW(),?)
-            ON DUPLICATE KEY UPDATE status='credited', credited_at=NOW(), credited_by=?, base_salary=?, net_pay=?
+            ON DUPLICATE KEY UPDATE status='credited',credited_at=NOW(),credited_by=?,base_salary=?,net_pay=?
           `, [emp.id, m, emp.salary, emp.salary, created_by||null, created_by||null, emp.salary, emp.salary]);
           credited++;
         }
       }
       await pool.query('INSERT INTO erp_audit_log (user_id,action,details) VALUES (?,?,?)', [created_by,'SALARY_BULK_CREDIT',`Salary credited for ${credited} employees — ${m}`]).catch(()=>{});
       return res.status(200).json({ success: true, credited });
+    }
+
+    // ── PATCH — approve & credit individual payroll row ──────────────────
+    if (req.method === 'PATCH') {
+      const { id, action, created_by } = req.body;
+      if (!id || action !== 'credit') return res.status(400).json({ error: 'Invalid action' });
+
+      const [rows]: any = await pool.query('SELECT * FROM erp_payroll WHERE id=?', [id]);
+      if (!rows.length) return res.status(404).json({ error: 'Payroll record not found' });
+      const pr = rows[0];
+      if (pr.status === 'credited') return res.status(400).json({ error: 'Already credited' });
+
+      // Fix 1: block future months
+      const now = currentMonthYear();
+      if (pr.month_year > now) return res.status(400).json({ error: 'Cannot credit future months' });
+
+      // Find/create employee ledger account
+      const [accounts]: any = await pool.query('SELECT id FROM erp_accounts WHERE reference_id=? AND type="employee"', [pr.employee_id]);
+      let accountId: number;
+      if (accounts.length) {
+        accountId = accounts[0].id;
+      } else {
+        const [userRows]: any = await pool.query('SELECT name FROM erp_users WHERE id=?', [pr.employee_id]);
+        const [newAcc]: any = await pool.query('INSERT INTO erp_accounts (name,type,reference_id) VALUES (?,?,?)', [userRows[0]?.name||'Employee','employee',pr.employee_id]);
+        accountId = newAcc.insertId;
+      }
+
+      // Check not already credited this month
+      const [existingTxn]: any = await pool.query(
+        'SELECT id FROM erp_transactions WHERE account_id=? AND reference_type="payroll" AND reference_id=?',
+        [accountId, id]
+      );
+      if (!existingTxn.length) {
+        await pool.query(
+          'INSERT INTO erp_transactions (account_id,type,amount,description,reference_type,reference_id,created_by) VALUES (?,?,?,?,?,?,?)',
+          [accountId, 'credit', pr.net_pay, `Salary for ${pr.month_year}`, 'payroll', id, created_by||null]
+        );
+      }
+
+      await pool.query(
+        'UPDATE erp_payroll SET status="credited", credited_at=NOW(), credited_by=? WHERE id=?',
+        [created_by||null, id]
+      );
+
+      await pool.query('INSERT INTO erp_audit_log (user_id,action,details) VALUES (?,?,?)',
+        [created_by, 'PAYROLL_CREDITED', `Payroll #${id} Rs.${pr.net_pay} for ${pr.month_year} credited`]
+      ).catch(()=>{});
+
+      return res.status(200).json({ success: true });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

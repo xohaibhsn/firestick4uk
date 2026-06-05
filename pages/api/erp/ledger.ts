@@ -8,14 +8,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { account_id, self, user_id, user_role } = req.query;
 
       if (account_id) {
-        const [txns] = await pool.query(
-          'SELECT * FROM erp_transactions WHERE account_id=? ORDER BY created_at DESC',
-          [account_id]
-        );
-        const [bal]: any = await pool.query(
-          'SELECT COALESCE(SUM(CASE WHEN type="credit" THEN amount ELSE -amount END),0) as balance FROM erp_transactions WHERE account_id=?',
-          [account_id]
-        );
+        // Fix 3 — exclude transactions linked to REJECTED expenses
+        const VALID_TXN = `
+          SELECT t.* FROM erp_transactions t
+          WHERE t.account_id=?
+          AND NOT (
+            t.reference_type='expense'
+            AND EXISTS (
+              SELECT 1 FROM erp_expenses e
+              WHERE e.id=t.reference_id AND e.status='rejected'
+            )
+          )
+          ORDER BY t.created_at ASC
+        `;
+        const [txns] = await pool.query(VALID_TXN, [account_id]);
+        const [bal]: any = await pool.query(`
+          SELECT COALESCE(SUM(CASE WHEN type='credit' THEN amount ELSE -amount END),0) as balance
+          FROM erp_transactions t WHERE t.account_id=?
+          AND NOT (
+            t.reference_type='expense'
+            AND EXISTS (SELECT 1 FROM erp_expenses e WHERE e.id=t.reference_id AND e.status='rejected')
+          )
+        `, [account_id]);
         const [acc]: any = await pool.query('SELECT * FROM erp_accounts WHERE id=?', [account_id]);
         const openingBalance = acc[0]?.opening_balance || 0;
         return res.status(200).json({ transactions: Array.isArray(txns)?txns:[], balance: Number(openingBalance) + Number(bal[0]?.balance || 0) });

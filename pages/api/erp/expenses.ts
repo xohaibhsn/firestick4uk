@@ -79,6 +79,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
       }
 
+      // Fix 3 — rejected expense: delete any existing transaction so it never appears in ledger
+      if (status === 'rejected') {
+        try {
+          await pool.query(
+            'DELETE FROM erp_transactions WHERE reference_type="expense" AND reference_id=?',
+            [id]
+          );
+        } catch (_) {}
+      }
+
       return res.status(200).json({ success: true });
     }
 
