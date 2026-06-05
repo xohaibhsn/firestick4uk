@@ -28,6 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `ALTER TABLE erp_office_expenses ADD COLUMN billing_cycle ENUM('monthly','none') NOT NULL DEFAULT 'none'`,
       `ALTER TABLE erp_office_expenses ADD COLUMN billing_month VARCHAR(7) NULL`,
       `ALTER TABLE erp_accounts MODIFY COLUMN type ENUM('employee','vendor','client','company') NOT NULL`,
+      `ALTER TABLE erp_office_expenses MODIFY COLUMN status ENUM('due','paid','overdue','dismissed') NOT NULL DEFAULT 'due'`,
     ]) { try { await pool.query(sql); } catch (_) {} }
 
     const curMonth = new Date().toISOString().slice(0, 7);
@@ -99,8 +100,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Main list — templates (billing_cycle='monthly' AND billing_month IS NULL) are excluded
-      let cond = `(billing_cycle='none' AND date LIKE ? AND billing_month IS NULL)
-                  OR (billing_cycle='monthly' AND billing_month=?)`;
+      let cond = `((billing_cycle='none' AND date LIKE ? AND billing_month IS NULL)
+                  OR (billing_cycle='monthly' AND billing_month=?)) AND status != 'dismissed'`;
       const params: any[] = [`${targetMonth}%`, targetMonth];
       if (category) { cond = `(${cond}) AND category=?`; params.push(category); }
 
@@ -126,7 +127,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [date, category || 'Miscellaneous', description || '', finalAmt, paid_by || '',
          receipt_path || '', notes || '', added_by || '', et,
-         'paid',  // templates stored as paid; instances are generated with status='due'
+         et !== 'one_time' ? 'paid' : 'due',  // templates=paid sentinel; one_time starts as due
          due_date || null, bc, null]
       );
       return res.status(200).json({ success: true, id: result.insertId });
@@ -191,7 +192,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'DELETE') {
       const { id } = req.query;
       if (!id) return res.status(400).json({ error: 'ID required' });
-      await pool.query('DELETE FROM erp_office_expenses WHERE id=?', [id]);
+      const [chk]: any = await pool.query(
+        `SELECT billing_cycle, billing_month FROM erp_office_expenses WHERE id=? LIMIT 1`, [id]
+      );
+      const row = Array.isArray(chk) ? chk[0] : null;
+      if (row?.billing_cycle === 'monthly' && row?.billing_month) {
+        // Soft-delete: dismissed record acts as a "skip" marker for the generation loop —
+        // prevents re-insert of this month's instance on the next GET.
+        await pool.query(`UPDATE erp_office_expenses SET status='dismissed' WHERE id=?`, [id]);
+      } else {
+        await pool.query('DELETE FROM erp_office_expenses WHERE id=?', [id]);
+      }
       return res.status(200).json({ success: true });
     }
 
