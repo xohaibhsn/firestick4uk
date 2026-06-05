@@ -119,19 +119,50 @@ function LedgerContent({ user }: { user: any }) {
   const emp = employees.find((e:any)=>String(e.id)===String(selectedEmpId));
 
   return (
-    <div style={{paddingBottom:90}}>
-      {/* Employee Selector */}
-      <div className="erp-card" style={{marginBottom:16}}>
-        <div style={{fontSize:11,letterSpacing:"1.5px",textTransform:"uppercase",color:"#888",marginBottom:8,fontWeight:600}}>Select Employee</div>
-        <select className="erp-select" value={selectedEmpId} onChange={e=>loadEmployee(e.target.value)} style={{width:"100%",padding:"10px 14px",fontSize:14}}>
-          <option value="">— Choose employee —</option>
-          {employees.map((e:any)=><option key={e.id} value={e.id}>{e.name} ({e.role})</option>)}
-        </select>
+    <>
+      {/* Print-only header + print CSS */}
+      <style>{`
+        @media print {
+          .erp-sidebar, .erp-hamburger, .erp-header, .erp-footer-brand,
+          .no-print, .erp-btn, select, input[type="date"],
+          .erp-modal-overlay { display: none !important; }
+          .erp-main { margin-left: 0 !important; padding: 20px !important; }
+          body { background: #fff !important; color: #111 !important; }
+          .erp-card { border: 1px solid #ddd !important; box-shadow: none !important; }
+          th, td { color: #111 !important; border-color: #ccc !important; }
+          .print-header { display: block !important; }
+        }
+        .print-header { display: none; }
+      `}</style>
+
+      <div style={{paddingBottom:90}}>
+      {/* Employee Selector + Export button */}
+      <div className="erp-card no-print" style={{marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{fontSize:11,letterSpacing:"1.5px",textTransform:"uppercase",color:"#888",marginBottom:8,fontWeight:600}}>Select Employee</div>
+            <select className="erp-select" value={selectedEmpId} onChange={e=>loadEmployee(e.target.value)} style={{width:"100%",padding:"10px 14px",fontSize:14}}>
+              <option value="">— Choose employee —</option>
+              {employees.map((e:any)=><option key={e.id} value={e.id}>{e.name} ({e.role})</option>)}
+            </select>
+          </div>
+          {selected?.id && (
+            <button onClick={()=>window.print()} style={{background:"#5B21B6",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",alignSelf:"flex-end"}}>
+              📥 Export PDF / Print
+            </button>
+          )}
+        </div>
         {selected && (
           <div style={{marginTop:10,fontSize:12,color:"#888"}}>
             Account: <strong style={{color:"#111"}}>{selected.name}</strong> · Type: <span className="badge badge-green">{selected.type}</span>
           </div>
         )}
+      </div>
+
+      {/* Print-only statement header */}
+      <div className="print-header" style={{marginBottom:20,paddingBottom:14,borderBottom:"2px solid #111"}}>
+        <div style={{fontSize:22,fontWeight:900,fontFamily:"serif"}}>FIRESTICK4UK — Employee Ledger Statement</div>
+        <div style={{fontSize:13,color:"#444",marginTop:4}}>Employee: <strong>{selected?.name}</strong> · Generated: {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
       </div>
 
       {msg && <div style={{marginBottom:12,padding:"10px 14px",background:msg.startsWith("✅")?"#DCFCE7":"#FEE2E2",borderRadius:10,fontSize:13,color:msg.startsWith("✅")?"#166534":"#DC2626",border:`1px solid ${msg.startsWith("✅")?"#BBF7D0":"#FECACA"}`}}>{msg}</div>}
@@ -234,9 +265,9 @@ function LedgerContent({ user }: { user: any }) {
         </>
       )}
 
-      {/* Sticky Action Buttons */}
+      {/* Sticky Action Buttons — hidden on print */}
       {selected && (
-        <div style={{position:"fixed",bottom:0,left:220,right:0,display:"grid",gridTemplateColumns:"1fr 1fr",zIndex:50,boxShadow:"0 -4px 12px rgba(0,0,0,0.12)"}}>
+        <div className="no-print" style={{position:"fixed",bottom:0,left:220,right:0,display:"grid",gridTemplateColumns:"1fr 1fr",zIndex:50,boxShadow:"0 -4px 12px rgba(0,0,0,0.12)"}}>
           <button onClick={()=>setModal("debit")} style={{background:"#DC2626",color:"#fff",padding:"18px",fontSize:15,fontWeight:700,border:"none",cursor:"pointer",letterSpacing:"0.5px"}}>
             ↑ YOU GAVE (Cr)
           </button>
@@ -289,5 +320,6 @@ function LedgerContent({ user }: { user: any }) {
         </div>
       )}
     </div>
+    </>
   );
 }

@@ -87,6 +87,27 @@ function MyLedgerContent({ user }: { user: any }) {
   if (loading) return <div style={{textAlign:"center",padding:60,color:"#888"}}>Loading ledger...</div>;
 
   return (
+    <>
+    {/* Print CSS */}
+    <style>{`
+      @media print {
+        .erp-sidebar, .erp-hamburger, .erp-header, .erp-footer-brand,
+        .no-print, .erp-btn, input[type="date"] { display: none !important; }
+        .erp-main { margin-left: 0 !important; padding: 20px !important; }
+        body { background: #fff !important; color: #111 !important; }
+        .erp-card { border: 1px solid #ddd !important; box-shadow: none !important; }
+        th, td { color: #111 !important; border-color: #ccc !important; }
+        .print-header-emp { display: block !important; }
+      }
+      .print-header-emp { display: none; }
+    `}</style>
+
+    {/* Print-only employee statement header */}
+    <div className="print-header-emp" style={{marginBottom:20,paddingBottom:14,borderBottom:"2px solid #111"}}>
+      <div style={{fontSize:22,fontWeight:900,fontFamily:"serif"}}>FIRESTICK4UK — Personal Ledger Statement</div>
+      <div style={{fontSize:13,color:"#444",marginTop:4}}>Employee: <strong>{user.name}</strong> · Generated: {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
+    </div>
+
     <div>
       {/* Header card */}
       <div className="erp-card" style={{marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
@@ -98,7 +119,10 @@ function MyLedgerContent({ user }: { user: any }) {
         <div style={{textAlign:"right"}}>
           <div style={{fontSize:11,color:"#888",letterSpacing:"1px",textTransform:"uppercase"}}>Net Receivable</div>
           <div style={{fontSize:24,fontWeight:900,color:netBal>=0?"#16A34A":"#DC2626"}}>{fmt(Math.abs(netBal))}</div>
-          <div style={{fontSize:11,color:netBal>=0?"#16A34A":"#DC2626"}}>{netBal>=0?"Company owes you":"You owe company"}</div>
+          <div style={{fontSize:11,color:netBal>=0?"#16A34A":"#DC2626",marginBottom:10}}>{netBal>=0?"Company owes you":"You owe company"}</div>
+          <button className="no-print" onClick={()=>window.print()} style={{background:"#5B21B6",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            📥 Export PDF / Print
+          </button>
         </div>
       </div>
 
@@ -123,8 +147,8 @@ function MyLedgerContent({ user }: { user: any }) {
         </div>
       </div>
 
-      {/* Date filter */}
-      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+      {/* Date filter — hidden on print */}
+      <div className="no-print" style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
         <input type="date" className="erp-input" style={{flex:1,minWidth:120,padding:"7px 10px",fontSize:12}} value={filterFrom} onChange={e=>setFilterFrom(e.target.value)} />
         <span style={{color:"#888",fontSize:12}}>to</span>
         <input type="date" className="erp-input" style={{flex:1,minWidth:120,padding:"7px 10px",fontSize:12}} value={filterTo} onChange={e=>setFilterTo(e.target.value)} />
@@ -183,7 +207,8 @@ function MyLedgerContent({ user }: { user: any }) {
           </div>
         )}
       </div>
-      {/* FIX 1: Sticky mutation buttons REMOVED — employee view is strictly READ-ONLY */}
+      {/* Strictly READ-ONLY — no mutation buttons */}
     </div>
+    </>
   );
 }
