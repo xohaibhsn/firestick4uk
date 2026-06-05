@@ -50,9 +50,17 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
   };
 
   const deactivate = async (id:number) => {
-    if (!confirm("Deactivate this employee?")) return;
+    if (!confirm("Deactivate this user? They will be unable to log in.")) return;
     await fetch(`/api/erp/employees?id=${id}`,{method:"DELETE"});
     load();
+  };
+
+  const deleteUser = async (id:number, name:string) => {
+    if (!confirm(`PERMANENTLY DELETE "${name}"?\n\nThis removes the user AND all their records (attendance, leaves, expenses, payroll, ledger).\nThis CANNOT be undone.`)) return;
+    if (!confirm(`Last chance — delete "${name}" forever?`)) return;
+    const res = await fetch(`/api/erp/employees?id=${id}&permanent=1`,{method:"DELETE"}).then(r=>r.json()).catch(()=>({}));
+    if (res.success) { load(); }
+    else alert("Delete failed. Please try again.");
   };
 
   const roleColor: any = {admin:"badge-purple",manager:"badge-blue",employee:"badge-green",vendor:"badge-orange"};
@@ -87,6 +95,7 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
                   <td style={{whiteSpace:"nowrap"}}>
                     <button className="erp-btn erp-btn-outline erp-btn-sm" style={{marginRight:6}} onClick={()=>openEdit(e)}>Edit</button>
                     {e.id!==user.id&&e.active&&<button className="erp-btn erp-btn-red erp-btn-sm" onClick={()=>deactivate(e.id)}>Deactivate</button>}
+                    {e.id!==user.id&&<button className="erp-btn erp-btn-sm" style={{background:'#7F1D1D',color:'#fff',marginLeft:4}} onClick={()=>deleteUser(e.id,e.name)}>🗑 Delete</button>}
                   </td>
                 </tr>
               ))}

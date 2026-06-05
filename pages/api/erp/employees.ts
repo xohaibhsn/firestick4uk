@@ -65,7 +65,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'DELETE') {
-      const { id } = req.query;
+      const { id, permanent } = req.query;
+      if (permanent === '1') {
+        // Permanent delete — remove user and all linked records
+        await pool.query('DELETE FROM erp_attendance WHERE employee_id=?', [id]).catch(()=>{});
+        await pool.query('DELETE FROM erp_expenses WHERE employee_id=?', [id]).catch(()=>{});
+        await pool.query('DELETE FROM erp_leaves WHERE employee_id=?', [id]).catch(()=>{});
+        await pool.query('DELETE FROM erp_payroll WHERE employee_id=?', [id]).catch(()=>{});
+        await pool.query('DELETE FROM erp_transactions WHERE account_id IN (SELECT id FROM erp_accounts WHERE reference_id=? AND type IN ("employee","vendor"))', [id]).catch(()=>{});
+        await pool.query('DELETE FROM erp_accounts WHERE reference_id=? AND type IN ("employee","vendor")', [id]).catch(()=>{});
+        await pool.query('DELETE FROM erp_users WHERE id=?', [id]);
+        return res.status(200).json({ success: true, deleted: true });
+      }
+      // Soft deactivate (existing behaviour)
       await pool.query('UPDATE erp_users SET active=0 WHERE id=?', [id]);
       return res.status(200).json({ success: true });
     }
