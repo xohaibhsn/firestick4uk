@@ -76,11 +76,19 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
         <>
           <div className="erp-stat-grid">
             {[
-              {icon:"👥",label:"Employees",val:stats.employees},
-              {icon:"💸",label:"Pending Expenses",val:stats.pendingExpenses},
-              {icon:"🌿",label:"Pending Leaves",val:stats.pendingLeaves},
+              {icon:"👥",label:"Users",val:stats.employees,href:"/erp/employees"},
+              {icon:"💸",label:"Pending Expenses",val:stats.pendingExpenses,href:"/erp/expenses"},
+              {icon:"🌿",label:"Pending Leaves",val:stats.pendingLeaves,href:"/erp/leaves"},
             ].map((s,i)=>(
-              <div className="erp-stat" key={i}><div className="erp-stat-icon">{s.icon}</div><div className="erp-stat-val">{s.val}</div><div className="erp-stat-label">{s.label}</div></div>
+              <a key={i} href={s.href} style={{textDecoration:"none",cursor:"pointer",display:"block"}}>
+                <div className="erp-stat" style={{cursor:"pointer",transition:"transform 0.15s,box-shadow 0.15s"}}
+                  onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.transform="translateY(-3px)";(e.currentTarget as HTMLElement).style.boxShadow="0 6px 18px rgba(0,0,0,0.12)";}}
+                  onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.transform="";(e.currentTarget as HTMLElement).style.boxShadow="";}}>
+                  <div className="erp-stat-icon">{s.icon}</div>
+                  <div className="erp-stat-val">{s.val}</div>
+                  <div className="erp-stat-label">{s.label}</div>
+                </div>
+              </a>
             ))}
           </div>
 
@@ -107,7 +115,7 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
           <div className="erp-card">
             <div className="erp-section-header"><div className="erp-section-title">Quick Actions</div></div>
             <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-              {[{href:"/erp/employees",label:"👥 Manage Employees"},{href:"/erp/expenses",label:"💸 Review Expenses"},{href:"/erp/leaves",label:"🌿 Review Leaves"},{href:"/erp/attendance",label:"⏰ View Attendance"},{href:"/erp/ledger",label:"📒 Open Ledger"}].map(a=>(
+              {[{href:"/erp/employees",label:"👥 Manage Users"},{href:"/erp/expenses",label:"💸 Review Expenses"},{href:"/erp/leaves",label:"🌿 Review Leaves"},{href:"/erp/attendance",label:"⏰ View Attendance"},{href:"/erp/ledger",label:"📒 Open Ledger"}].map(a=>(
                 <a key={a.href} href={a.href} style={{padding:"10px 18px",background:"rgba(139,0,255,0.12)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:10,color:"rgba(255,255,255,0.8)",textDecoration:"none",fontSize:13,transition:"all 0.2s"}}>{a.label}</a>
               ))}
             </div>

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
 export default function ERPEmployees() {
-  return <ERPLayout title="Employees" active="employees">{(user, currency) => user.role==="admin" ? <EmpContent user={user} currency={currency} /> : <div style={{padding:40,textAlign:"center",color:"rgba(255,255,255,0.35)"}}>⛔ Admin access only</div>}</ERPLayout>;
+  return <ERPLayout title="Users" active="employees">{(user, currency) => user.role==="admin" ? <EmpContent user={user} currency={currency} /> : <div style={{padding:40,textAlign:"center",color:"rgba(255,255,255,0.35)"}}>⛔ Admin access only</div>}</ERPLayout>;
 }
 
 function EmpContent({ user, currency }: { user: any; currency: string }) {
@@ -43,7 +43,7 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
     load();
   };
 
-  const roleColor: any = {admin:"badge-purple",manager:"badge-blue",employee:"badge-green"};
+  const roleColor: any = {admin:"badge-purple",manager:"badge-blue",employee:"badge-green",vendor:"badge-orange"};
   const depts = ["","Management","Sales","Support","Technical","Finance","Marketing","Operations"];
 
   // Reports To dropdown options based on selected role
@@ -51,7 +51,10 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
 
   return (
     <div>
-      <div style={{marginBottom:20,display:"flex",justifyContent:"flex-end"}}><button className="erp-btn erp-btn-primary" onClick={openNew}>+ Add Employee</button></div>
+      <div style={{marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div className="erp-page-title">Manage <span>Users</span></div>
+        <button className="erp-btn erp-btn-primary" onClick={openNew}>+ Add User</button>
+      </div>
       <div className="erp-card">
         <div className="erp-table-wrap">
           <table>
@@ -83,7 +86,7 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
       {modal && (
         <div className="erp-modal-overlay">
           <div className="erp-modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
-            <div className="erp-modal-title">{modal==="new"?"Add Employee":"Edit Employee"}</div>
+            <div className="erp-modal-title">{modal==="new"?"Add User":"Edit User"}</div>
             {msg && <div style={{marginBottom:12,color:"#ff8888",fontSize:13}}>{msg}</div>}
             <div className="erp-grid-2">
               <div className="erp-field"><label>Full Name *</label><input className="erp-input" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="John Smith" /></div>
@@ -97,6 +100,7 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
                   <option value="employee">Employee</option>
                   <option value="manager">Manager</option>
                   <option value="admin">Admin</option>
+                  <option value="vendor">Vendor</option>
                 </select>
               </div>
             </div>
@@ -120,7 +124,7 @@ function EmpContent({ user, currency }: { user: any; currency: string }) {
             </div>
             <div className="erp-modal-actions">
               <button className="erp-btn erp-btn-outline" onClick={()=>setModal(null)}>Cancel</button>
-              <button className="erp-btn erp-btn-primary" onClick={save}>{modal==="new"?"Add Employee":"Save Changes"}</button>
+              <button className="erp-btn erp-btn-primary" onClick={save}>{modal==="new"?"Add User":"Save Changes"}</button>
             </div>
           </div>
         </div>

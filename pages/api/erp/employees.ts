@@ -47,7 +47,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'INSERT INTO erp_users (name,email,password,role,department,salary,joining_date,reports_to) VALUES (?,?,?,?,?,?,?,?)',
         [name, email, password, role||'employee', department||'', salary||0, joining_date||null, reports_to||null]
       );
-      await pool.query('INSERT INTO erp_accounts (name,type,reference_id) VALUES (?,?,?)', [name, 'employee', result.insertId]);
+      // Step 3: vendor role maps to 'vendor' account type, all others map to 'employee'
+      const accountType = (role === 'vendor') ? 'vendor' : 'employee';
+      await pool.query('INSERT INTO erp_accounts (name,type,reference_id) VALUES (?,?,?)', [name, accountType, result.insertId]);
       return res.status(200).json({ success: true, id: result.insertId });
     }
 

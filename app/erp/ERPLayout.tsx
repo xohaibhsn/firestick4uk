@@ -134,7 +134,7 @@ const adminNav = [
   { href:"/erp/expenses", icon:"💸", label:"Expenses", key:"expenses" },
   { href:"/erp/leaves", icon:"🌿", label:"Leaves", key:"leaves" },
   { href:"/erp/office-expenses", icon:"🏢", label:"Office Expenses", key:"office-expenses" },
-  { href:"/erp/employees", icon:"👥", label:"Employees", key:"employees" },
+  { href:"/erp/employees", icon:"👥", label:"Users", key:"employees" },
   { href:"/erp/ledger", icon:"📒", label:"Ledger", key:"ledger" },
   { href:"/erp/payroll", icon:"💰", label:"Payroll", key:"payroll" },
   { href:"/erp/audit", icon:"🔍", label:"Audit Log", key:"audit" },
