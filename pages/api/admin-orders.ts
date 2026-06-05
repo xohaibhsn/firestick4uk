@@ -39,6 +39,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ success: true });
     }
 
+    if (req.method === 'DELETE') {
+      const { order_id } = req.body;
+      if (!order_id) return res.status(400).json({ error: 'order_id required' });
+
+      // Fetch order before deleting (for response summary)
+      const [orderRows]: any = await pool.query('SELECT * FROM orders WHERE order_id=?', [order_id]);
+      if (!orderRows.length) return res.status(404).json({ error: 'Order not found' });
+      const order = orderRows[0];
+
+      // Delete order items first (FK constraint)
+      await pool.query('DELETE FROM order_items WHERE order_id=?', [order_id]);
+      // Delete main order
+      await pool.query('DELETE FROM orders WHERE order_id=?', [order_id]);
+
+      return res.status(200).json({
+        success: true,
+        deleted_order_id: order_id,
+        reversed_amount: Number(order.total || 0),
+        was_status: order.status,
+      });
+    }
+
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });

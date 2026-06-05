@@ -434,6 +434,24 @@ export default function AdminPage() {
     setOrderModal(null);
   };
 
+  const deleteOrder = async (orderId: string, total: string, status: string) => {
+    const amountNum = parseFloat((total||"0").replace("£","").replace(",",""));
+    const isRevenue = ["confirmed","dispatched","delivered"].includes(status);
+    const msg = `⚠️ Delete order ${orderId}?\n\nAmount: ${total}\nStatus: ${status.toUpperCase()}${isRevenue ? `\n\n💰 This will reverse £${amountNum.toFixed(2)} from confirmed revenue.` : ""}\n\nThis cannot be undone.`;
+    if (!confirm(msg)) return;
+    const res = await fetch("/api/admin-orders", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      body: JSON.stringify({ order_id: orderId }),
+    }).then(r=>r.json()).catch(()=>({}));
+    if (res.success) {
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+      setOrderModal(null);
+    } else {
+      alert(`❌ Delete failed: ${res.error || "Unknown error"}`);
+    }
+  };
+
   const toSlug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 
   const handleFeatImg = async (file: File) => {
@@ -617,9 +635,18 @@ export default function AdminPage() {
                 <option value="delivered">📦 Delivered</option>
               </select>
             </div>
-            <div className="modal-actions">
-              <button className="modal-cancel" onClick={() => setOrderModal(null)}>Close</button>
-              {orderModal.receipt && <button className="modal-save" onClick={() => { setOrderModal(null); setReceiptModal(orderModal.id); }}>View Receipt</button>}
+            <div className="modal-actions" style={{justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              <button
+                className="modal-cancel"
+                style={{background:"rgba(220,38,38,0.1)",color:"#DC2626",border:"1px solid rgba(220,38,38,0.25)"}}
+                onClick={() => deleteOrder(orderModal.id, orderModal.total, orderModal.status)}
+              >
+                🗑 Delete Order
+              </button>
+              <div style={{display:"flex",gap:8}}>
+                <button className="modal-cancel" onClick={() => setOrderModal(null)}>Close</button>
+                {orderModal.receipt && <button className="modal-save" onClick={() => { setOrderModal(null); setReceiptModal(orderModal.id); }}>View Receipt</button>}
+              </div>
             </div>
           </div>
         </div>
@@ -1000,6 +1027,7 @@ export default function AdminPage() {
                         <td style={{whiteSpace:"nowrap"}}>
                           <button className="action-btn btn-view" onClick={() => setOrderModal(o)}>View</button>
                           {o.status==="pending" && o.receipt && <button className="action-btn btn-verify" onClick={() => setReceiptModal(o.id)}>Verify</button>}
+                          <button className="action-btn btn-delete" onClick={() => deleteOrder(o.id, o.total, o.status)}>Delete</button>
                         </td>
                       </tr>
                     ))}
