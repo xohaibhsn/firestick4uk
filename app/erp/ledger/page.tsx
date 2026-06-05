@@ -38,8 +38,9 @@ function LedgerContent({ user }: { user: any }) {
 
   // Add entry modal
   const [modal, setModal] = useState<"debit"|"credit"|null>(null);
-  const [form, setForm] = useState({ amount:"", description:"", date:new Date().toISOString().slice(0,10), category:"Salary" });
+  const [form, setForm] = useState({ amount:"", description:"", date:new Date().toISOString().slice(0,10), category:"Salary", payment_coa_id:"" });
   const [saving, setSaving] = useState(false);
+  const [modalErr, setModalErr] = useState("");
 
   // Edit/Delete transaction modal
   const [editTxn, setEditTxn] = useState<any>(null);
@@ -129,26 +130,29 @@ function LedgerContent({ user }: { user: any }) {
 
   const submit = async () => {
     if (!form.amount || !form.description || !selected || !selected.id) return;
+    setModalErr("");
     setSaving(true);
+    const body: any = {
+      account_id: selected.id,
+      type: modal === "debit" ? "debit" : "credit",
+      amount: form.amount,
+      description: form.description,
+      reference_type: "manual_entry",
+      created_by: user.id,
+    };
+    if (modal === "debit" && form.payment_coa_id) body.payment_coa_id = form.payment_coa_id;
     const res = await fetch("/api/erp/ledger", {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({
-        account_id: selected.id,
-        type: modal === "debit" ? "debit" : "credit",
-        amount: form.amount,
-        description: form.description,
-        reference_type: "manual_entry",
-        created_by: user.id,
-      }),
+      body: JSON.stringify(body),
     }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
-      setMsg(modal==="debit" ? "✅ Debit entry recorded" : "✅ Credit entry recorded");
-      setForm({ amount:"", description:"", date:new Date().toISOString().slice(0,10), category:"Salary" });
-      setModal(null);
+      setMsg(modal==="debit" ? "✅ Payment recorded — cash balance updated" : "✅ Credit entry recorded");
+      setForm({ amount:"", description:"", date:new Date().toISOString().slice(0,10), category:"Salary", payment_coa_id:"" });
+      setModal(null); setModalErr("");
       loadEmployee(selectedEmpId);
-    } else { setMsg(`❌ ${res.error||"Failed"}`); }
+    } else { setModalErr(res.error||"Failed to save"); }
     setSaving(false);
-    setTimeout(()=>setMsg(""),3000);
+    setTimeout(()=>setMsg(""),4000);
   };
 
   const openEdit = (t: any) => {
@@ -453,7 +457,7 @@ function LedgerContent({ user }: { user: any }) {
 
       {/* Entry Modal */}
       {modal && (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setModal(null)}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>{setModal(null);setModalErr("");}}>
           <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"28px 24px 36px",width:"100%",maxWidth:520}} onClick={e=>e.stopPropagation()}>
             <div style={{width:40,height:4,background:"#E5E5E5",borderRadius:2,margin:"0 auto 20px"}}/>
             <div style={{fontSize:18,fontWeight:700,color:modal==="debit"?"#DC2626":"#16A34A",marginBottom:4}}>
@@ -470,6 +474,22 @@ function LedgerContent({ user }: { user: any }) {
               <label style={{fontSize:11,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",color:"#666",display:"block",marginBottom:6}}>Description *</label>
               <input type="text" className="erp-input" placeholder="e.g. June salary payment" value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} style={{width:"100%"}} />
             </div>
+            {modal === "debit" && (
+              <div style={{marginBottom:14}}>
+                <label style={{fontSize:11,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",color:"#666",display:"block",marginBottom:6}}>💳 Pay From Source Account *</label>
+                <select className="erp-select" value={form.payment_coa_id} onChange={e=>setForm(f=>({...f,payment_coa_id:e.target.value}))} style={{width:"100%"}}>
+                  <option value="">— Select cash/bank source —</option>
+                  {assetAccounts.map((a:any)=>(
+                    <option key={a.id} value={a.id}>{a.account_name}</option>
+                  ))}
+                </select>
+                {form.payment_coa_id && (
+                  <div style={{marginTop:6,padding:"6px 10px",background:"rgba(220,38,38,0.04)",border:"1px solid rgba(220,38,38,0.15)",borderRadius:7,fontSize:11,color:"#7F1D1D",fontFamily:"monospace"}}>
+                    DR Employee Account ↑ &nbsp;·&nbsp; CR {assetAccounts.find((a:any)=>String(a.id)===form.payment_coa_id)?.account_name||"…"} ↓
+                  </div>
+                )}
+              </div>
+            )}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
               <div>
                 <label style={{fontSize:11,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",color:"#666",display:"block",marginBottom:6}}>Date</label>
@@ -484,9 +504,12 @@ function LedgerContent({ user }: { user: any }) {
                 </select>
               </div>
             </div>
+            {modalErr && (
+              <div style={{marginBottom:14,padding:"10px 13px",background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:9,fontSize:13,color:"#DC2626",fontWeight:500}}>{modalErr}</div>
+            )}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              <button onClick={()=>setModal(null)} style={{background:"#F5F5F5",color:"#555",border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:600,cursor:"pointer"}}>Cancel</button>
-              <button onClick={submit} disabled={saving||!form.amount||!form.description} style={{background:modal==="debit"?"#DC2626":"#16A34A",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:700,cursor:"pointer",opacity:(saving||!form.amount||!form.description)?0.5:1}}>
+              <button onClick={()=>{setModal(null);setModalErr("");}} style={{background:"#F5F5F5",color:"#555",border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={submit} disabled={saving||!form.amount||!form.description||(modal==="debit"&&!form.payment_coa_id)} style={{background:modal==="debit"?"#DC2626":"#16A34A",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:700,cursor:"pointer",opacity:(saving||!form.amount||!form.description||(modal==="debit"&&!form.payment_coa_id))?0.5:1}}>
                 {saving ? "Saving..." : modal==="debit" ? "Record Payment" : "Record Receipt"}
               </button>
             </div>

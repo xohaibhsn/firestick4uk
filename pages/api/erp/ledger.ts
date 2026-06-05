@@ -100,11 +100,90 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
-      const { account_id, type, amount, description, reference_type, created_by } = req.body;
+      const { account_id, type, amount, description, reference_type, created_by, payment_coa_id } = req.body;
       if (!account_id || !type || !amount) return res.status(400).json({ error: 'Missing fields' });
+      const finalAmt = Number(amount);
+
+      // Double-entry: when paying out (debit = You Gave), credit the asset account
+      if (type === 'debit') {
+        // Step 1: resolve payment source COA
+        let srcCoaId: number;
+        let srcName: string;
+        if (payment_coa_id) {
+          const [coaRow]: any = await pool.query(
+            'SELECT id, account_name FROM erp_chart_of_accounts WHERE id=? LIMIT 1',
+            [payment_coa_id]
+          );
+          if (!Array.isArray(coaRow) || !coaRow.length)
+            return res.status(400).json({ error: 'Invalid payment source account selected' });
+          srcCoaId = coaRow[0].id;
+          srcName  = coaRow[0].account_name;
+        } else {
+          // Graceful default: Cash In Hand
+          const [coaRow]: any = await pool.query(
+            "SELECT id, account_name FROM erp_chart_of_accounts WHERE account_name='Cash In Hand' LIMIT 1"
+          );
+          if (!Array.isArray(coaRow) || !coaRow.length)
+            return res.status(400).json({ error: 'Cash In Hand account not found — please seed COA first' });
+          srcCoaId = coaRow[0].id;
+          srcName  = coaRow[0].account_name;
+        }
+
+        // Step 2: balance guard — assets increase on DR, decrease on CR
+        const [srcBal]: any = await pool.query(`
+          SELECT COALESCE(a.opening_balance, 0) + COALESCE(
+            SUM(CASE WHEN t.type='debit' THEN t.amount WHEN t.type='credit' THEN -t.amount ELSE 0 END), 0
+          ) AS balance
+          FROM erp_chart_of_accounts c
+          LEFT JOIN erp_accounts a ON a.name = c.account_name AND a.type = 'company'
+          LEFT JOIN erp_transactions t ON t.coa_id = c.id
+          WHERE c.id = ?
+          GROUP BY c.id, a.opening_balance
+        `, [srcCoaId]);
+        const available = Array.isArray(srcBal) && srcBal.length ? Number(srcBal[0]?.balance ?? 0) : 0;
+        if (available < finalAmt) {
+          return res.status(400).json({
+            error: `Insufficient Funds! ${srcName} has Rs. ${Math.round(available).toLocaleString()} available but Rs. ${Math.round(finalAmt).toLocaleString()} is required. Inject funds via the Ledger to proceed.`,
+          });
+        }
+
+        // Step 3: find or create company erp_accounts row for this asset COA
+        const [compAcc]: any = await pool.query(
+          "SELECT id FROM erp_accounts WHERE name=? AND type='company' LIMIT 1",
+          [srcName]
+        );
+        let assetAccId: number;
+        if (Array.isArray(compAcc) && compAcc.length) {
+          assetAccId = compAcc[0].id;
+        } else {
+          const [ins]: any = await pool.query(
+            "INSERT INTO erp_accounts (name, type, opening_balance) VALUES (?, 'company', 0)",
+            [srcName]
+          );
+          assetAccId = ins.insertId;
+        }
+
+        const voucherRef = `VOUCH-LEDGER-${Date.now()}`;
+
+        // Row 1: employee/vendor ledger debit (You Gave)
+        const [result]: any = await pool.query(
+          'INSERT INTO erp_transactions (account_id,type,amount,description,reference_type,created_by,voucher_ref) VALUES (?,?,?,?,?,?,?)',
+          [account_id, 'debit', finalAmt, description||'', reference_type||'manual_entry', created_by||null, voucherRef]
+        );
+
+        // Row 2: asset CR — cash/bank balance decreases
+        await pool.query(
+          'INSERT INTO erp_transactions (account_id,type,amount,description,reference_type,coa_id,voucher_ref) VALUES (?,?,?,?,?,?,?)',
+          [assetAccId, 'credit', finalAmt, `CR ${srcName} — ${description||'Ledger payment'}`, 'ledger_payment', srcCoaId, voucherRef]
+        );
+
+        return res.status(200).json({ success: true, id: result.insertId });
+      }
+
+      // Credit (You Got) — single entry, no asset movement needed
       const [result]: any = await pool.query(
         'INSERT INTO erp_transactions (account_id,type,amount,description,reference_type,created_by) VALUES (?,?,?,?,?,?)',
-        [account_id, type, amount, description||'', reference_type||'manual_entry', created_by||null]
+        [account_id, type, finalAmt, description||'', reference_type||'manual_entry', created_by||null]
       );
       return res.status(200).json({ success: true, id: result.insertId });
     }
