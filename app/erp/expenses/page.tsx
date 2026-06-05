@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import ERPLayout from "../ERPLayout";
 
 export default function ERPExpenses() {
+  // Step 2 — vendor sees "Bill Submissions" title
   return <ERPLayout title="Expenses" active="expenses">{(user, currency) => <ExpContent user={user} currency={currency} />}</ERPLayout>;
 }
 
@@ -17,6 +18,9 @@ function ExpContent({ user, currency }: { user: any; currency: string }) {
   const [note, setNote] = useState("");
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState("");
+
+  // Step 2: vendor always sees only their own bills
+  const isVendor = user.role === "vendor";
 
   const load = () => {
     const url = (user.role==="admin"||user.role==="manager") ? "/api/erp/expenses" : `/api/erp/expenses?employee_id=${user.id}`;
@@ -82,14 +86,14 @@ function ExpContent({ user, currency }: { user: any; currency: string }) {
           {pending>0&&<span className="badge badge-orange">{pending} Pending</span>}
           {(user.role==="admin"||user.role==="manager")&&pending>0&&<span style={{fontSize:13,color:"rgba(255,255,255,0.5)"}}>Total: {fmt(totalPending)}</span>}
         </div>
-        {user.role!=="admin"&&<button className="erp-btn erp-btn-primary" onClick={()=>setShowForm(!showForm)}>+ Submit Expense</button>}
+        {user.role!=="admin"&&<button className="erp-btn erp-btn-primary" onClick={()=>setShowForm(!showForm)}>{isVendor ? "🧾 Submit Bill / Invoice" : "+ Submit Expense"}</button>}
       </div>
 
       {msg&&<div style={{marginBottom:16,padding:"10px 16px",background:msg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${msg.startsWith("✅")?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,borderRadius:10,fontSize:13,color:msg.startsWith("✅")?"#00c864":"#ff6666"}}>{msg}</div>}
 
       {showForm&&(
         <div className="erp-card" style={{marginBottom:20}}>
-          <div style={{fontWeight:700,fontSize:15,marginBottom:16}}>New Expense Claim</div>
+          <div style={{fontWeight:700,fontSize:15,marginBottom:16}}>{isVendor ? "🧾 New Bill / Invoice Submission" : "New Expense Claim"}</div>
           <div className="erp-grid-2">
             <div className="erp-field"><label>Amount ({currency==="PKR"?"PKR":"Rs. "}) *</label><input type="number" step="0.01" className="erp-input" placeholder="0.00" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} /></div>
             <div className="erp-field"><label>Category</label><select className="erp-select" value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>{cats.map(c=><option key={c}>{c}</option>)}</select></div>
@@ -116,7 +120,7 @@ function ExpContent({ user, currency }: { user: any; currency: string }) {
       )}
 
       <div className="erp-card">
-        <div className="erp-section-header"><div className="erp-section-title">Expense Claims</div></div>
+        <div className="erp-section-header"><div className="erp-section-title">{isVendor ? "Bill / Invoice Submissions" : "Expense Claims"}</div></div>
         <div className="erp-table-wrap">
           <table>
             <thead><tr><th>Date</th>{(user.role==="admin"||user.role==="manager")&&<th>Employee</th>}<th>Amount</th><th>Category</th><th>Description</th><th>Receipt</th><th>Status</th><th>Note</th>{(user.role==="admin"||user.role==="manager")&&<th>Actions</th>}</tr></thead>

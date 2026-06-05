@@ -66,9 +66,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      // Account lookup by user_id — used by employee self-view AND admin looking up specific employee
-      if (self === '1' || user_role === 'employee') {
+      // Account lookup by user_id — employee, vendor, or admin-initiated lookup
+      if (self === '1' || user_role === 'employee' || user_role === 'vendor') {
         if (!user_id) return res.status(400).json({ error: 'user_id required' });
+        // Step 3: vendor looks up by type='vendor', employee by type='employee'
+        const acctType = user_role === 'vendor' ? 'vendor' : 'employee';
         const [accounts] = await pool.query(`
           SELECT a.*,
             COALESCE(a.opening_balance,0) + COALESCE(SUM(
@@ -76,9 +78,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ),0) as balance
           FROM erp_accounts a
           LEFT JOIN erp_transactions t ON a.id=t.account_id
-          WHERE a.reference_id=? AND a.type='employee'
+          WHERE a.reference_id=? AND (a.type=? OR a.type='employee')
           GROUP BY a.id
-        `, [user_id]);
+          LIMIT 1
+        `, [user_id, acctType]);
         return res.status(200).json(Array.isArray(accounts) ? accounts : []);
       }
 

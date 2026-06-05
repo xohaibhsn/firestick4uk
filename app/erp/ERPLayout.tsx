@@ -140,15 +140,25 @@ const adminNav = [
   { href:"/erp/audit", icon:"🔍", label:"Audit Log", key:"audit" },
 ];
 
+// Step 1 — Vendor nav: only My Ledger and Expense Claims (as Bill Submissions)
+const vendorNav = [
+  { href:"/erp/my-ledger", icon:"📒", label:"My Ledger", key:"my-ledger" },
+  { href:"/erp/expenses", icon:"🧾", label:"Bill Submissions", key:"expenses" },
+];
+
 const routeRoles: Record<string, string[]> = {
-  "/erp/ledger": ["admin"],
-  "/erp/employees": ["admin"],
-  "/erp/payroll": ["admin"],
-  "/erp/approvals": ["admin","manager"],
-  "/erp/my-payroll": ["admin","manager","employee"],
-  "/erp/my-ledger": ["admin","manager","employee"],
-  "/erp/audit": ["admin"],
+  "/erp/ledger":        ["admin"],
+  "/erp/employees":     ["admin"],
+  "/erp/payroll":       ["admin"],
+  "/erp/approvals":     ["admin","manager"],
+  "/erp/my-payroll":    ["admin","manager","employee"],
+  "/erp/my-ledger":     ["admin","manager","employee","vendor"],
+  "/erp/audit":         ["admin"],
   "/erp/office-expenses": ["admin","manager"],
+  "/erp/attendance":    ["admin","manager","employee"],
+  "/erp/leaves":        ["admin","manager","employee"],
+  "/erp/expenses":      ["admin","manager","employee","vendor"],
+  "/erp/dashboard":     ["admin","manager","employee"],
 };
 
 export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
@@ -164,7 +174,8 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
       const path = window.location.pathname;
       const allowed = routeRoles[path];
       if (allowed && !allowed.includes(u.role)) {
-        window.location.href = "/erp/dashboard";
+        // Vendor can't access most pages — redirect to their ledger
+        window.location.href = u.role === "vendor" ? "/erp/my-ledger" : "/erp/dashboard";
         return;
       }
       setUser(u);
@@ -197,7 +208,7 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
             <div className="erp-logo-sub">ERP System</div>
           </div>
           <nav className="erp-nav">
-            {(user.role==="admin" ? adminNav : user.role==="manager" ? managerNav : employeeNav).map(item => (
+            {(user.role==="admin" ? adminNav : user.role==="manager" ? managerNav : user.role==="vendor" ? vendorNav : employeeNav).map(item => (
               <a key={item.key} href={item.href} className={`erp-nav-item ${active===item.key?"active":""}`} onClick={() => setSidebarOpen(false)}>
                 <span className="erp-nav-icon">{item.icon}</span>{item.label}
               </a>
