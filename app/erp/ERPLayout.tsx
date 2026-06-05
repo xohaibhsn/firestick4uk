@@ -173,7 +173,17 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
     const s = localStorage.getItem("erp_session");
     if (!s) { window.location.href = "/erp"; return; }
     try {
-      const u = JSON.parse(s) as ERPUser;
+      const raw = JSON.parse(s);
+      // Normalize role — guard against null/empty/unknown values from DB
+      const normalizedRole = (raw.role || '').toLowerCase().trim();
+      const VALID_ROLES = ['admin', 'manager', 'employee', 'vendor'];
+      if (!normalizedRole || !VALID_ROLES.includes(normalizedRole)) {
+        // Unknown/empty role — clear bad session and redirect to login
+        localStorage.removeItem("erp_session");
+        window.location.href = "/erp";
+        return;
+      }
+      const u: ERPUser = { ...raw, role: normalizedRole };
       const path = window.location.pathname;
       const allowed = routeRoles[path];
       if (allowed && !allowed.includes(u.role)) {

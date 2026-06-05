@@ -25,6 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
+    // Fix blank roles in DB before login query
+    await pool.query(`UPDATE erp_users SET role='employee' WHERE (role IS NULL OR role='' OR role NOT IN ('admin','manager','employee','vendor'))`).catch(()=>{});
     const [rows]: any = await pool.query('SELECT id,name,email,role,department FROM erp_users WHERE email=? AND password=? AND active=1', [email, password]);
     if (!rows.length) {
       await pool.query('INSERT INTO erp_audit_log (action,details,ip_address) VALUES (?,?,?)', ['LOGIN_FAILED', `Failed login for ${email}`, req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown']).catch(()=>{});

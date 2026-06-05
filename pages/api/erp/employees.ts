@@ -45,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!name || !email || !password) return res.status(400).json({ error: 'Name, email and password required' });
       const [result]: any = await pool.query(
         'INSERT INTO erp_users (name,email,password,role,department,salary,joining_date,reports_to) VALUES (?,?,?,?,?,?,?,?)',
-        [name, email, password, role||'employee', department||'', salary||0, joining_date||null, reports_to||null]
+        [name, email, password, (role||'employee').toLowerCase().trim(), department||'', salary||0, joining_date||null, reports_to||null]
       );
       // Step 3: vendor role maps to 'vendor' account type, all others map to 'employee'
       const accountType = (role === 'vendor') ? 'vendor' : 'employee';
@@ -57,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { id, name, email, role, department, salary, joining_date, active, reports_to } = req.body;
       await pool.query(
         'UPDATE erp_users SET name=?,email=?,role=?,department=?,salary=?,joining_date=?,active=?,reports_to=? WHERE id=?',
-        [name, email, role, department||'', salary||0, joining_date||null, active??1, reports_to||null, id]
+        [name, email, (role||'employee').toLowerCase().trim(), department||'', salary||0, joining_date||null, active??1, reports_to||null, id]
       );
       return res.status(200).json({ success: true });
     }
