@@ -480,7 +480,8 @@ html body .erp-layout * {
 html body .erp-main { background: #F5F5F5 !important; color: #111111 !important; }
 html body .erp-sidebar { background: #111111 !important; color: #FFFFFF !important; }
 html body .erp-card { background: #FFFFFF !important; color: #111111 !important; border-color: #E5E5E5 !important; }
-html body .erp-card * { color: #111111 !important; }
+/* Exclude buttons from the wildcard dark-text rule — buttons manage their own colors */
+html body .erp-card *:not(button):not(a) { color: #111111 !important; }
 html body .erp-section-title { color: #111111 !important; }
 html body .erp-page-title { color: #111111 !important; -webkit-text-fill-color: #111111 !important; }
 html body .erp-page-title span { color: #5B21B6 !important; -webkit-text-fill-color: #5B21B6 !important; }
@@ -516,6 +517,28 @@ html body .erp-layout ul li,
 html body .erp-layout ol li { color: #333333 !important; }
 /* Sidebar stays dark */
 html body .erp-sidebar * { color: #FFFFFF !important; }
+
+/* ── ERP Button Text Contrast Fix ───────────────────────────────────────────
+   html body .erp-card * forces #111111 on ALL card children (wildcard rule).
+   The rules below use higher specificity to restore white text on solid buttons.
+   ─────────────────────────────────────────────────────────────────────────── */
+html body .erp-btn-primary,
+html body .erp-layout .erp-btn-primary,
+html body .erp-card .erp-btn-primary,
+html body button.erp-btn-primary { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
+
+html body .erp-clock-in,
+html body .erp-clock-out,
+html body .erp-layout .erp-clock-in,
+html body .erp-layout .erp-clock-out { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
+
+/* Solid inline-styled ERP buttons (payroll generate, vendor tab, etc.) */
+html body .erp-layout button[style*="background:#5B21B6"],
+html body .erp-layout button[style*="background: #5B21B6"],
+html body .erp-layout button[style*="background:#EA580C"],
+html body .erp-layout button[style*="background:#DC2626"],
+html body .erp-layout button[style*="background:#16A34A"],
+html body .erp-layout button[style*="background:#111111"] { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
 /* Fix: general "html body nav" rule sets bg #FFFFFF — override for ERP + Admin sidebar nav */
 html body .erp-sidebar nav { background: transparent !important; }
 html body .erp-nav-item { color: #CCCCCC !important; }
