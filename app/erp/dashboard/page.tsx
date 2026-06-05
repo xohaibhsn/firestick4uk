@@ -5,7 +5,13 @@ import ERPLayout from "../ERPLayout";
 export default function ERPDashboard() {
   return (
     <ERPLayout title="Dashboard" active="dashboard">
-      {(user, currency) => <DashboardContent user={user} currency={currency} />}
+      {(user, currency) =>
+        // Route vendor to their safe component BEFORE DashboardContent mounts
+        // — avoids Rules-of-Hooks violation from early return inside DashboardContent
+        user.role === "vendor"
+          ? <VendorDashboard user={user} />
+          : <DashboardContent user={user} currency={currency} />
+      }
     </ERPLayout>
   );
 }
@@ -27,9 +33,6 @@ function VendorDashboard({ user }: { user: any }) {
 }
 
 function DashboardContent({ user, currency }: { user: any; currency: string }) {
-  // Fix 3: vendor bypasses full dashboard to prevent rendering crashes
-  if (user.role === "vendor") return <VendorDashboard user={user} />;
-
   const fmt = (n: number) => `Rs. ${Math.round(n).toLocaleString()}`;
   const [stats, setStats] = useState({ employees:0, pendingExpenses:0, pendingLeaves:0, todayAttendance:0 });
   const [officeExpSummary, setOfficeExpSummary] = useState<any>({ total:0, categories:[] });
