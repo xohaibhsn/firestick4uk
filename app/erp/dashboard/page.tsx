@@ -5,32 +5,19 @@ import ERPLayout from "../ERPLayout";
 export default function ERPDashboard() {
   return (
     <ERPLayout title="Dashboard" active="dashboard">
-      {(user, currency) =>
-        // Route vendor to their safe component BEFORE DashboardContent mounts
-        // — avoids Rules-of-Hooks violation from early return inside DashboardContent
-        user.role === "vendor"
-          ? <VendorDashboard user={user} />
-          : <DashboardContent user={user} currency={currency} />
-      }
+      {(user, currency) => {
+        // Vendor should never reach here (ERPLayout redirects them)
+        // Hard safety net: if they somehow slip through, redirect immediately
+        if (user.role === "vendor") {
+          if (typeof window !== "undefined") window.location.href = "/erp/my-ledger";
+          return null;
+        }
+        return <DashboardContent user={user} currency={currency} />;
+      }}
     </ERPLayout>
   );
 }
 
-function VendorDashboard({ user }: { user: any }) {
-  return (
-    <div>
-      <div className="erp-card" style={{marginBottom:16,textAlign:"center",padding:"40px 24px"}}>
-        <div style={{fontSize:40,marginBottom:12}}>🏢</div>
-        <div style={{fontSize:18,fontWeight:700,color:"#111",marginBottom:6}}>Welcome, {user.name}</div>
-        <div style={{fontSize:13,color:"#888",marginBottom:24}}>Vendor Portal · {user.email}</div>
-        <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
-          <a href="/erp/my-ledger" className="erp-btn erp-btn-primary" style={{textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6}}>📒 My Ledger</a>
-          <a href="/erp/expenses" className="erp-btn erp-btn-outline" style={{textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6}}>🧾 Bill Submissions</a>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function DashboardContent({ user, currency }: { user: any; currency: string }) {
   const fmt = (n: number) => `Rs. ${Math.round(n).toLocaleString()}`;

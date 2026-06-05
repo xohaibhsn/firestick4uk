@@ -158,24 +158,17 @@ const routeRoles: Record<string, string[]> = {
   "/erp/attendance":    ["admin","manager","employee"],
   "/erp/leaves":        ["admin","manager","employee"],
   "/erp/expenses":      ["admin","manager","employee","vendor"],
-  "/erp/dashboard":     ["admin","manager","employee","vendor"],
+  "/erp/dashboard":     ["admin","manager","employee"], // vendor → redirected to /erp/my-ledger
 };
 
 export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
-  // Synchronously initialise user from localStorage to eliminate white flash
-  const [user, setUser] = useState<ERPUser | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const s = localStorage.getItem("erp_session");
-      if (!s) return null;
-      return JSON.parse(s) as ERPUser;
-    } catch { return null; }
-  });
+  const [user, setUser] = useState<ERPUser | null>(null);
+  const [ready, setReady] = useState(false);
   const currency = "PKR";
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userDropOpen, setUserDropOpen] = useState(false);
 
-  // Auth + route-guard effect (runs once after mount to validate & redirect if needed)
+  // Single auth effect — runs client-side only, no hydration mismatch
   useEffect(() => {
     const s = localStorage.getItem("erp_session");
     if (!s) { window.location.href = "/erp"; return; }
@@ -184,24 +177,26 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
       const path = window.location.pathname;
       const allowed = routeRoles[path];
       if (allowed && !allowed.includes(u.role)) {
+        // Vendor always redirects to my-ledger — NEVER stays on dashboard
         window.location.href = u.role === "vendor" ? "/erp/my-ledger" : "/erp/dashboard";
         return;
       }
-      // Refresh user in case session changed
       setUser(u);
+      setReady(true);
     } catch { window.location.href = "/erp"; }
   }, []);
 
-  // Sweeper — only run when user is confirmed valid, never fire for null/redirecting state
+  // Sweeper — only run after user is confirmed valid
   useEffect(() => {
     if (!user) return;
     const runSweeper = () => fetch('/api/erp/attendance-sweeper').catch(()=>{});
-    runSweeper();
+    const t = setTimeout(runSweeper, 2000); // slight delay so it never races auth
     const interval = setInterval(runSweeper, 15 * 60 * 1000);
-    return () => clearInterval(interval);
+    return () => { clearTimeout(t); clearInterval(interval); };
   }, [user?.id]);
 
-  if (!user) return <><style>{erpStyles}</style><div style={{minHeight:"100vh",background:"#F5F5F5",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{color:"#888",fontSize:14}}>Loading...</div></div></>;
+  // Show nothing (not even a flash) while auth check runs — consistent server+client
+  if (!ready || !user) return <style>{erpStyles}</style>;
 
   const logout = () => { localStorage.removeItem("erp_session"); window.location.href = "/erp"; };
 
