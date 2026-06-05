@@ -89,9 +89,14 @@ function MyLedgerContent({ user }: { user: any }) {
   };
 
   const filtered = txns.filter(t => {
-    // Fix 2D: exclude transactions from current/future months
-    const txMonth = String(t.created_at || "").slice(0, 7);
-    if (txMonth && txMonth > LEDGER_CUTOFF) return false;
+    // Fix 2 — smart filter: payroll uses payroll_month, not created_at
+    if (t.reference_type === 'payroll') {
+      const pm = t.payroll_month || String(t.created_at||"").slice(0,7);
+      if (pm > LEDGER_CUTOFF) return false;
+    } else {
+      const txMonth = String(t.created_at || "").slice(0, 7);
+      if (txMonth && txMonth > LEDGER_CUTOFF) return false;
+    }
     if (filterFrom && new Date(t.created_at) < new Date(filterFrom)) return false;
     if (filterTo && new Date(t.created_at) > new Date(filterTo+"T23:59:59")) return false;
     return true;
@@ -171,13 +176,19 @@ function MyLedgerContent({ user }: { user: any }) {
         ) : withBal.map((t:any, i:number) => (
           <div key={t.id} style={{display:"grid",gridTemplateColumns:"1fr 90px 90px",padding:"12px 14px",borderBottom:"1px solid #F5F5F5",background:i%2===0?"#FFFFFF":"#FAFAFA"}}>
             <div>
-              <div style={{fontSize:11,color:"#888",marginBottom:2}}>{new Date(t.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>
+              {/* Fix 4 — payroll shows its month, not physical created_at */}
+              <div style={{fontSize:11,color:"#888",marginBottom:2}}>
+                {t.reference_type==="payroll" && t.payroll_month
+                  ? `Salary — ${new Date(t.payroll_month+"-01").toLocaleDateString("en-GB",{month:"long",year:"numeric"})}`
+                  : new Date(t.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}
+              </div>
               <div style={{fontSize:13,fontWeight:600,color:"#111",marginBottom:4}}>{t.description||"—"}</div>
               <span style={{background:"#F5F5F5",border:"1px solid #E5E5E5",borderRadius:12,padding:"2px 8px",fontSize:11,color:"#666"}}>
                 Bal. {fmt(t.runningBalance)}
               </span>
-              {t.reference_type==="salary" && <span style={{marginLeft:6,background:"#DCFCE7",border:"1px solid #BBF7D0",borderRadius:12,padding:"2px 8px",fontSize:10,color:"#16A34A"}}>salary</span>}
-              {t.reference_type==="expense" && <span style={{marginLeft:6,background:"#EDE9FE",border:"1px solid #DDD6FE",borderRadius:12,padding:"2px 8px",fontSize:10,color:"#5B21B6"}}>expense</span>}
+              {t.reference_type==="payroll"     && <span style={{marginLeft:6,background:"#DCFCE7",border:"1px solid #BBF7D0",borderRadius:12,padding:"2px 8px",fontSize:10,color:"#16A34A",fontWeight:700}}>💰 payroll</span>}
+              {t.reference_type==="salary"      && <span style={{marginLeft:6,background:"#DCFCE7",border:"1px solid #BBF7D0",borderRadius:12,padding:"2px 8px",fontSize:10,color:"#16A34A"}}>salary</span>}
+              {t.reference_type==="expense"     && <span style={{marginLeft:6,background:"#EDE9FE",border:"1px solid #DDD6FE",borderRadius:12,padding:"2px 8px",fontSize:10,color:"#5B21B6"}}>expense</span>}
               {t.reference_type==="employee_request" && <span style={{marginLeft:6,background:"#FEF3C7",border:"1px solid #FDE68A",borderRadius:12,padding:"2px 8px",fontSize:10,color:"#92400E"}}>request</span>}
             </div>
             <div style={{textAlign:"right",paddingTop:4}}>

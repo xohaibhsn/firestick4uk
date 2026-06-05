@@ -100,7 +100,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // ── STEP B: Attendance records ──────────────────────────────────────
       const [attRows]: any = await pool.query(
-        `SELECT date, status FROM erp_attendance
+        // Fix 3: USE date (anchor) NOT time_in — night shifts count for their start date
+        `SELECT date, status, working_hours, shift_type FROM erp_attendance
          WHERE employee_id=? AND DATE_FORMAT(date,'%Y-%m')=?`,
         [emp.id, targetMonth]
       );

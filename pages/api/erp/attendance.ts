@@ -98,25 +98,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Personal clock in/out
       if (action === 'in' || action === 'out') {
-        const today = new Date().toISOString().slice(0,10);
-        const now = new Date().toISOString().slice(0,19).replace('T',' ');
-        const [existing]: any = await pool.query('SELECT * FROM erp_attendance WHERE employee_id=? AND date=?', [employee_id, today]);
+        const nowTs     = new Date();
+        const nowStr    = nowTs.toISOString().slice(0,19).replace('T',' ');
+
         if (action === 'in') {
-          if (existing.length) return res.status(400).json({ error: 'Already clocked in today' });
-          const hour = new Date().getHours();
-          const st = hour >= 10 ? 'late' : 'present';
-          await pool.query('INSERT INTO erp_attendance (employee_id,date,time_in,status) VALUES (?,?,?,?)', [employee_id, today, now, st]);
-          await pool.query('INSERT INTO erp_audit_log (user_id,action,details) VALUES (?,?,?)', [employee_id,'CLOCK_IN',`Clocked in at ${now}`]).catch(()=>{});
-          return res.status(200).json({ success:true, message:'Clocked in', status:st });
+          // Fix 2: ANCHOR DATE = clock-in date (handles night shifts)
+          const anchorDate = nowTs.toISOString().slice(0,10); // always clock-in date
+          const [existing]: any = await pool.query(
+            'SELECT * FROM erp_attendance WHERE employee_id=? AND date=?',
+            [employee_id, anchorDate]
+          );
+          if (existing.length && existing[0].time_in) {
+            return res.status(400).json({ error: 'Already clocked in for this date' });
+          }
+          const hour = nowTs.getHours();
+          const st   = hour >= 10 ? 'late' : 'present';
+          // Detect night shift for shift_type
+          const shiftType = (hour >= 18 || hour <= 5) ? 'night' : 'day';
+          await pool.query(
+            'INSERT INTO erp_attendance (employee_id,date,time_in,status,shift_type) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE time_in=?,status=?,shift_type=?',
+            [employee_id, anchorDate, nowStr, st, shiftType, nowStr, st, shiftType]
+          );
+          await pool.query('INSERT INTO erp_audit_log (user_id,action,details) VALUES (?,?,?)',
+            [employee_id,'CLOCK_IN',`Clocked in at ${nowStr} (anchor: ${anchorDate})`]
+          ).catch(()=>{});
+          return res.status(200).json({ success:true, message:'Clocked in', status:st, anchor_date: anchorDate });
         }
+
         if (action === 'out') {
-          if (!existing.length) return res.status(400).json({ error: 'Not clocked in today' });
-          if (existing[0].time_out) return res.status(400).json({ error: 'Already clocked out' });
-          const hours = Math.round((Date.now() - new Date(existing[0].time_in).getTime()) / 3600000 * 100) / 100;
-          const st = hours < 4 ? 'half_day' : existing[0].status;
-          await pool.query('UPDATE erp_attendance SET time_out=?,working_hours=?,status=? WHERE id=?', [now, hours, st, existing[0].id]);
-          await pool.query('INSERT INTO erp_audit_log (user_id,action,details) VALUES (?,?,?)', [employee_id,'CLOCK_OUT',`Clocked out at ${now} — ${hours}h`]).catch(()=>{});
-          return res.status(200).json({ success:true, message:'Clocked out', hours });
+          // Find the OPEN session for this employee (date anchored at clock-in date)
+          // Look for any open session (time_out IS NULL) — not tied to today's date
+          const [openSession]: any = await pool.query(
+            'SELECT * FROM erp_attendance WHERE employee_id=? AND time_out IS NULL AND time_in IS NOT NULL ORDER BY time_in DESC LIMIT 1',
+            [employee_id]
+          );
+          if (!openSession.length) return res.status(400).json({ error: 'Not clocked in' });
+          const sess = openSession[0];
+          // time_out can be NEXT DAY — date column never changes (anchor stays)
+          const hours = Math.round((nowTs.getTime() - new Date(sess.time_in).getTime()) / 3600000 * 100) / 100;
+          const cappedHours = Math.min(hours, 8); // cap at 8h
+          const st = cappedHours < 4 ? 'half_day' : sess.status;
+          // DO NOT update date column — only time_out + hours
+          await pool.query(
+            'UPDATE erp_attendance SET time_out=?,working_hours=?,status=? WHERE id=?',
+            [nowStr, cappedHours, st, sess.id]
+          );
+          await pool.query('INSERT INTO erp_audit_log (user_id,action,details) VALUES (?,?,?)',
+            [employee_id,'CLOCK_OUT',`Clocked out at ${nowStr} — ${cappedHours}h (anchor: ${sess.date})`]
+          ).catch(()=>{});
+          return res.status(200).json({ success:true, message:'Clocked out', hours: cappedHours, anchor_date: sess.date });
         }
       }
 

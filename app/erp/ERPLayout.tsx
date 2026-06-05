@@ -173,6 +173,14 @@ export default function ERPLayout({ children, title, active }: ERPLayoutProps) {
 
   const [userDropOpen, setUserDropOpen] = useState(false);
 
+  // Fix 4 — auto clock-out sweeper: runs every 15 min silently
+  useEffect(() => {
+    const runSweeper = () => fetch('/api/erp/attendance-sweeper').catch(()=>{});
+    runSweeper();
+    const interval = setInterval(runSweeper, 15 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   if (!user) return <><style>{erpStyles}</style><div style={{minHeight:"100vh",background:"#F5F5F5"}} /></>;
 
   const logout = () => { localStorage.removeItem("erp_session"); window.location.href = "/erp"; };

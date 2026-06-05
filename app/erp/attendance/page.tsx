@@ -330,7 +330,11 @@ function AttContent({ user, currency: _c }: { user: any; currency: string }) {
                     <td style={{fontWeight:600}}>{r.working_hours?`${r.working_hours}h`:"—"}</td>
                     <td>
                       <span className={`badge ${STATUS_COLOR[r.status]||"badge-purple"}`}>{r.status}</span>
-                      {r.is_manual?<span style={{marginLeft:4,fontSize:9,color:"rgba(255,180,0,0.7)",background:"rgba(255,180,0,0.1)",padding:"1px 6px",borderRadius:8}}>ADMIN</span>:null}
+                      {r.is_manual&&<span style={{marginLeft:4,fontSize:9,color:"rgba(255,180,0,0.7)",background:"rgba(255,180,0,0.1)",padding:"1px 6px",borderRadius:8}}>ADMIN</span>}
+                      {/* Fix 5 — auto clock-out badge */}
+                      {r.admin_note?.includes('Auto clock-out')&&<span style={{marginLeft:4,background:"#FEF3C7",color:"#92400E",padding:"2px 7px",borderRadius:12,fontSize:10,fontWeight:700}}>⏰ Auto</span>}
+                      {/* Night shift badge */}
+                      {r.shift_type==="night"&&<span style={{marginLeft:4,background:"#EDE9FE",color:"#5B21B6",padding:"2px 7px",borderRadius:12,fontSize:10,fontWeight:700}}>🌙 Night</span>}
                     </td>
                     <td style={{fontSize:11,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"rgba(255,255,255,0.4)"}}>{r.admin_note||"—"}</td>
                     {isAdmin&&<td style={{fontSize:11,color:"rgba(255,255,255,0.35)"}}>{r.marked_by_name||<span style={{color:"rgba(255,255,255,0.2)"}}>Self</span>}</td>}
