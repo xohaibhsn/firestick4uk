@@ -105,10 +105,11 @@ function LedgerContent({ user }: { user: any }) {
     setSelectedEmpId(empId);
     if (!empId) { setSelected(null); setTxns([]); return; }
 
-    // Fetch employee's account directly by user_id — don't rely on pre-loaded accounts cache
-    // (avoids race condition where accounts haven't loaded yet)
+    const empRecord = employees.find((e: any) => String(e.id) === empId);
+    const selectedRole = empRecord?.role || 'employee';
+
     const accsData: any[] = await fetch(
-      `/api/erp/ledger?self=1&user_id=${empId}&user_role=admin`
+      `/api/erp/ledger?self=1&user_id=${empId}&user_role=${selectedRole}`
     ).then(r=>r.json()).catch(()=>[]);
 
     const acc = Array.isArray(accsData) && accsData.length ? accsData[0] : null;
@@ -116,12 +117,49 @@ function LedgerContent({ user }: { user: any }) {
     if (acc) {
       setSelected(acc);
       setOpeningBal(Number(acc.opening_balance || 0));
-      fetch(`/api/erp/ledger?account_id=${acc.id}`).then(r=>r.json()).then(d=>{
-        setTxns(d.transactions || []);
-      }).catch(()=>{});
+
+      const [txnData, poData] = await Promise.all([
+        fetch(`/api/erp/ledger?account_id=${acc.id}`).then(r=>r.json()).catch(()=>({})),
+        selectedRole === 'vendor'
+          ? fetch('/api/erp/iptv/purchases').then(r=>r.json()).catch(()=>({}))
+          : Promise.resolve(null),
+      ]);
+
+      let allTxns: any[] = txnData.transactions || [];
+      if (selectedRole === 'vendor' && Array.isArray(poData?.orders)) {
+        const vendorPOs = (poData.orders as any[]).filter((o: any) => String(o.vendor_id) === empId);
+        const synthetic = vendorPOs.map((o: any) => ({
+          id: `po-${o.id}`, account_id: acc.id,
+          type: 'credit', amount: o.total_amount,
+          description: o.vendor_description || `PO #${o.id} — ${o.server_name}`,
+          reference_type: 'iptv_purchase', created_at: o.created_at,
+          voucher_ref: o.voucher_ref, payroll_month: null,
+        }));
+        allTxns = [...allTxns, ...synthetic].sort(
+          (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      }
+      setTxns(allTxns);
+    } else if (selectedRole === 'vendor') {
+      // Vendor has no ledger account yet — render purchase order history as synthetic entries
+      const poData = await fetch('/api/erp/iptv/purchases').then(r=>r.json()).catch(()=>({}));
+      const vendorPOs = Array.isArray(poData?.orders)
+        ? (poData.orders as any[]).filter((o: any) => String(o.vendor_id) === empId)
+        : [];
+      setSelected({ name: empRecord?.name || empId, type: 'vendor', id: null, opening_balance: 0 });
+      setOpeningBal(0);
+      const synthetic = vendorPOs.map((o: any) => ({
+        id: `po-${o.id}`, account_id: null,
+        type: 'credit', amount: o.total_amount,
+        description: o.vendor_description || `PO #${o.id} — ${o.server_name}`,
+        reference_type: 'iptv_purchase', created_at: o.created_at,
+        voucher_ref: o.voucher_ref, payroll_month: null,
+      }));
+      setTxns(synthetic.sort(
+        (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      ));
     } else {
-      // Account doesn't exist yet — show empty state with message
-      setSelected({ name: employees.find((e:any)=>String(e.id)===empId)?.name || empId, type:"employee", id:null });
+      setSelected({ name: empRecord?.name || empId, type: 'employee', id: null });
       setTxns([]);
       setMsg("⚠️ No ledger account found for this employee. Credit a salary to auto-create their account.");
       setTimeout(()=>setMsg(""),5000);

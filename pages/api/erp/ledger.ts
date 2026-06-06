@@ -22,13 +22,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           AND (
             (t.reference_type='payroll' AND p.month_year <= ?)
             OR
-            (t.reference_type IN ('salary','advance','manual_entry','employee_request','cash_injection'))
+            (t.reference_type IN ('salary','advance','manual_entry','employee_request','cash_injection','iptv_purchase','iptv_payment'))
             OR
             (t.reference_type='expense' AND NOT EXISTS (
               SELECT 1 FROM erp_expenses e WHERE e.id=t.reference_id AND e.status='rejected'
             ))
             OR
-            (t.reference_type NOT IN ('payroll','expense','salary','advance','manual_entry','employee_request')
+            (t.reference_type NOT IN ('payroll','expense','salary','advance','manual_entry','employee_request','cash_injection','iptv_purchase','iptv_payment')
              AND DATE_FORMAT(t.created_at,'%Y-%m') <= ?)
           )
           ORDER BY
@@ -47,13 +47,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           AND (
             (t.reference_type='payroll' AND p.month_year <= ?)
             OR
-            (t.reference_type IN ('salary','advance','manual_entry','employee_request','cash_injection'))
+            (t.reference_type IN ('salary','advance','manual_entry','employee_request','cash_injection','iptv_purchase','iptv_payment'))
             OR
             (t.reference_type='expense' AND NOT EXISTS (
               SELECT 1 FROM erp_expenses e WHERE e.id=t.reference_id AND e.status='rejected'
             ))
             OR
-            (t.reference_type NOT IN ('payroll','expense','salary','advance','manual_entry','employee_request')
+            (t.reference_type NOT IN ('payroll','expense','salary','advance','manual_entry','employee_request','cash_injection','iptv_purchase','iptv_payment')
              AND DATE_FORMAT(t.created_at,'%Y-%m') <= ?)
           )
         `, [account_id, cutoff, cutoff]);
@@ -78,7 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ),0) as balance
           FROM erp_accounts a
           LEFT JOIN erp_transactions t ON a.id=t.account_id
-          WHERE a.reference_id=? AND (a.type=? OR a.type='employee')
+          WHERE a.reference_id=? AND (a.type=? OR a.type='employee' OR a.type='vendor')
           GROUP BY a.id
           LIMIT 1
         `, [user_id, acctType]);

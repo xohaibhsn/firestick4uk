@@ -245,10 +245,9 @@ export default function CartPage() {
         const oid = data.order_id;
         setOrderId(oid);
 
-        // Build WhatsApp message
         const itemsList = cart.map(i => `• ${i.name} x${i.qty} — £${(i.price * i.qty).toFixed(2)}`).join('\n');
         const fullAddress = [form.address, form.city, form.postcode].filter(Boolean).join(', ');
-        const lines = [
+        const waMessage = [
           '🛍️ *NEW ORDER — firestick4uk.com*',
           '',
           `📋 *Order ID:* ${oid}`,
@@ -273,11 +272,14 @@ export default function CartPage() {
           '',
           '📦 *Status:* Pending ⏳',
           '— Sent from firestick4uk.com',
-        ].filter(l => l !== null).join('\n');
+        ].filter(Boolean).join('\n');
 
-        window.open(`https://wa.me/447934519060?text=${encodeURIComponent(lines)}`, '_blank');
+        sessionStorage.setItem('orderSuccess', JSON.stringify({
+          orderId: oid, items: cart, subtotal, shipping, vatAmount,
+          discountAmount, grandTotal, couponApplied, form, paymentMethod, waMessage,
+        }));
         clearCart();
-        setStep("success");
+        window.location.href = '/cart/success';
       } else {
         setOrderError(data.error?.includes("connect") || data.error?.includes("timeout")
           ? "Our system is temporarily unavailable. Please try again in a moment."
@@ -288,64 +290,6 @@ export default function CartPage() {
     }
     setPlacing(false);
   };
-
-  if (step === "success") {
-    return (
-      <>
-        <style>{navStyles}</style>
-        
-        <nav>
-          <a href="/" className="nav-logo">FIRESTICK4UK</a>
-          <ul className="nav-links">
-            <li><a href="/">Home</a></li>
-            <li><a href="/order-tracking">Track Order</a></li>
-          </ul>
-        </nav>
-        <div className="success-screen">
-          <span className="success-icon">🎉</span>
-          <h2 className="success-title">Order Placed!</h2>
-          <div className="order-id-box">Order ID: {orderId}</div>
-
-          {/* WhatsApp CTA */}
-          <div style={{background:"rgba(37,211,102,0.12)",border:"1px solid rgba(37,211,102,0.35)",borderRadius:16,padding:"20px 24px",margin:"20px 0",textAlign:"left"}}>
-            <div style={{fontSize:22,marginBottom:8}}>💬 WhatsApp opened!</div>
-            <p style={{color:"rgba(255,255,255,0.85)",fontSize:14,lineHeight:1.7,marginBottom:14}}>
-              Your order details have been pre-filled in WhatsApp.<br/>
-              <strong style={{color:"#25d366"}}>Please tap Send to confirm your order with us.</strong>
-            </p>
-            <a
-              href={`https://wa.me/447934519060`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{display:"inline-flex",alignItems:"center",gap:8,background:"linear-gradient(135deg,#25d366,#128c7e)",color:"white",padding:"12px 24px",borderRadius:50,fontSize:14,fontWeight:700,textDecoration:"none",boxShadow:"0 4px 16px rgba(37,211,102,0.4)"}}>
-              💬 Open WhatsApp Again
-            </a>
-          </div>
-
-          <div className="status-box">
-            {[
-              {label:"Order Received", sub:"Just now ✅", active:true},
-              {label:"Send WhatsApp Message", sub:"Tap the button above to confirm", active:true},
-              {label:"Payment Verification", sub:"Within 2 hours", active:false},
-              {label:"Order Confirmed", sub:"After payment verified", active:false},
-              {label:"Dispatched / Activated", sub:"Within 24 hours", active:false},
-            ].map((s,i) => (
-              <div className="status-step" key={i}>
-                <div className={`step-dot ${s.active?"active":"inactive"}`} />
-                <div className="step-text"><strong>{s.label}</strong><span>{s.sub}</span></div>
-              </div>
-            ))}
-          </div>
-          <a href="/order-tracking" className="btn-primary">Track My Order →</a>
-        </div>
-        <footer>
-          <div className="footer-logo">FIRESTICK4UK</div>
-          <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
-        </footer>
-        <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
-      </>
-    );
-  }
 
   return (
     <>
