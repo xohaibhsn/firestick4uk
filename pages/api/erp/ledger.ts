@@ -22,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           AND (
             (t.reference_type='payroll' AND p.month_year <= ?)
             OR
-            (t.reference_type IN ('salary','advance','manual_entry','employee_request'))
+            (t.reference_type IN ('salary','advance','manual_entry','employee_request','cash_injection'))
             OR
             (t.reference_type='expense' AND NOT EXISTS (
               SELECT 1 FROM erp_expenses e WHERE e.id=t.reference_id AND e.status='rejected'
@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           AND (
             (t.reference_type='payroll' AND p.month_year <= ?)
             OR
-            (t.reference_type IN ('salary','advance','manual_entry','employee_request'))
+            (t.reference_type IN ('salary','advance','manual_entry','employee_request','cash_injection'))
             OR
             (t.reference_type='expense' AND NOT EXISTS (
               SELECT 1 FROM erp_expenses e WHERE e.id=t.reference_id AND e.status='rejected'

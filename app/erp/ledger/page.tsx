@@ -73,7 +73,7 @@ function LedgerContent({ user }: { user: any }) {
     const res = await fetch('/api/erp/ledger/inject-funds', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(injectForm),
+      body: JSON.stringify({ ...injectForm, admin_user_id: user.id }),
     }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
       setMsg('✅ Funds injected successfully');

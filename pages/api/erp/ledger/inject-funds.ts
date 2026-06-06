@@ -56,6 +56,30 @@ async function resolveZohaibAccount(): Promise<{ userId: number; accId: number; 
   return { userId, accId, name };
 }
 
+// Generalized resolver — looks up by user_id directly (not by name)
+async function resolveAdminAccount(userId: number): Promise<{ userId: number; accId: number; name: string } | null> {
+  const [rows]: any = await pool.query(`
+    SELECT u.id AS user_id, u.name, a.id AS account_id
+    FROM erp_users u
+    LEFT JOIN erp_accounts a ON a.reference_id = u.id AND a.type = 'employee'
+    WHERE u.id = ? AND u.role = 'admin'
+    LIMIT 1
+  `, [userId]);
+  if (!Array.isArray(rows) || !rows.length) return null;
+
+  const { user_id, name, account_id } = rows[0];
+  let accId: number = account_id;
+  if (!accId) {
+    const [ins]: any = await pool.query(
+      `INSERT INTO erp_accounts (name, type, reference_id, opening_balance) VALUES (?, 'employee', ?, 0)`,
+      [name, user_id]
+    );
+    accId = ins.insertId;
+    console.log(`[inject-funds] Created missing employee account for ${name} (user_id=${user_id}, acc_id=${accId})`);
+  }
+  return { userId: user_id, accId, name };
+}
+
 // ── Historical orphan repair ────────────────────────────────────────────────
 // Runs on every request but is idempotent — only inserts rows that are still
 // missing. After the first successful repair pass the NOT EXISTS subquery
@@ -115,7 +139,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { amount, injection_type, destination_account_id, description } = req.body;
+  const { amount, injection_type, destination_account_id, description, admin_user_id } = req.body;
 
   if (!amount || !injection_type || !destination_account_id) {
     return res.status(400).json({ error: 'amount, injection_type, and destination_account_id are required' });
@@ -178,25 +202,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [crAccId, 'credit', finalAmt, `CR ${creditName} — ${memo}`, 'cash_injection', crCoaId, voucherRef]
     );
 
-    // Row 3 (loan only): mirror the loan into Zohaib's personal employee ledger so the
-    // amount shows in his individual profile statement as a credit the company owes him back
+    // Row 3 (loan only): mirror as Credit (Cr) into the injecting admin's personal
+    // employee ledger — "company owes director back". Uses admin_user_id from the
+    // request body; falls back to Zohaib name-match for backward compatibility.
     if (injection_type === 'loan') {
       try {
-        const zh = await resolveZohaibAccount();
-        if (!zh) {
-          console.error('[inject-funds] Row 3: Zohaib admin user not found — personal ledger mirror skipped');
+        const adminAcc = admin_user_id
+          ? await resolveAdminAccount(Number(admin_user_id))
+          : await resolveZohaibAccount();
+        if (!adminAcc) {
+          console.error('[inject-funds] Row 3: Admin account not found — personal ledger mirror skipped');
         } else {
           await pool.query(
             `INSERT INTO erp_transactions
              (account_id,type,amount,description,reference_type,voucher_ref)
              VALUES (?,?,?,?,?,?)`,
-            [zh.accId, 'credit', finalAmt,
-             memo || 'Director Capital Infusion / Operational Loan from Zohaib Hassan',
+            [adminAcc.accId, 'credit', finalAmt,
+             memo || `Director Capital Infusion — Loan from ${adminAcc.name}`,
              'cash_injection', voucherRef]
           );
         }
       } catch (err) {
-        // Log the real error so it's visible in server logs — not silently swallowed
         console.error('[inject-funds] Row 3 personal ledger mirror failed:', err);
       }
     }

@@ -67,7 +67,7 @@ function MyLedgerContent({ user }: { user: any }) {
     }
     // Fix 2: manual_entry / salary / advance / employee_request — NEVER apply month cutoff
     // These are admin-initiated and can happen any time (current month is valid)
-    else if (['manual_entry','salary','advance','employee_request','expense'].includes(t.reference_type)) {
+    else if (['manual_entry','salary','advance','employee_request','expense','cash_injection'].includes(t.reference_type)) {
       // No cutoff — always show
     }
     // Everything else: apply created_at cutoff
