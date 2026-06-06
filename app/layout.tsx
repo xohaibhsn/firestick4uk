@@ -24,12 +24,12 @@ export async function generateMetadata(): Promise<Metadata> {
   const tagline = settings.site_tagline || "Best Firestick Service in UK";
   const favicon = settings.favicon_url || "/favicon.ico";
   const ogImage = settings.og_default_image || "https://firestick4uk.com/og-default.jpg";
-  const description = "Buy Firestick, IPTV subscriptions and Android boxes in the UK. Fast delivery, easy setup, real support.";
+  const description = "Buy Firestick, streaming subscriptions and Android boxes in the UK. Fast delivery, easy setup, real support.";
 
   return {
     title: `${title} — ${tagline}`,
     description,
-    keywords: "Firestick UK, IPTV subscription, Android box, streaming device, buy firestick UK",
+    keywords: "Firestick UK, Firestick subscription, Android box, streaming device, buy firestick UK",
     authors: [{ name: title }],
     icons: { icon: favicon },
     openGraph: {

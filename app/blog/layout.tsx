@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Blog — Firestick4UK | Streaming Tips & Guides",
-  description: "Read our latest guides, tips and news about Firestick, IPTV, Android boxes and streaming in the UK.",
+  description: "Read our latest guides, tips and news about Firestick, streaming services, Android boxes and live TV in the UK.",
   openGraph: {
     title: "Blog — Firestick4UK | Streaming Tips & Guides",
-    description: "Read our latest guides, tips and news about Firestick, IPTV, Android boxes and streaming in the UK.",
+    description: "Read our latest guides, tips and news about Firestick, streaming services, Android boxes and live TV in the UK.",
     url: "https://firestick4uk.com/blog",
     siteName: "Firestick4UK",
     type: "website",

@@ -187,7 +187,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
 
             <div className="cta-box">
               <div className="cta-title">Ready to Shop?</div>
-              <div className="cta-sub">Browse our full range of Firestick devices and IPTV plans.</div>
+              <div className="cta-sub">Browse our full range of Firestick devices and Streaming Plans.</div>
               <a href="/products" className="btn-primary">View Products →</a>
             </div>
           </>

@@ -28,7 +28,7 @@ export default function Home() {
 
   // Section data from DB
   const [sec, setSec] = useState<Record<string,any>>({
-    home_hero: { title:"Best Firestick Service in UK", subtitle:"Premium IPTV & Streaming Solutions", button_text:"Shop Now", button_link:"/products", secondary_button_text:"Learn More", secondary_button_link:"/about" },
+    home_hero: { title:"Best Firestick Service in UK", subtitle:"Premium Streaming Solutions", button_text:"Shop Now", button_link:"/products", secondary_button_text:"Learn More", secondary_button_link:"/about" },
     home_features: { title:"Why Choose Us", items:[{icon:"⚡",title:"Fast Setup",description:"Ready in minutes"},{icon:"🔒",title:"Secure",description:"Safe & reliable"},{icon:"💬",title:"24/7 Support",description:"Always here for you"},{icon:"🚀",title:"Fast Delivery",description:"Quick & efficient"}] },
     home_testimonials: { title:"What Our Customers Say", items:[{name:"John Smith",rating:5,text:"Amazing service!"},{name:"Sarah Jones",rating:5,text:"Best firestick service in UK!"}] },
     home_newsletter: { title:"Stay in the Loop", subtitle:"Get the latest guides, tips and offers", button_text:"Subscribe" },
@@ -294,7 +294,7 @@ export default function Home() {
                 {sec.home_hero?.title?.split(' ').slice(0,-2).join(' ') || "Best Firestick"}<br/>
                 <span>{sec.home_hero?.title?.split(' ').slice(-2).join(' ') || "Service in UK"}</span>
               </h1>
-              <p className="hero-subtitle">{sec.home_hero?.subtitle || "Premium IPTV & Streaming Solutions for the whole UK. Fast delivery, easy setup, real support."}</p>
+              <p className="hero-subtitle">{sec.home_hero?.subtitle || "Premium Streaming Solutions for the whole UK. Fast delivery, easy setup, real support."}</p>
               <div className="hero-btns">
                 <a href={sec.home_hero?.button_link||"/products"} className="hero-btn-primary">{sec.home_hero?.button_text||"Shop Now"} →</a>
                 <a href={sec.home_hero?.secondary_button_link||"/about"} className="hero-btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>
@@ -348,7 +348,7 @@ export default function Home() {
         {/* CTA — from DB */}
         <div className="cta-section">
           <h2 className="cta-title">{sec.home_hero?.title || "Best Firestick Service in UK"}</h2>
-          <p className="cta-sub">{sec.home_hero?.subtitle || "Premium IPTV & Streaming Solutions"}</p>
+          <p className="cta-sub">{sec.home_hero?.subtitle || "Premium Streaming Solutions"}</p>
           <div className="cta-btns">
             <a href={sec.home_hero?.button_link||"/products"} className="btn-primary">{sec.home_hero?.button_text||"Shop Now"}</a>
             <a href={sec.home_hero?.secondary_button_link||"/about"} className="btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>

@@ -50,7 +50,7 @@ export default function PlayerPage() {
   // ── App state machine ────────────────────────────────────────────────────
   const [appState, setAppState] = useState<AppState>("login");
   const [isXtream, setIsXtream] = useState(false);
-  const [profileName, setProfileName] = useState("IPTV");
+  const [profileName, setProfileName] = useState("Streaming");
 
   // ── Login form ───────────────────────────────────────────────────────────
   const [loginTab, setLoginTab] = useState<"xtream"|"m3u">("xtream");
@@ -348,7 +348,7 @@ export default function PlayerPage() {
           )}
           <div style={{fontSize:15,fontWeight:800,color:'#fff',letterSpacing:'-0.5px',display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
             <span style={{width:7,height:7,borderRadius:'50%',background:'#e53e3e',display:'inline-block'}}/>
-            IPTV
+            Streaming
           </div>
 
           {appState !== 'login' && (
@@ -391,7 +391,7 @@ export default function PlayerPage() {
 
               {loginTab==='xtream' ? (
                 <>
-                  {([{k:'server',l:'Host URL',p:'http://provider.com:8080'},{k:'username',l:'Username',p:'your_username'},{k:'password',l:'Password',p:'your_password'},{k:'name',l:'Profile Name (optional)',p:'My IPTV'}] as const).map(f=>(
+                  {([{k:'server',l:'Host URL',p:'http://provider.com:8080'},{k:'username',l:'Username',p:'your_username'},{k:'password',l:'Password',p:'your_password'},{k:'name',l:'Profile Name (optional)',p:'My Stream'}] as const).map(f=>(
                     <div key={f.k} style={{marginBottom:14}}>
                       <label style={{display:'block',fontSize:10,fontWeight:600,color:'#444',letterSpacing:'1.2px',textTransform:'uppercase',marginBottom:5}}>{f.l}</label>
                       <input style={{width:'100%',background:'#0a0a0a',border:'1px solid #252525',borderRadius:8,padding:'11px 13px',color:'#e0e0e0',fontSize:14,outline:'none'}}

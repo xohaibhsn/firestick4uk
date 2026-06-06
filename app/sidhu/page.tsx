@@ -703,7 +703,7 @@ export default function AdminPage() {
             </div>
             <div className="modal-field">
               <label>Features (one per line)</label>
-              <textarea rows={3} placeholder={"✅ 1 Year IPTV Access\n✅ 10,000+ Channels\n✅ Free Setup Support"} value={editProduct.features} onChange={e => setEditProduct({...editProduct,features:e.target.value})} style={{resize:"vertical"}} />
+              <textarea rows={3} placeholder={"✅ 1 Year Streaming Access\n✅ 10,000+ Channels\n✅ Free Setup Support"} value={editProduct.features} onChange={e => setEditProduct({...editProduct,features:e.target.value})} style={{resize:"vertical"}} />
             </div>
 
             {/* SEO Section */}
@@ -1537,7 +1537,7 @@ export default function AdminPage() {
                 <div className="section-card" style={{padding:24}}>
                   <div className="section-header" style={{marginBottom:20}}><div className="section-title">🏠 Home Page Content</div></div>
                   <div className="modal-field"><label>Hero Title</label><input style={{width:"100%"}} value={siteContent.home_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_hero_title:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
-                  <div className="modal-field"><label>Hero Subtitle</label><textarea rows={2} style={{width:"100%",resize:"vertical"}} value={siteContent.home_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_hero_subtitle:e.target.value}))} placeholder="Premium IPTV & Streaming Solutions" /></div>
+                  <div className="modal-field"><label>Hero Subtitle</label><textarea rows={2} style={{width:"100%",resize:"vertical"}} value={siteContent.home_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_hero_subtitle:e.target.value}))} placeholder="Premium Streaming Solutions" /></div>
                   <div className="modal-field"><label>Tagline</label><input style={{width:"100%"}} value={siteContent.home_tagline||""} onChange={e=>setSiteContent(s=>({...s,home_tagline:e.target.value}))} placeholder="Fast. Reliable. Affordable." /></div>
                   <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["home_hero_title","home_hero_subtitle","home_tagline"])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
                 </div>
