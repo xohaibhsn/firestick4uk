@@ -192,7 +192,8 @@ export default function BlogPage() {
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
-          setAllPosts(data.map((p: any) => ({
+          const published = data.filter((p: any) => (p.status || "published") === "published");
+          setAllPosts(published.map((p: any) => ({
             id: p.id,
             emoji: p.emoji || "📝",
             badge: p.badge || "guide",

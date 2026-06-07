@@ -244,6 +244,7 @@ export default function AdminPage() {
   const [couponForm, setCouponForm] = useState({ code:"", type:"percentage", value:"", minimum_order:"0", usage_limit:"", expires_at:"" });
   const [couponMsg, setCouponMsg] = useState("");
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [blogMsg, setBlogMsg] = useState("");
   const [blogModal, setBlogModal] = useState<BlogPost|"new"|null>(null);
   const [featImgUploading, setFeatImgUploading] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -472,22 +473,39 @@ export default function AdminPage() {
     if (html) setEditBlog(p=>({...p, content: html}));
   }, []);
 
+  const fetchBlogs = () => {
+    fetch("/api/blog").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setBlogPosts(d); }).catch(()=>{});
+  };
+
   const saveBlog = async () => {
     const content = editorRef.current?.innerHTML || editBlog.content;
     const payload = { ...editBlog, content };
-    if (blogModal === "new") {
-      const res = await fetch("/api/blog",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}).then(r=>r.json()).catch(()=>({}));
-      setBlogPosts([...blogPosts, { ...payload, id: res.id || Date.now() } as BlogPost]);
-    } else if (blogModal) {
-      await fetch("/api/blog",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...payload,id:(blogModal as BlogPost).id})}).catch(()=>{});
-      setBlogPosts(blogPosts.map(p=>p.id===(blogModal as BlogPost).id?{...p,...payload} as BlogPost:p));
+    const isNew = blogModal === "new";
+    const res = await fetch("/api/blog", {
+      method: isNew ? "POST" : "PUT",
+      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      body: JSON.stringify(isNew ? payload : { ...payload, id: (blogModal as BlogPost).id }),
+    }).then(r=>r.json()).catch(()=>({}));
+    if (res.success) {
+      setBlogMsg(isNew ? "✅ Post published!" : "✅ Post updated!");
+      setBlogModal(null);
+      fetchBlogs();
+    } else {
+      setBlogMsg(`❌ ${res.error || "Save failed"}`);
     }
-    setBlogModal(null);
+    setTimeout(()=>setBlogMsg(""),3000);
   };
 
-  const deleteBlog = (id: number) => {
-    fetch(`/api/blog?id=${id}`, { method: "DELETE" }).catch(() => {});
-    setBlogPosts(blogPosts.filter(p => p.id !== id));
+  const deleteBlog = async (id: number) => {
+    if (!confirm("Delete this blog post?")) return;
+    const res = await fetch(`/api/blog?id=${id}`, { method: "DELETE", headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"" } }).then(r=>r.json()).catch(()=>({}));
+    if (res.success) {
+      setBlogPosts(blogPosts.filter(p => p.id !== id));
+      setBlogMsg("✅ Post deleted");
+    } else {
+      setBlogMsg(`❌ ${res.error || "Delete failed"}`);
+    }
+    setTimeout(()=>setBlogMsg(""),3000);
   };
 
   const deleteProduct = (id: number) => {
@@ -718,10 +736,10 @@ export default function AdminPage() {
               </div>
               <div className="modal-field">
                 <label style={{display:"flex",justifyContent:"space-between"}}>
-                  Meta Description <span style={{fontSize:11,color:editProduct.meta_description.length>150?"#ff6666":editProduct.meta_description.length>120?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.meta_description.length}/160</span>
+                  Meta Description <span style={{fontSize:11,color:editProduct.meta_description.length>=175?"#ff6666":editProduct.meta_description.length>=140?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.meta_description.length}/180</span>
                 </label>
-                <textarea rows={2} placeholder={`Auto: Short description will be used if empty`} maxLength={160} value={editProduct.meta_description} onChange={e => setEditProduct({...editProduct,meta_description:e.target.value})} style={{resize:"none"}} />
-                <div className="char-bar" style={{background:"rgba(255,255,255,0.08)",width:"100%"}}><div className="char-bar" style={{width:`${Math.min(100,(editProduct.meta_description.length/160)*100)}%`,background:editProduct.meta_description.length>150?"#ff6666":editProduct.meta_description.length>120?"#00c864":"rgba(139,0,255,0.5)"}} /></div>
+                <textarea rows={2} placeholder={`Auto: Short description will be used if empty (max 180 chars)`} maxLength={180} value={editProduct.meta_description} onChange={e => setEditProduct({...editProduct,meta_description:e.target.value})} style={{resize:"none"}} />
+                <div className="char-bar" style={{background:"rgba(255,255,255,0.08)",width:"100%"}}><div className="char-bar" style={{width:`${Math.min(100,(editProduct.meta_description.length/180)*100)}%`,background:editProduct.meta_description.length>=175?"#ff6666":editProduct.meta_description.length>=140?"#00c864":"rgba(139,0,255,0.5)"}} /></div>
               </div>
               <div className="modal-field" style={{marginBottom:0}}><label>Focus Keyword</label><input placeholder="e.g. firestick 4k uk" value={editProduct.focus_keyword} onChange={e => setEditProduct({...editProduct,focus_keyword:e.target.value})} /></div>
             </div>
@@ -787,8 +805,8 @@ export default function AdminPage() {
               <div className="modal-field"><label>Meta Title</label><input placeholder="SEO title (50-60 chars)" value={editBlog.meta_title} onChange={e=>setEditBlog(p=>({...p,meta_title:e.target.value}))} /></div>
               <div className="modal-field">
                 <label>Meta Description</label>
-                <textarea rows={2} placeholder="SEO description (max 160 chars)" value={editBlog.meta_description} onChange={e=>setEditBlog(p=>({...p,meta_description:e.target.value.slice(0,160)}))} style={{resize:"none"}} />
-                <div className={`char-count ${editBlog.meta_description.length>140?"char-warn":""}`}>{editBlog.meta_description.length}/160</div>
+                <textarea rows={2} placeholder="SEO description (max 180 chars)" value={editBlog.meta_description} onChange={e=>setEditBlog(p=>({...p,meta_description:e.target.value.slice(0,180)}))} style={{resize:"none"}} />
+                <div className="char-count" style={{color:editBlog.meta_description.length>=175?"#DC2626":editBlog.meta_description.length>=140?"#16A34A":"#999999"}}>{editBlog.meta_description.length}/180</div>
               </div>
               <div className="modal-field"><label>Focus Keyword</label><input placeholder="e.g. firestick uk" value={editBlog.focus_keyword} onChange={e=>setEditBlog(p=>({...p,focus_keyword:e.target.value}))} /></div>
               <div className="modal-field" style={{marginBottom:0}}>
@@ -1070,6 +1088,8 @@ export default function AdminPage() {
 
           {/* BLOG */}
           {tab==="blog" && (
+            <div>
+              {blogMsg && <div style={{marginBottom:16,padding:"10px 16px",background:blogMsg.startsWith("✅")?"rgba(22,163,74,0.1)":"rgba(220,38,38,0.1)",border:`1px solid ${blogMsg.startsWith("✅")?"rgba(22,163,74,0.3)":"rgba(220,38,38,0.25)"}`,borderRadius:10,fontSize:13,color:blogMsg.startsWith("✅")?"#16A34A":"#DC2626"}}>{blogMsg}</div>}
             <div className="section-card">
               <div className="section-header">
                 <div className="section-title">Blog Posts ({blogPosts.length})</div>
@@ -1097,6 +1117,7 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
             </div>
           )}
 

@@ -30,6 +30,14 @@ export async function generateMetadata(): Promise<Metadata> {
     title: `${title} — ${tagline}`,
     description,
     keywords: "Firestick UK, Firestick subscription, Android box, streaming device, buy firestick UK",
+    robots: {
+      index: false,
+      follow: false,
+      googleBot: {
+        index: false,
+        follow: false,
+      },
+    },
     authors: [{ name: title }],
     icons: { icon: favicon },
     openGraph: {
