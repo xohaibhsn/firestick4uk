@@ -152,7 +152,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const currentTraining = await getCurrentTrainingKnowledge();
     const history = await getTrainingChatHistory(60);
-    const messages: TrainingChatMessage[] = [...history, { role: 'user', content: message }];
+    const messages: TrainingChatMessage[] = [
+      ...history.map((item) => ({ role: item.role, content: item.content })),
+      { role: 'user', content: message },
+    ];
     await pool.query(
       'INSERT INTO berlin_training_chat_messages (role, content) VALUES (?,?)',
       ['user', message]
