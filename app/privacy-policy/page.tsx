@@ -154,7 +154,7 @@ export default function PrivacyPolicyPage() {
               <ul>
                 <li>Full name</li>
                 <li>Email address</li>
-                <li>Phone number / WhatsApp number</li>
+                <li>Phone number / WhatsApp number / Telegram username if provided</li>
                 <li>Delivery address (street, city, postcode)</li>
                 <li>Order details and payment receipts</li>
                 <li>IP address and browser information (via cookies)</li>
@@ -170,7 +170,7 @@ export default function PrivacyPolicyPage() {
                 <li>Processing and fulfilling your orders</li>
                 <li>Verifying bank transfer payments</li>
                 <li>Sending order confirmations and status updates</li>
-                <li>Providing customer support via WhatsApp or email</li>
+                <li>Providing customer support via WhatsApp, Telegram or email</li>
                 <li>Improving our website and services</li>
                 <li>Complying with legal obligations</li>
               </ul>
@@ -228,6 +228,7 @@ export default function PrivacyPolicyPage() {
               <div className="highlight-box">
                 <p>📧 Email: firestick4uk@gmail.com<br />
                 💬 WhatsApp: +447934519060<br />
+                ✈️ Telegram: @firestick44<br />
                 🌐 Website: firestick4uk.com</p>
               </div>
               <p>You also have the right to lodge a complaint with the Information Commissioner&apos;s Office (ICO) at ico.org.uk if you believe your data has been mishandled.</p>

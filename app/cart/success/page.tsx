@@ -52,6 +52,8 @@ const styles = `
 
   .wa-btn { display:flex; align-items:center; justify-content:center; gap:10px; background:linear-gradient(135deg,#25d366,#128c7e); color:#FFFFFF !important; text-decoration:none; padding:15px 28px; border-radius:50px; font-size:14px; font-weight:700; letter-spacing:0.3px; box-shadow:0 4px 20px rgba(37,211,102,0.4); transition:all 0.2s; margin-bottom:10px; text-align:center; line-height:1.4; }
   .wa-btn:hover { transform:translateY(-2px); box-shadow:0 6px 28px rgba(37,211,102,0.5); }
+  .telegram-btn { display:flex; align-items:center; justify-content:center; gap:10px; background:#229ED9; color:#FFFFFF !important; text-decoration:none; padding:14px 28px; border-radius:50px; font-size:14px; font-weight:700; letter-spacing:0.3px; transition:all 0.2s; margin-bottom:10px; text-align:center; line-height:1.4; }
+  .telegram-btn:hover { transform:translateY(-2px); }
   .wa-optional { font-size:11px; color:#999; text-align:center; margin-bottom:24px; line-height:1.5; }
 
   .track-btn { display:block; text-align:center; background:#111; color:#fff !important; text-decoration:none; padding:14px 28px; border-radius:9px; font-size:13px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; transition:all 0.2s; }
@@ -143,7 +145,7 @@ export default function CartSuccessPage() {
           <h1 className="title">Thank you for your order!</h1>
           <p className="subtitle">
             Your order has been received and is being processed.<br />
-            You&apos;ll receive confirmation once payment is verified.
+            You&apos;ll receive confirmation once payment is verified. Subscription services are active within 1 hour of payment confirmation.
           </p>
 
           {/* Order ID */}
@@ -210,6 +212,9 @@ export default function CartSuccessPage() {
           {/* Optional WhatsApp CTA */}
           <a href={waUrl} target="_blank" rel="noopener noreferrer" className="wa-btn">
             💬 Need Instant Activation? Chat with Support via WhatsApp (Optional)
+          </a>
+          <a href="https://t.me/firestick44" target="_blank" rel="noopener noreferrer" className="telegram-btn">
+            ✈️ Message Telegram @firestick44
           </a>
           <p className="wa-optional">
             This is completely optional — your order is already confirmed and being processed above.<br />

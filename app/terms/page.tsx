@@ -122,6 +122,7 @@ export default function TermsPage() {
                 <li>Product descriptions and images are for illustrative purposes. Actual products may vary slightly.</li>
                 <li>We reserve the right to modify or discontinue any product or service without prior notice.</li>
                 <li>Subscription plans are for personal, non-commercial use only.</li>
+                <li>Compatible devices include Firestick (all generations), Android box, Smart TV (Samsung/LG), iPhone, Android phone/tablet, Roku and Windows.</li>
                 <li>Reselling or redistributing our subscription plans is strictly prohibited.</li>
               </ul>
             </div>
@@ -132,7 +133,7 @@ export default function TermsPage() {
               <ul>
                 <li>You must provide accurate and complete information when placing an order.</li>
                 <li>An order is confirmed only after payment has been verified by our team.</li>
-                <li>We will notify you of order confirmation via email or WhatsApp.</li>
+                <li>We will notify you of order confirmation via email, WhatsApp or Telegram.</li>
                 <li>Orders cannot be modified once payment has been verified and fulfilment has begun.</li>
               </ul>
             </div>
@@ -143,7 +144,7 @@ export default function TermsPage() {
               <ul>
                 <li><strong>Bank Transfer:</strong> Payment must be made to the account details shown at checkout. Include your Order ID as the payment reference. Upload your receipt to complete the order.</li>
                 <li><strong>Cash on Delivery:</strong> Payment is due upon delivery of physical goods. Available for UK mainland addresses only.</li>
-                <li>We verify all bank transfer receipts manually. This may take up to a few hours during business hours.</li>
+                <li>We verify all bank transfer receipts manually. Subscription services are active within 1 hour of payment confirmation.</li>
                 <li>Orders will not be fulfilled until payment is verified.</li>
               </ul>
             </div>
@@ -152,10 +153,10 @@ export default function TermsPage() {
               <h2>5. Delivery</h2>
               <ul>
                 <li>Physical products are delivered within 2-3 working days to UK mainland addresses.</li>
-                <li>Subscription plans are activated digitally within a few hours of payment verification.</li>
+                <li>Subscription plans are activated digitally and are active within 1 hour of payment confirmation.</li>
                 <li>Delivery times are estimates and not guaranteed. We are not liable for delays caused by couriers or circumstances beyond our control.</li>
                 <li>Risk of loss passes to you upon delivery.</li>
-                <li>We deliver to UK addresses only.</li>
+                <li>Service is available outside UK, but performance is not guaranteed due to regional restrictions.</li>
               </ul>
             </div>
 
@@ -164,7 +165,8 @@ export default function TermsPage() {
               <p>Please refer to our <a href="/refund-policy" style={{color:"var(--purple-glow)"}}>Refund Policy</a> for full details on returns and refunds.</p>
               <ul>
                 <li>Physical products may be returned within 14 days of delivery if unused and in original packaging.</li>
-                <li>Digital subscription plans are non-refundable once activated.</li>
+                <li>No free trials are offered. Subscription plans include a 7-day money back guarantee on 1 Year plans and above only.</li>
+                <li>Each subscription includes one connection at a time. For simultaneous use on 2 devices, you need 2 separate subscriptions.</li>
                 <li>Faulty items will be replaced or refunded at no additional cost.</li>
               </ul>
             </div>
@@ -184,6 +186,7 @@ export default function TermsPage() {
               <ul>
                 <li>Any indirect, incidental, or consequential damages arising from use of our products or website.</li>
                 <li>Loss of data, revenue, or profits.</li>
+                <li>Streaming performance issues caused by ISP blocking, regional restrictions, device setup, or third-party network conditions. If your ISP affects performance, please try a VPN or mobile hotspot.</li>
                 <li>Delays or failures caused by circumstances beyond our reasonable control (including courier delays, technical outages, or force majeure events).</li>
               </ul>
               <p>Our total liability shall not exceed the value of the order in question.</p>
@@ -200,6 +203,7 @@ export default function TermsPage() {
               <div className="highlight-box">
                 <p>📧 Email: firestick4uk@gmail.com<br />
                 💬 WhatsApp: +447934519060<br />
+                ✈️ Telegram: @firestick44<br />
                 🌐 Website: firestick4uk.com</p>
               </div>
             </div>

@@ -283,7 +283,7 @@ export default function CartPage() {
       } else {
         setOrderError(data.error?.includes("connect") || data.error?.includes("timeout")
           ? "Our system is temporarily unavailable. Please try again in a moment."
-          : "Order could not be placed. Please try again or contact us on WhatsApp.");
+          : "Order could not be placed. Please try again or contact us on WhatsApp or Telegram.");
       }
     } catch {
       setOrderError("Network error. Please check your connection and try again.");
@@ -475,6 +475,9 @@ export default function CartPage() {
                     <hr className="summary-divider" />
                     <div className="summary-row summary-total"><span>Total</span><span>£{grandTotal.toFixed(2)}</span></div>
                   </div>
+                  <div style={{background:"rgba(91,33,182,0.08)",border:"1px solid rgba(91,33,182,0.2)",borderRadius:"12px",padding:"12px 14px",fontSize:"13px",lineHeight:1.6,color:"#444444",marginBottom:"16px"}}>
+                    Subscription services are active within 1 hour of payment confirmation.
+                  </div>
 
                   <button className="place-order-btn"
                     disabled={placing || cart.length === 0}
@@ -490,6 +493,9 @@ export default function CartPage() {
                         </button>
                         <a href="https://wa.me/447934519060" target="_blank" rel="noopener noreferrer" style={{background:"rgba(37,211,102,0.15)",border:"1px solid rgba(37,211,102,0.3)",color:"#25d366",padding:"7px 16px",borderRadius:"8px",fontSize:"12px",textDecoration:"none"}}>
                           💬 WhatsApp Us
+                        </a>
+                        <a href="https://t.me/firestick44" target="_blank" rel="noopener noreferrer" style={{background:"rgba(34,158,217,0.15)",border:"1px solid rgba(34,158,217,0.3)",color:"#229ED9",padding:"7px 16px",borderRadius:"8px",fontSize:"12px",textDecoration:"none"}}>
+                          ✈️ Telegram @firestick44
                         </a>
                       </div>
                     </div>

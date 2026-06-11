@@ -186,7 +186,7 @@ export default function AboutPage() {
               {sc.about_mission || "Firestick4UK was founded by a team of tech enthusiasts who were frustrated with overpriced, complicated streaming setups. We wanted something simple — great devices, fair prices, and real human support."}
             </p>
             <p className="story-para">
-              Today, we serve hundreds of customers across the United Kingdom, offering carefully selected Firestick devices, powerful Android boxes, and flexible subscription plans — all backed by our dedicated WhatsApp support team.
+              Today, we serve hundreds of customers across the United Kingdom, offering carefully selected Firestick devices, powerful Android boxes, and flexible subscription plans — all backed by our dedicated WhatsApp and Telegram support team.
             </p>
             <p className="story-para">
               Every order is personally handled. No bots. No long waits. Just real people who care about getting you set up quickly and correctly.
@@ -195,7 +195,7 @@ export default function AboutPage() {
           <div className="story-visual">
             {[
               { icon: "🇬🇧", title: "UK Based", desc: "We operate fully within the United Kingdom, serving customers nationwide." },
-              { icon: "🤝", title: "Personal Service", desc: "Every customer gets direct WhatsApp support from our team." },
+              { icon: "🤝", title: "Personal Service", desc: "Every customer gets direct WhatsApp and Telegram support from our team." },
               { icon: "⚡", title: "Fast & Reliable", desc: "Orders processed and dispatched within 24 hours of confirmation." },
               { icon: "💰", title: "Fair Pricing", desc: "No hidden fees. What you see is what you pay." },
             ].map((p, i) => (
@@ -221,7 +221,7 @@ export default function AboutPage() {
             {[
               { icon: "🔒", title: "Transparency", desc: "No hidden charges, no confusing terms. We tell you exactly what you're getting before you buy." },
               { icon: "⚡", title: "Speed", desc: "Fast order processing, quick delivery, and instant support responses — we value your time." },
-              { icon: "💬", title: "Real Support", desc: "Our WhatsApp team is staffed by real humans who know our products inside out." },
+              { icon: "💬", title: "Real Support", desc: "Our WhatsApp and Telegram team is staffed by real humans who know our products inside out." },
               { icon: "✅", title: "Quality", desc: "We only sell devices and plans we trust and have tested ourselves." },
               { icon: "🤝", title: "Reliability", desc: "We follow through on every promise — from delivery times to after-sales support." },
               { icon: "💰", title: "Value", desc: "Premium products at fair prices. We believe quality shouldn't cost a fortune." },
@@ -244,7 +244,7 @@ export default function AboutPage() {
             {[
               { year: "2022", icon: "🚀", title: "Founded", desc: "Firestick4UK launched with a small range of Firestick devices and a big ambition to serve UK customers better." },
               { year: "2023", icon: "📦", title: "Expanded Products", desc: "Added Android boxes and flexible subscription plans to our catalogue based on customer demand." },
-              { year: "2024", icon: "💬", title: "WhatsApp Support Launched", desc: "Introduced dedicated WhatsApp support, making us one of the most responsive tech stores in the UK." },
+              { year: "2024", icon: "💬", title: "WhatsApp Support Launched", desc: "Introduced dedicated WhatsApp and Telegram support, making us one of the most responsive tech stores in the UK." },
               { year: "2025", icon: "🌟", title: "500+ Happy Customers", desc: "Reached a major milestone of 500 satisfied customers with a 99% satisfaction rate." },
               { year: "2026", icon: "🔥", title: "New Website Launch", desc: "Launched our brand new custom-built website with full order tracking and easy payment options." },
             ].map((t, i) => (

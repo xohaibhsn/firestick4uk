@@ -118,7 +118,7 @@ export default function RefundPolicyPage() {
         <div className="summary-cards">
           {[
             { icon: "📦", title: "Physical Products", text: "14-day return window from delivery date" },
-            { icon: "💻", title: "Subscription Plans", text: "Non-refundable once activated" },
+            { icon: "💻", title: "Subscription Plans", text: "7-day money back on 1 Year plans and above only" },
             { icon: "⚠️", title: "Faulty Items", text: "Full refund or replacement at no cost" },
             { icon: "🚚", title: "Return Postage", text: "Customer's responsibility unless item is faulty" },
           ].map((c, i) => (
@@ -149,7 +149,7 @@ export default function RefundPolicyPage() {
             <div className="policy-section" id="overview">
               <h2>1. Overview</h2>
               <div className="highlight-box">
-                <p>We want you to be completely satisfied with your purchase. If you are not happy with your order, please contact us within the timeframes outlined below and we will do our best to resolve the issue.</p>
+                <p>No free trials are offered. We provide a 7-day money back guarantee on 1 Year subscription plans and above only.</p>
               </div>
               <p>This Refund Policy applies to all purchases made on firestick4uk.com. By placing an order, you agree to the terms set out in this policy.</p>
             </div>
@@ -169,13 +169,15 @@ export default function RefundPolicyPage() {
             <div className="policy-section" id="subscriptions">
               <h2>3. Subscription Plans</h2>
               <div className="warning-box">
-                <p>⚠️ Subscription plans (Monthly, 6-Month, and Yearly) are <strong>non-refundable once activated</strong>. Please ensure you are happy with your purchase before completing your order.</p>
+                <p>⚠️ No free trials. A 7-day money back guarantee applies to <strong>1 Year plans and above only</strong>.</p>
               </div>
-              <p>If you have not yet activated your subscription and wish to cancel, please contact us within 24 hours of placing your order. We will do our best to accommodate cancellation requests before activation.</p>
+              <p>Subscription services are active within 1 hour of payment confirmation. Please check device compatibility before purchasing.</p>
               <ul>
-                <li>Subscriptions that have not been activated may be eligible for a full refund within 24 hours of purchase.</li>
-                <li>Once a subscription is activated, no refund will be issued regardless of usage.</li>
-                <li>We are not responsible for incompatibility issues with your device — please check compatibility before purchasing.</li>
+                <li>Monthly and shorter plans are not covered by the 7-day money back guarantee.</li>
+                <li>Each subscription includes one connection at a time. For simultaneous use on 2 devices, you need 2 separate subscriptions.</li>
+                <li>Compatible devices include Firestick (all generations), Android box, Smart TV (Samsung/LG), iPhone, Android phone/tablet, Roku and Windows.</li>
+                <li>Service is available outside UK, but performance is not guaranteed due to regional restrictions.</li>
+                <li>If your service is buffering or not working, please try using a VPN or switching to mobile hotspot because some ISPs may affect streaming performance.</li>
               </ul>
             </div>
 
@@ -199,7 +201,7 @@ export default function RefundPolicyPage() {
               <h2>5. How to Return an Item</h2>
               <p>To initiate a return, please follow these steps:</p>
               <ul>
-                <li>Contact us via WhatsApp (+447934519060) or email (firestick4uk@gmail.com) with your Order ID and reason for return.</li>
+                <li>Contact us via WhatsApp (+447934519060), Telegram (@firestick44) or email (firestick4uk@gmail.com) with your Order ID and reason for return.</li>
                 <li>Wait for our team to confirm your return request and provide return instructions.</li>
                 <li>Package the item securely in its original packaging.</li>
                 <li>Send the item to the address provided by our team.</li>
@@ -214,7 +216,7 @@ export default function RefundPolicyPage() {
               <ul>
                 <li>Refunds are processed within <strong>5-7 working days</strong>.</li>
                 <li>Refunds will be made via UK bank transfer to the account you provide.</li>
-                <li>We will notify you by email or WhatsApp once the refund has been processed.</li>
+                <li>We will notify you by email, WhatsApp or Telegram once the refund has been processed.</li>
               </ul>
             </div>
 
@@ -222,7 +224,7 @@ export default function RefundPolicyPage() {
               <h2>7. Exceptions</h2>
               <p>The following items and situations are not eligible for a refund:</p>
               <ul>
-                <li>Subscription plans that have been activated.</li>
+                <li>Subscription plans below 1 Year.</li>
                 <li>Physical products returned after the 14-day window.</li>
                 <li>Items that have been used, damaged by the customer, or returned without original packaging.</li>
                 <li>Orders where the customer provided incorrect delivery details.</li>
@@ -236,6 +238,7 @@ export default function RefundPolicyPage() {
               <div className="highlight-box">
                 <p>📧 Email: firestick4uk@gmail.com<br />
                 💬 WhatsApp: +447934519060<br />
+                ✈️ Telegram: @firestick44<br />
                 🌐 Website: firestick4uk.com</p>
               </div>
               <p>We aim to respond to all refund and return enquiries within 24 hours during business hours.</p>
@@ -247,9 +250,10 @@ export default function RefundPolicyPage() {
         <div className="contact-cta">
           <div className="cta-box">
             <div className="cta-title">Need Help With a Return?</div>
-            <p className="cta-sub">Our team is here to help. Contact us via WhatsApp for the fastest response.</p>
+            <p className="cta-sub">Our team is here to help. Contact us via WhatsApp or Telegram for the fastest response.</p>
             <div className="cta-btns">
               <a href="https://wa.me/447934519060" className="btn-wa" target="_blank" rel="noopener noreferrer">💬 WhatsApp Us</a>
+              <a href="https://t.me/firestick44" className="btn-contact" target="_blank" rel="noopener noreferrer">✈️ Telegram @firestick44</a>
               <a href="/contact" className="btn-contact">📧 Email Us</a>
             </div>
           </div>

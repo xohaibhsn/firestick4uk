@@ -144,7 +144,7 @@ const styles = `
 
 const faqs = [
   { q: "How do I place an order?", a: "Browse our products, add items to your cart, fill in your details, and complete payment via bank transfer or cash on delivery. You'll receive an Order ID to track your order." },
-  { q: "How long does delivery take?", a: "Physical items (Firestick, Android Boxes) are delivered within 2-3 working days across the UK. Subscription plans are activated within a few hours of payment verification." },
+  { q: "How long does delivery take?", a: "Physical items (Firestick, Android Boxes) are delivered within 2-3 working days across the UK. Subscription plans are active within 1 hour of payment confirmation." },
   { q: "How do I pay via bank transfer?", a: "During checkout, our UK bank account details will be shown. Transfer the exact amount, take a screenshot of your receipt, and upload it during checkout." },
   { q: "How can I track my order?", a: "Use your Order ID (e.g. FK44-12345) on our Order Tracking page to check your order status in real time." },
 ];
@@ -172,9 +172,9 @@ export default function ContactPage() {
       });
       const data = await res.json();
       if (data.success || res.ok) setSubmitted(true);
-      else alert('Failed to send message. Please try WhatsApp instead.');
+      else alert('Failed to send message. Please try WhatsApp or Telegram instead.');
     } catch {
-      alert('Failed to send message. Please try WhatsApp instead.');
+      alert('Failed to send message. Please try WhatsApp or Telegram instead.');
     }
     setSubmitting(false);
   };
@@ -213,6 +213,12 @@ export default function ContactPage() {
             <div className="contact-card-value">{sc.contact_phone||"+44 7934 519060"}</div>
             <div className="contact-card-sub">✦ Fastest response</div>
           </a>
+          <a href="https://t.me/firestick44" className="contact-card" target="_blank" rel="noopener noreferrer">
+            <span className="contact-card-icon">✈️</span>
+            <div className="contact-card-title">Telegram</div>
+            <div className="contact-card-value">@firestick44</div>
+            <div className="contact-card-sub">Message us anytime</div>
+          </a>
           <a href={`mailto:${sc.contact_email||"firestick4uk@gmail.com"}`} className="contact-card">
             <span className="contact-card-icon">📧</span>
             <div className="contact-card-title">Email</div>
@@ -229,7 +235,7 @@ export default function ContactPage() {
             <span className="contact-card-icon">📍</span>
             <div className="contact-card-title">Based In</div>
             <div className="contact-card-value">{sc.contact_address||"United Kingdom"}</div>
-            <div className="contact-card-sub">UK orders only</div>
+            <div className="contact-card-sub">UK based support</div>
           </div>
         </div>
 
@@ -241,7 +247,7 @@ export default function ContactPage() {
               <div className="form-success">
                 <span className="success-icon">✅</span>
                 <div className="success-title">Message Sent!</div>
-                <p className="success-sub">Thank you for reaching out. We&apos;ll get back to you within 24 hours. For urgent queries, please WhatsApp us directly.</p>
+                <p className="success-sub">Thank you for reaching out. We&apos;ll get back to you within 24 hours. For urgent queries, please WhatsApp us or message us on Telegram directly.</p>
               </div>
             ) : (
               <>
@@ -294,10 +300,14 @@ export default function ContactPage() {
               </div>
               <div className="info-card-body">
                 <strong>Fastest way to reach us</strong>
-                Send us a message on WhatsApp for instant support. We typically reply within minutes during business hours.
+                Send us a message on WhatsApp or Telegram for instant support. We typically reply within minutes during business hours.
               </div>
               <a href={`https://wa.me/${sc.contact_whatsapp||"447934519060"}`} className="info-card-link" target="_blank" rel="noopener noreferrer">
                 Chat Now on WhatsApp →
+              </a>
+              <br />
+              <a href="https://t.me/firestick44" className="info-card-link" target="_blank" rel="noopener noreferrer">
+                Message @firestick44 on Telegram →
               </a>
             </div>
 

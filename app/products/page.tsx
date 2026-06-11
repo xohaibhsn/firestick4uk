@@ -101,6 +101,8 @@ export default function ProductsPage() {
         .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; }
         .page-title { font-family:'Cinzel',serif; font-size:clamp(26px,3.5vw,44px); font-weight:700; color:#111111; }
         .page-title span { color:#5B21B6; }
+        .activation-banner { max-width:1300px; margin:0 auto 24px; padding:0 60px; }
+        .activation-banner-inner { background:#F5F3FF; border:1px solid #DDD6FE; border-radius:14px; padding:14px 18px; color:#444444; font-size:14px; line-height:1.6; }
         .filters { max-width:1300px; margin:0 auto; padding:0 60px 30px; display:flex; gap:10px; flex-wrap:wrap; }
         .filter-btn { padding:8px 20px; border-radius:30px; border:1px solid #E5E5E5; background:#F5F5F5; color:#111111; font-size:13px; cursor:pointer; transition:all 0.2s; }
         .filter-btn:hover { border-color:#5B21B6; color:#5B21B6; }
@@ -141,6 +143,7 @@ export default function ProductsPage() {
           .nav-links.open{display:flex;flex-direction:column;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#FFFFFF;align-items:center;justify-content:center;gap:28px;z-index:9999;margin:0;padding:0;}
           .hamburger{display:flex;}
           .page-header{padding:32px 16px 20px;}
+          .activation-banner{padding:0 16px;margin-bottom:18px;}
           .filters{padding:0 16px 16px;}
           .products-grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:0 12px 50px;}
           .product-info{padding:10px 12px;}
@@ -204,6 +207,12 @@ export default function ProductsPage() {
           <h1 className="page-title">All <span>Products</span></h1>
         </div>
 
+        <div className="activation-banner">
+          <div className="activation-banner-inner">
+            Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp +447934519060 or Telegram @firestick44.
+          </div>
+        </div>
+
         {/* Filters + Sort */}
         <div style={{maxWidth:1300,margin:"0 auto",padding:"0 60px 20px",display:"flex",flexWrap:"wrap",gap:12,alignItems:"center"}}>
           <div className="filters" style={{margin:0,padding:0,flex:1,minWidth:200}}>
@@ -232,7 +241,7 @@ export default function ProductsPage() {
             <div className="loading" style={{textAlign:"center",padding:"40px 0"}}>
               <div style={{fontSize:"32px",marginBottom:"12px"}}>⚠️</div>
               <div style={{color:"rgba(255,255,255,0.7)",marginBottom:"8px"}}>Could not load products right now.</div>
-              <div style={{color:"rgba(255,255,255,0.4)",fontSize:"13px",marginBottom:"20px"}}>Please try again in a moment or contact us via WhatsApp.</div>
+              <div style={{color:"rgba(255,255,255,0.4)",fontSize:"13px",marginBottom:"20px"}}>Please try again in a moment or contact us via WhatsApp or Telegram @firestick44.</div>
               <button onClick={() => window.location.reload()} style={{background:"linear-gradient(135deg,#4a0080,#8b00ff)",color:"white",border:"none",padding:"10px 24px",borderRadius:"30px",cursor:"pointer",fontSize:"14px"}}>Try Again</button>
             </div>
           ) : filtered.length === 0 ? (
@@ -297,7 +306,7 @@ export default function ProductsPage() {
         </footer>
       </div>
 
-      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
+      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer" title="WhatsApp +447934519060 | Telegram @firestick44">💬</a>
     </>
   );
 }

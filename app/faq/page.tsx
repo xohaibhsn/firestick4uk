@@ -51,6 +51,7 @@ const styles = `
   .help-sub { color:rgba(255,255,255,0.7); font-size:15px; margin-bottom:30px; }
   .help-btns { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
   .btn-whatsapp { background:linear-gradient(135deg,#25d366,#128c7e); color:#FFFFFF; padding:14px 32px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; transition:all 0.2s; }
+  .btn-telegram { background:#229ED9; color:#FFFFFF; padding:14px 32px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; transition:all 0.2s; }
   .btn-contact { background:transparent; color:#FFFFFF; padding:14px 32px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; border:2px solid rgba(255,255,255,0.4); transition:all 0.2s; }
   .btn-contact:hover { border-color:#FFFFFF; }
   footer { background:#111111; padding:40px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
@@ -167,6 +168,9 @@ export default function FAQPage() {
             <div className="help-btns">
               <a href="https://wa.me/447934519060" className="btn-whatsapp" target="_blank" rel="noopener noreferrer">
                 💬 WhatsApp Us
+              </a>
+              <a href="https://t.me/firestick44" className="btn-telegram" target="_blank" rel="noopener noreferrer">
+                ✈️ Telegram @firestick44
               </a>
               <a href="/contact" className="btn-contact">📧 Contact Form</a>
             </div>

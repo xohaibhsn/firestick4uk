@@ -78,6 +78,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
         .add-btn.added{background:#16A34A;}
         .meta-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px;}
         .meta-pill{background:#F5F5F5;border:1px solid #E5E5E5;border-radius:20px;padding:6px 14px;font-size:13px;color:#555555;}
+        .activation-note{background:#F5F3FF;border:1px solid #DDD6FE;border-radius:12px;padding:12px 14px;margin-bottom:18px;color:#444444;font-size:14px;line-height:1.6;}
         .cart-link{display:block;text-align:center;margin-top:14px;color:#5B21B6;font-size:13px;text-decoration:none;font-weight:600;}
         .cart-link:hover{color:#4C1D95;}
         .loading-state{text-align:center;padding:120px 24px;color:#888888;font-size:18px;}
@@ -141,7 +142,11 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
                 <div className="meta-row">
                   <span className="meta-pill">📦 {product.stock || "In Stock"}</span>
                   <span className="meta-pill">🚚 Fast Delivery</span>
+                  <span className="meta-pill">⚡ Active within 1 hour</span>
                   <span className="meta-pill">✅ UK Based</span>
+                </div>
+                <div className="activation-note">
+                  Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp +447934519060 or Telegram @firestick44.
                 </div>
                 <button
                   className="add-btn"
@@ -185,7 +190,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
         <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
       </footer>
 
-      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
+      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer" title="WhatsApp +447934519060 | Telegram @firestick44">💬</a>
     </>
   );
 }
