@@ -278,6 +278,7 @@ export default function AdminPage() {
   const [faqMsg, setFaqMsg] = useState("");
   const [chatLeads, setChatLeads] = useState<ChatLead[]>([]);
   const [leadModal, setLeadModal] = useState<ChatLead|null>(null);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
   const [leadWindowStart] = useState(() => Date.now() - 24 * 60 * 60 * 1000);
   const [berlinTraining, setBerlinTraining] = useState<BerlinTraining[]>([]);
   const [trainingForm, setTrainingForm] = useState({ id:0, title:"", content:"", is_active:true });
@@ -357,7 +358,12 @@ export default function AdminPage() {
     fetch("/api/faqs?admin=true").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setFaqs(d); }).catch(()=>{});
     fetch("/api/admin/leads", { headers: adminHeaders })
       .then(r => r.json())
-      .then(d => { if (Array.isArray(d)) setChatLeads(d); })
+      .then(d => {
+        if (Array.isArray(d)) {
+          setChatLeads(d);
+          setSelectedLeadIds([]);
+        }
+      })
       .catch(() => {});
     fetch("/api/admin/berlin-training", { headers: adminHeaders })
       .then(r => r.json())
@@ -562,7 +568,33 @@ export default function AdminPage() {
     }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
       setChatLeads(prev => prev.filter(lead => lead.id !== id));
+      setSelectedLeadIds(prev => prev.filter(leadId => leadId !== id));
       setLeadModal(null);
+    }
+  };
+
+  const toggleLeadSelection = (id: number) => {
+    setSelectedLeadIds(prev => prev.includes(id) ? prev.filter(leadId => leadId !== id) : [...prev, id]);
+  };
+
+  const toggleAllLeads = () => {
+    setSelectedLeadIds(prev => prev.length === chatLeads.length ? [] : chatLeads.map(lead => lead.id));
+  };
+
+  const deleteSelectedLeads = async () => {
+    if (selectedLeadIds.length === 0) return;
+    if (!confirm(`Delete ${selectedLeadIds.length} selected Berlin chat lead${selectedLeadIds.length === 1 ? "" : "s"}?`)) return;
+    const res = await fetch("/api/admin/leads", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      body: JSON.stringify({ ids:selectedLeadIds }),
+    }).then(r=>r.json()).catch(()=>({}));
+    if (res.success) {
+      setChatLeads(prev => prev.filter(lead => !selectedLeadIds.includes(lead.id)));
+      setSelectedLeadIds([]);
+      setLeadModal(null);
+    } else {
+      alert(`❌ Bulk delete failed: ${res.error || "Unknown error"}`);
     }
   };
 
@@ -1354,18 +1386,25 @@ export default function AdminPage() {
               <div className="section-card">
                 <div className="section-header">
                   <div className="section-title">Berlin Chat Leads ({chatLeads.length})</div>
+                  {selectedLeadIds.length > 0 && (
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:12,color:"#666666"}}>{selectedLeadIds.length} selected</span>
+                      <button className="action-btn btn-delete" onClick={deleteSelectedLeads}>🗑️ Delete Selected</button>
+                    </div>
+                  )}
                 </div>
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>Name</th><th>WhatsApp</th><th>Interested In</th><th>Date</th><th>Actions</th></tr></thead>
+                    <thead><tr><th><input type="checkbox" checked={chatLeads.length > 0 && selectedLeadIds.length === chatLeads.length} onChange={toggleAllLeads} aria-label="Select all leads" /></th><th>Name</th><th>WhatsApp</th><th>Interested In</th><th>Date</th><th>Actions</th></tr></thead>
                     <tbody>
                       {chatLeads.length === 0 && (
-                        <tr><td colSpan={5} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No Berlin chat leads yet.</td></tr>
+                        <tr><td colSpan={6} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No Berlin chat leads yet.</td></tr>
                       )}
                       {chatLeads.map(lead => {
                         const waNumber = (lead.customer_whatsapp || "").replace(/\D/g,"");
                         return (
                           <tr key={lead.id}>
+                            <td><input type="checkbox" checked={selectedLeadIds.includes(lead.id)} onChange={() => toggleLeadSelection(lead.id)} aria-label={`Select lead ${lead.customer_name || lead.id}`} /></td>
                             <td style={{fontWeight:600}}>{lead.customer_name || "—"}</td>
                             <td style={{fontSize:13}}>{lead.customer_whatsapp || "—"}</td>
                             <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{lead.interested_in || "—"}</span></td>

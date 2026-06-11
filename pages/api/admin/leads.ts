@@ -33,6 +33,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'DELETE') {
+      const ids = Array.isArray(req.body?.ids)
+        ? req.body.ids.map((value: unknown) => Number(value)).filter((value: number) => Number.isInteger(value) && value > 0)
+        : [];
+      if (ids.length > 0) {
+        const placeholders = ids.map(() => '?').join(',');
+        await pool.query(`DELETE FROM chat_leads WHERE id IN (${placeholders})`, ids);
+        return res.status(200).json({ success: true, deleted: ids.length });
+      }
+
       const id = Number(req.query.id || req.body?.id);
       if (!id) return res.status(400).json({ error: 'id required' });
       await pool.query('DELETE FROM chat_leads WHERE id=?', [id]);
