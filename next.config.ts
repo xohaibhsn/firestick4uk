@@ -25,6 +25,12 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: securityHeaders,
       },
+      {
+        source: "/downloads/:path*",
+        headers: [
+          { key: "Content-Disposition", value: "attachment" },
+        ],
+      },
     ];
   },
 };
