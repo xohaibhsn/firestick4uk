@@ -215,6 +215,7 @@ type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
 type ChatLead = { id:number; customer_name:string; customer_whatsapp:string; customer_email:string|null; interested_in:string; chat_history:string; ip_address:string; created_at:string; };
 type BerlinTraining = { id:number; title:string; content:string; is_active:number; created_at:string; updated_at:string; };
+type TrainingChatMessage = { role:"user"|"assistant"; content:string; saved?:boolean; };
 
 export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -281,6 +282,11 @@ export default function AdminPage() {
   const [berlinTraining, setBerlinTraining] = useState<BerlinTraining[]>([]);
   const [trainingForm, setTrainingForm] = useState({ id:0, title:"", content:"", is_active:true });
   const [trainingMsg, setTrainingMsg] = useState("");
+  const [trainingChat, setTrainingChat] = useState<TrainingChatMessage[]>([
+    { role:"assistant", content:"Professor, Berlin is ready. Ask me what I know, test my answers, or say 'save this' when you want a correction added to my training." },
+  ]);
+  const [trainingChatInput, setTrainingChatInput] = useState("");
+  const [trainingChatLoading, setTrainingChatLoading] = useState(false);
 
   useEffect(() => {
     if (localStorage.getItem("sAdminSession") === "true") {
@@ -546,6 +552,34 @@ export default function AdminPage() {
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setBerlinTraining(d); })
       .catch(() => {});
+  };
+
+  const sendTrainingChat = async () => {
+    const message = trainingChatInput.trim();
+    if (!message || trainingChatLoading) return;
+
+    const nextMessages: TrainingChatMessage[] = [...trainingChat, { role:"user", content:message }];
+    setTrainingChat(nextMessages);
+    setTrainingChatInput("");
+    setTrainingChatLoading(true);
+
+    const res = await fetch("/api/admin/berlin-training-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      body: JSON.stringify({ message, history: trainingChat }),
+    }).then(r => r.json()).catch(() => ({ error:"Training chat failed" }));
+
+    setTrainingChatLoading(false);
+    if (res.response) {
+      setTrainingChat(prev => [...prev, { role:"assistant", content:res.response, saved:!!res.saved }]);
+      if (res.saved) {
+        setTrainingMsg("✅ Berlin saved that correction to training");
+        loadBerlinTraining();
+        setTimeout(() => setTrainingMsg(""), 3000);
+      }
+    } else {
+      setTrainingChat(prev => [...prev, { role:"assistant", content:`Sorry Professor, ${res.error || "I could not process that training message."}` }]);
+    }
   };
 
   const saveBerlinTraining = async () => {
@@ -1335,12 +1369,65 @@ export default function AdminPage() {
                 </div>
               )}
 
+              <div className="section-card" style={{padding:0,marginBottom:20,overflow:"hidden"}}>
+                <div style={{padding:"16px 20px",background:"linear-gradient(135deg,#111111,#4C1D95)",color:"#FFFFFF",display:"flex",justifyContent:"space-between",gap:12,alignItems:"center"}}>
+                  <div>
+                    <div style={{fontFamily:"Cinzel,serif",fontWeight:900,fontSize:16,color:"#FFFFFF"}}>Professor ↔ Berlin Training Chat</div>
+                    <div style={{fontSize:12,color:"rgba(255,255,255,0.72)",marginTop:4}}>
+                      Test Berlin, ask what he knows, then say “save this” or “remember this” to add training automatically.
+                    </div>
+                  </div>
+                  <button
+                    className="action-btn btn-view"
+                    onClick={() => setTrainingChat([{ role:"assistant", content:"Professor, Berlin is ready. Ask me what I know, test my answers, or say 'save this' when you want a correction added to my training." }])}
+                    style={{background:"rgba(255,255,255,0.12)",borderColor:"rgba(255,255,255,0.22)",color:"#FFFFFF"}}
+                  >
+                    Clear Chat
+                  </button>
+                </div>
+                <div style={{height:360,overflowY:"auto",padding:18,background:"#F8F8FA",display:"flex",flexDirection:"column",gap:12}}>
+                  {trainingChat.map((msg, idx) => (
+                    <div key={idx} style={{display:"flex",justifyContent:msg.role==="user"?"flex-end":"flex-start"}}>
+                      <div style={{maxWidth:"78%",background:msg.role==="user"?"#5B21B6":"#FFFFFF",color:msg.role==="user"?"#FFFFFF":"#111111",border:msg.role==="user"?"none":"1px solid #E5E5E5",borderRadius:msg.role==="user"?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"11px 13px",boxShadow:"0 2px 8px rgba(0,0,0,0.05)",whiteSpace:"pre-wrap",fontSize:13,lineHeight:1.55}}>
+                        <div style={{fontSize:10,fontWeight:800,letterSpacing:1,textTransform:"uppercase",opacity:0.68,marginBottom:4}}>
+                          {msg.role==="user" ? "Professor" : "Berlin"} {msg.saved ? "• Saved to Training" : ""}
+                        </div>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  {trainingChatLoading && (
+                    <div style={{alignSelf:"flex-start",background:"#FFFFFF",border:"1px solid #E5E5E5",borderRadius:"16px 16px 16px 4px",padding:"11px 13px",fontSize:13,color:"#666666"}}>
+                      Berlin is thinking, Professor...
+                    </div>
+                  )}
+                </div>
+                <div style={{padding:14,borderTop:"1px solid #E5E5E5",display:"flex",gap:10,background:"#FFFFFF"}}>
+                  <input
+                    value={trainingChatInput}
+                    onChange={e => setTrainingChatInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendTrainingChat();
+                      }
+                    }}
+                    placeholder="Professor: ask Berlin something, or say 'save this correction: ...'"
+                    disabled={trainingChatLoading}
+                    style={{flex:1,border:"1px solid #E5E5E5",borderRadius:10,padding:"12px 14px",fontSize:13,outline:"none"}}
+                  />
+                  <button className="btn-primary" onClick={sendTrainingChat} disabled={trainingChatLoading || !trainingChatInput.trim()}>
+                    Send
+                  </button>
+                </div>
+              </div>
+
               <div className="section-card" style={{padding:20,marginBottom:20}}>
                 <div className="section-header" style={{padding:0,marginBottom:16,borderBottom:"none"}}>
                   <div>
-                    <div className="section-title">{trainingForm.id ? "Edit Berlin Training" : "Add Berlin Training"}</div>
+                    <div className="section-title">{trainingForm.id ? "Edit Manual Training" : "Add Manual Training"}</div>
                     <div style={{fontSize:12,color:"#888888",marginTop:6}}>
-                      Add corrections, product rules, device setup notes, or answers Berlin should follow in future chats.
+                      You can still add corrections manually if you do not want to use chat.
                     </div>
                   </div>
                   {trainingForm.id > 0 && (
