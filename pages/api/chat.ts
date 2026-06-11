@@ -185,20 +185,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .map((m) => `${m.role === 'user' ? 'Customer' : 'Berlin'}: ${m.content}`)
       .join('\n\n');
 
-    if (lead) {
-      const timestamp = new Date().toLocaleString('en-GB', { timeZone: 'Europe/London' });
-      await pool.query(
-        'INSERT INTO chat_leads (customer_name, customer_whatsapp, customer_email, interested_in, chat_history, ip_address) VALUES (?,?,?,?,?,?)',
-        [lead.name, lead.whatsapp, null, lead.interest, fullChatHistory, getClientIp(req)]
-      );
-      await sendLeadEmail({
-        name: lead.name,
-        whatsapp: lead.whatsapp,
-        interest: lead.interest,
-        timestamp,
-        chatHistory: fullChatHistory,
-      }).catch((err: unknown) => console.error('[chat] Lead email failed:', err));
-    }
+    const timestamp = new Date().toLocaleString('en-GB', { timeZone: 'Europe/London' });
+    const leadName = lead?.name || 'Website visitor';
+    const leadWhatsapp = lead?.whatsapp || 'Not provided';
+    const leadInterest = lead?.interest || 'General chat enquiry';
+
+    await pool.query(
+      'INSERT INTO chat_leads (customer_name, customer_whatsapp, customer_email, interested_in, chat_history, ip_address) VALUES (?,?,?,?,?,?)',
+      [leadName, leadWhatsapp, null, leadInterest, fullChatHistory, getClientIp(req)]
+    );
+    await sendLeadEmail({
+      name: leadName,
+      whatsapp: leadWhatsapp,
+      interest: leadInterest,
+      timestamp,
+      chatHistory: fullChatHistory,
+    }).catch((err: unknown) => console.error('[chat] Lead email failed:', err));
 
     return res.status(200).json({ response: cleanReply });
   } catch (error: unknown) {

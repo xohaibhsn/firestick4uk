@@ -706,9 +706,13 @@ export default function AdminPage() {
             </div>
             <div className="modal-actions">
               <button className="modal-cancel" onClick={() => setLeadModal(null)}>Close</button>
-              <a href={`https://wa.me/${(leadModal.customer_whatsapp||"").replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer">
-                <button className="modal-save">💬 WhatsApp</button>
-              </a>
+              {(leadModal.customer_whatsapp || "").replace(/\D/g,"") ? (
+                <a href={`https://wa.me/${(leadModal.customer_whatsapp||"").replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer">
+                  <button className="modal-save">💬 WhatsApp</button>
+                </a>
+              ) : (
+                <button className="modal-save" disabled style={{opacity:0.5,cursor:"not-allowed"}}>💬 WhatsApp unavailable</button>
+              )}
             </div>
           </div>
         </div>
@@ -1242,9 +1246,13 @@ export default function AdminPage() {
                             <td style={{color:"rgba(255,255,255,0.4)",fontSize:"12px",whiteSpace:"nowrap"}}>{lead.created_at ? new Date(lead.created_at).toLocaleString("en-GB") : "—"}</td>
                             <td style={{whiteSpace:"nowrap"}}>
                               <button className="action-btn btn-view" onClick={() => setLeadModal(lead)}>👁️ View</button>
-                              <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer">
-                                <button className="action-btn btn-verify">💬 WhatsApp</button>
-                              </a>
+                              {waNumber ? (
+                                <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer">
+                                  <button className="action-btn btn-verify">💬 WhatsApp</button>
+                                </a>
+                              ) : (
+                                <button className="action-btn btn-verify" disabled style={{opacity:0.5,cursor:"not-allowed"}}>💬 WhatsApp</button>
+                              )}
                               <button className="action-btn btn-delete" onClick={() => deleteLead(lead.id)}>🗑️ Delete</button>
                             </td>
                           </tr>
