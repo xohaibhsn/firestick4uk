@@ -5,6 +5,12 @@ import pool from '@/lib/db';
 type TrainingChatMessage = {
   role: 'user' | 'assistant';
   content: string;
+  saved?: boolean;
+};
+
+type StoredTrainingChatMessage = TrainingChatMessage & {
+  id?: number;
+  created_at?: unknown;
 };
 
 function checkAdminAuth(req: NextApiRequest): boolean {
@@ -25,19 +31,61 @@ async function ensureBerlinTrainingTable() {
   `);
 }
 
-function normaliseHistory(history: unknown): TrainingChatMessage[] {
-  if (!Array.isArray(history)) return [];
+async function ensureBerlinTrainingChatTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS berlin_training_chat_messages (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      role ENUM('user','assistant') NOT NULL,
+      content TEXT NOT NULL,
+      saved_training_title VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+}
 
-  return history
-    .map((item) => {
-      const candidate = item as { role?: unknown; content?: unknown };
+async function getTrainingChatHistory(limit = 80) {
+  const [rows] = await pool.query(
+    `SELECT * FROM (
+      SELECT id, role, content, saved_training_title, created_at
+      FROM berlin_training_chat_messages
+      ORDER BY id DESC
+      LIMIT ?
+    ) recent_messages ORDER BY id ASC`,
+    [limit]
+  );
+  if (!Array.isArray(rows)) return [];
+
+  const messages: StoredTrainingChatMessage[] = [];
+  rows
+    .map((row) => {
+      const item = row as {
+        id?: number;
+        role?: unknown;
+        content?: unknown;
+        saved_training_title?: unknown;
+        created_at?: unknown;
+      };
       return {
-        role: candidate.role === 'assistant' ? 'assistant' : candidate.role === 'user' ? 'user' : null,
-        content: typeof candidate.content === 'string' ? candidate.content.trim() : '',
+        id: item.id,
+        role: item.role === 'assistant' ? 'assistant' : item.role === 'user' ? 'user' : null,
+        content: typeof item.content === 'string' ? item.content : '',
+        saved: typeof item.saved_training_title === 'string' && item.saved_training_title.length > 0,
+        created_at: item.created_at,
       };
     })
-    .filter((item): item is TrainingChatMessage => !!item.role && item.content.length > 0)
-    .slice(-20);
+    .forEach((item) => {
+      if ((item.role === 'user' || item.role === 'assistant') && item.content.length > 0) {
+        messages.push({
+          id: item.id,
+          role: item.role,
+          content: item.content,
+          saved: item.saved,
+          created_at: item.created_at,
+        });
+      }
+    });
+
+  return messages;
 }
 
 function extractText(content: unknown): string {
@@ -86,18 +134,29 @@ function extractTrainingSave(reply: string) {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!checkAdminAuth(req)) return res.status(403).json({ error: 'Forbidden' });
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     await ensureBerlinTrainingTable();
+    await ensureBerlinTrainingChatTable();
+
+    if (req.method === 'GET') {
+      const history = await getTrainingChatHistory(500);
+      return res.status(200).json(history);
+    }
+
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
     if (!message) return res.status(400).json({ error: 'Message is required' });
     if (!process.env.ANTHROPIC_API_KEY) return res.status(500).json({ error: 'Chat is not configured' });
 
     const currentTraining = await getCurrentTrainingKnowledge();
-    const history = normaliseHistory(req.body?.history);
+    const history = await getTrainingChatHistory(60);
     const messages: TrainingChatMessage[] = [...history, { role: 'user', content: message }];
+    await pool.query(
+      'INSERT INTO berlin_training_chat_messages (role, content) VALUES (?,?)',
+      ['user', message]
+    );
 
     const system = `You are Berlin in Firestick4UK admin training mode. The admin is "Professor".
 
@@ -134,9 +193,14 @@ ${currentTraining}`;
         [save.title, save.content]
       );
     }
+    const cleanReply = save?.cleanReply || rawReply;
+    await pool.query(
+      'INSERT INTO berlin_training_chat_messages (role, content, saved_training_title) VALUES (?,?,?)',
+      ['assistant', cleanReply, save?.title || null]
+    );
 
     return res.status(200).json({
-      response: save?.cleanReply || rawReply,
+      response: cleanReply,
       saved: !!save,
       savedTraining: save ? { title: save.title, content: save.content } : null,
     });

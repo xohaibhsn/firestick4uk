@@ -287,6 +287,8 @@ export default function AdminPage() {
   ]);
   const [trainingChatInput, setTrainingChatInput] = useState("");
   const [trainingChatLoading, setTrainingChatLoading] = useState(false);
+  const trainingChatInputRef = useRef<HTMLInputElement>(null);
+  const trainingChatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (localStorage.getItem("sAdminSession") === "true") {
@@ -361,11 +363,28 @@ export default function AdminPage() {
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setBerlinTraining(d); })
       .catch(() => {});
+    fetch("/api/admin/berlin-training-chat", { headers: adminHeaders })
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d) && d.length > 0) {
+          setTrainingChat(d.map((m: TrainingChatMessage) => ({ role:m.role, content:m.content, saved:!!m.saved })));
+        }
+      })
+      .catch(() => {});
     if (adminRole === "super_admin") {
       fetch("/api/admin-staff", { headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"", "x-admin-role": "super_admin" } })
         .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setStaffUsers(d); }).catch(()=>{});
     }
   }, [loggedIn]);
+
+  useEffect(() => {
+    if (tab !== "training") return;
+    trainingChatEndRef.current?.scrollIntoView({ behavior:"smooth", block:"end" });
+    if (!trainingChatLoading) {
+      const focusTimer = window.setTimeout(() => trainingChatInputRef.current?.focus(), 50);
+      return () => window.clearTimeout(focusTimer);
+    }
+  }, [tab, trainingChat, trainingChatLoading]);
 
   const saveContent = async (keys: string[]) => {
     setContentSaving(true); setContentMsg("");
@@ -554,6 +573,18 @@ export default function AdminPage() {
       .catch(() => {});
   };
 
+  const loadBerlinTrainingChat = () => {
+    fetch("/api/admin/berlin-training-chat", { headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"" } })
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d) && d.length > 0) {
+          setTrainingChat(d.map((m: TrainingChatMessage) => ({ role:m.role, content:m.content, saved:!!m.saved })));
+        }
+        trainingChatInputRef.current?.focus();
+      })
+      .catch(() => {});
+  };
+
   const sendTrainingChat = async () => {
     const message = trainingChatInput.trim();
     if (!message || trainingChatLoading) return;
@@ -566,7 +597,7 @@ export default function AdminPage() {
     const res = await fetch("/api/admin/berlin-training-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
-      body: JSON.stringify({ message, history: trainingChat }),
+      body: JSON.stringify({ message }),
     }).then(r => r.json()).catch(() => ({ error:"Training chat failed" }));
 
     setTrainingChatLoading(false);
@@ -1379,10 +1410,10 @@ export default function AdminPage() {
                   </div>
                   <button
                     className="action-btn btn-view"
-                    onClick={() => setTrainingChat([{ role:"assistant", content:"Professor, Berlin is ready. Ask me what I know, test my answers, or say 'save this' when you want a correction added to my training." }])}
+                    onClick={loadBerlinTrainingChat}
                     style={{background:"rgba(255,255,255,0.12)",borderColor:"rgba(255,255,255,0.22)",color:"#FFFFFF"}}
                   >
-                    Clear Chat
+                    Refresh History
                   </button>
                 </div>
                 <div style={{height:360,overflowY:"auto",padding:18,background:"#F8F8FA",display:"flex",flexDirection:"column",gap:12}}>
@@ -1401,9 +1432,11 @@ export default function AdminPage() {
                       Berlin is thinking, Professor...
                     </div>
                   )}
+                  <div ref={trainingChatEndRef} />
                 </div>
                 <div style={{padding:14,borderTop:"1px solid #E5E5E5",display:"flex",gap:10,background:"#FFFFFF"}}>
                   <input
+                    ref={trainingChatInputRef}
                     value={trainingChatInput}
                     onChange={e => setTrainingChatInput(e.target.value)}
                     onKeyDown={e => {
