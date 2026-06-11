@@ -209,10 +209,11 @@ const demoCustomers = [
   { name:"Emma Wilson", email:"emma@example.com", phone:"+44 7444 444444", orders:1, spent:"£9.99", joined:"May 2026" },
 ];
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff";
 type AdminRole = "super_admin"|"manager"|"writer";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
+type ChatLead = { id:number; customer_name:string; customer_whatsapp:string; customer_email:string|null; interested_in:string; chat_history:string; ip_address:string; created_at:string; };
 
 export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -273,6 +274,9 @@ export default function AdminPage() {
   const [faqModal, setFaqModal] = useState<FAQ|"new"|null>(null);
   const [editFaq, setEditFaq] = useState({ question:"", answer:"", category:"General" });
   const [faqMsg, setFaqMsg] = useState("");
+  const [chatLeads, setChatLeads] = useState<ChatLead[]>([]);
+  const [leadModal, setLeadModal] = useState<ChatLead|null>(null);
+  const [leadWindowStart] = useState(() => Date.now() - 24 * 60 * 60 * 1000);
 
   useEffect(() => {
     if (localStorage.getItem("sAdminSession") === "true") {
@@ -339,6 +343,10 @@ export default function AdminPage() {
       .catch(() => {});
     fetch("/api/sections?page=home&all=1").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); }).catch(()=>{});
     fetch("/api/faqs?admin=true").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setFaqs(d); }).catch(()=>{});
+    fetch("/api/admin/leads", { headers: adminHeaders })
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setChatLeads(d); })
+      .catch(() => {});
     if (adminRole === "super_admin") {
       fetch("/api/admin-staff", { headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"", "x-admin-role": "super_admin" } })
         .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setStaffUsers(d); }).catch(()=>{});
@@ -513,6 +521,18 @@ export default function AdminPage() {
     setProducts(products.filter(p => p.id !== id));
   };
 
+  const deleteLead = async (id: number) => {
+    if (!confirm("Delete this chat lead?")) return;
+    const res = await fetch(`/api/admin/leads?id=${id}`, {
+      method: "DELETE",
+      headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+    }).then(r=>r.json()).catch(()=>({}));
+    if (res.success) {
+      setChatLeads(prev => prev.filter(lead => lead.id !== id));
+      setLeadModal(null);
+    }
+  };
+
   const handleProductImage = async (file: File) => {
     setImageUploading(true);
     try {
@@ -586,6 +606,7 @@ export default function AdminPage() {
   const revenueOrders = orders.filter(o => ["confirmed","dispatched","delivered"].includes(o.status));
   const totalRevenue = revenueOrders.reduce((s, o) => s + parseFloat((o.total||"0").replace("£","").replace(",","")), 0);
   const deliveredCount = orders.filter(o => o.status === "delivered").length;
+  const leadsLast24 = chatLeads.filter(lead => new Date(lead.created_at).getTime() >= leadWindowStart).length;
 
   const statusClass = (s: string) => `status-badge status-${s}`;
 
@@ -665,6 +686,29 @@ export default function AdminPage() {
                 <button className="modal-cancel" onClick={() => setOrderModal(null)}>Close</button>
                 {orderModal.receipt && <button className="modal-save" onClick={() => { setOrderModal(null); setReceiptModal(orderModal.id); }}>View Receipt</button>}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHAT LEAD MODAL */}
+      {leadModal && (
+        <div className="modal-overlay">
+          <div className="modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()} style={{maxWidth:680}}>
+            <div className="modal-title">Berlin Chat Lead — {leadModal.customer_name || "Unknown"}</div>
+            <div className="modal-field"><label>Name</label><input readOnly value={leadModal.customer_name || "—"} /></div>
+            <div className="modal-field"><label>WhatsApp</label><input readOnly value={leadModal.customer_whatsapp || "—"} /></div>
+            <div className="modal-field"><label>Interested In</label><input readOnly value={leadModal.interested_in || "—"} /></div>
+            <div className="modal-field"><label>Date</label><input readOnly value={leadModal.created_at ? new Date(leadModal.created_at).toLocaleString("en-GB") : "—"} /></div>
+            <div className="modal-field">
+              <label>Chat History</label>
+              <textarea readOnly rows={12} value={leadModal.chat_history || "No chat history saved."} style={{resize:"vertical",fontFamily:"monospace",fontSize:12,lineHeight:1.6}} />
+            </div>
+            <div className="modal-actions">
+              <button className="modal-cancel" onClick={() => setLeadModal(null)}>Close</button>
+              <a href={`https://wa.me/${(leadModal.customer_whatsapp||"").replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer">
+                <button className="modal-save">💬 WhatsApp</button>
+              </a>
             </div>
           </div>
         </div>
@@ -874,6 +918,7 @@ export default function AdminPage() {
               { id:"orders",    icon:"🛒", label:"Orders",       badge: pendingCount > 0 ? String(pendingCount) : null, badgeColor:"orange", roles:["super_admin","manager"] },
               { id:"products",  icon:"📦", label:"Products",     roles:["super_admin","manager"] },
               { id:"customers", icon:"👥", label:"Customers",    roles:["super_admin","manager"] },
+              { id:"leads",     icon:"💬", label:"Leads",        badge: leadsLast24 > 0 ? String(leadsLast24) : null, badgeColor:"orange", roles:["super_admin","manager"] },
               { id:"blog",      icon:"📝", label:"Blog",         roles:["super_admin","manager","writer"] },
               { id:"coupons",   icon:"🎟️", label:"Coupons",      roles:["super_admin"] },
               { id:"builder",   icon:"🎨", label:"Page Builder", roles:["super_admin"] },
@@ -906,6 +951,7 @@ export default function AdminPage() {
                 {tab==="orders" && <>Manage <span>Orders</span></>}
                 {tab==="products" && <>Manage <span>Products</span></>}
                 {tab==="customers" && <>Customer <span>Data</span></>}
+                {tab==="leads" && <>Berlin <span>Leads</span></>}
                 {tab==="blog" && <>Manage <span>Blog</span></>}
                 {tab==="coupons" && <>Manage <span>Coupons</span></>}
                 {tab==="builder" && <>Page <span>Builder</span></>}
@@ -1149,6 +1195,64 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* 💬 CHAT LEADS */}
+          {tab==="leads" && (
+            <div>
+              <div className="stats-grid" style={{marginBottom:20}}>
+                <div className="stat-card">
+                  <div className="stat-card-top">
+                    <span className="stat-icon">💬</span>
+                    <span className="stat-trend">Last 24 hours</span>
+                  </div>
+                  <div className="stat-value">{leadsLast24}</div>
+                  <div className="stat-label">{leadsLast24} new leads (last 24 hours)</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-card-top">
+                    <span className="stat-icon">📈</span>
+                    <span className="stat-trend">All time</span>
+                  </div>
+                  <div className="stat-value">{chatLeads.length}</div>
+                  <div className="stat-label">Total leads count</div>
+                </div>
+              </div>
+
+              <div className="section-card">
+                <div className="section-header">
+                  <div className="section-title">Berlin Chat Leads ({chatLeads.length})</div>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>Name</th><th>WhatsApp</th><th>Interested In</th><th>Date</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {chatLeads.length === 0 && (
+                        <tr><td colSpan={5} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No Berlin chat leads yet.</td></tr>
+                      )}
+                      {chatLeads.map(lead => {
+                        const waNumber = (lead.customer_whatsapp || "").replace(/\D/g,"");
+                        return (
+                          <tr key={lead.id}>
+                            <td style={{fontWeight:600}}>{lead.customer_name || "—"}</td>
+                            <td style={{fontSize:13}}>{lead.customer_whatsapp || "—"}</td>
+                            <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{lead.interested_in || "—"}</span></td>
+                            <td style={{color:"rgba(255,255,255,0.4)",fontSize:"12px",whiteSpace:"nowrap"}}>{lead.created_at ? new Date(lead.created_at).toLocaleString("en-GB") : "—"}</td>
+                            <td style={{whiteSpace:"nowrap"}}>
+                              <button className="action-btn btn-view" onClick={() => setLeadModal(lead)}>👁️ View</button>
+                              <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer">
+                                <button className="action-btn btn-verify">💬 WhatsApp</button>
+                              </a>
+                              <button className="action-btn btn-delete" onClick={() => deleteLead(lead.id)}>🗑️ Delete</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
