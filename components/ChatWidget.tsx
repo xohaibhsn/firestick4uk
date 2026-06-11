@@ -31,12 +31,19 @@ export default function ChatWidget() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const hidden = pathname?.startsWith("/sidhu") || pathname?.startsWith("/erp");
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading, open]);
+
+  useEffect(() => {
+    if (!open || loading) return;
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 80);
+    return () => window.clearTimeout(focusTimer);
+  }, [open, loading, messages.length]);
 
   if (hidden) return null;
 
@@ -99,9 +106,9 @@ export default function ChatWidget() {
         .berlin-window {
           position:fixed;
           right:24px;
-          bottom:96px;
-          width:380px;
-          height:520px;
+          bottom:24px;
+          width:min(380px, calc(100vw - 32px));
+          height:min(520px, calc(100dvh - 48px));
           background:#FFFFFF;
           border-radius:16px;
           box-shadow:0 8px 32px rgba(0,0,0,0.15);
@@ -128,6 +135,9 @@ export default function ChatWidget() {
         .berlin-online { display:flex; align-items:center; gap:6px; font-size:12px; margin-top:6px; opacity:0.9; }
         .berlin-dot { width:8px; height:8px; border-radius:50%; background:#22C55E; }
         .berlin-close { background:transparent; border:none; color:#FFFFFF; font-size:22px; cursor:pointer; line-height:1; padding:4px; }
+        .berlin-header-actions { display:flex; align-items:center; gap:8px; }
+        .berlin-header-btn { width:30px; height:30px; border:none; border-radius:50%; background:rgba(255,255,255,0.14); color:#FFFFFF; cursor:pointer; font-size:20px; line-height:1; display:flex; align-items:center; justify-content:center; }
+        .berlin-header-btn:hover { background:rgba(255,255,255,0.24); }
         .berlin-messages { flex:1; overflow-y:auto; padding:16px; background:#FFFFFF; }
         .berlin-message-row { display:flex; gap:8px; margin-bottom:14px; align-items:flex-end; }
         .berlin-message-row.user { justify-content:flex-end; }
@@ -167,12 +177,12 @@ export default function ChatWidget() {
         .berlin-button.closed { animation:berlinPulse 2s infinite; }
         @media(max-width:640px) {
           .berlin-window {
-            inset:0;
+            left:0;
+            right:0;
+            bottom:0;
             width:100vw;
-            height:100vh;
-            border-radius:0;
-            bottom:auto;
-            right:auto;
+            height:min(560px, 88dvh);
+            border-radius:16px 16px 0 0;
           }
           .berlin-button { right:18px; bottom:18px; }
         }
@@ -191,7 +201,10 @@ export default function ChatWidget() {
               </div>
               <div className="berlin-online"><span className="berlin-dot" /> Online</div>
             </div>
-            <button className="berlin-close" onClick={() => setOpen(false)} aria-label="Close chat">×</button>
+            <div className="berlin-header-actions">
+              <button className="berlin-header-btn" onClick={() => setOpen(false)} aria-label="Minimise chat" title="Minimise">−</button>
+              <button className="berlin-header-btn berlin-close" onClick={() => setOpen(false)} aria-label="Close chat" title="Close">×</button>
+            </div>
           </div>
 
           <div className="berlin-messages">
@@ -217,6 +230,7 @@ export default function ChatWidget() {
 
           <div className="berlin-input-wrap">
             <input
+              ref={inputRef}
               className="berlin-input"
               placeholder="Type a message..."
               value={input}
@@ -233,19 +247,20 @@ export default function ChatWidget() {
         </div>
       )}
 
-      <button
-        className={`berlin-button ${open ? "open" : "closed"}`}
-        onClick={() => {
-          const nextOpen = !open;
-          if (nextOpen && messages.length === 0) {
-            setMessages([{ role: "assistant", content: FIRST_MESSAGE, createdAt: new Date() }]);
-          }
-          setOpen(nextOpen);
-        }}
-        aria-label={open ? "Close chat" : "Open chat"}
-      >
-        {open ? "×" : "💬"}
-      </button>
+      {!open && (
+        <button
+          className="berlin-button closed"
+          onClick={() => {
+            if (messages.length === 0) {
+              setMessages([{ role: "assistant", content: FIRST_MESSAGE, createdAt: new Date() }]);
+            }
+            setOpen(true);
+          }}
+          aria-label="Open chat"
+        >
+          💬
+        </button>
+      )}
     </>
   );
 }
