@@ -271,7 +271,6 @@ export default function RefundPolicyPage() {
         </footer>
       </div>
 
-      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
     </>
   );
 }

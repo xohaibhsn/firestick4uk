@@ -190,7 +190,6 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
         <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
       </footer>
 
-      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer" title="WhatsApp +447934519060 | Telegram @firestick44">💬</a>
     </>
   );
 }

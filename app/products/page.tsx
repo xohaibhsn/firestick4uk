@@ -306,7 +306,6 @@ export default function ProductsPage() {
         </footer>
       </div>
 
-      <a href="https://wa.me/447934519060" className="whatsapp-btn" target="_blank" rel="noopener noreferrer" title="WhatsApp +447934519060 | Telegram @firestick44">💬</a>
     </>
   );
 }

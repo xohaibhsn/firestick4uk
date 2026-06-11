@@ -205,7 +205,6 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
         <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
       </footer>
 
-      <a href="https://wa.me/447934519060" style={{position:"fixed",bottom:30,right:30,zIndex:999,width:58,height:58,borderRadius:"50%",background:"linear-gradient(135deg,#25d366,#128c7e)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 25px rgba(37,211,102,0.5)",textDecoration:"none",fontSize:26}} target="_blank" rel="noopener noreferrer" title="WhatsApp +447934519060 | Telegram @firestick44">💬</a>
     </>
   );
 }

@@ -368,7 +368,6 @@ export default function ContactPage() {
         </footer>
       </div>
 
-      <a href={`https://wa.me/${sc.contact_whatsapp||"447934519060"}`} className="whatsapp-btn" target="_blank" rel="noopener noreferrer">💬</a>
     </>
   );
 }
