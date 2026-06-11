@@ -80,6 +80,36 @@ async function ensureChatLeadsTable() {
   `);
 }
 
+async function ensureBerlinTrainingTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS berlin_training (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(255) NOT NULL,
+      content TEXT NOT NULL,
+      is_active TINYINT(1) DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+}
+
+async function getBerlinTrainingPrompt() {
+  await ensureBerlinTrainingTable();
+  const [rows] = await pool.query(
+    'SELECT title, content FROM berlin_training WHERE is_active=1 ORDER BY updated_at DESC, id DESC LIMIT 25'
+  );
+  if (!Array.isArray(rows) || rows.length === 0) return '';
+
+  const training = rows
+    .map((row) => {
+      const item = row as { title?: string; content?: string };
+      return `### ${item.title || 'Training note'}\n${item.content || ''}`;
+    })
+    .join('\n\n');
+
+  return `\n\nADMIN BERLIN TRAINING KNOWLEDGE:\nUse these admin-added instructions as the latest source of truth. If they conflict with earlier instructions, follow these training notes.\n\n${training}`;
+}
+
 function normaliseHistory(history: unknown): ChatMessage[] {
   if (!Array.isArray(history)) return [];
 
@@ -169,12 +199,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const history = normaliseHistory(req.body?.history);
     const messages: ChatMessage[] = [...history, { role: 'user', content: message }];
+    const trainingPrompt = await getBerlinTrainingPrompt();
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const completion = await client.messages.create({
       model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5',
       max_tokens: 700,
-      system: SYSTEM_PROMPT,
+      system: `${SYSTEM_PROMPT}${trainingPrompt}`,
       messages,
     });
 

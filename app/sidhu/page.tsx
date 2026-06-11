@@ -209,11 +209,12 @@ const demoCustomers = [
   { name:"Emma Wilson", email:"emma@example.com", phone:"+44 7444 444444", orders:1, spent:"£9.99", joined:"May 2026" },
 ];
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"training"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff";
 type AdminRole = "super_admin"|"manager"|"writer";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
 type ChatLead = { id:number; customer_name:string; customer_whatsapp:string; customer_email:string|null; interested_in:string; chat_history:string; ip_address:string; created_at:string; };
+type BerlinTraining = { id:number; title:string; content:string; is_active:number; created_at:string; updated_at:string; };
 
 export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -277,6 +278,9 @@ export default function AdminPage() {
   const [chatLeads, setChatLeads] = useState<ChatLead[]>([]);
   const [leadModal, setLeadModal] = useState<ChatLead|null>(null);
   const [leadWindowStart] = useState(() => Date.now() - 24 * 60 * 60 * 1000);
+  const [berlinTraining, setBerlinTraining] = useState<BerlinTraining[]>([]);
+  const [trainingForm, setTrainingForm] = useState({ id:0, title:"", content:"", is_active:true });
+  const [trainingMsg, setTrainingMsg] = useState("");
 
   useEffect(() => {
     if (localStorage.getItem("sAdminSession") === "true") {
@@ -346,6 +350,10 @@ export default function AdminPage() {
     fetch("/api/admin/leads", { headers: adminHeaders })
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setChatLeads(d); })
+      .catch(() => {});
+    fetch("/api/admin/berlin-training", { headers: adminHeaders })
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setBerlinTraining(d); })
       .catch(() => {});
     if (adminRole === "super_admin") {
       fetch("/api/admin-staff", { headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"", "x-admin-role": "super_admin" } })
@@ -531,6 +539,57 @@ export default function AdminPage() {
       setChatLeads(prev => prev.filter(lead => lead.id !== id));
       setLeadModal(null);
     }
+  };
+
+  const loadBerlinTraining = () => {
+    fetch("/api/admin/berlin-training", { headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"" } })
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setBerlinTraining(d); })
+      .catch(() => {});
+  };
+
+  const saveBerlinTraining = async () => {
+    if (!trainingForm.title.trim() || !trainingForm.content.trim()) {
+      setTrainingMsg("❌ Title and instruction required");
+      return;
+    }
+    const isEdit = trainingForm.id > 0;
+    const res = await fetch("/api/admin/berlin-training", {
+      method: isEdit ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      body: JSON.stringify(trainingForm),
+    }).then(r => r.json()).catch(() => ({}));
+    if (res.success) {
+      setTrainingMsg(isEdit ? "✅ Berlin training updated" : "✅ Berlin training added");
+      setTrainingForm({ id:0, title:"", content:"", is_active:true });
+      loadBerlinTraining();
+    } else {
+      setTrainingMsg(`❌ ${res.error || "Save failed"}`);
+    }
+    setTimeout(() => setTrainingMsg(""), 3000);
+  };
+
+  const editBerlinTraining = (item: BerlinTraining) => {
+    setTrainingForm({ id:item.id, title:item.title || "", content:item.content || "", is_active:!!item.is_active });
+    setTab("training");
+  };
+
+  const toggleBerlinTraining = async (item: BerlinTraining) => {
+    await fetch("/api/admin/berlin-training", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      body: JSON.stringify({ ...item, is_active: !item.is_active }),
+    });
+    loadBerlinTraining();
+  };
+
+  const deleteBerlinTraining = async (id: number) => {
+    if (!confirm("Delete this Berlin training note?")) return;
+    await fetch(`/api/admin/berlin-training?id=${id}`, {
+      method: "DELETE",
+      headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+    });
+    loadBerlinTraining();
   };
 
   const handleProductImage = async (file: File) => {
@@ -923,6 +982,7 @@ export default function AdminPage() {
               { id:"products",  icon:"📦", label:"Products",     roles:["super_admin","manager"] },
               { id:"customers", icon:"👥", label:"Customers",    roles:["super_admin","manager"] },
               { id:"leads",     icon:"💬", label:"Leads",        badge: leadsLast24 > 0 ? String(leadsLast24) : null, badgeColor:"orange", roles:["super_admin","manager"] },
+              { id:"training",  icon:"🧠", label:"Berlin Training", roles:["super_admin","manager"] },
               { id:"blog",      icon:"📝", label:"Blog",         roles:["super_admin","manager","writer"] },
               { id:"coupons",   icon:"🎟️", label:"Coupons",      roles:["super_admin"] },
               { id:"builder",   icon:"🎨", label:"Page Builder", roles:["super_admin"] },
@@ -956,6 +1016,7 @@ export default function AdminPage() {
                 {tab==="products" && <>Manage <span>Products</span></>}
                 {tab==="customers" && <>Customer <span>Data</span></>}
                 {tab==="leads" && <>Berlin <span>Leads</span></>}
+                {tab==="training" && <>Berlin <span>Training</span></>}
                 {tab==="blog" && <>Manage <span>Blog</span></>}
                 {tab==="coupons" && <>Manage <span>Coupons</span></>}
                 {tab==="builder" && <>Page <span>Builder</span></>}
@@ -1258,6 +1319,96 @@ export default function AdminPage() {
                           </tr>
                         );
                       })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 🧠 BERLIN TRAINING */}
+          {tab==="training" && (
+            <div>
+              {trainingMsg && (
+                <div style={{marginBottom:14,padding:"10px 14px",background:trainingMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:trainingMsg.startsWith("✅")?"#00c864":"#ff6666"}}>
+                  {trainingMsg}
+                </div>
+              )}
+
+              <div className="section-card" style={{padding:20,marginBottom:20}}>
+                <div className="section-header" style={{padding:0,marginBottom:16,borderBottom:"none"}}>
+                  <div>
+                    <div className="section-title">{trainingForm.id ? "Edit Berlin Training" : "Add Berlin Training"}</div>
+                    <div style={{fontSize:12,color:"#888888",marginTop:6}}>
+                      Add corrections, product rules, device setup notes, or answers Berlin should follow in future chats.
+                    </div>
+                  </div>
+                  {trainingForm.id > 0 && (
+                    <button className="action-btn btn-view" onClick={() => setTrainingForm({ id:0, title:"", content:"", is_active:true })}>Cancel Edit</button>
+                  )}
+                </div>
+                <div className="modal-field">
+                  <label>Training Title *</label>
+                  <input
+                    placeholder="e.g. Do not mention reseller pricing"
+                    value={trainingForm.title}
+                    onChange={e => setTrainingForm(f => ({ ...f, title:e.target.value }))}
+                  />
+                </div>
+                <div className="modal-field">
+                  <label>Knowledge / Instruction *</label>
+                  <textarea
+                    rows={7}
+                    placeholder={"Example:\nIf a customer asks about buffering, tell them to try VPN first, then mobile hotspot. Do not blame their device unless they have tried both."}
+                    value={trainingForm.content}
+                    onChange={e => setTrainingForm(f => ({ ...f, content:e.target.value }))}
+                    style={{resize:"vertical"}}
+                  />
+                </div>
+                <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#555555",marginBottom:14}}>
+                  <input
+                    type="checkbox"
+                    checked={trainingForm.is_active}
+                    onChange={e => setTrainingForm(f => ({ ...f, is_active:e.target.checked }))}
+                  />
+                  Active and used by Berlin
+                </label>
+                <button className="btn-primary" onClick={saveBerlinTraining}>
+                  {trainingForm.id ? "💾 Update Training" : "+ Add Training"}
+                </button>
+              </div>
+
+              <div className="section-card">
+                <div className="section-header">
+                  <div className="section-title">Training Knowledge ({berlinTraining.length})</div>
+                  <button className="action-btn btn-view" onClick={loadBerlinTraining}>🔄 Refresh</button>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>Title</th><th>Instruction</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {berlinTraining.length === 0 && (
+                        <tr><td colSpan={5} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No Berlin training added yet.</td></tr>
+                      )}
+                      {berlinTraining.map(item => (
+                        <tr key={item.id}>
+                          <td style={{fontWeight:600,minWidth:180}}>{item.title}</td>
+                          <td style={{maxWidth:420,whiteSpace:"pre-wrap",fontSize:12,lineHeight:1.6,color:"rgba(255,255,255,0.65)"}}>{item.content}</td>
+                          <td>
+                            <span
+                              style={{fontSize:11,background:item.is_active?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${item.is_active?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,color:item.is_active?"#00c864":"#ff6666",padding:"3px 10px",borderRadius:20,cursor:"pointer"}}
+                              onClick={() => toggleBerlinTraining(item)}
+                            >
+                              {item.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          <td style={{fontSize:12,color:"rgba(255,255,255,0.4)",whiteSpace:"nowrap"}}>{item.updated_at ? new Date(item.updated_at).toLocaleString("en-GB") : "—"}</td>
+                          <td style={{whiteSpace:"nowrap"}}>
+                            <button className="action-btn btn-edit" onClick={() => editBerlinTraining(item)}>Edit</button>
+                            <button className="action-btn btn-delete" onClick={() => deleteBerlinTraining(item.id)}>Delete</button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
