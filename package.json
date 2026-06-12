@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "echo Build complete",
+    "postbuild": "node scripts/sync-hostinger-apks.js",
     "start": "next start",
     "lint": "eslint"
   },
