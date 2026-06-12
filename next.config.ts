@@ -29,6 +29,7 @@ const nextConfig: NextConfig = {
         source: "/downloads/:path*",
         headers: [
           { key: "Content-Disposition", value: "attachment" },
+          { key: "Content-Type", value: "application/vnd.android.package-archive" },
         ],
       },
     ];
