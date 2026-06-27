@@ -30,11 +30,14 @@
     "dotenv": "^17.4.2",
     "hls.js": "^1.6.16",
     "mysql2": "^3.22.4",
-    "next": "16.2.6",
-    "nodemailer": "^8.0.10",
+    "next": "^16.2.9",
+    "nodemailer": "^9.0.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "xss": "^1.0.15"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -42,7 +45,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "^16.2.9",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
