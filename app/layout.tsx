@@ -62,6 +62,26 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <head>
+        <meta
+          name="google-site-verification"
+          content="bE3BpMEsptGDckTW4IX1nVwGibbaaiphTCCbQp9y-FY"
+        />
+        <script
+          async
+          src="https://www.googletagmanager.com/gtag/js?id=G-055GHH06KD"
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-055GHH06KD');
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         <CartProvider>{children}</CartProvider>
         <ChatWidget />
