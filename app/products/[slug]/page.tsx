@@ -22,19 +22,32 @@ async function getProduct(slug: string): Promise<Product | null> {
   }
 }
 
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProduct(slug);
   if (!product) return { title: "Product Not Found | Firestick4UK" };
 
   const title = `${product.seo_title || product.name} | Firestick4UK`;
-  const description = product.meta_description || product.short_description || product.description || "";
+  const rawDescription =
+    product.meta_description || product.short_description || product.description || "";
+  const description = stripHtml(rawDescription);
   const image = product.og_image || product.image || "";
 
   return {
     title,
     description,
     keywords: product.focus_keyword || "",
+    alternates: {
+      canonical: `https://firestick4uk.com/products/${slug}`,
+    },
     openGraph: {
       title,
       description,
@@ -70,7 +83,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
-    description: product.full_description || product.short_description || product.description || "",
+    description: stripHtml(
+      product.full_description || product.short_description || product.description || ""
+    ),
     image: product.image || "",
     offers: {
       "@type": "Offer",

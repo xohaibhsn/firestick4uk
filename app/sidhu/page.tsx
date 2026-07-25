@@ -911,17 +911,22 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Descriptions */}
+            {/* Descriptions — TipTap rich text */}
             <div className="modal-field">
-              <label style={{display:"flex",justifyContent:"space-between"}}>
-                Short Description
-                <span style={{fontSize:11,color:editProduct.short_description.length>180?"#ff6666":"rgba(255,255,255,0.3)"}}>{editProduct.short_description.length}/200</span>
-              </label>
-              <textarea rows={2} placeholder="Brief product summary shown on listing page..." maxLength={200} value={editProduct.short_description} onChange={e => setEditProduct({...editProduct,short_description:e.target.value})} style={{resize:"vertical"}} />
+              <label>Short Description</label>
+              <TipTapEditor
+                content={editProduct.short_description || ""}
+                onChange={(html) => setEditProduct({ ...editProduct, short_description: html })}
+                placeholder="Brief product summary shown on the product page..."
+              />
             </div>
             <div className="modal-field">
               <label>Full Description</label>
-              <textarea rows={3} placeholder="Detailed product description for the product page..." value={editProduct.full_description} onChange={e => setEditProduct({...editProduct,full_description:e.target.value})} style={{resize:"vertical"}} />
+              <TipTapEditor
+                content={editProduct.full_description || ""}
+                onChange={(html) => setEditProduct({ ...editProduct, full_description: html })}
+                placeholder="Detailed product description for the product page..."
+              />
             </div>
             <div className="modal-field">
               <label>Features (one per line)</label>
@@ -1979,10 +1984,18 @@ export default function AdminPage() {
               {activePage==="home" && (
                 <div className="section-card" style={{padding:24}}>
                   <div className="section-header" style={{marginBottom:20}}><div className="section-title">🏠 Home Page Content</div></div>
-                  <div className="modal-field"><label>Hero Title</label><input style={{width:"100%"}} value={siteContent.home_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_hero_title:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
-                  <div className="modal-field"><label>Hero Subtitle</label><textarea rows={2} style={{width:"100%",resize:"vertical"}} value={siteContent.home_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_hero_subtitle:e.target.value}))} placeholder="Premium Streaming Solutions" /></div>
+                  <div className="modal-field">
+                    <label>Meta Title <span style={{fontSize:11,color:(siteContent.home_meta_title||"").length>55?"#ff6666":(siteContent.home_meta_title||"").length>40?"#00c864":"rgba(255,255,255,0.3)"}}>{(siteContent.home_meta_title||"").length}/60</span></label>
+                    <input style={{width:"100%"}} maxLength={60} value={siteContent.home_meta_title||""} onChange={e=>setSiteContent(s=>({...s,home_meta_title:e.target.value}))} placeholder="Firestick4UK — Best Streaming Service UK" />
+                  </div>
+                  <div className="modal-field">
+                    <label>Meta Description <span style={{fontSize:11,color:(siteContent.home_meta_description||"").length>160?"#ff6666":(siteContent.home_meta_description||"").length>120?"#00c864":"rgba(255,255,255,0.3)"}}>{(siteContent.home_meta_description||"").length}/180</span></label>
+                    <textarea rows={3} style={{width:"100%",resize:"vertical"}} maxLength={180} value={siteContent.home_meta_description||""} onChange={e=>setSiteContent(s=>({...s,home_meta_description:e.target.value}))} placeholder="Premium Firestick subscriptions and streaming services in the UK..." />
+                  </div>
+                  <div className="modal-field"><label>Hero Title (H1)</label><input style={{width:"100%"}} value={siteContent.home_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_hero_title:e.target.value}))} placeholder="Best Firestick Subscription Service in UK" /></div>
+                  <div className="modal-field"><label>Hero Subtitle</label><textarea rows={2} style={{width:"100%",resize:"vertical"}} value={siteContent.home_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_hero_subtitle:e.target.value}))} placeholder="Premium streaming for Firestick, Android Box, Smart TV & more" /></div>
                   <div className="modal-field"><label>Tagline</label><input style={{width:"100%"}} value={siteContent.home_tagline||""} onChange={e=>setSiteContent(s=>({...s,home_tagline:e.target.value}))} placeholder="Fast. Reliable. Affordable." /></div>
-                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["home_hero_title","home_hero_subtitle","home_tagline"])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["home_meta_title","home_meta_description","home_hero_title","home_hero_subtitle","home_tagline"])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
                 </div>
               )}
 

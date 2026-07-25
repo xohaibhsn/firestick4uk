@@ -32,12 +32,15 @@ export async function generateMetadata(): Promise<Metadata> {
     description,
     keywords: "Firestick UK, Firestick subscription, Android box, streaming device, buy firestick UK",
     robots: {
-      index: false,
-      follow: false,
+      index: true,
+      follow: true,
       googleBot: {
-        index: false,
-        follow: false,
+        index: true,
+        follow: true,
       },
+    },
+    alternates: {
+      canonical: "https://firestick4uk.com",
     },
     authors: [{ name: title }],
     icons: { icon: favicon },

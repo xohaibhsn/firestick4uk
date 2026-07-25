@@ -1,7 +1,24 @@
 "use client";
 import { useEffect, useState } from "react";
+import xss from "xss";
 import { useCart } from "../../lib/cartContext";
 
+const xssOptions = {
+  whiteList: {
+    h1: [], h2: [], h3: [], h4: [],
+    p: ["style", "class"],
+    strong: [], em: [], u: [], s: [], b: [], i: [],
+    ul: [], ol: [], li: [],
+    blockquote: [],
+    a: ["href", "target", "rel"],
+    img: ["src", "alt", "width", "height", "class"],
+    br: [], hr: [],
+    span: ["style", "class"],
+    div: ["style", "class"],
+    pre: [], code: [],
+  } as Record<string, string[]>,
+  stripIgnoreTag: true,
+};
 
 interface Product {
   id: number; name: string; description: string;
@@ -71,6 +88,18 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
         .product-category{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#5B21B6;margin-bottom:12px;font-weight:600;}
         .product-name{font-family:'Cinzel',serif;font-size:clamp(22px,3vw,34px);font-weight:700;color:#111111;margin-bottom:12px;line-height:1.25;}
         .product-short-desc{color:#555555;font-size:15px;line-height:1.8;margin-bottom:18px;}
+        .product-description,.product-full-description{color:#444444;font-size:15px;line-height:1.85;}
+        .product-description p,.product-full-description p{margin:0 0 1rem;line-height:1.85;}
+        .product-description ul,.product-full-description ul{list-style:disc;padding-left:1.5rem;margin:1rem 0;}
+        .product-description ol,.product-full-description ol{list-style:decimal;padding-left:1.5rem;margin:1rem 0;}
+        .product-description li,.product-full-description li{margin:0.4rem 0;color:#333333;}
+        .product-description h1,.product-full-description h1{font-family:'Cinzel',serif;font-size:1.75rem;font-weight:700;color:#111111;margin:1.25rem 0 0.75rem;}
+        .product-description h2,.product-full-description h2{font-family:'Cinzel',serif;font-size:1.5rem;font-weight:700;color:#111111;margin:1.25rem 0 0.75rem;}
+        .product-description h3,.product-full-description h3{font-family:'Cinzel',serif;font-size:1.25rem;font-weight:600;color:#5B21B6;margin:1rem 0 0.5rem;}
+        .product-description a,.product-full-description a{color:#5B21B6;text-decoration:underline;}
+        .product-description strong,.product-full-description strong{font-weight:700;color:#111111;}
+        .product-description blockquote,.product-full-description blockquote{border-left:4px solid #5B21B6;padding:1rem 1.5rem;background:#F5F3FF;margin:1.25rem 0;color:#444444;font-style:italic;border-radius:0 8px 8px 0;}
+        .product-description img,.product-full-description img{max-width:100%;border-radius:10px;margin:1.25rem 0;display:block;}
         .product-price{font-family:'Cinzel',serif;font-size:36px;font-weight:900;color:#5B21B6;-webkit-text-fill-color:#5B21B6;margin-bottom:22px;}
         .badge-tag{display:inline-block;background:#5B21B6;color:#FFFFFF;font-size:12px;font-weight:700;padding:4px 14px;border-radius:20px;letter-spacing:1px;margin-bottom:14px;}
         .add-btn{width:100%;background:#5B21B6;color:#FFFFFF;border:none;padding:18px;border-radius:9px;font-size:16px;font-weight:700;letter-spacing:0.5px;cursor:pointer;transition:all 0.2s;}
@@ -85,7 +114,6 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
         .product-sections{max-width:1100px;margin:0 auto;padding:0 60px 80px;}
         .section-block{background:#F9F9F9;border:1px solid #E5E5E5;border-radius:16px;padding:30px;margin-bottom:18px;}
         .section-heading{font-family:'Cinzel',serif;font-size:17px;font-weight:700;color:#111111;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #E5E5E5;}
-        .full-desc{color:#444444;font-size:15px;line-height:1.9;}
         .feature-list{list-style:none;display:flex;flex-direction:column;gap:10px;}
         .feature-list li{display:flex;align-items:center;gap:12px;color:#444444;font-size:15px;}
         .feature-list li::before{content:"✅";flex-shrink:0;}
@@ -136,7 +164,12 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
                 {product.badge && <div className="badge-tag">{product.badge}</div>}
                 <h1 className="product-name">{product.name}</h1>
                 {product.short_description && (
-                  <p className="product-short-desc">{product.short_description}</p>
+                  <div
+                    className="product-description"
+                    dangerouslySetInnerHTML={{
+                      __html: xss(product.short_description, xssOptions),
+                    }}
+                  />
                 )}
                 <div className="product-price">£{Number(product.price).toFixed(2)}</div>
                 <div className="meta-row">
@@ -169,7 +202,12 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
           {product.full_description && (
             <div className="section-block">
               <div className="section-heading">About This Product</div>
-              <p className="full-desc">{product.full_description}</p>
+              <div
+                className="product-full-description"
+                dangerouslySetInnerHTML={{
+                  __html: xss(product.full_description, xssOptions),
+                }}
+              />
             </div>
           )}
           {featureList.length > 0 && (
