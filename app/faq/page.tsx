@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import JsonLd from "@/components/JsonLd";
+import Navbar from "@/components/Navbar";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -70,7 +71,6 @@ const styles = `
 interface FaqItem { id:number; question:string; answer:string; category:string; sort_order:number; }
 
 export default function FAQPage() {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All");
   const [openItem, setOpenItem] = useState<number | null>(null);
   const [faqData, setFaqData] = useState<FaqItem[]>([]);
@@ -111,20 +111,7 @@ export default function FAQPage() {
       <JsonLd data={faqLd} />
       <style>{styles}</style>
 
-      <nav>
-        <a href="/" className="nav-logo">FIRESTICK4UK</a>
-        <ul className={`nav-links ${menuOpen ? "open" : ""}`}>
-          <li><a href="/" onClick={() => setMenuOpen(false)}>Home</a></li>
-          <li><a href="/products" onClick={() => setMenuOpen(false)}>Products</a></li>
-          <li><a href="/order-tracking" onClick={() => setMenuOpen(false)}>Track Order</a></li>
-          <li><a href="/blog" onClick={() => setMenuOpen(false)}>Blog</a></li>
-          <li><a href="/contact" onClick={() => setMenuOpen(false)}>Contact</a></li>
-          <li><a href="/" className="nav-cta" onClick={() => setMenuOpen(false)}>Shop Now</a></li>
-        </ul>
-        <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">
-          <span /><span /><span />
-        </button>
-      </nav>
+      <Navbar cta="shop" shopHref="/" />
 
       <div className="page-wrapper">
         <div className="page-header">

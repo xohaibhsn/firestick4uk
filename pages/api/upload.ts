@@ -22,6 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Determine Cloudinary folder — caller can override, default to products
     const cloudinaryFolder = (folder as string) || 'firestick4uk/products';
     const isReceipt = cloudinaryFolder.includes('receipt');
+    const isLogo = cloudinaryFolder.includes('logo');
 
     // Use Cloudinary if credentials are configured
     if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
@@ -29,7 +30,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const uploadOptions: any = { folder: cloudinaryFolder };
 
-      if (isReceipt) {
+      if (isLogo) {
+        // Logo: keep transparency, limit size without square crop / webp force
+        uploadOptions.transformation = [
+          { width: 800, height: 200, crop: 'limit' },
+          { quality: 90 },
+        ];
+      } else if (isReceipt) {
         // Receipts: preserve original, no aggressive compression
         uploadOptions.transformation = [{ quality: 90 }];
       } else {
@@ -46,12 +53,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Fallback: save locally (localhost dev without Cloudinary creds)
     const base64Data = file.replace(/^data:[^;]+;base64,/, '');
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', isReceipt ? 'receipts' : '');
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', isReceipt ? 'receipts' : isLogo ? 'logo' : '');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
     const safeName = Date.now() + '-' + String(name).replace(/[^a-zA-Z0-9._-]/g, '_');
 
-    if (!isReceipt) {
+    if (!isReceipt && !isLogo) {
       try {
         const sharp = require('sharp');
         const inputBuffer = Buffer.from(base64Data, 'base64');
@@ -62,7 +69,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     fs.writeFileSync(path.join(uploadsDir, safeName), base64Data, 'base64');
-    return res.status(200).json({ path: `/uploads/${isReceipt ? 'receipts/' : ''}${safeName}` });
+    const sub = isReceipt ? 'receipts/' : isLogo ? 'logo/' : '';
+    return res.status(200).json({ path: `/uploads/${sub}${safeName}` });
 
   } catch (error: any) {
     return res.status(500).json({ error: error.message });

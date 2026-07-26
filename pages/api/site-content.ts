@@ -11,6 +11,7 @@ function checkAdminAuth(req: any): boolean {
 const DEFAULTS = [
   ['site_title','Firestick4UK','text','settings','Website Title'],
   ['site_tagline','Best Firestick Service in UK','text','settings','Website Tagline'],
+  ['site_logo_url','','image','settings','Site Logo'],
   ['favicon_url','/favicon.ico','image','settings','Favicon URL'],
   ['og_default_image','','image','settings','Default OG Share Image'],
   ['home_top_hero_title','Best Firestick Service in UK','text','home','Top Hero Title'],

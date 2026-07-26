@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Navbar from "@/components/Navbar";
 
 export const metadata: Metadata = {
   title: "Page Not Found — Firestick4UK",
@@ -30,9 +31,7 @@ export default function NotFound() {
         @media(max-width:600px){nav{padding:16px 24px;}}
       `}</style>
 
-      <nav>
-        <a href="/" className="nav-logo">FIRESTICK4UK</a>
-      </nav>
+      <Navbar cta="none" />
 
       <div className="wrap">
         <div className="content">

@@ -5,6 +5,7 @@ import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "../lib/cartContext";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
+import Navbar from "@/components/Navbar";
 
 const cardDescXss = {
   whiteList: {
@@ -41,7 +42,6 @@ export default function ProductsPage() {
   const [loadError, setLoadError] = useState(false);
   const [added, setAdded] = useState<number | null>(null);
   const [hoveringId, setHoveringId] = useState<number | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [filter, setFilter] = useState("All");
   const [sort, setSort] = useState("featured");
   const [minPrice, setMinPrice] = useState("");
@@ -186,44 +186,32 @@ export default function ProductsPage() {
         ))}
       </div>
 
-      <nav>
-        <a href="/" className="nav-logo">FIRESTICK4UK</a>
-        <ul className={`nav-links ${menuOpen?"open":""}`}>
-          <li><a href="/" onClick={()=>setMenuOpen(false)}>Home</a></li>
-          <li><a href="/products" onClick={()=>setMenuOpen(false)}>Products</a></li>
-          <li><a href="/order-tracking" onClick={()=>setMenuOpen(false)}>Track Order</a></li>
-          <li><a href="/blog" onClick={()=>setMenuOpen(false)}>Blog</a></li>
-          <li><a href="/contact" onClick={()=>setMenuOpen(false)}>Contact</a></li>
-          <li><a href="/cart" className="nav-cta" onClick={()=>setMenuOpen(false)}>🛒 Cart {cart.length > 0 && `(${cart.length})`}</a></li>
-        </ul>
+      <Navbar cartCount={cart.length} cta="cart">
         {/* Live Search */}
         <div ref={searchRef} style={{position:"relative",display:"flex",alignItems:"center",gap:8}}>
           {searchActive
-            ? <input autoFocus style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.4)",borderRadius:20,padding:"7px 16px",color:"white",fontSize:13,outline:"none",width:220}} placeholder="Search products..." value={searchQ} onChange={e=>setSearchQ(e.target.value)} onKeyDown={e=>e.key==="Escape"&&(setSearchActive(false),setSearchQ(""),setSearchOpen(false))} />
-            : <button style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.6)",fontSize:20,padding:"4px 8px"}} onClick={()=>setSearchActive(true)} title="Search">🔍</button>
+            ? <input autoFocus style={{background:"#F5F5F5",border:"1px solid #E5E5E5",borderRadius:20,padding:"7px 16px",color:"#111",fontSize:13,outline:"none",width:220}} placeholder="Search products..." value={searchQ} onChange={e=>setSearchQ(e.target.value)} onKeyDown={e=>e.key==="Escape"&&(setSearchActive(false),setSearchQ(""),setSearchOpen(false))} />
+            : <button type="button" style={{background:"none",border:"none",cursor:"pointer",color:"#666",fontSize:20,padding:"4px 8px"}} onClick={()=>setSearchActive(true)} title="Search">🔍</button>
           }
           {searchOpen && searchResults.length > 0 && (
-            <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:320,background:"linear-gradient(135deg,rgba(26,0,40,0.98),rgba(13,0,20,0.99))",border:"1px solid rgba(139,0,255,0.3)",borderRadius:14,overflow:"hidden",zIndex:200,boxShadow:"0 8px 32px rgba(0,0,0,0.6)",animation:"fadeIn 0.15s ease"}}>
+            <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:320,background:"#FFFFFF",border:"1px solid #E5E5E5",borderRadius:14,overflow:"hidden",zIndex:200,boxShadow:"0 8px 32px rgba(0,0,0,0.12)"}}>
               {searchResults.map((r:any)=>(
-                <a key={r.id} href={`/products/${r.slug}`} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 16px",textDecoration:"none",borderBottom:"1px solid rgba(139,0,255,0.07)",transition:"background 0.15s"}} onMouseEnter={e=>(e.currentTarget.style.background="rgba(139,0,255,0.08)")} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
-                  {r.image ? <img src={r.image} alt={r.name} style={{width:40,height:40,borderRadius:6,objectFit:"cover",border:"1px solid rgba(139,0,255,0.2)"}} loading="lazy" /> : <div style={{width:40,height:40,borderRadius:6,background:"rgba(139,0,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>📦</div>}
+                <a key={r.id} href={`/products/${r.slug}`} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 16px",textDecoration:"none",borderBottom:"1px solid #F0F0F0",transition:"background 0.15s"}} onMouseEnter={e=>(e.currentTarget.style.background="#F9F9F9")} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
+                  {r.image ? <img src={r.image} alt={r.name} style={{width:40,height:40,borderRadius:6,objectFit:"cover",border:"1px solid #E5E5E5"}} loading="lazy" /> : <div style={{width:40,height:40,borderRadius:6,background:"#F5F5F5",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>📦</div>}
                   <div style={{flex:1,overflow:"hidden"}}>
-                    <div style={{fontSize:13,fontWeight:600,color:"white",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.name}</div>
-                    <div style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>{r.category} · £{Number(r.price).toFixed(2)}</div>
+                    <div style={{fontSize:13,fontWeight:600,color:"#111",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.name}</div>
+                    <div style={{fontSize:11,color:"#888"}}>{r.category} · £{Number(r.price).toFixed(2)}</div>
                   </div>
                 </a>
               ))}
-              <a href={`/products?q=${encodeURIComponent(searchQ)}`} style={{display:"block",padding:"10px 16px",fontSize:12,color:"var(--purple-glow)",textDecoration:"none",textAlign:"center",background:"rgba(139,0,255,0.05)"}}>View all results for &quot;{searchQ}&quot; →</a>
+              <a href={`/products?q=${encodeURIComponent(searchQ)}`} style={{display:"block",padding:"10px 16px",fontSize:12,color:"#5B21B6",textDecoration:"none",textAlign:"center",background:"#F5F3FF"}}>View all results for &quot;{searchQ}&quot; →</a>
             </div>
           )}
           {searchOpen && searchQ.length >= 2 && searchResults.length === 0 && (
-            <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:240,background:"rgba(13,0,20,0.98)",border:"1px solid rgba(139,0,255,0.2)",borderRadius:10,padding:"14px 16px",zIndex:200,fontSize:13,color:"rgba(255,255,255,0.4)"}}>No products found for &quot;{searchQ}&quot;</div>
+            <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:240,background:"#FFFFFF",border:"1px solid #E5E5E5",borderRadius:10,padding:"14px 16px",zIndex:200,fontSize:13,color:"#888"}}>No products found for &quot;{searchQ}&quot;</div>
           )}
         </div>
-        <button className="hamburger" onClick={()=>setMenuOpen(!menuOpen)} aria-label="Menu">
-          <span/><span/><span/>
-        </button>
-      </nav>
+      </Navbar>
 
       <div className="page-wrapper">
         <div className="page-header">

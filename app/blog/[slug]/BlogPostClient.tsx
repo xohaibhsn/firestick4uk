@@ -2,6 +2,7 @@
 import { useState } from "react";
 import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
+import Navbar from "@/components/Navbar";
 
 // Allowed HTML tags from TipTap editor output
 const xssOptions = {
@@ -131,16 +132,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
         }
       `}</style>
 
-      <nav>
-        <a href="/" className="nav-logo">FIRESTICK4UK</a>
-        <ul className="nav-links">
-          <li><a href="/">Home</a></li>
-          <li><a href="/products">Products</a></li>
-          <li><a href="/blog">Blog</a></li>
-          <li><a href="/contact">Contact</a></li>
-          <li><a href="/products" className="nav-cta">Shop Now</a></li>
-        </ul>
-      </nav>
+      <Navbar cta="shop" shopHref="/products" />
 
       <div className="wrap">
         {!post ? (

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "./lib/cartContext";
+import Navbar from "@/components/Navbar";
 
 const cardDescXss = {
   whiteList: {
@@ -53,7 +54,6 @@ export default function HomeClient({
   heroTitle = "Premium UK Streaming Service",
   heroSubtitle = "Firestick4UK provides premium UK streaming services for Firestick and Android Box users.",
 }: HomeClientProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [added, setAdded] = useState<number | null>(null);
@@ -231,20 +231,7 @@ export default function HomeClient({
         }
       `}</style>
 
-      <nav>
-        <a href="/" className="nav-logo">FIRESTICK4UK</a>
-        <ul className={`nav-links ${menuOpen?"open":""}`}>
-          <li><a href="/" onClick={()=>setMenuOpen(false)}>Home</a></li>
-          <li><a href="/products" onClick={()=>setMenuOpen(false)}>Products</a></li>
-          <li><a href="/order-tracking" onClick={()=>setMenuOpen(false)}>Track Order</a></li>
-          <li><a href="/blog" onClick={()=>setMenuOpen(false)}>Blog</a></li>
-          <li><a href="/contact" onClick={()=>setMenuOpen(false)}>Contact</a></li>
-          <li><a href="/cart" className="nav-cta" onClick={()=>setMenuOpen(false)}>🛒 Cart {cart.length > 0 && `(${cart.length})`}</a></li>
-        </ul>
-        <button className="hamburger" onClick={()=>setMenuOpen(!menuOpen)} aria-label="Menu">
-          <span/><span/><span/>
-        </button>
-      </nav>
+      <Navbar cartCount={cart.length} cta="cart" />
 
       <div className="page-wrapper">
         {/* Clean SEO hero — H1 above products */}

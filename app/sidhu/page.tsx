@@ -260,6 +260,7 @@ export default function AdminPage() {
   const [contentMsg, setContentMsg] = useState("");
   const [activePage, setActivePage] = useState("home");
   const [faviconUploading, setFaviconUploading] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [ogImgUploading, setOgImgUploading] = useState(false);
 
   // Page Builder
@@ -420,6 +421,31 @@ export default function AdminPage() {
       setContentMsg("✅ Favicon uploaded!");
     } catch { setContentMsg("❌ Upload failed"); }
     setFaviconUploading(false);
+    setTimeout(() => setContentMsg(""), 3000);
+  };
+
+  const uploadLogoAdmin = async (file: File) => {
+    setLogoUploading(true);
+    try {
+      const base64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(file); });
+      const data = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+        body: JSON.stringify({ file: base64, name: file.name, folder: "firestick4uk/logo" }),
+      }).then(r => r.json());
+      if (data.path) {
+        setSiteContent(s => ({ ...s, site_logo_url: data.path }));
+        await fetch("/api/site-content", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+          body: JSON.stringify({ key: "site_logo_url", value: data.path }),
+        });
+        setContentMsg("✅ Logo saved!");
+      } else {
+        setContentMsg(`❌ ${data.error || "Upload failed"}`);
+      }
+    } catch { setContentMsg("❌ Upload failed"); }
+    setLogoUploading(false);
     setTimeout(() => setContentMsg(""), 3000);
   };
 
@@ -1961,6 +1987,35 @@ export default function AdminPage() {
               <div style={{maxWidth:600}}>
                 <div className="modal-field"><label>Website Title</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_title||""} onChange={e=>setSiteContent(s=>({...s,site_title:e.target.value}))} placeholder="Firestick4UK" /></div>
                 <div className="modal-field"><label>Website Tagline</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_tagline||""} onChange={e=>setSiteContent(s=>({...s,site_tagline:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
+
+                <div className="modal-field">
+                  <label>Site Logo</label>
+                  <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
+                    Recommended: <strong>360×80px</strong>, PNG transparent
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap",marginTop:4}}>
+                    {siteContent.site_logo_url && (
+                      <img
+                        src={siteContent.site_logo_url}
+                        alt="Site logo"
+                        style={{height:40,width:"auto",maxWidth:200,objectFit:"contain",border:"1px solid #E5E5E5",borderRadius:6,padding:6,background:"#fff"}}
+                      />
+                    )}
+                    <label style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}>
+                      {logoUploading ? "Uploading..." : "Upload Logo"}
+                      <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&uploadLogoAdmin(e.target.files[0])} disabled={logoUploading} />
+                    </label>
+                    {siteContent.site_logo_url && (
+                      <button
+                        type="button"
+                        style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:12}}
+                        onClick={()=>{ setSiteContent(s=>({...s,site_logo_url:""})); saveContent(["site_logo_url"]); }}
+                      >
+                        ✕ Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
 
                 <div className="modal-field">
                   <label>Favicon</label>

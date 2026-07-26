@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "../../lib/cartContext";
+import Navbar from "@/components/Navbar";
 
 const xssOptions = {
   whiteList: {
@@ -33,7 +34,6 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
   const [loading, setLoading] = useState(!initialProduct);
   const [added, setAdded] = useState(false);
   const [hovering, setHovering] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const { addToCart, removeFromCart, cart } = useCart();
 
   useEffect(() => {
@@ -126,22 +126,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
         @media(max-width:768px){.page-wrap{padding:90px 16px 40px;}.product-sections{padding:0 16px 60px;}.product-layout{grid-template-columns:1fr;gap:24px;}footer{padding:30px 24px;flex-direction:column;text-align:center;}}
       `}</style>
 
-      <nav>
-        <a href="/" className="nav-logo">FIRESTICK4UK</a>
-        <ul className={`nav-links ${menuOpen ? "open" : ""}`}>
-          <li><a href="/" onClick={() => setMenuOpen(false)}>Home</a></li>
-          <li><a href="/products" onClick={() => setMenuOpen(false)}>Products</a></li>
-          <li><a href="/order-tracking" onClick={() => setMenuOpen(false)}>Track Order</a></li>
-          <li><a href="/blog" onClick={() => setMenuOpen(false)}>Blog</a></li>
-          <li><a href="/contact" onClick={() => setMenuOpen(false)}>Contact</a></li>
-          <li><a href="/cart" className="nav-cta" onClick={() => setMenuOpen(false)}>
-            🛒 Cart{cart.length > 0 ? ` (${cart.length})` : ""}
-          </a></li>
-        </ul>
-        <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">
-          <span/><span/><span/>
-        </button>
-      </nav>
+      <Navbar cartCount={cart.length} cta="cart" />
 
       <div className="page-wrap">
         {loading ? (

@@ -8,21 +8,6 @@ import JsonLd from "@/components/JsonLd";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
-const organizationLd = {
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  name: "Firestick4UK",
-  url: "https://firestick4uk.com",
-  logo: "https://firestick4uk.com/logo.png",
-  contactPoint: {
-    "@type": "ContactPoint",
-    telephone: "+447934519060",
-    contactType: "customer service",
-    availableLanguage: "English",
-  },
-  sameAs: ["https://t.me/firestick44"],
-};
-
 async function getSiteSettings(): Promise<Record<string,string>> {
   try {
     const pool = (await import("../lib/db")).default;
@@ -78,7 +63,24 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const settings = await getSiteSettings();
+  const logoUrl = settings.site_logo_url || "https://firestick4uk.com/logo.png";
+  const organizationLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Firestick4UK",
+    url: "https://firestick4uk.com",
+    logo: logoUrl,
+    contactPoint: {
+      "@type": "ContactPoint",
+      telephone: "+447934519060",
+      contactType: "customer service",
+      availableLanguage: "English",
+    },
+    sameAs: ["https://t.me/firestick44"],
+  };
+
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <head>

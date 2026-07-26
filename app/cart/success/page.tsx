@@ -1,6 +1,7 @@
 "use client";
 export const dynamic = 'force-dynamic';
 import { useEffect, useState } from "react";
+import Navbar from "@/components/Navbar";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -97,13 +98,7 @@ export default function CartSuccessPage() {
     return (
       <>
         <style>{styles}</style>
-        <nav>
-          <a href="/" className="nav-logo">FIRESTICK4UK</a>
-          <ul className="nav-links">
-            <li><a href="/">Home</a></li>
-            <li><a href="/products">Products</a></li>
-          </ul>
-        </nav>
+        <Navbar cta="none" />
         <div className="page">
           <div className="container" style={{ textAlign: 'center', paddingTop: 60 }}>
             <div style={{ fontSize: 52, marginBottom: 16 }}>🛒</div>
@@ -122,13 +117,7 @@ export default function CartSuccessPage() {
     <>
       <style>{styles}</style>
 
-      <nav>
-        <a href="/" className="nav-logo">FIRESTICK4UK</a>
-        <ul className="nav-links">
-          <li><a href="/">Home</a></li>
-          <li><a href="/order-tracking">Track Order</a></li>
-        </ul>
-      </nav>
+      <Navbar cta="none" />
 
       <div className="page">
         <div className="container">
