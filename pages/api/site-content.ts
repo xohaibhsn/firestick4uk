@@ -13,8 +13,10 @@ const DEFAULTS = [
   ['site_tagline','Best Firestick Service in UK','text','settings','Website Tagline'],
   ['favicon_url','/favicon.ico','image','settings','Favicon URL'],
   ['og_default_image','','image','settings','Default OG Share Image'],
-  ['home_hero_title','Best Firestick Subscription Service in UK','text','home','Hero Title'],
-  ['home_hero_subtitle','Premium streaming for Firestick, Android Box, Smart TV & more','textarea','home','Hero Subtitle'],
+  ['home_top_hero_title','Best Firestick Service in UK','text','home','Top Hero Title'],
+  ['home_top_hero_subtitle','Premium Streaming Solutions for the UK','textarea','home','Top Hero Subtitle'],
+  ['home_hero_title','Premium UK Streaming Service','text','home','Main Hero Title'],
+  ['home_hero_subtitle','Firestick4UK provides premium UK streaming services for Firestick and Android Box users.','textarea','home','Main Hero Subtitle'],
   ['home_tagline','Fast. Reliable. Affordable.','text','home','Tagline'],
   ['home_meta_title','Firestick4UK — Best Streaming Service UK','text','home','Meta Title'],
   ['home_meta_description','Premium Firestick subscriptions and streaming services in the UK. HD & 4K channels, live sports, movies and more.','textarea','home','Meta Description'],
@@ -60,6 +62,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await pool.query(
         "UPDATE site_content SET content_value='firestick4uk@gmail.com' WHERE content_key='contact_email' AND content_value LIKE '%@firestick4uk.com%'"
       );
+    } catch (_) {}
+
+    // Replace public IPTV wording with Streaming
+    for (const [from, to] of [
+      ['Premium IPTV & Streaming', 'Premium Streaming'],
+      ['IPTV & Streaming Solutions', 'Streaming Solutions'],
+      ['Premium IPTV', 'Premium Streaming'],
+      ['IPTV', 'Streaming'],
+      ['iptv', 'streaming'],
+    ] as const) {
+      try {
+        await pool.query(
+          'UPDATE site_content SET content_value = REPLACE(content_value, ?, ?) WHERE content_value LIKE ?',
+          [from, to, `%${from}%`]
+        );
+      } catch (_) {}
+    }
+
+    // Keep labels in sync for new/renamed home fields
+    try {
+      await pool.query(`UPDATE site_content SET label='Top Hero Title' WHERE content_key='home_top_hero_title'`);
+      await pool.query(`UPDATE site_content SET label='Top Hero Subtitle' WHERE content_key='home_top_hero_subtitle'`);
+      await pool.query(`UPDATE site_content SET label='Main Hero Title' WHERE content_key='home_hero_title'`);
+      await pool.query(`UPDATE site_content SET label='Main Hero Subtitle' WHERE content_key='home_hero_subtitle'`);
     } catch (_) {}
 
     if (req.method === 'GET') {

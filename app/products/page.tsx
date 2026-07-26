@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "../lib/cartContext";
+import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 
 const cardDescXss = {
   whiteList: {
@@ -97,6 +98,12 @@ export default function ProductsPage() {
 
   return (
     <>
+      <BreadcrumbSchema
+        items={[
+          { name: "Home", url: "https://firestick4uk.com" },
+          { name: "Products", url: "https://firestick4uk.com/products" },
+        ]}
+      />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }

@@ -2033,10 +2033,17 @@ export default function AdminPage() {
                     <label>Meta Description <span style={{fontSize:11,color:(siteContent.home_meta_description||"").length>160?"#ff6666":(siteContent.home_meta_description||"").length>120?"#00c864":"rgba(255,255,255,0.3)"}}>{(siteContent.home_meta_description||"").length}/180</span></label>
                     <textarea rows={3} style={{width:"100%",resize:"vertical"}} maxLength={180} value={siteContent.home_meta_description||""} onChange={e=>setSiteContent(s=>({...s,home_meta_description:e.target.value}))} placeholder="Premium Firestick subscriptions and streaming services in the UK..." />
                   </div>
-                  <div className="modal-field"><label>Hero Title (H1)</label><input style={{width:"100%"}} value={siteContent.home_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_hero_title:e.target.value}))} placeholder="Best Firestick Subscription Service in UK" /></div>
-                  <div className="modal-field"><label>Hero Subtitle</label><textarea rows={2} style={{width:"100%",resize:"vertical"}} value={siteContent.home_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_hero_subtitle:e.target.value}))} placeholder="Premium streaming for Firestick, Android Box, Smart TV & more" /></div>
+
+                  <div style={{margin:"20px 0 12px",paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.08)",fontSize:13,fontWeight:700,color:"#5B21B6"}}>TOP HERO (centered)</div>
+                  <div className="modal-field"><label>Top Hero Title</label><input style={{width:"100%"}} value={siteContent.home_top_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_top_hero_title:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
+                  <div className="modal-field"><label>Top Hero Subtitle</label><textarea rows={2} style={{width:"100%",resize:"vertical"}} value={siteContent.home_top_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_top_hero_subtitle:e.target.value}))} placeholder="Premium Streaming Solutions for the UK" /></div>
+
+                  <div style={{margin:"20px 0 12px",paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.08)",fontSize:13,fontWeight:700,color:"#5B21B6"}}>MAIN HERO (left aligned + buttons)</div>
+                  <div className="modal-field"><label>Main Hero Title</label><input style={{width:"100%"}} value={siteContent.home_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_hero_title:e.target.value}))} placeholder="Premium UK Streaming Service" /></div>
+                  <div className="modal-field"><label>Main Hero Subtitle</label><textarea rows={3} style={{width:"100%",resize:"vertical"}} value={siteContent.home_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_hero_subtitle:e.target.value}))} placeholder="Firestick4UK provides premium UK streaming services for Firestick and Android Box users." /></div>
+
                   <div className="modal-field"><label>Tagline</label><input style={{width:"100%"}} value={siteContent.home_tagline||""} onChange={e=>setSiteContent(s=>({...s,home_tagline:e.target.value}))} placeholder="Fast. Reliable. Affordable." /></div>
-                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["home_meta_title","home_meta_description","home_hero_title","home_hero_subtitle","home_tagline"])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["home_meta_title","home_meta_description","home_top_hero_title","home_top_hero_subtitle","home_hero_title","home_hero_subtitle","home_tagline"])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
                 </div>
               )}
 

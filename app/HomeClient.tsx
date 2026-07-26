@@ -25,6 +25,8 @@ interface Product {
 }
 
 interface HomeClientProps {
+  topHeroTitle?: string;
+  topHeroSubtitle?: string;
   heroTitle?: string;
   heroSubtitle?: string;
 }
@@ -46,8 +48,10 @@ function formatHeroTitle(title: string) {
 }
 
 export default function HomeClient({
-  heroTitle = "Best Firestick Subscription Service in UK",
-  heroSubtitle = "Premium streaming for Firestick, Android Box, Smart TV & more",
+  topHeroTitle = "Best Firestick Service in UK",
+  topHeroSubtitle = "Premium Streaming Solutions for the UK",
+  heroTitle = "Premium UK Streaming Service",
+  heroSubtitle = "Firestick4UK provides premium UK streaming services for Firestick and Android Box users.",
 }: HomeClientProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -64,7 +68,7 @@ export default function HomeClient({
 
   // Section data from DB
   const [sec, setSec] = useState<Record<string,any>>({
-    home_hero: { title:"Best Firestick Service in UK", subtitle:"Premium Streaming Solutions", button_text:"Shop Now", button_link:"/products", secondary_button_text:"Learn More", secondary_button_link:"/about" },
+    home_hero: { title:"Premium UK Streaming Service", subtitle:"Firestick4UK provides premium UK streaming services for Firestick and Android Box users.", button_text:"Shop Now", button_link:"/products", secondary_button_text:"Learn More", secondary_button_link:"/about" },
     home_features: { title:"Why Choose Us", items:[{icon:"⚡",title:"Fast Setup",description:"Ready in minutes"},{icon:"🔒",title:"Secure",description:"Safe & reliable"},{icon:"💬",title:"24/7 Support",description:"Always here for you"},{icon:"🚀",title:"Fast Delivery",description:"Quick & efficient"}] },
     home_testimonials: { title:"What Our Customers Say", items:[{name:"John Smith",rating:5,text:"Amazing service!"},{name:"Sarah Jones",rating:5,text:"Best firestick service in UK!"}] },
     home_newsletter: { title:"Stay in the Loop", subtitle:"Get the latest guides, tips and offers", button_text:"Subscribe" },
@@ -246,8 +250,8 @@ export default function HomeClient({
         {/* Clean SEO hero — H1 above products */}
         <section className="home-seo-hero">
           <div className="home-seo-hero-inner">
-            <h1>{formatHeroTitle(heroTitle)}</h1>
-            <p>{heroSubtitle}</p>
+            <h1>{formatHeroTitle(topHeroTitle)}</h1>
+            <p>{topHeroSubtitle}</p>
           </div>
         </section>
 

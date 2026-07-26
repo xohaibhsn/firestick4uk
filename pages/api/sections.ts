@@ -9,7 +9,7 @@ function checkAdminAuth(req: any): boolean {
 
 
 const DEFAULTS = [
-  ['home_hero','{"title":"Best Firestick Service in UK","subtitle":"Premium IPTV & Streaming Solutions","button_text":"Shop Now","button_link":"/products","secondary_button_text":"Learn More","secondary_button_link":"/about"}','json','home','Hero Section',1,1],
+  ['home_hero','{"title":"Premium UK Streaming Service","subtitle":"Firestick4UK provides premium UK streaming services for Firestick and Android Box users.","button_text":"Shop Now","button_link":"/products","secondary_button_text":"Learn More","secondary_button_link":"/about"}','json','home','Hero Section',1,1],
   ['home_featured_products','{"title":"Our Products","subtitle":"Premium streaming solutions for every need","show_count":6}','json','home','Featured Products Section',2,1],
   ['home_features','{"title":"Why Choose Us","items":[{"icon":"⚡","title":"Fast Setup","description":"Ready in minutes"},{"icon":"🔒","title":"Secure","description":"Safe & reliable"},{"icon":"💬","title":"24/7 Support","description":"Always here for you"},{"icon":"🚀","title":"Fast Delivery","description":"Quick & efficient"}]}','json','home','Features Section',3,1],
   ['home_testimonials','{"title":"What Our Customers Say","items":[{"name":"John Smith","rating":5,"text":"Amazing service! Got my Firestick set up in minutes."},{"name":"Sarah Jones","rating":5,"text":"Best firestick service in UK! Great value."}]}','json','home','Testimonials Section',4,1],
@@ -61,6 +61,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await pool.query(
           'INSERT IGNORE INTO site_content (content_key,content_value,content_type,page_name,label,section_order,is_visible) VALUES (?,?,?,?,?,?,?)',
           [key,val,type,page,label,order,vis]
+        );
+      } catch (_) {}
+    }
+
+    // Replace IPTV wording in section JSON content
+    for (const [from, to] of [
+      ['Premium IPTV & Streaming', 'Premium Streaming'],
+      ['IPTV & Streaming Solutions', 'Streaming Solutions'],
+      ['Premium IPTV', 'Premium Streaming'],
+      ['IPTV', 'Streaming'],
+    ] as const) {
+      try {
+        await pool.query(
+          `UPDATE site_content SET content_value = REPLACE(content_value, ?, ?)
+           WHERE content_type='json' AND content_value LIKE ?`,
+          [from, to, `%${from}%`]
         );
       } catch (_) {}
     }

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -217,6 +218,12 @@ export default function BlogPage() {
 
   return (
     <>
+      <BreadcrumbSchema
+        items={[
+          { name: "Home", url: "https://firestick4uk.com" },
+          { name: "Blog", url: "https://firestick4uk.com/blog" },
+        ]}
+      />
       <style>{styles}</style>
       <div className="bg-fixed" />
 

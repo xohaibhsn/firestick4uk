@@ -3,9 +3,25 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "./lib/cartContext";
 import ChatWidget from "@/components/ChatWidget";
+import JsonLd from "@/components/JsonLd";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+
+const organizationLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Firestick4UK",
+  url: "https://firestick4uk.com",
+  logo: "https://firestick4uk.com/logo.png",
+  contactPoint: {
+    "@type": "ContactPoint",
+    telephone: "+447934519060",
+    contactType: "customer service",
+    availableLanguage: "English",
+  },
+  sameAs: ["https://t.me/firestick44"],
+};
 
 async function getSiteSettings(): Promise<Record<string,string>> {
   try {
@@ -86,6 +102,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         />
       </head>
       <body className="min-h-full flex flex-col">
+        <JsonLd data={organizationLd} />
         <CartProvider>{children}</CartProvider>
         <ChatWidget />
       </body>

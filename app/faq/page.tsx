@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
+import BreadcrumbSchema from "@/components/BreadcrumbSchema";
+import JsonLd from "@/components/JsonLd";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -100,7 +102,13 @@ export default function FAQPage() {
 
   return (
     <>
-      {faqLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />}
+      <BreadcrumbSchema
+        items={[
+          { name: "Home", url: "https://firestick4uk.com" },
+          { name: "FAQ", url: "https://firestick4uk.com/faq" },
+        ]}
+      />
+      <JsonLd data={faqLd} />
       <style>{styles}</style>
 
       <nav>

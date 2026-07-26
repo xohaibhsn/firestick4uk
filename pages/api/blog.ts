@@ -53,6 +53,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Activate any existing posts that have NULL active (added before column existed)
     try { await pool.query("UPDATE blog_posts SET active=1 WHERE active IS NULL"); } catch (_) {}
 
+    // Replace IPTV wording in existing public blog content
+    for (const [from, to] of [
+      ['Premium IPTV & Streaming', 'Premium Streaming'],
+      ['IPTV & Streaming Solutions', 'Streaming Solutions'],
+      ['Premium IPTV', 'Premium Streaming'],
+      ['Best IPTV', 'Best Streaming'],
+      ['IPTV Subscriptions', 'Streaming Subscriptions'],
+      ['IPTV service', 'streaming service'],
+      ['IPTV Plans', 'Streaming Plans'],
+      ['IPTV', 'Streaming'],
+      ['iptv', 'streaming'],
+    ] as const) {
+      try {
+        await pool.query(
+          `UPDATE blog_posts SET
+             title = REPLACE(title, ?, ?),
+             excerpt = REPLACE(excerpt, ?, ?),
+             content = REPLACE(content, ?, ?),
+             meta_title = REPLACE(IFNULL(meta_title,''), ?, ?),
+             meta_description = REPLACE(IFNULL(meta_description,''), ?, ?)
+           WHERE title LIKE ? OR excerpt LIKE ? OR content LIKE ? OR IFNULL(meta_title,'') LIKE ? OR IFNULL(meta_description,'') LIKE ?`,
+          [from, to, from, to, from, to, from, to, from, to, `%${from}%`, `%${from}%`, `%${from}%`, `%${from}%`, `%${from}%`]
+        );
+      } catch (_) {}
+    }
+
     if (req.method === 'GET') {
       const { slug, id } = req.query;
       if (slug) {
@@ -72,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           INSERT INTO blog_posts (title, slug, excerpt, content, category, emoji, badge, badgeText, status)
           VALUES
           ('How to Set Up Your Firestick in 5 Minutes', 'how-to-set-up-your-firestick', 'Getting started with your new Amazon Firestick is easier than you think. Follow these simple steps to be streaming in minutes.', '<h2>Getting Started</h2><p>Plug your Firestick into your TV HDMI port and connect the power cable. Follow the on-screen setup instructions.</p>', 'Guides', '🔥', 'guide', 'Guide', 'published'),
-          ('Best IPTV Subscriptions in the UK 2026', 'best-iptv-subscriptions-uk-2026', 'Looking for the best IPTV service in the UK? We compare the top options so you can pick the right plan.', '<h2>Top IPTV Plans</h2><p>We offer 1 Month, 6 Month and 1 Year subscription plans to suit every budget.</p>', 'Tips', '📺', 'tips', 'Tips', 'published'),
+          ('Best Streaming Subscriptions in the UK 2026', 'best-streaming-subscriptions-uk-2026', 'Looking for the best streaming service in the UK? We compare the top options so you can pick the right plan.', '<h2>Top Streaming Plans</h2><p>We offer 1 Month, 6 Month and 1 Year subscription plans to suit every budget.</p>', 'Tips', '📺', 'tips', 'Tips', 'published'),
           ('Firestick4UK — What''s New This Month', 'firestick4uk-whats-new', 'We have added new subscription plans, improved order tracking, and launched faster delivery.', '<h2>New This Month</h2><p>Check out our improved order tracking and new product range.</p>', 'News', '🚀', 'news', 'News', 'published')
         `);
         const [fresh] = await pool.query('SELECT * FROM blog_posts WHERE active = 1 ORDER BY created_at DESC');

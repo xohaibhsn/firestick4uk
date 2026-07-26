@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import BlogPostClient from "./BlogPostClient";
 import pool from "../../../lib/db";
+import BreadcrumbSchema from "@/components/BreadcrumbSchema";
+import JsonLd from "@/components/JsonLd";
 
 interface Post {
   id: number; title: string; slug: string; content: string; excerpt: string;
   category: string; emoji: string; badge: string; badgeText: string;
   featured_image: string; meta_title: string; meta_description: string;
-  created_at: string; canonical_url: string | null;
+  created_at: string; updated_at?: string | null; canonical_url: string | null;
   faqs: Array<{question:string;answer:string}> | string | null;
 }
 
@@ -57,44 +59,56 @@ export default async function BlogSlugPage({ params }: { params: Promise<{ slug:
     ? (typeof post.faqs === "string" ? JSON.parse(post.faqs) : post.faqs) as Array<{question:string;answer:string}>
     : [];
 
-  const breadcrumbLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: "https://firestick4uk.com" },
-      { "@type": "ListItem", position: 2, name: "Blog", item: "https://firestick4uk.com/blog" },
-      { "@type": "ListItem", position: 3, name: post?.title || slug, item: canonical },
-    ],
-  };
+  const articleLd = post
+    ? {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        headline: post.title,
+        description: post.excerpt || post.meta_description || "",
+        image: post.featured_image || "",
+        datePublished: post.created_at,
+        dateModified: post.updated_at || post.created_at,
+        author: {
+          "@type": "Organization",
+          name: "Firestick4UK",
+          url: "https://firestick4uk.com",
+        },
+        publisher: {
+          "@type": "Organization",
+          name: "Firestick4UK",
+          logo: {
+            "@type": "ImageObject",
+            url: "https://firestick4uk.com/logo.png",
+          },
+        },
+        mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
+      }
+    : null;
 
-  const articleLd = post ? {
-    "@context": "https://schema.org",
-    "@type": "Article",
-    headline: post.meta_title || post.title,
-    description: post.meta_description || post.excerpt || "",
-    image: post.featured_image || "",
-    datePublished: post.created_at,
-    dateModified: post.created_at,
-    author: { "@type": "Organization", name: "Firestick4UK" },
-    publisher: { "@type": "Organization", name: "Firestick4UK", url: "https://firestick4uk.com" },
-    mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
-  } : null;
-
-  const faqLd = faqsArr.length > 0 ? {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: faqsArr.map(f => ({
-      "@type": "Question",
-      name: f.question,
-      acceptedAnswer: { "@type": "Answer", text: f.answer },
-    })),
-  } : null;
+  const faqLd =
+    faqsArr.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: faqsArr.map((f) => ({
+            "@type": "Question",
+            name: f.question,
+            acceptedAnswer: { "@type": "Answer", text: f.answer },
+          })),
+        }
+      : null;
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
-      {articleLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleLd) }} />}
-      {faqLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />}
+      <BreadcrumbSchema
+        items={[
+          { name: "Home", url: "https://firestick4uk.com" },
+          { name: "Blog", url: "https://firestick4uk.com/blog" },
+          { name: post?.title || slug, url: canonical },
+        ]}
+      />
+      <JsonLd data={articleLd} />
+      <JsonLd data={faqLd} />
       <BlogPostClient post={post as any} />
     </>
   );

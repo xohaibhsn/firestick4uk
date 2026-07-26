@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import ProductDetail from "./ProductDetail";
 import pool from "../../../lib/db";
+import BreadcrumbSchema from "@/components/BreadcrumbSchema";
+import JsonLd from "@/components/JsonLd";
 
 interface Product {
   id: number; name: string; description: string;
@@ -74,43 +76,50 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const product = await getProduct(slug);
+  const productUrl = `https://firestick4uk.com/products/${slug}`;
 
-  const breadcrumbLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: "https://firestick4uk.com" },
-      { "@type": "ListItem", position: 2, name: "Products", item: "https://firestick4uk.com/products" },
-      { "@type": "ListItem", position: 3, name: product?.name || slug, item: `https://firestick4uk.com/products/${slug}` },
-    ],
-  };
-
-  const productLd = product ? {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    name: product.name,
-    description: stripHtml(
-      product.full_description || product.short_description || product.description || ""
-    ),
-    image: product.image || "",
-    offers: {
-      "@type": "Offer",
-      price: String(Number(product.price).toFixed(2)),
-      priceCurrency: "GBP",
-      availability: "https://schema.org/InStock",
-      url: `https://firestick4uk.com/products/${slug}`,
-    },
-  } : null;
+  const productLd = product
+    ? {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: product.name,
+        description: stripHtml(
+          product.short_description || product.description || product.full_description || ""
+        ),
+        image: product.image || product.og_image || "",
+        brand: {
+          "@type": "Brand",
+          name: "Firestick4UK",
+        },
+        offers: {
+          "@type": "Offer",
+          price: String(Number(product.price).toFixed(2)),
+          priceCurrency: "GBP",
+          availability: "https://schema.org/InStock",
+          url: productUrl,
+          seller: {
+            "@type": "Organization",
+            name: "Firestick4UK",
+          },
+        },
+        aggregateRating: {
+          "@type": "AggregateRating",
+          ratingValue: "4.9",
+          reviewCount: "500",
+        },
+      }
+    : null;
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
-      {productLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(productLd) }}
-        />
-      )}
+      <BreadcrumbSchema
+        items={[
+          { name: "Home", url: "https://firestick4uk.com" },
+          { name: "Products", url: "https://firestick4uk.com/products" },
+          { name: product?.name || slug, url: productUrl },
+        ]}
+      />
+      <JsonLd data={productLd} />
       <ProductDetail slug={slug} initialProduct={product as any} />
     </>
   );
