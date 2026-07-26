@@ -1,5 +1,6 @@
 "use client";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
@@ -9,12 +10,66 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
 import { useCallback, useState, useEffect } from "react";
+import { isInternalHref, linkMarkAttrs } from "@/lib/seoLinks";
 
 interface TipTapEditorProps {
   content: string;
   onChange: (html: string) => void;
   placeholder?: string;
 }
+
+const SmartLink = Link.extend({
+  renderHTML({ HTMLAttributes }) {
+    const href = String(HTMLAttributes.href || "");
+    if (
+      !this.options.isAllowedUri(href, {
+        defaultValidate: (url) => !!url,
+        protocols: this.options.protocols,
+        defaultProtocol: this.options.defaultProtocol,
+      })
+    ) {
+      return [
+        "a",
+        mergeAttributes(this.options.HTMLAttributes, { ...HTMLAttributes, href: "" }),
+        0,
+      ];
+    }
+
+    const attrs = { ...HTMLAttributes };
+    delete attrs.rel;
+    delete attrs.target;
+
+    if (isInternalHref(href)) {
+      return [
+        "a",
+        mergeAttributes(this.options.HTMLAttributes, attrs, {
+          href,
+          rel: undefined,
+          target: undefined,
+        }),
+        0,
+      ];
+    }
+
+    return [
+      "a",
+      mergeAttributes(this.options.HTMLAttributes, attrs, {
+        href,
+        target: "_blank",
+        rel: "noopener noreferrer",
+      }),
+      0,
+    ];
+  },
+}).configure({
+  openOnClick: false,
+  HTMLAttributes: {
+    class: "tiptap-link",
+    // Override TipTap defaults (noopener noreferrer nofollow + target=_blank)
+    rel: null,
+    target: null,
+  },
+});
 
 const ToolBtn = ({ active, onClick, title, children }: {
   active?: boolean; onClick: () => void; title: string; children: React.ReactNode;
@@ -59,7 +114,7 @@ export default function TipTapEditor({ content, onChange, placeholder = "Write y
       Underline,
       TextStyle,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
-      Link.configure({ openOnClick: false, HTMLAttributes: { class: "tiptap-link" } }),
+      SmartLink,
       Image.configure({ inline: false, HTMLAttributes: { class: "tiptap-img" } }),
       Placeholder.configure({ placeholder }),
       CharacterCount,
@@ -83,8 +138,12 @@ export default function TipTapEditor({ content, onChange, placeholder = "Write y
 
   const setLink = useCallback(() => {
     if (!editor) return;
-    if (!linkUrl) { editor.chain().focus().unsetLink().run(); }
-    else { editor.chain().focus().setLink({ href: linkUrl }).run(); }
+    if (!linkUrl) {
+      editor.chain().focus().unsetLink().run();
+    } else {
+      const href = linkUrl.trim();
+      editor.chain().focus().setLink(linkMarkAttrs(href)).run();
+    }
     setLinkUrl(""); setShowLinkInput(false);
   }, [editor, linkUrl]);
 

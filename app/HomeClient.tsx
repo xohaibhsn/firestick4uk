@@ -1,11 +1,24 @@
 "use client";
 import { useEffect, useState } from "react";
+import xss from "xss";
+import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "./lib/cartContext";
+
+const cardDescXss = {
+  whiteList: {
+    p: [], strong: [], em: [], u: [],
+    br: [], span: [], a: ["href"],
+    ul: [], ol: [], li: [],
+  } as Record<string, string[]>,
+  stripIgnoreTag: true,
+};
 
 interface Product {
   id: number;
   name: string;
   description: string;
+  short_description?: string | null;
+  slug?: string | null;
   price: number;
   badge: string | null;
   image: string | null;
@@ -25,7 +38,8 @@ function formatHeroTitle(title: string) {
   const accent = words.slice(-2).join(" ");
   return (
     <>
-      {lead}{" "}
+      {lead}
+      <br />
       <span>{accent}</span>
     </>
   );
@@ -156,7 +170,10 @@ export default function HomeClient({
         .badge.bundle { background:#EA580C; color:#FFFFFF; }
         .product-info { padding:16px 18px; }
         .product-name { font-family:'Cinzel',serif; font-size:15px; font-weight:700; color:#111111; margin-bottom:6px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; word-break:break-word; }
-        .product-desc { font-size:13px; color:#666666; line-height:1.6; margin-bottom:14px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+        .product-desc,.product-short-desc { font-size:14px; color:#555555; line-height:1.6; margin-bottom:14px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+        .product-short-desc p { margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:14px; color:#555555; }
+        .product-short-desc strong,.product-desc strong { font-weight:700; color:#333333; }
+        .product-short-desc a,.product-desc a { color:#5B21B6; text-decoration:none; }
         .product-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; }
         .product-price { font-size:18px; font-weight:700; color:#111111; font-family:'Cinzel',serif; white-space:nowrap; }
         .add-btn { background:#5B21B6; color:#FFFFFF; border:none; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
@@ -170,14 +187,6 @@ export default function HomeClient({
         .feature-icon { font-size:28px; margin-bottom:14px; display:block; }
         .feature-title { font-weight:700; font-size:15px; color:#111111; margin-bottom:7px; }
         .feature-desc { font-size:13px; color:#666666; line-height:1.6; }
-        .cta-section { margin:0 60px 80px; padding:70px 60px; border-radius:16px; background:#111111; text-align:center; }
-        .cta-title { font-family:'Cinzel',serif; font-size:clamp(22px,3vw,38px); font-weight:700; color:#FFFFFF; margin-bottom:14px; }
-        .cta-sub { color:rgba(255,255,255,0.7); font-size:15px; margin-bottom:36px; }
-        .cta-btns { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
-        .btn-primary { background:#5B21B6; color:#FFFFFF; padding:14px 36px; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; transition:all 0.2s; display:inline-block; }
-        .btn-primary:hover { background:#4C1D95; transform:translateY(-1px); box-shadow:0 4px 12px rgba(91,33,182,0.4); }
-        .btn-secondary { background:transparent; color:#FFFFFF; padding:14px 36px; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; border:2px solid rgba(255,255,255,0.5); transition:all 0.2s; }
-        .btn-secondary:hover { background:rgba(255,255,255,0.1); border-color:#FFFFFF; }
         footer { background:#111111; padding:50px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; }
         .footer-logo { font-family:'Cinzel',serif; font-size:17px; font-weight:900; color:#FFFFFF; }
         .footer-links { display:flex; gap:24px; list-style:none; flex-wrap:wrap; }
@@ -203,7 +212,8 @@ export default function HomeClient({
           .products-grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:0 12px 16px;}
           .product-info{padding:10px 12px;}
           .product-name{font-size:12px;}
-          .product-desc{font-size:11px;margin-bottom:8px;}
+          .product-desc,.product-short-desc{font-size:11px;margin-bottom:8px;}
+          .product-short-desc p{font-size:11px;}
           .product-price{font-size:14px;}
           .add-btn{padding:7px 10px;font-size:11px;}
           .badge{font-size:9px;padding:3px 7px;top:6px;right:6px;}
@@ -213,8 +223,6 @@ export default function HomeClient({
           .hero-visual{display:none;}
           .hero-stats{gap:20px;}
           .features-section{padding:40px 24px 50px;}
-          .features-section{padding:40px 24px 50px;}
-          .cta-section{margin:0 24px 60px;padding:50px 24px;}
           footer{padding:36px 24px;flex-direction:column;text-align:center;}
         }
       `}</style>
@@ -273,7 +281,7 @@ export default function HomeClient({
             <div className="loading">No products found.</div>
           ) : (
             products.slice(0, 8).map((p) => (
-              <div className="product-card" key={p.id} style={{cursor:"pointer"}} onClick={()=>window.location.href=`/products/${p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`}>
+              <div className="product-card" key={p.id} style={{cursor:"pointer"}} onClick={()=>window.location.href=`/products/${p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`}>
                 <div className="product-image">
                   {p.badge && (
                     <span className={`badge ${p.badge==="BEST VALUE"?"gold":p.badge==="NEW"?"new":p.badge==="BUNDLE"?"bundle":""}`}>
@@ -294,7 +302,17 @@ export default function HomeClient({
                 </div>
                 <div className="product-info">
                   <div className="product-name">{p.name}</div>
-                  <div className="product-desc">{p.description}</div>
+                  <div
+                    className="product-short-desc"
+                    dangerouslySetInnerHTML={{
+                      __html: fixContentLinkRels(
+                        xss(
+                          p.short_description || p.description || "",
+                          cardDescXss
+                        )
+                      ),
+                    }}
+                  />
                   <div className="product-footer">
                     <div className="product-price">£{Number(p.price).toFixed(2)}</div>
                     {(() => {
@@ -330,10 +348,9 @@ export default function HomeClient({
             <div className="hero-content">
               <span className="hero-tag">✦ UK&apos;s #1 Firestick Service</span>
               <h2 className="hero-title">
-                {sec.home_hero?.title?.split(' ').slice(0,-2).join(' ') || "Best Firestick"}<br/>
-                <span>{sec.home_hero?.title?.split(' ').slice(-2).join(' ') || "Service in UK"}</span>
+                {formatHeroTitle(heroTitle)}
               </h2>
-              <p className="hero-subtitle">{sec.home_hero?.subtitle || "Premium Streaming Solutions for the whole UK. Fast delivery, easy setup, real support."}</p>
+              <p className="hero-subtitle">{heroSubtitle}</p>
               <div className="hero-btns">
                 <a href={sec.home_hero?.button_link||"/products"} className="hero-btn-primary">{sec.home_hero?.button_text||"Shop Now"} →</a>
                 <a href={sec.home_hero?.secondary_button_link||"/about"} className="hero-btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>
@@ -382,16 +399,6 @@ export default function HomeClient({
               </div>
             </div>
           )}
-        </div>
-
-        {/* CTA — from DB */}
-        <div className="cta-section">
-          <h2 className="cta-title">{sec.home_hero?.title || "Best Firestick Service in UK"}</h2>
-          <p className="cta-sub">{sec.home_hero?.subtitle || "Premium Streaming Solutions"}</p>
-          <div className="cta-btns">
-            <a href={sec.home_hero?.button_link||"/products"} className="btn-primary">{sec.home_hero?.button_text||"Shop Now"}</a>
-            <a href={sec.home_hero?.secondary_button_link||"/about"} className="btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>
-          </div>
         </div>
 
         <footer>

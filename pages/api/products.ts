@@ -9,6 +9,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!allowed) return res.status(429).json({ error: 'Too many requests' });
 
   try {
+    // Ensure slug column exists for lookups (safe no-op if already present)
+    try { await pool.query("ALTER TABLE products ADD COLUMN slug VARCHAR(255)"); } catch (_) {}
+
     const { slug, id, category, minPrice, maxPrice, sort } = req.query;
 
     if (id) {
@@ -17,9 +20,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (slug) {
+      const s = String(slug).toLowerCase();
       const [rows]: any = await pool.query(
-        "SELECT * FROM products WHERE active=1 AND LOWER(REPLACE(REPLACE(name,' ','-'),'/',''))=?",
-        [String(slug).toLowerCase()]
+        `SELECT * FROM products
+         WHERE active=1 AND (
+           slug = ?
+           OR LOWER(REPLACE(REPLACE(name,' ','-'),'/','')) = ?
+         )
+         LIMIT 1`,
+        [s, s]
       );
       return res.status(200).json(rows[0] || null);
     }

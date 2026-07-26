@@ -76,12 +76,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'POST') {
       const { key, value, updates } = req.body;
+
+      const upsert = async (contentKey: string, contentValue: string) => {
+        const defaults = DEFAULTS.find((d) => d[0] === contentKey);
+        const contentType = (defaults?.[2] as string) || 'text';
+        const pageName = (defaults?.[3] as string) || (contentKey.split('_')[0] || 'home');
+        const label = (defaults?.[4] as string) || contentKey;
+        await pool.query(
+          `INSERT INTO site_content (content_key, content_value, content_type, page_name, label)
+           VALUES (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE content_value = VALUES(content_value), page_name = VALUES(page_name), label = VALUES(label)`,
+          [contentKey, contentValue || '', contentType, pageName, label]
+        );
+      };
+
       if (updates && Array.isArray(updates)) {
         for (const u of updates) {
-          await pool.query('UPDATE site_content SET content_value=? WHERE content_key=?', [u.value||'', u.key]);
+          if (!u?.key) continue;
+          await upsert(String(u.key), String(u.value ?? ''));
         }
       } else if (key) {
-        await pool.query('UPDATE site_content SET content_value=? WHERE content_key=?', [value||'', key]);
+        await upsert(String(key), String(value ?? ''));
+      } else {
+        return res.status(400).json({ error: 'No content keys provided' });
       }
       return res.status(200).json({ success: true });
     }

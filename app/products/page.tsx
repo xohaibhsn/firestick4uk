@@ -1,12 +1,25 @@
 "use client";
 export const dynamic = 'force-dynamic';
 import { useEffect, useState, useRef, useCallback } from "react";
+import xss from "xss";
+import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "../lib/cartContext";
+
+const cardDescXss = {
+  whiteList: {
+    p: [], strong: [], em: [], u: [],
+    br: [], span: [], a: ["href"],
+    ul: [], ol: [], li: [],
+  } as Record<string, string[]>,
+  stripIgnoreTag: true,
+};
 
 interface Product {
   id: number;
   name: string;
   description: string;
+  short_description?: string | null;
+  slug?: string | null;
   price: number;
   badge: string | null;
   image: string | null;
@@ -122,7 +135,10 @@ export default function ProductsPage() {
         .badge.bundle { background:#EA580C; color:#FFFFFF; }
         .product-info { padding:16px 18px; }
         .product-name { font-family:'Cinzel',serif; font-size:15px; font-weight:700; color:#111111; margin-bottom:6px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; word-break:break-word; }
-        .product-desc { font-size:13px; color:#555555; line-height:1.6; margin-bottom:14px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+        .product-desc,.product-short-desc { font-size:14px; color:#555555; line-height:1.6; margin-bottom:14px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+        .product-short-desc p { margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:14px; color:#555555; }
+        .product-short-desc strong,.product-desc strong { font-weight:700; color:#333333; }
+        .product-short-desc a,.product-desc a { color:#5B21B6; text-decoration:none; }
         .product-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; }
         .product-price { font-size:18px; font-weight:700; color:#111111; font-family:'Cinzel',serif; white-space:nowrap; }
         .add-btn { background:#5B21B6; color:#FFFFFF; border:none; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
@@ -148,7 +164,8 @@ export default function ProductsPage() {
           .products-grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:0 12px 50px;}
           .product-info{padding:10px 12px;}
           .product-name{font-size:12px;}
-          .product-desc{font-size:11px;margin-bottom:8px;-webkit-line-clamp:2;}
+          .product-desc,.product-short-desc{font-size:11px;margin-bottom:8px;-webkit-line-clamp:2;}
+          .product-short-desc p{font-size:11px;}
           .product-price{font-size:14px;}
           .add-btn{padding:7px 10px;font-size:11px;}
           .badge{font-size:9px;padding:3px 7px;top:6px;right:6px;}
@@ -248,7 +265,7 @@ export default function ProductsPage() {
             <div className="loading">No products found.</div>
           ) : (
             filtered.map((p) => (
-              <div className="product-card" key={p.id} onClick={() => window.location.href=`/products/${p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`} style={{cursor:"pointer"}}>
+              <div className="product-card" key={p.id} onClick={() => window.location.href=`/products/${p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`} style={{cursor:"pointer"}}>
                 <div className="product-image">
                   {p.badge && (
                     <span className={`badge ${p.badge==="BEST VALUE"?"gold":p.badge==="NEW"?"new":p.badge==="BUNDLE"?"bundle":""}`}>
@@ -269,7 +286,17 @@ export default function ProductsPage() {
                 </div>
                 <div className="product-info">
                   <div className="product-name">{p.name}</div>
-                  <div className="product-desc">{p.description}</div>
+                  <div
+                    className="product-short-desc"
+                    dangerouslySetInnerHTML={{
+                      __html: fixContentLinkRels(
+                        xss(
+                          p.short_description || p.description || "",
+                          cardDescXss
+                        )
+                      ),
+                    }}
+                  />
                   <div className="product-footer">
                     <div className="product-price">£{Number(p.price).toFixed(2)}</div>
                     {(()=>{

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import xss from "xss";
+import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "../../lib/cartContext";
 
 const xssOptions = {
@@ -167,7 +168,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
                   <div
                     className="product-description"
                     dangerouslySetInnerHTML={{
-                      __html: xss(product.short_description, xssOptions),
+                      __html: fixContentLinkRels(xss(product.short_description, xssOptions)),
                     }}
                   />
                 )}
@@ -205,7 +206,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
               <div
                 className="product-full-description"
                 dangerouslySetInnerHTML={{
-                  __html: xss(product.full_description, xssOptions),
+                  __html: fixContentLinkRels(xss(product.full_description, xssOptions)),
                 }}
               />
             </div>

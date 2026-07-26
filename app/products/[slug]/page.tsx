@@ -12,9 +12,15 @@ interface Product {
 
 async function getProduct(slug: string): Promise<Product | null> {
   try {
+    const s = slug.toLowerCase();
     const [rows]: any = await pool.query(
-      "SELECT * FROM products WHERE active = 1 AND LOWER(REPLACE(REPLACE(name, ' ', '-'), '/', '')) = ? LIMIT 1",
-      [slug.toLowerCase()]
+      `SELECT * FROM products
+       WHERE active = 1 AND (
+         slug = ?
+         OR LOWER(REPLACE(REPLACE(name, ' ', '-'), '/', '')) = ?
+       )
+       LIMIT 1`,
+      [s, s]
     );
     return rows[0] || null;
   } catch {

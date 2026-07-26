@@ -23,9 +23,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let blogPages: MetadataRoute.Sitemap = [];
 
   try {
-    // Product URLs are derived from name (same as /products/[slug] and /api/products)
+    // Prefer stored slug column; fall back to name-derived slug for older rows
     const [products]: any = await pool.query(
-      `SELECT LOWER(REPLACE(REPLACE(name, ' ', '-'), '/', '')) AS slug, created_at
+      `SELECT
+         COALESCE(
+           NULLIF(slug, ''),
+           LOWER(REPLACE(REPLACE(name, ' ', '-'), '/', ''))
+         ) AS slug,
+         created_at
        FROM products
        WHERE active = 1 AND name IS NOT NULL AND name != ''`
     );

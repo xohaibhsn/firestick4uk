@@ -232,14 +232,14 @@ export default function AdminPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminDropOpen, setAdminDropOpen] = useState(false);
   const [orders, setOrders] = useState(demoOrders);
-  const [products, setProducts] = useState(demoProducts);
+  const [products, setProducts] = useState<any[]>(demoProducts);
   const [statusFilter, setStatusFilter] = useState("all");
   const [ordersPage, setOrdersPage] = useState(1);
   const ORDERS_PER_PAGE = 20;
   const [receiptModal, setReceiptModal] = useState<string|null>(null);
   const [orderModal, setOrderModal] = useState<typeof demoOrders[0]|null>(null);
-  const [productModal, setProductModal] = useState<typeof demoProducts[0]|null|"new">(null);
-  const [editProduct, setEditProduct] = useState({ name:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"" });
+  const [productModal, setProductModal] = useState<any|null|"new">(null);
+  const [editProduct, setEditProduct] = useState({ name:"", slug:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"" });
   const [imageUploading, setImageUploading] = useState(false);
   const [heroImgUploading, setHeroImgUploading] = useState(false);
   const [customers, setCustomers] = useState(demoCustomers);
@@ -392,12 +392,22 @@ export default function AdminPage() {
     }
   }, [tab, trainingChat, trainingChatLoading]);
 
+  // Helper: pass role in all admin API headers (SSR-safe)
+  const getRoleHeaders = () => ({
+    "x-admin-session": typeof window !== "undefined" ? localStorage.getItem("sAdminSession")||"" : "",
+    "x-admin-role": adminRole,
+  });
+
   const saveContent = async (keys: string[]) => {
     setContentSaving(true); setContentMsg("");
     const updates = keys.map(k => ({ key: k, value: siteContent[k] || "" }));
-    const res = await fetch("/api/site-content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ updates }) }).then(r => r.json()).catch(() => ({}));
+    const res = await fetch("/api/site-content", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+      body: JSON.stringify({ updates }),
+    }).then(r => r.json()).catch(() => ({}));
     setContentSaving(false);
-    setContentMsg(res.success ? "✅ Saved!" : "❌ Save failed");
+    setContentMsg(res.success ? "✅ Saved!" : `❌ ${res.error || "Save failed"}`);
     setTimeout(() => setContentMsg(""), 3000);
   };
 
@@ -443,12 +453,6 @@ export default function AdminPage() {
     setLoggedIn(false);
     setAdminRole("super_admin");
   };
-
-  // Helper: pass role in all admin API headers (SSR-safe)
-  const getRoleHeaders = () => ({
-    "x-admin-session": typeof window !== "undefined" ? localStorage.getItem("sAdminSession")||"" : "",
-    "x-admin-role": adminRole,
-  });
 
   const loadStaff = () => {
     fetch("/api/admin-staff", { headers: getRoleHeaders() })
@@ -710,8 +714,12 @@ export default function AdminPage() {
 
   const saveProduct = async () => {
     const rawPrice = String(editProduct.price).replace(/[^0-9.]/g, "");
+    const slug = (editProduct.slug || toSlug(editProduct.name)).trim();
+    if (!editProduct.name.trim()) return;
+    if (!slug) return;
     const payload = {
       name: editProduct.name,
+      slug,
       description: editProduct.short_description || "",
       price: rawPrice,
       category: editProduct.category,
@@ -732,27 +740,29 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json", "x-admin-session": adminSess },
         body: JSON.stringify(payload),
       }).then(r => r.json()).catch(() => ({}));
+      if (res.error) { alert(res.error); return; }
       const newId = res.id || Date.now();
-      setProducts([...products, { ...editProduct, id: newId, emoji: "" }]);
+      setProducts([...products, { ...editProduct, slug, id: newId, emoji: "" }]);
     } else if (productModal) {
-      await fetch("/api/admin-products", {
+      const res = await fetch("/api/admin-products", {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-admin-session": adminSess },
         body: JSON.stringify({ ...payload, id: productModal.id, active: 1 }),
-      }).catch(() => {});
-      setProducts(products.map(p => p.id === productModal.id ? { ...p, ...editProduct } : p));
+      }).then(r => r.json()).catch(() => ({}));
+      if (res.error) { alert(res.error); return; }
+      setProducts(products.map(p => p.id === productModal.id ? { ...p, ...editProduct, slug } : p));
     }
     setProductModal(null);
   };
 
   const openEditProduct = (p: any) => {
     const rawPrice = p.price ? `£${Number(String(p.price).replace(/[^0-9.]/g,'')).toFixed(2)}` : "";
-    setEditProduct({ name:p.name||"", category:p.category||"Subscription", price:rawPrice, stock:p.stock||"Digital", image:p.image||"", short_description:p.short_description||"", full_description:p.full_description||"", features:p.features||"", seo_title:p.seo_title||"", meta_description:p.meta_description||"", focus_keyword:p.focus_keyword||"" });
+    setEditProduct({ name:p.name||"", slug:p.slug||toSlug(p.name||""), category:p.category||"Subscription", price:rawPrice, stock:p.stock||"Digital", image:p.image||"", short_description:p.short_description||"", full_description:p.full_description||"", features:p.features||"", seo_title:p.seo_title||"", meta_description:p.meta_description||"", focus_keyword:p.focus_keyword||"" });
     setProductModal(p);
   };
 
   const openNewProduct = () => {
-    setEditProduct({ name:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"" });
+    setEditProduct({ name:"", slug:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"" });
     setProductModal("new");
   };
 
@@ -882,13 +892,44 @@ export default function AdminPage() {
 
             {/* Basic Info */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-              <div className="modal-field"><label>Product Name *</label><input placeholder="e.g. B1G 1 Year Plan" value={editProduct.name} onChange={e => setEditProduct({...editProduct,name:e.target.value})} /></div>
+              <div className="modal-field">
+                <label>Product Name *</label>
+                <input
+                  placeholder="e.g. B1G 1 Year Plan"
+                  value={editProduct.name}
+                  onChange={e => {
+                    const name = e.target.value;
+                    setEditProduct(p => {
+                      const shouldAuto = productModal === "new" || !p.slug || p.slug === toSlug(p.name);
+                      return { ...p, name, slug: shouldAuto ? toSlug(name) : p.slug };
+                    });
+                  }}
+                />
+              </div>
               <div className="modal-field">
                 <label>Category</label>
                 <select value={editProduct.category} onChange={e => setEditProduct({...editProduct,category:e.target.value})}>
                   <option>Subscription</option><option>Device</option><option>Bundle</option>
                 </select>
               </div>
+            </div>
+            <div className="modal-field">
+              <label>URL Slug</label>
+              <input
+                type="text"
+                value={editProduct.slug || ""}
+                onChange={e => setEditProduct({
+                  ...editProduct,
+                  slug: e.target.value
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/(^-|-$)/g, ""),
+                })}
+                placeholder="e.g. b1g-1-month-plan"
+              />
+              <small style={{display:"block",marginTop:4,fontSize:11,color:"rgba(255,255,255,0.35)"}}>
+                URL: firestick4uk.com/products/{editProduct.slug || "product-slug"}
+              </small>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div className="modal-field"><label>Price</label><input placeholder="e.g. £9.99" value={editProduct.price} onChange={e => setEditProduct({...editProduct,price:e.target.value})} /></div>
@@ -1950,7 +1991,7 @@ export default function AdminPage() {
                           const data=await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file:base64,name:file.name,folder:"firestick4uk/og"})}).then(r=>r.json());
                           if(data.path){
                             setSiteContent(s=>({...s,og_default_image:data.path}));
-                            await fetch("/api/site-content",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:"og_default_image",value:data.path})});
+                            await fetch("/api/site-content",{method:"POST",headers:{"Content-Type":"application/json",...getRoleHeaders()},body:JSON.stringify({key:"og_default_image",value:data.path})});
                             setContentMsg("✅ OG image saved!");
                           }
                         } catch { setContentMsg("❌ Upload failed"); }

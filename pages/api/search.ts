@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const term = `%${q}%`;
     const [rows]: any = await pool.query(
       `SELECT id, name, price, image, category, badge,
-        LOWER(REPLACE(REPLACE(name, ' ', '-'), '/', '')) as slug
+        COALESCE(NULLIF(slug, ''), LOWER(REPLACE(REPLACE(name, ' ', '-'), '/', ''))) as slug
        FROM products
        WHERE active=1 AND (name LIKE ? OR short_description LIKE ? OR focus_keyword LIKE ?)
        LIMIT 6`,

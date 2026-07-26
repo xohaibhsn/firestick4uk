@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import xss from "xss";
+import { fixContentLinkRels } from "@/lib/seoLinks";
 
 // Allowed HTML tags from TipTap editor output
 const xssOptions = {
@@ -165,7 +166,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
             )}
             {post.excerpt && <div className="post-excerpt">{post.excerpt}</div>}
             {post.content && (
-              <div className="post-content" dangerouslySetInnerHTML={{ __html: xss(post.content || "", xssOptions) }} />
+              <div className="post-content" dangerouslySetInnerHTML={{ __html: fixContentLinkRels(xss(post.content || "", xssOptions)) }} />
             )}
 
             {faqs.length > 0 && (
