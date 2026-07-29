@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
 import Navbar from "@/components/Navbar";
+import { useContactConfig } from "@/hooks/useContactConfig";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -93,6 +93,7 @@ const styles = `
 `;
 
 export default function PrivacyPolicyPage() {
+  const contact = useContactConfig();
 
   return (
     <>
@@ -201,7 +202,7 @@ export default function PrivacyPolicyPage() {
                 <li><strong>Right to data portability</strong> — request your data in a machine-readable format.</li>
                 <li><strong>Right to object</strong> — object to processing of your data in certain circumstances.</li>
               </ul>
-              <p>To exercise any of these rights, please contact us at firestick4uk@gmail.com.</p>
+              <p>To exercise any of these rights, please contact us at {contact.email}.</p>
             </div>
 
             <div className="policy-section" id="retention">
@@ -213,9 +214,9 @@ export default function PrivacyPolicyPage() {
               <h2>9. Contact Us</h2>
               <p>If you have any questions about this Privacy Policy or how we handle your data, please contact us:</p>
               <div className="highlight-box">
-                <p>📧 Email: firestick4uk@gmail.com<br />
-                💬 WhatsApp: +447518787653<br />
-                ✈️ Telegram: @firestick44<br />
+                <p>📧 Email: {contact.email}<br />
+                💬 WhatsApp: {contact.phone}<br />
+                ✈️ Telegram: {contact.telegram}<br />
                 🌐 Website: firestick4uk.com</p>
               </div>
               <p>You also have the right to lodge a complaint with the Information Commissioner&apos;s Office (ICO) at ico.org.uk if you believe your data has been mishandled.</p>

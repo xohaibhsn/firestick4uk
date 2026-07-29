@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
 import Navbar from "@/components/Navbar";
+import { useContactConfig } from "@/hooks/useContactConfig";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -62,6 +62,7 @@ const styles = `
 `;
 
 export default function TermsPage() {
+  const contact = useContactConfig();
 
   return (
     <>
@@ -188,9 +189,9 @@ export default function TermsPage() {
               <h2>10. Contact Us</h2>
               <p>If you have any questions about these Terms & Conditions, please contact us:</p>
               <div className="highlight-box">
-                <p>📧 Email: firestick4uk@gmail.com<br />
-                💬 WhatsApp: +447518787653<br />
-                ✈️ Telegram: @firestick44<br />
+                <p>📧 Email: {contact.email}<br />
+                💬 WhatsApp: {contact.phone}<br />
+                ✈️ Telegram: {contact.telegram}<br />
                 🌐 Website: firestick4uk.com</p>
               </div>
             </div>

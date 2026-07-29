@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import JsonLd from "@/components/JsonLd";
 import Navbar from "@/components/Navbar";
+import { useContactConfig } from "@/hooks/useContactConfig";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -75,6 +76,7 @@ export default function FAQPage() {
   const [openItem, setOpenItem] = useState<number | null>(null);
   const [faqData, setFaqData] = useState<FaqItem[]>([]);
   const [loadingFaqs, setLoadingFaqs] = useState(true);
+  const contact = useContactConfig();
 
   useEffect(() => {
     fetch("/api/faqs")
@@ -161,11 +163,11 @@ export default function FAQPage() {
             <h2 className="help-title">Still Need Help?</h2>
             <p className="help-sub">Can&apos;t find the answer you&apos;re looking for? Our team is happy to help.</p>
             <div className="help-btns">
-              <a href="https://wa.me/447518787653" className="btn-whatsapp" target="_blank" rel="noopener noreferrer">
+              <a href={contact.whatsappUrl} className="btn-whatsapp" target="_blank" rel="noopener noreferrer">
                 💬 WhatsApp Us
               </a>
-              <a href="https://t.me/firestick44" className="btn-telegram" target="_blank" rel="noopener noreferrer">
-                ✈️ Telegram @firestick44
+              <a href={contact.telegramUrl} className="btn-telegram" target="_blank" rel="noopener noreferrer">
+                ✈️ Telegram {contact.telegram}
               </a>
               <a href="/contact" className="btn-contact">📧 Contact Form</a>
             </div>

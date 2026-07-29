@@ -5,6 +5,7 @@ import { CartProvider } from "./lib/cartContext";
 // import ChatWidget from "@/components/ChatWidget"; // BERLIN TEMPORARILY HIDDEN
 import WhatsAppButton from "@/components/WhatsAppButton";
 import JsonLd from "@/components/JsonLd";
+import { getContactConfig } from "@/lib/contact-config";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -66,6 +67,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const settings = await getSiteSettings();
+  const contact = await getContactConfig();
   const logoUrl = settings.site_logo_url || "https://firestick4uk.com/logo.png";
   const organizationLd = {
     "@context": "https://schema.org",
@@ -75,11 +77,12 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     logo: logoUrl,
     contactPoint: {
       "@type": "ContactPoint",
-      telephone: "+447518787653",
+      telephone: contact.phone,
+      email: contact.email,
       contactType: "customer service",
       availableLanguage: "English",
     },
-    sameAs: ["https://t.me/firestick44"],
+    sameAs: [contact.telegramUrl],
   };
 
   return (

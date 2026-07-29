@@ -16,6 +16,10 @@ const DEFAULTS = [
   ['og_default_image','','image','settings','Default OG Share Image'],
   ['whatsapp_number','447518787653','text','settings','WhatsApp Number'],
   ['whatsapp_icon_url','','image','settings','WhatsApp Button Icon'],
+  ['contact_whatsapp','447518787653','text','settings','WhatsApp Number'],
+  ['contact_phone','+447518787653','text','settings','Phone Number'],
+  ['contact_email','firestick4uk@gmail.com','text','settings','Contact Email'],
+  ['contact_telegram','@firestick44','text','settings','Telegram Handle'],
   ['home_top_hero_title','Best Firestick Service in UK','text','home','Top Hero Title'],
   ['home_top_hero_subtitle','Premium Streaming Solutions for the UK','textarea','home','Top Hero Subtitle'],
   ['home_hero_title','Premium UK Streaming Service','text','home','Main Hero Title'],
@@ -26,11 +30,8 @@ const DEFAULTS = [
   ['about_title','About Firestick4UK','text','about','Page Title'],
   ['about_description','We started Firestick4UK with one goal — to make premium streaming devices and subscription plans accessible, affordable, and hassle-free for everyone in the UK.','textarea','about','Main Description'],
   ['about_mission','Our mission is to deliver the best streaming experience at fair prices, with real human support that actually helps.','textarea','about','Mission Statement'],
-  ['contact_phone','+44 7518 787653','text','contact','Phone Number'],
-  ['contact_email','firestick4uk@gmail.com','text','contact','Email Address'],
   ['contact_hours','9AM – 10PM, 7 days a week','text','contact','Business Hours'],
   ['contact_address','United Kingdom','text','contact','Address'],
-  ['contact_whatsapp','447518787653','text','contact','WhatsApp Number'],
   ['footer_text','© 2026 Firestick4UK. All rights reserved.','textarea','footer','Footer Text'],
   ['footer_tagline','Premium Firestick Services UK','text','footer','Footer Tagline'],
 ];
@@ -67,19 +68,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
     } catch (_) {}
 
-    // Migrate old WhatsApp / phone number to new one
+    // Migrate old WhatsApp / phone number to new one (only when old number is still stored)
     try {
       await pool.query(
-        "UPDATE site_content SET content_value='447518787653' WHERE content_key IN ('whatsapp_number','contact_whatsapp')"
+        "UPDATE site_content SET content_value='447518787653', page_name='settings', label='WhatsApp Number' WHERE content_key IN ('whatsapp_number','contact_whatsapp') AND content_value LIKE '%447934519060%'"
       );
       await pool.query(
         "UPDATE site_content SET content_value=REPLACE(content_value,'447934519060','447518787653') WHERE content_value LIKE '%447934519060%'"
       );
       await pool.query(
-        "UPDATE site_content SET content_value=REPLACE(content_value,'+44 7934 519060','+44 7518 787653') WHERE content_value LIKE '%7934 519060%'"
+        "UPDATE site_content SET content_value=REPLACE(content_value,'+44 7934 519060','+447518787653') WHERE content_value LIKE '%7934 519060%'"
       );
       await pool.query(
-        "UPDATE site_content SET content_value='+44 7518 787653' WHERE content_key='contact_phone' AND (content_value LIKE '%7934%519060%' OR content_value LIKE '%447934519060%' OR content_value='')"
+        "UPDATE site_content SET content_value='+447518787653', page_name='settings', label='Phone Number' WHERE content_key='contact_phone' AND (content_value LIKE '%7934%519060%' OR content_value LIKE '%447934519060%')"
+      );
+      await pool.query(
+        "UPDATE site_content SET page_name='settings', label='WhatsApp Number' WHERE content_key='contact_whatsapp'"
+      );
+      await pool.query(
+        "UPDATE site_content SET page_name='settings', label='Phone Number' WHERE content_key='contact_phone'"
+      );
+      await pool.query(
+        "UPDATE site_content SET page_name='settings', label='Contact Email' WHERE content_key='contact_email'"
+      );
+    } catch (_) {}
+
+    // Keep whatsapp_number in sync with contact_whatsapp (legacy key for floating button)
+    try {
+      await pool.query(
+        `UPDATE site_content wa
+         INNER JOIN site_content cw ON cw.content_key='contact_whatsapp'
+         SET wa.content_value = cw.content_value
+         WHERE wa.content_key='whatsapp_number'`
+      );
+    } catch (_) {}
+
+    // Ensure telegram default exists
+    try {
+      await pool.query(
+        "INSERT IGNORE INTO site_content (content_key, content_value, content_type, page_name, label) VALUES ('contact_telegram','@firestick44','text','settings','Telegram Handle')"
       );
     } catch (_) {}
 

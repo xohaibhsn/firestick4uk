@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Navbar from "@/components/Navbar";
+import { useContactConfig } from "@/hooks/useContactConfig";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -125,6 +126,7 @@ export default function OrderTrackingPage() {
   const [result, setResult] = useState<OrderResult | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [searching, setSearching] = useState(false);
+  const contact = useContactConfig();
 
   const handleSearch = async () => {
     const trimmed = query.trim();
@@ -284,11 +286,11 @@ export default function OrderTrackingPage() {
               <h4>Need Help?</h4>
               <p>Can&apos;t find your order or have a question? Chat with us on WhatsApp or Telegram.</p>
             </div>
-            <a href="https://wa.me/447518787653" className="wa-btn" target="_blank" rel="noopener noreferrer">
+            <a href={contact.whatsappUrl} className="wa-btn" target="_blank" rel="noopener noreferrer">
               💬 WhatsApp Us
             </a>
-            <a href="https://t.me/firestick44" className="wa-btn" target="_blank" rel="noopener noreferrer" style={{background:"#229ED9"}}>
-              ✈️ Telegram @firestick44
+            <a href={contact.telegramUrl} className="wa-btn" target="_blank" rel="noopener noreferrer" style={{background:"#229ED9"}}>
+              ✈️ Telegram {contact.telegram}
             </a>
           </div>
         </div>

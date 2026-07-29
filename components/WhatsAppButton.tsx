@@ -13,7 +13,7 @@ export default function WhatsAppButton() {
       .then((r) => r.json())
       .then((data) => {
         setConfig({
-          number: data.whatsapp_number || data.contact_whatsapp || "447518787653",
+          number: data.contact_whatsapp || data.whatsapp_number || "447518787653",
           iconUrl: data.whatsapp_icon_url || "",
         });
       })

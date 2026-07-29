@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { RL_GENERAL, getClientIp } from '../../lib/rateLimit';
 import pool from '../../lib/db';
 import nodemailer from 'nodemailer';
+import { getContactConfig } from '../../lib/contact-config';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -22,6 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       payment_reference } = req.body;
 
     const order_id = 'ORD-' + Date.now();
+    const contact = await getContactConfig();
 
     await pool.query(
       'INSERT INTO orders (order_id,customer_name,customer_email,customer_phone,delivery_address,city,postcode,notes,payment_method,receipt_path,total,coupon_code,discount_amount,vat_amount,payment_reference,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
@@ -99,13 +101,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       transporter.sendMail({
         from: `"Firestick4UK Orders" <noreply@firestick4uk.com>`,
-        to: 'firestick4uk@gmail.com',
+        to: contact.email,
         subject: `🛍️ New Order ${order_id} — ${customer_name}`,
         html,
       }).catch((err: any) => console.error('[orders] Email notification failed:', err));
     }
 
-    return res.status(200).json({ success:true, order_id });
+    return res.status(200).json({
+      success: true,
+      order_id,
+      whatsappUrl: contact.whatsappUrl,
+      telegramUrl: contact.telegramUrl,
+    });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }

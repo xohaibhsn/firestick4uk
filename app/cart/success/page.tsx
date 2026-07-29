@@ -2,6 +2,7 @@
 export const dynamic = 'force-dynamic';
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
+import { useContactConfig } from "@/hooks/useContactConfig";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -83,6 +84,7 @@ interface OrderSnapshot {
 export default function CartSuccessPage() {
   const [snap, setSnap] = useState<OrderSnapshot | null>(null);
   const [ready, setReady] = useState(false);
+  const contact = useContactConfig();
 
   useEffect(() => {
     try {
@@ -111,7 +113,7 @@ export default function CartSuccessPage() {
     );
   }
 
-  const waUrl = `https://wa.me/447518787653?text=${encodeURIComponent(snap.waMessage)}`;
+  const waUrl = `${contact.whatsappUrl}?text=${encodeURIComponent(snap.waMessage)}`;
 
   return (
     <>
@@ -202,8 +204,8 @@ export default function CartSuccessPage() {
           <a href={waUrl} target="_blank" rel="noopener noreferrer" className="wa-btn">
             💬 Need Instant Activation? Chat with Support via WhatsApp (Optional)
           </a>
-          <a href="https://t.me/firestick44" target="_blank" rel="noopener noreferrer" className="telegram-btn">
-            ✈️ Message Telegram @firestick44
+          <a href={contact.telegramUrl} target="_blank" rel="noopener noreferrer" className="telegram-btn">
+            ✈️ Message Telegram {contact.telegram}
           </a>
           <p className="wa-optional">
             This is completely optional — your order is already confirmed and being processed above.<br />

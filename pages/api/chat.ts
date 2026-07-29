@@ -3,8 +3,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import nodemailer from 'nodemailer';
 import pool from '@/lib/db';
 import { RL_GENERAL, getClientIp } from '@/lib/rateLimit';
+import { getContactConfig } from '@/lib/contact-config';
 
-const SYSTEM_PROMPT = `Your name is Berlin. You are a friendly sales and support assistant for Firestick4UK (firestick4uk.com) — a UK-based streaming service.
+function buildSystemPrompt(whatsappDisplay: string, telegram: string) {
+  return `Your name is Berlin. You are a friendly sales and support assistant for Firestick4UK (firestick4uk.com) — a UK-based streaming service.
 
 PRODUCTS & PRICING:
 - 1 Month: £12
@@ -43,8 +45,8 @@ POLICIES:
 - ISP blocking: use VPN or mobile hotspot
 
 CONTACT:
-- WhatsApp: +447518787653
-- Telegram: @firestick44
+- WhatsApp: ${whatsappDisplay}
+- Telegram: ${telegram}
 
 BEHAVIOUR RULES:
 - Friendly British English
@@ -54,11 +56,12 @@ BEHAVIOUR RULES:
 - Collect name + WhatsApp BEFORE sharing payment details
 - Say: 'Before I share payment details, could I get your name and WhatsApp number so we can confirm your order?'
 - Recommend 1 Year plan for unsure customers
-- Complex issues → WhatsApp: +447518787653
+- Complex issues → WhatsApp: ${whatsappDisplay}
 
 LEAD CAPTURE:
 - Once you have customer name + WhatsApp: add [LEAD_CAPTURED:name:number:interest] at END of your response
 - Example: [LEAD_CAPTURED:John:07911234567:1 Year]`;
+}
 
 type ChatMessage = {
   role: 'user' | 'assistant';
@@ -200,12 +203,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const history = normaliseHistory(req.body?.history);
     const messages: ChatMessage[] = [...history, { role: 'user', content: message }];
     const trainingPrompt = await getBerlinTrainingPrompt();
+    const contact = await getContactConfig();
+    const whatsappDisplay = contact.phone.startsWith('+') ? contact.phone : `+${contact.whatsapp}`;
+    const systemPrompt = buildSystemPrompt(whatsappDisplay, contact.telegram);
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const completion = await client.messages.create({
       model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5',
       max_tokens: 700,
-      system: `${SYSTEM_PROMPT}${trainingPrompt}`,
+      system: `${systemPrompt}${trainingPrompt}`,
       messages,
     });
 

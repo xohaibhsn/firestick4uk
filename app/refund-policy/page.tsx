@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
 import Navbar from "@/components/Navbar";
+import { useContactConfig } from "@/hooks/useContactConfig";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -87,6 +87,7 @@ const styles = `
 `;
 
 export default function RefundPolicyPage() {
+  const contact = useContactConfig();
 
   return (
     <>
@@ -188,7 +189,7 @@ export default function RefundPolicyPage() {
               <h2>5. How to Return an Item</h2>
               <p>To initiate a return, please follow these steps:</p>
               <ul>
-                <li>Contact us via WhatsApp (+447518787653), Telegram (@firestick44) or email (firestick4uk@gmail.com) with your Order ID and reason for return.</li>
+                <li>Contact us via WhatsApp ({contact.phone}), Telegram ({contact.telegram}) or email ({contact.email}) with your Order ID and reason for return.</li>
                 <li>Wait for our team to confirm your return request and provide return instructions.</li>
                 <li>Package the item securely in its original packaging.</li>
                 <li>Send the item to the address provided by our team.</li>
@@ -223,9 +224,9 @@ export default function RefundPolicyPage() {
               <h2>8. Contact Us</h2>
               <p>If you have any questions about our refund policy or wish to initiate a return, please get in touch:</p>
               <div className="highlight-box">
-                <p>📧 Email: firestick4uk@gmail.com<br />
-                💬 WhatsApp: +447518787653<br />
-                ✈️ Telegram: @firestick44<br />
+                <p>📧 Email: {contact.email}<br />
+                💬 WhatsApp: {contact.phone}<br />
+                ✈️ Telegram: {contact.telegram}<br />
                 🌐 Website: firestick4uk.com</p>
               </div>
               <p>We aim to respond to all refund and return enquiries within 24 hours during business hours.</p>
@@ -239,8 +240,8 @@ export default function RefundPolicyPage() {
             <div className="cta-title">Need Help With a Return?</div>
             <p className="cta-sub">Our team is here to help. Contact us via WhatsApp or Telegram for the fastest response.</p>
             <div className="cta-btns">
-              <a href="https://wa.me/447518787653" className="btn-wa" target="_blank" rel="noopener noreferrer">💬 WhatsApp Us</a>
-              <a href="https://t.me/firestick44" className="btn-contact" target="_blank" rel="noopener noreferrer">✈️ Telegram @firestick44</a>
+              <a href={contact.whatsappUrl} className="btn-wa" target="_blank" rel="noopener noreferrer">💬 WhatsApp Us</a>
+              <a href={contact.telegramUrl} className="btn-contact" target="_blank" rel="noopener noreferrer">✈️ Telegram {contact.telegram}</a>
               <a href="/contact" className="btn-contact">📧 Email Us</a>
             </div>
           </div>

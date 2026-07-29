@@ -2085,17 +2085,6 @@ export default function AdminPage() {
                 </div>
 
                 <div className="modal-field" style={{marginTop:8}}>
-                  <label>WhatsApp Number</label>
-                  <input
-                    className="modal-field"
-                    style={{width:"100%"}}
-                    value={siteContent.whatsapp_number||""}
-                    onChange={e=>setSiteContent(s=>({...s,whatsapp_number:e.target.value,contact_whatsapp:e.target.value}))}
-                    placeholder="447518787653 (no + sign)"
-                  />
-                </div>
-
-                <div className="modal-field" style={{marginTop:8}}>
                   <label>WhatsApp Button Icon (PNG)</label>
                   <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
                     Recommended: <strong>512×512px PNG</strong>
@@ -2124,7 +2113,60 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","whatsapp_number","contact_whatsapp"])}>
+                <div style={{marginTop:28,paddingTop:24,borderTop:"1px solid #E5E5E5"}}>
+                  <div style={{fontSize:15,fontWeight:700,color:"#111",marginBottom:16}}>📞 Contact Details</div>
+                  <div className="modal-field">
+                    <label>WhatsApp Number</label>
+                    <input
+                      className="modal-field"
+                      style={{width:"100%"}}
+                      value={siteContent.contact_whatsapp||siteContent.whatsapp_number||""}
+                      onChange={e=>setSiteContent(s=>({...s,contact_whatsapp:e.target.value,whatsapp_number:e.target.value}))}
+                      placeholder="447518787653"
+                    />
+                    <div style={{fontSize:11,color:"#888",marginTop:4}}>(without + sign)</div>
+                  </div>
+                  <div className="modal-field">
+                    <label>Phone Number</label>
+                    <input
+                      className="modal-field"
+                      style={{width:"100%"}}
+                      value={siteContent.contact_phone||""}
+                      onChange={e=>setSiteContent(s=>({...s,contact_phone:e.target.value}))}
+                      placeholder="+447518787653"
+                    />
+                  </div>
+                  <div className="modal-field">
+                    <label>Email Address</label>
+                    <input
+                      className="modal-field"
+                      style={{width:"100%"}}
+                      value={siteContent.contact_email||""}
+                      onChange={e=>setSiteContent(s=>({...s,contact_email:e.target.value}))}
+                      placeholder="firestick4uk@gmail.com"
+                    />
+                  </div>
+                  <div className="modal-field">
+                    <label>Telegram Handle</label>
+                    <input
+                      className="modal-field"
+                      style={{width:"100%"}}
+                      value={siteContent.contact_telegram||""}
+                      onChange={e=>setSiteContent(s=>({...s,contact_telegram:e.target.value}))}
+                      placeholder="@firestick44"
+                    />
+                  </div>
+                  <button
+                    className="btn-primary"
+                    style={{marginTop:8}}
+                    disabled={contentSaving}
+                    onClick={()=>saveContent(["contact_whatsapp","whatsapp_number","contact_phone","contact_email","contact_telegram"])}
+                  >
+                    {contentSaving?"Saving...":"💾 Save Contact Details"}
+                  </button>
+                </div>
+
+                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline"])}>
                   {contentSaving?"Saving...":"💾 Save Settings"}
                 </button>
               </div>
@@ -2186,11 +2228,12 @@ export default function AdminPage() {
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
                     <div className="modal-field"><label>Phone Number</label><input style={{width:"100%"}} value={siteContent.contact_phone||""} onChange={e=>setSiteContent(s=>({...s,contact_phone:e.target.value}))} /></div>
                     <div className="modal-field"><label>Email Address</label><input style={{width:"100%"}} value={siteContent.contact_email||""} onChange={e=>setSiteContent(s=>({...s,contact_email:e.target.value}))} /></div>
-                    <div className="modal-field"><label>WhatsApp (numbers only)</label><input style={{width:"100%"}} value={siteContent.contact_whatsapp||""} onChange={e=>setSiteContent(s=>({...s,contact_whatsapp:e.target.value}))} placeholder="447518787653" /></div>
+                    <div className="modal-field"><label>WhatsApp (numbers only)</label><input style={{width:"100%"}} value={siteContent.contact_whatsapp||""} onChange={e=>setSiteContent(s=>({...s,contact_whatsapp:e.target.value,whatsapp_number:e.target.value}))} placeholder="447518787653" /></div>
+                    <div className="modal-field"><label>Telegram Handle</label><input style={{width:"100%"}} value={siteContent.contact_telegram||""} onChange={e=>setSiteContent(s=>({...s,contact_telegram:e.target.value}))} placeholder="@firestick44" /></div>
                     <div className="modal-field"><label>Business Hours</label><input style={{width:"100%"}} value={siteContent.contact_hours||""} onChange={e=>setSiteContent(s=>({...s,contact_hours:e.target.value}))} /></div>
                     <div className="modal-field"><label>Address</label><input style={{width:"100%"}} value={siteContent.contact_address||""} onChange={e=>setSiteContent(s=>({...s,contact_address:e.target.value}))} /></div>
                   </div>
-                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["contact_phone","contact_email","contact_whatsapp","contact_hours","contact_address"])}>{contentSaving?"Saving...":"💾 Save Contact"}</button>
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["contact_phone","contact_email","contact_whatsapp","whatsapp_number","contact_telegram","contact_hours","contact_address"])}>{contentSaving?"Saving...":"💾 Save Contact"}</button>
                 </div>
               )}
 

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
+import { useContactConfig } from "@/hooks/useContactConfig";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
@@ -156,6 +157,7 @@ export default function ContactPage() {
   const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
   const [submitting, setSubmitting] = useState(false);
   const [sc, setSc] = useState<Record<string,string>>({});
+  const contact = useContactConfig();
 
   useEffect(() => {
     fetch("/api/site-content?page=contact").then(r=>r.json()).then(d=>{ if(d&&typeof d==="object") setSc(d); }).catch(()=>{});
@@ -194,22 +196,22 @@ export default function ContactPage() {
 
         {/* CONTACT CARDS */}
         <div className="contact-cards">
-          <a href={`https://wa.me/${sc.contact_whatsapp||"447518787653"}`} className="contact-card-featured" target="_blank" rel="noopener noreferrer">
+          <a href={contact.whatsappUrl} className="contact-card-featured" target="_blank" rel="noopener noreferrer">
             <span className="contact-card-icon">💬</span>
             <div className="contact-card-title">WhatsApp</div>
-            <div className="contact-card-value">{sc.contact_phone||"+44 7518 787653"}</div>
+            <div className="contact-card-value">{contact.phone}</div>
             <div className="contact-card-sub">✦ Fastest response</div>
           </a>
-          <a href="https://t.me/firestick44" className="contact-card" target="_blank" rel="noopener noreferrer">
+          <a href={contact.telegramUrl} className="contact-card" target="_blank" rel="noopener noreferrer">
             <span className="contact-card-icon">✈️</span>
             <div className="contact-card-title">Telegram</div>
-            <div className="contact-card-value">@firestick44</div>
+            <div className="contact-card-value">{contact.telegram}</div>
             <div className="contact-card-sub">Message us anytime</div>
           </a>
-          <a href={`mailto:${sc.contact_email||"firestick4uk@gmail.com"}`} className="contact-card">
+          <a href={`mailto:${contact.email}`} className="contact-card">
             <span className="contact-card-icon">📧</span>
             <div className="contact-card-title">Email</div>
-            <div className="contact-card-value">{sc.contact_email||"firestick4uk@gmail.com"}</div>
+            <div className="contact-card-value">{contact.email}</div>
             <div className="contact-card-sub">Reply within 24 hours</div>
           </a>
           <div className="contact-card">
@@ -252,7 +254,7 @@ export default function ContactPage() {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Phone / WhatsApp</label>
-                    <input type="tel" placeholder="+447518787653" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                    <input type="tel" placeholder={contact.phone} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                   </div>
                   <div className="form-group">
                     <label>Subject</label>
@@ -289,12 +291,12 @@ export default function ContactPage() {
                 <strong>Fastest way to reach us</strong>
                 Send us a message on WhatsApp or Telegram for instant support. We typically reply within minutes during business hours.
               </div>
-              <a href={`https://wa.me/${sc.contact_whatsapp||"447518787653"}`} className="info-card-link" target="_blank" rel="noopener noreferrer">
+              <a href={contact.whatsappUrl} className="info-card-link" target="_blank" rel="noopener noreferrer">
                 Chat Now on WhatsApp →
               </a>
               <br />
-              <a href="https://t.me/firestick44" className="info-card-link" target="_blank" rel="noopener noreferrer">
-                Message @firestick44 on Telegram →
+              <a href={contact.telegramUrl} className="info-card-link" target="_blank" rel="noopener noreferrer">
+                Message {contact.telegram} on Telegram →
               </a>
             </div>
 

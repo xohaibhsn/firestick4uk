@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useContactConfig } from "@/hooks/useContactConfig";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -26,6 +27,7 @@ function formatTime(date: Date) {
 
 export default function ChatWidget() {
   const pathname = usePathname();
+  const contact = useContactConfig();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -78,7 +80,7 @@ export default function ChatWidget() {
         ...nextMessages,
         {
           role: "assistant",
-          content: "Sorry, I'm having trouble connecting. Please reach us directly on WhatsApp:\n+447518787653",
+          content: `Sorry, I'm having trouble connecting. Please reach us directly on WhatsApp:\n${contact.phone}`,
           createdAt: new Date(),
         },
       ]);

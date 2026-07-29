@@ -6,6 +6,7 @@ import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "../lib/cartContext";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import Navbar from "@/components/Navbar";
+import { useContactConfig } from "@/hooks/useContactConfig";
 
 const cardDescXss = {
   whiteList: {
@@ -46,6 +47,7 @@ export default function ProductsPage() {
   const [sort, setSort] = useState("featured");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  const contact = useContactConfig();
   // Live search
   const [searchQ, setSearchQ] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -221,7 +223,7 @@ export default function ProductsPage() {
 
         <div className="activation-banner">
           <div className="activation-banner-inner">
-            Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp +447518787653 or Telegram @firestick44.
+            Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp {contact.phone} or Telegram {contact.telegram}.
           </div>
         </div>
 
@@ -253,7 +255,7 @@ export default function ProductsPage() {
             <div className="loading" style={{textAlign:"center",padding:"40px 0"}}>
               <div style={{fontSize:"32px",marginBottom:"12px"}}>⚠️</div>
               <div style={{color:"rgba(255,255,255,0.7)",marginBottom:"8px"}}>Could not load products right now.</div>
-              <div style={{color:"rgba(255,255,255,0.4)",fontSize:"13px",marginBottom:"20px"}}>Please try again in a moment or contact us via WhatsApp or Telegram @firestick44.</div>
+              <div style={{color:"rgba(255,255,255,0.4)",fontSize:"13px",marginBottom:"20px"}}>Please try again in a moment or contact us via WhatsApp or Telegram {contact.telegram}.</div>
               <button onClick={() => window.location.reload()} style={{background:"linear-gradient(135deg,#4a0080,#8b00ff)",color:"white",border:"none",padding:"10px 24px",borderRadius:"30px",cursor:"pointer",fontSize:"14px"}}>Try Again</button>
             </div>
           ) : filtered.length === 0 ? (

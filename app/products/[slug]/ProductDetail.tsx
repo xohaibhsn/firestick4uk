@@ -4,6 +4,7 @@ import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "../../lib/cartContext";
 import Navbar from "@/components/Navbar";
+import { useContactConfig } from "@/hooks/useContactConfig";
 
 const xssOptions = {
   whiteList: {
@@ -35,6 +36,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
   const [added, setAdded] = useState(false);
   const [hovering, setHovering] = useState(false);
   const { addToCart, removeFromCart, cart } = useCart();
+  const contact = useContactConfig();
 
   useEffect(() => {
     if (initialProduct) return;
@@ -165,7 +167,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
                   <span className="meta-pill">✅ UK Based</span>
                 </div>
                 <div className="activation-note">
-                  Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp +447518787653 or Telegram @firestick44.
+                  Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp {contact.phone} or Telegram {contact.telegram}.
                 </div>
                 <button
                   className="add-btn"
