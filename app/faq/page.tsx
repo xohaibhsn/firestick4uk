@@ -161,7 +161,7 @@ export default function FAQPage() {
             <h2 className="help-title">Still Need Help?</h2>
             <p className="help-sub">Can&apos;t find the answer you&apos;re looking for? Our team is happy to help.</p>
             <div className="help-btns">
-              <a href="https://wa.me/447934519060" className="btn-whatsapp" target="_blank" rel="noopener noreferrer">
+              <a href="https://wa.me/447518787653" className="btn-whatsapp" target="_blank" rel="noopener noreferrer">
                 💬 WhatsApp Us
               </a>
               <a href="https://t.me/firestick44" className="btn-telegram" target="_blank" rel="noopener noreferrer">

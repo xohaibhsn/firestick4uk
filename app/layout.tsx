@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "./lib/cartContext";
-import ChatWidget from "@/components/ChatWidget";
+// import ChatWidget from "@/components/ChatWidget"; // BERLIN TEMPORARILY HIDDEN
+import WhatsAppButton from "@/components/WhatsAppButton";
 import JsonLd from "@/components/JsonLd";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -74,7 +75,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     logo: logoUrl,
     contactPoint: {
       "@type": "ContactPoint",
-      telephone: "+447934519060",
+      telephone: "+447518787653",
       contactType: "customer service",
       availableLanguage: "English",
     },
@@ -106,7 +107,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body className="min-h-full flex flex-col">
         <JsonLd data={organizationLd} />
         <CartProvider>{children}</CartProvider>
+        {/* BERLIN TEMPORARILY HIDDEN
         <ChatWidget />
+        */}
+        <WhatsAppButton />
       </body>
     </html>
   );

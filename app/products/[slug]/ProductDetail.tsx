@@ -165,7 +165,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
                   <span className="meta-pill">✅ UK Based</span>
                 </div>
                 <div className="activation-note">
-                  Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp +447934519060 or Telegram @firestick44.
+                  Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp +447518787653 or Telegram @firestick44.
                 </div>
                 <button
                   className="add-btn"

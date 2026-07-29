@@ -221,7 +221,7 @@ export default function ProductsPage() {
 
         <div className="activation-banner">
           <div className="activation-banner-inner">
-            Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp +447934519060 or Telegram @firestick44.
+            Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp +447518787653 or Telegram @firestick44.
           </div>
         </div>
 

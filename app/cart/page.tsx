@@ -368,7 +368,7 @@ export default function CartPage() {
                   {[
                     {label:"Full Name", key:"name", type:"text", placeholder:"John Smith"},
                     {label:"Email Address", key:"email", type:"email", placeholder:"john@example.com"},
-                    {label:"WhatsApp / Phone", key:"phone", type:"tel", placeholder:"+447934519060"},
+                    {label:"WhatsApp / Phone", key:"phone", type:"tel", placeholder:"+447518787653"},
                     {label:"Delivery Address", key:"address", type:"text", placeholder:"123 High Street"},
                   ].map(f => (
                     <div className="form-group" key={f.key}>
@@ -479,7 +479,7 @@ export default function CartPage() {
                         <button onClick={handleOrder} style={{background:"rgba(255,68,68,0.2)",border:"1px solid rgba(255,68,68,0.4)",color:"#ff8888",padding:"7px 16px",borderRadius:"8px",fontSize:"12px",cursor:"pointer"}}>
                           🔄 Retry
                         </button>
-                        <a href="https://wa.me/447934519060" target="_blank" rel="noopener noreferrer" style={{background:"rgba(37,211,102,0.15)",border:"1px solid rgba(37,211,102,0.3)",color:"#25d366",padding:"7px 16px",borderRadius:"8px",fontSize:"12px",textDecoration:"none"}}>
+                        <a href="https://wa.me/447518787653" target="_blank" rel="noopener noreferrer" style={{background:"rgba(37,211,102,0.15)",border:"1px solid rgba(37,211,102,0.3)",color:"#25d366",padding:"7px 16px",borderRadius:"8px",fontSize:"12px",textDecoration:"none"}}>
                           💬 WhatsApp Us
                         </a>
                         <a href="https://t.me/firestick44" target="_blank" rel="noopener noreferrer" style={{background:"rgba(34,158,217,0.15)",border:"1px solid rgba(34,158,217,0.3)",color:"#229ED9",padding:"7px 16px",borderRadius:"8px",fontSize:"12px",textDecoration:"none"}}>

@@ -183,7 +183,7 @@ const styles = `
 
 // DEMO DATA
 const demoOrders = [
-  { id:"FK44-62305", customer:"John Smith", email:"john@example.com", phone:"+447934519060", items:"B1G 6 Month Plan + Firestick 4K", total:"£89.98", status:"confirmed", date:"30 May 2026", receipt:true },
+  { id:"FK44-62305", customer:"John Smith", email:"john@example.com", phone:"+447518787653", items:"B1G 6 Month Plan + Firestick 4K", total:"£89.98", status:"confirmed", date:"30 May 2026", receipt:true },
   { id:"FK44-22222", customer:"Ali Hassan", email:"ali@example.com", phone:"+44 7222 222222", items:"B1G 1 Year Plan", total:"£79.99", status:"pending", date:"30 May 2026", receipt:true },
   { id:"FK44-11111", customer:"Sarah Jones", email:"sarah@example.com", phone:"+44 7111 111111", items:"Android Box Ultra", total:"£73.98", status:"dispatched", date:"28 May 2026", receipt:true },
   { id:"FK44-33333", customer:"David Brown", email:"david@example.com", phone:"+44 7333 333333", items:"Firestick 4K Max", total:"£54.99", status:"delivered", date:"25 May 2026", receipt:false },
@@ -202,7 +202,7 @@ const demoProducts = [
 ];
 
 const demoCustomers = [
-  { name:"John Smith", email:"john@example.com", phone:"+447934519060", orders:3, spent:"£219.96", joined:"Jan 2026" },
+  { name:"John Smith", email:"john@example.com", phone:"+447518787653", orders:3, spent:"£219.96", joined:"Jan 2026" },
   { name:"Sarah Jones", email:"sarah@example.com", phone:"+44 7111 111111", orders:2, spent:"£123.97", joined:"Feb 2026" },
   { name:"Ali Hassan", email:"ali@example.com", phone:"+44 7222 222222", orders:1, spent:"£79.99", joined:"May 2026" },
   { name:"David Brown", email:"david@example.com", phone:"+44 7333 333333", orders:4, spent:"£189.95", joined:"Dec 2025" },
@@ -261,6 +261,7 @@ export default function AdminPage() {
   const [activePage, setActivePage] = useState("home");
   const [faviconUploading, setFaviconUploading] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [waIconUploading, setWaIconUploading] = useState(false);
   const [ogImgUploading, setOgImgUploading] = useState(false);
 
   // Page Builder
@@ -446,6 +447,31 @@ export default function AdminPage() {
       }
     } catch { setContentMsg("❌ Upload failed"); }
     setLogoUploading(false);
+    setTimeout(() => setContentMsg(""), 3000);
+  };
+
+  const uploadWhatsAppIconAdmin = async (file: File) => {
+    setWaIconUploading(true);
+    try {
+      const base64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(file); });
+      const data = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+        body: JSON.stringify({ file: base64, name: file.name, folder: "firestick4uk/whatsapp-icon" }),
+      }).then(r => r.json());
+      if (data.path) {
+        setSiteContent(s => ({ ...s, whatsapp_icon_url: data.path }));
+        await fetch("/api/site-content", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+          body: JSON.stringify({ key: "whatsapp_icon_url", value: data.path }),
+        });
+        setContentMsg("✅ WhatsApp icon saved!");
+      } else {
+        setContentMsg(`❌ ${data.error || "Upload failed"}`);
+      }
+    } catch { setContentMsg("❌ Upload failed"); }
+    setWaIconUploading(false);
     setTimeout(() => setContentMsg(""), 3000);
   };
 
@@ -2058,7 +2084,47 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline"])}>
+                <div className="modal-field" style={{marginTop:8}}>
+                  <label>WhatsApp Number</label>
+                  <input
+                    className="modal-field"
+                    style={{width:"100%"}}
+                    value={siteContent.whatsapp_number||""}
+                    onChange={e=>setSiteContent(s=>({...s,whatsapp_number:e.target.value,contact_whatsapp:e.target.value}))}
+                    placeholder="447518787653 (no + sign)"
+                  />
+                </div>
+
+                <div className="modal-field" style={{marginTop:8}}>
+                  <label>WhatsApp Button Icon (PNG)</label>
+                  <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
+                    Recommended: <strong>512×512px PNG</strong>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+                    {siteContent.whatsapp_icon_url && (
+                      <img
+                        src={siteContent.whatsapp_icon_url}
+                        alt="WhatsApp icon"
+                        style={{width:48,height:48,borderRadius:"50%",border:"1px solid #E5E5E5",objectFit:"cover"}}
+                      />
+                    )}
+                    <label style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}>
+                      {waIconUploading ? "Uploading..." : "Upload Icon"}
+                      <input type="file" accept="image/png,image/jpeg,image/webp" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&uploadWhatsAppIconAdmin(e.target.files[0])} disabled={waIconUploading} />
+                    </label>
+                    {siteContent.whatsapp_icon_url && (
+                      <button
+                        type="button"
+                        style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:12}}
+                        onClick={()=>{ setSiteContent(s=>({...s,whatsapp_icon_url:""})); saveContent(["whatsapp_icon_url"]); }}
+                      >
+                        ✕ Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","whatsapp_number","contact_whatsapp"])}>
                   {contentSaving?"Saving...":"💾 Save Settings"}
                 </button>
               </div>
@@ -2120,7 +2186,7 @@ export default function AdminPage() {
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
                     <div className="modal-field"><label>Phone Number</label><input style={{width:"100%"}} value={siteContent.contact_phone||""} onChange={e=>setSiteContent(s=>({...s,contact_phone:e.target.value}))} /></div>
                     <div className="modal-field"><label>Email Address</label><input style={{width:"100%"}} value={siteContent.contact_email||""} onChange={e=>setSiteContent(s=>({...s,contact_email:e.target.value}))} /></div>
-                    <div className="modal-field"><label>WhatsApp (numbers only)</label><input style={{width:"100%"}} value={siteContent.contact_whatsapp||""} onChange={e=>setSiteContent(s=>({...s,contact_whatsapp:e.target.value}))} placeholder="447934519060" /></div>
+                    <div className="modal-field"><label>WhatsApp (numbers only)</label><input style={{width:"100%"}} value={siteContent.contact_whatsapp||""} onChange={e=>setSiteContent(s=>({...s,contact_whatsapp:e.target.value}))} placeholder="447518787653" /></div>
                     <div className="modal-field"><label>Business Hours</label><input style={{width:"100%"}} value={siteContent.contact_hours||""} onChange={e=>setSiteContent(s=>({...s,contact_hours:e.target.value}))} /></div>
                     <div className="modal-field"><label>Address</label><input style={{width:"100%"}} value={siteContent.contact_address||""} onChange={e=>setSiteContent(s=>({...s,contact_address:e.target.value}))} /></div>
                   </div>

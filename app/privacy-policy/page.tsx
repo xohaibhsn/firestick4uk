@@ -214,7 +214,7 @@ export default function PrivacyPolicyPage() {
               <p>If you have any questions about this Privacy Policy or how we handle your data, please contact us:</p>
               <div className="highlight-box">
                 <p>📧 Email: firestick4uk@gmail.com<br />
-                💬 WhatsApp: +447934519060<br />
+                💬 WhatsApp: +447518787653<br />
                 ✈️ Telegram: @firestick44<br />
                 🌐 Website: firestick4uk.com</p>
               </div>

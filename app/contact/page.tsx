@@ -194,10 +194,10 @@ export default function ContactPage() {
 
         {/* CONTACT CARDS */}
         <div className="contact-cards">
-          <a href={`https://wa.me/${sc.contact_whatsapp||"447934519060"}`} className="contact-card-featured" target="_blank" rel="noopener noreferrer">
+          <a href={`https://wa.me/${sc.contact_whatsapp||"447518787653"}`} className="contact-card-featured" target="_blank" rel="noopener noreferrer">
             <span className="contact-card-icon">💬</span>
             <div className="contact-card-title">WhatsApp</div>
-            <div className="contact-card-value">{sc.contact_phone||"+44 7934 519060"}</div>
+            <div className="contact-card-value">{sc.contact_phone||"+44 7518 787653"}</div>
             <div className="contact-card-sub">✦ Fastest response</div>
           </a>
           <a href="https://t.me/firestick44" className="contact-card" target="_blank" rel="noopener noreferrer">
@@ -252,7 +252,7 @@ export default function ContactPage() {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Phone / WhatsApp</label>
-                    <input type="tel" placeholder="+447934519060" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                    <input type="tel" placeholder="+447518787653" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                   </div>
                   <div className="form-group">
                     <label>Subject</label>
@@ -289,7 +289,7 @@ export default function ContactPage() {
                 <strong>Fastest way to reach us</strong>
                 Send us a message on WhatsApp or Telegram for instant support. We typically reply within minutes during business hours.
               </div>
-              <a href={`https://wa.me/${sc.contact_whatsapp||"447934519060"}`} className="info-card-link" target="_blank" rel="noopener noreferrer">
+              <a href={`https://wa.me/${sc.contact_whatsapp||"447518787653"}`} className="info-card-link" target="_blank" rel="noopener noreferrer">
                 Chat Now on WhatsApp →
               </a>
               <br />

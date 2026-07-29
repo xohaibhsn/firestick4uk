@@ -111,7 +111,7 @@ export default function CartSuccessPage() {
     );
   }
 
-  const waUrl = `https://wa.me/447934519060?text=${encodeURIComponent(snap.waMessage)}`;
+  const waUrl = `https://wa.me/447518787653?text=${encodeURIComponent(snap.waMessage)}`;
 
   return (
     <>

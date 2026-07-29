@@ -78,7 +78,7 @@ export default function ChatWidget() {
         ...nextMessages,
         {
           role: "assistant",
-          content: "Sorry, I'm having trouble connecting. Please reach us directly on WhatsApp:\n+447934519060",
+          content: "Sorry, I'm having trouble connecting. Please reach us directly on WhatsApp:\n+447518787653",
           createdAt: new Date(),
         },
       ]);
