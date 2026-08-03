@@ -141,17 +141,21 @@ export default function HomeClient({
           color:#FFFFFF;
           line-height:1.1;
           margin:0 0 14px;
-          text-shadow:0 2px 4px rgba(0,0,0,0.3);
+          text-shadow:0 2px 8px rgba(0,0,0,0.8);
         }
-        .slider-hero-inner h1 span { color:#a78bfa; }
+        .slider-hero-inner h1 span {
+          color:#c4b5fd;
+          text-shadow:0 2px 8px rgba(0,0,0,0.8);
+        }
         .slider-hero-inner p {
           font-family:var(--font-body);
           font-size:clamp(0.95rem,1.5vw,1.1rem);
           font-weight:400;
-          color:rgba(255,255,255,0.85);
+          color:rgba(255,255,255,0.95);
           line-height:1.7;
           margin:0 0 28px;
           max-width:500px;
+          text-shadow:0 1px 4px rgba(0,0,0,0.8);
         }
         .slider-hero-btns { display:flex; gap:14px; flex-wrap:wrap; }
         .slider-btn-primary {

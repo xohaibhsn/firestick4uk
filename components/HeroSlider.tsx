@@ -57,10 +57,11 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
           inset: 0;
           z-index: 1;
           background: linear-gradient(
-            to bottom,
-            rgba(0,0,0,0.5) 0%,
-            rgba(0,0,0,0.3) 50%,
-            rgba(0,0,0,0.6) 100%
+            to right,
+            rgba(0,0,0,0.85) 0%,
+            rgba(0,0,0,0.75) 40%,
+            rgba(0,0,0,0.3) 70%,
+            rgba(0,0,0,0.1) 100%
           );
           pointer-events: none;
         }
