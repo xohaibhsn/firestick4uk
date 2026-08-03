@@ -138,20 +138,28 @@ export default function HomeClient({
           font-size:clamp(2rem,4vw,3.2rem);
           font-weight:800;
           letter-spacing:-0.02em;
-          color:#FFFFFF;
+          color:#FFFFFF !important;
+          -webkit-text-fill-color:#FFFFFF !important;
           line-height:1.1;
           margin:0 0 14px;
           text-shadow:0 2px 8px rgba(0,0,0,0.8);
         }
+        .slider-hero-inner h1 span,
+        .slider-hero-inner h1 * {
+          color:#FFFFFF !important;
+          -webkit-text-fill-color:#FFFFFF !important;
+        }
         .slider-hero-inner h1 span {
-          color:#c4b5fd;
+          color:#c4b5fd !important;
+          -webkit-text-fill-color:#c4b5fd !important;
           text-shadow:0 2px 8px rgba(0,0,0,0.8);
         }
         .slider-hero-inner p {
           font-family:var(--font-body);
           font-size:clamp(0.95rem,1.5vw,1.1rem);
           font-weight:400;
-          color:rgba(255,255,255,0.95);
+          color:rgba(255,255,255,0.95) !important;
+          -webkit-text-fill-color:rgba(255,255,255,0.95) !important;
           line-height:1.7;
           margin:0 0 28px;
           max-width:500px;

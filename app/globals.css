@@ -128,6 +128,25 @@ html body h4, html body h5, html body h6 {
   font-family: var(--font-display);
 }
 
+/* Hero slider — force light text over dark slides */
+html body .hero-slider h1,
+html body .hero-slider h1 *,
+html body .hero-slider .slider-hero-inner h1,
+html body .hero-slider .slider-hero-inner h1 * {
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
+html body .hero-slider h1 span,
+html body .hero-slider .slider-hero-inner h1 span {
+  color: #c4b5fd !important;
+  -webkit-text-fill-color: #c4b5fd !important;
+}
+html body .hero-slider p,
+html body .hero-slider .slider-hero-inner p {
+  color: rgba(255, 255, 255, 0.95) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.95) !important;
+}
+
 html body .page-title,
 html body .section-title,
 html body .hero-title,

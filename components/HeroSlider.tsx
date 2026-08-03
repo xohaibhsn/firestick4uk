@@ -78,6 +78,22 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
           width: 100%;
           box-sizing: border-box;
         }
+        .hero-slider .hero-slider-content h1,
+        .hero-slider .hero-slider-content h1 span,
+        .hero-slider .hero-slider-content h1 * {
+          color: #FFFFFF !important;
+          -webkit-text-fill-color: #FFFFFF !important;
+        }
+        .hero-slider .hero-slider-content h1 span {
+          color: #c4b5fd !important;
+          -webkit-text-fill-color: #c4b5fd !important;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+        }
+        .hero-slider .hero-slider-content p,
+        .hero-slider .hero-slider-content p * {
+          color: rgba(255,255,255,0.95) !important;
+          -webkit-text-fill-color: rgba(255,255,255,0.95) !important;
+        }
         .hero-slider-dots {
           position: absolute;
           z-index: 3;
