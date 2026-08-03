@@ -24,6 +24,22 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
     if (index >= slides.length && slides.length > 0) setIndex(0);
   }, [slides.length, index]);
 
+  const dots =
+    hasSlides && slides.length > 1 ? (
+      <div className="hero-slider-dots" role="tablist" aria-label="Hero slides">
+        {slides.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            className={`hero-slider-dot${i === index ? " active" : ""}`}
+            aria-label={`Go to slide ${i + 1}`}
+            aria-selected={i === index}
+            onClick={() => setIndex(i)}
+          />
+        ))}
+      </div>
+    ) : null;
+
   return (
     <section
       className="hero-slider"
@@ -32,6 +48,11 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
     >
       <style>{`
         .hero-slider {
+          position: relative;
+          width: 100%;
+          background: #111111;
+        }
+        .hero-slider-stage {
           position: relative;
           width: 100%;
           height: 600px;
@@ -94,15 +115,17 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
           color: rgba(255,255,255,0.95) !important;
           -webkit-text-fill-color: rgba(255,255,255,0.95) !important;
         }
+        /* Desktop: dots overlay bottom of stage */
         .hero-slider-dots {
           position: absolute;
-          z-index: 3;
+          z-index: 10;
           left: 50%;
-          bottom: 24px;
+          bottom: 20px;
           transform: translateX(-50%);
           display: flex;
           gap: 10px;
           align-items: center;
+          justify-content: center;
         }
         .hero-slider-dot {
           width: 10px;
@@ -121,49 +144,51 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
           transform: scale(1.15);
         }
         @media (max-width: 1024px) {
-          .hero-slider { height: 480px; }
+          .hero-slider-stage { height: 480px; }
           .hero-slider-content { padding: 32px 40px; }
         }
         @media (max-width: 640px) {
-          .hero-slider { height: 380px; }
-          .hero-slider-content { padding: 28px 20px; }
+          .hero-slider-stage { height: 380px; }
+          .hero-slider-content {
+            padding: 28px 20px 20px;
+          }
+          /* Mobile: dots sit below stage, not over buttons */
+          .hero-slider-dots {
+            position: relative;
+            left: auto;
+            bottom: auto;
+            transform: none;
+            display: flex;
+            justify-content: center;
+            padding: 12px 0;
+            background: #111111;
+            gap: 12px;
+          }
           .hero-slider-dot {
             width: 14px;
             height: 14px;
           }
-          .hero-slider-dots { bottom: 18px; gap: 12px; }
         }
       `}</style>
 
-      {hasSlides &&
-        slides.map((src, i) => (
-          <img
-            key={`${src}-${i}`}
-            src={src}
-            alt=""
-            className={`hero-slider-slide${i === index ? " active" : ""}`}
-            draggable={false}
-          />
-        ))}
-
-      <div className="hero-slider-overlay" aria-hidden />
-
-      <div className="hero-slider-content">{children}</div>
-
-      {hasSlides && slides.length > 1 && (
-        <div className="hero-slider-dots" role="tablist" aria-label="Hero slides">
-          {slides.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              className={`hero-slider-dot${i === index ? " active" : ""}`}
-              aria-label={`Go to slide ${i + 1}`}
-              aria-selected={i === index}
-              onClick={() => setIndex(i)}
+      <div className="hero-slider-stage">
+        {hasSlides &&
+          slides.map((src, i) => (
+            <img
+              key={`${src}-${i}`}
+              src={src}
+              alt=""
+              className={`hero-slider-slide${i === index ? " active" : ""}`}
+              draggable={false}
             />
           ))}
-        </div>
-      )}
+
+        <div className="hero-slider-overlay" aria-hidden />
+
+        <div className="hero-slider-content">{children}</div>
+      </div>
+
+      {dots}
     </section>
   );
 }
