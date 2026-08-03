@@ -31,7 +31,7 @@ const navStyles = `
   .page-wrapper { padding-top:100px; min-height:100vh; background:#FFFFFF; }
   .page-header { max-width:1200px; margin:0 auto; padding:50px 60px 30px; }
   .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; font-weight:600; }
-  .page-title { font-family:var(--font-display); font-size:clamp(26px,3.5vw,44px); font-weight:700; color:#111111; }
+  .page-title { font-family:var(--font-display); font-size:clamp(26px,3.5vw,44px); font-weight:900; letter-spacing:-0.03em; color:#111111; }
   .page-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
 
   /* CART LAYOUT */

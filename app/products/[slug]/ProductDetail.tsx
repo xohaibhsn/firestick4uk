@@ -88,7 +88,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
         .product-img-box img{width:100%;height:100%;object-fit:cover;}
         .placeholder-img{font-size:80px;text-align:center;}
         .product-category{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#5B21B6;margin-bottom:12px;font-weight:600;}
-        .product-name{font-family:var(--font-display);font-size:clamp(22px,3vw,34px);font-weight:800;color:#111111;margin-bottom:12px;line-height:1.25;}
+        .product-name{font-family:var(--font-display);font-size:clamp(22px,3vw,34px);font-weight:900;letter-spacing:-0.03em;color:#111111;margin-bottom:12px;line-height:1.25;}
         .product-short-desc{color:#555555;font-size:15px;line-height:1.8;margin-bottom:18px;}
         .product-description,.product-full-description{color:#444444;font-size:15px;line-height:1.85;}
         .product-description p,.product-full-description p{margin:0 0 1rem;line-height:1.85;}

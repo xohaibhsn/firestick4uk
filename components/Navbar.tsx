@@ -77,8 +77,8 @@ export default function Navbar({
         }
         .site-nav .nav-links a {
           font-family: var(--font-body), 'Inter', system-ui, sans-serif;
-          color: #111111; text-decoration: none; font-size: 13px; font-weight: 500;
-          letter-spacing: 1.5px; text-transform: uppercase; transition: color 0.2s;
+          color: #374151; text-decoration: none; font-size: 14px; font-weight: 500;
+          letter-spacing: 0.01em; text-transform: uppercase; transition: color 0.2s;
         }
         .site-nav .nav-links a:hover { color: #5B21B6; }
         .site-nav .nav-cta {

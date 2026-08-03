@@ -9,7 +9,7 @@ html {
 }
 
 :root {
-  --font-display: var(--font-playfair), 'Playfair Display', Georgia, serif;
+  --font-display: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
   --font-body: var(--font-inter), 'Inter', system-ui, sans-serif;
   --font-logo: var(--font-cinzel), 'Cinzel', Georgia, serif;
 
@@ -35,8 +35,26 @@ html body {
 
 html body h1, html body h2, html body h3, html body h4 {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 800;
   color: #111111 !important;
+  letter-spacing: -0.02em;
+}
+
+html body h1 {
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+html body h2 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+html body h3 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 /* Logo text fallback only */
@@ -123,12 +141,53 @@ html body .stat-number {
 
 html body .product-card .product-name,
 html body .card-title {
-  font-family: var(--font-body) !important;
-  font-weight: 600;
+  font-family: var(--font-display) !important;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
-html body .section-tag {
+html body .section-tag,
+html body .hero-tag {
   color: #5B21B6 !important;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+html body .page-title,
+html body .section-title,
+html body .hero-title {
+  letter-spacing: -0.02em;
+  font-weight: 800;
+}
+
+html body .page-title {
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+html body button,
+html body .btn-primary,
+html body .btn-secondary,
+html body .add-btn,
+html body .hero-btn-primary,
+html body .hero-btn-secondary,
+html body .nav-cta {
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+html body p,
+html body .hero-subtitle,
+html body .product-desc,
+html body .product-short-desc,
+html body input,
+html body textarea,
+html body label,
+html body select {
   font-family: var(--font-body);
 }
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display, Cinzel } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans, Cinzel } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "./lib/cartContext";
 // import ChatWidget from "@/components/ChatWidget"; // BERLIN TEMPORARILY HIDDEN
@@ -14,11 +14,11 @@ const inter = Inter({
   weight: ["300", "400", "500", "600", "700", "800"],
 });
 
-const playfair = Playfair_Display({
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  variable: "--font-playfair",
+  variable: "--font-jakarta",
   display: "swap",
-  weight: ["400", "700", "800", "900"],
+  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
 /** Logo text fallback only — do not use elsewhere */
@@ -113,7 +113,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${playfair.variable} ${cinzel.variable} h-full antialiased`}
+      className={`${inter.variable} ${jakarta.variable} ${cinzel.variable} h-full antialiased`}
     >
       <head>
         <meta
