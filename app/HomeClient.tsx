@@ -4,6 +4,7 @@ import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "./lib/cartContext";
 import Navbar from "@/components/Navbar";
+import HeroSlider from "@/components/HeroSlider";
 
 const cardDescXss = {
   whiteList: {
@@ -59,6 +60,7 @@ export default function HomeClient({
   const [added, setAdded] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [hoveringId, setHoveringId] = useState<number | null>(null);
+  const [slides, setSlides] = useState<string[]>([]);
   const { addToCart, removeFromCart, cart } = useCart();
 
   const handleSearch = () => {
@@ -89,6 +91,19 @@ export default function HomeClient({
         }
       })
       .catch(() => {});
+    fetch('/api/site-content?page=all')
+      .then(r => r.json())
+      .then(data => {
+        if (!data || typeof data !== 'object') return;
+        const slideUrls = [
+          data.hero_slide_1,
+          data.hero_slide_2,
+          data.hero_slide_3,
+          data.hero_slide_4,
+        ].filter((u): u is string => typeof u === 'string' && !!u.trim());
+        setSlides(slideUrls);
+      })
+      .catch(() => {});
     return () => {};
   }, []);
 
@@ -115,16 +130,53 @@ export default function HomeClient({
         .hamburger span { display:block; width:25px; height:2px; background:#111111; border-radius:2px; }
         .page-wrapper { position:relative; z-index:1; padding-top:80px; background:#FFFFFF; }
         /* SEO HERO — clean, above products */
-        .home-seo-hero { background:#FFFFFF; padding:40px 20px; text-align:center; }
-        .home-seo-hero-inner { max-width:800px; margin:0 auto; }
-        .home-seo-hero h1 { font-family:var(--font-display); font-size:clamp(2.5rem,6vw,4.5rem); color:#111111; line-height:1.05; margin:0 0 14px; font-weight:800; letter-spacing:-0.03em; }
-        .home-seo-hero h1 span { color:#5B21B6; }
-        .home-seo-hero p { font-family:var(--font-body); color:#64748b; font-size:clamp(1rem,2vw,1.2rem); font-weight:400; line-height:1.7; margin:0; max-width:520px; margin-left:auto; margin-right:auto; }
+        /* SEO HERO SLIDER */
+        .home-seo-hero { display:none; }
+        .slider-hero-inner { max-width:640px; }
+        .slider-hero-inner h1 {
+          font-family:var(--font-display);
+          font-size:clamp(2rem,4vw,3.2rem);
+          font-weight:800;
+          letter-spacing:-0.02em;
+          color:#FFFFFF;
+          line-height:1.1;
+          margin:0 0 14px;
+          text-shadow:0 2px 4px rgba(0,0,0,0.3);
+        }
+        .slider-hero-inner h1 span { color:#a78bfa; }
+        .slider-hero-inner p {
+          font-family:var(--font-body);
+          font-size:clamp(0.95rem,1.5vw,1.1rem);
+          font-weight:400;
+          color:rgba(255,255,255,0.85);
+          line-height:1.7;
+          margin:0 0 28px;
+          max-width:500px;
+        }
+        .slider-hero-btns { display:flex; gap:14px; flex-wrap:wrap; }
+        .slider-btn-primary {
+          font-family:var(--font-body);
+          background:#5B21B6; color:#FFFFFF;
+          padding:14px 32px; border-radius:50px;
+          font-size:14px; font-weight:600; letter-spacing:0.01em;
+          text-decoration:none; display:inline-block; transition:all 0.2s;
+        }
+        .slider-btn-primary:hover { background:#4C1D95; transform:translateY(-1px); }
+        .slider-btn-secondary {
+          font-family:var(--font-body);
+          background:rgba(255,255,255,0.15);
+          border:2px solid rgba(255,255,255,0.6);
+          color:#FFFFFF; padding:14px 32px; border-radius:50px;
+          font-size:14px; font-weight:600; letter-spacing:0.01em;
+          text-decoration:none; display:inline-block;
+          backdrop-filter:blur(4px); transition:all 0.2s;
+        }
+        .slider-btn-secondary:hover { background:rgba(255,255,255,0.25); }
         /* PRODUCTS HEADER */
         .products-header { max-width:1300px; margin:0 auto; padding:50px 60px 28px; display:flex; justify-content:space-between; align-items:flex-end; }
         .products-header-left {}
         .section-tag { font-family:var(--font-body); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5B21B6; margin-bottom:10px; display:block; font-weight:700; }
-        .section-title { font-family:var(--font-display); font-size:clamp(22px,3vw,36px); font-weight:800; letter-spacing:-0.02em; color:#111111; }
+        .section-title { font-family:var(--font-display); font-size:clamp(1.5rem,2.5vw,2.2rem); font-weight:800; letter-spacing:-0.02em; color:#111111; }
         .section-title span { color:#5B21B6; }
         .view-all-link { font-size:13px; font-weight:600; color:#5B21B6; text-decoration:none; border:1px solid #5B21B6; padding:8px 20px; border-radius:8px; transition:all 0.2s; white-space:nowrap; }
         .view-all-link:hover { background:#5B21B6; color:#FFFFFF; }
@@ -145,7 +197,7 @@ export default function HomeClient({
         .hero { background:transparent; padding:70px 60px 80px; max-width:1300px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center; }
         .hero-content {}
         .hero-tag { font-family:var(--font-body); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5B21B6; margin-bottom:16px; display:block; font-weight:700; }
-        .hero-title { font-family:var(--font-display); font-size:clamp(2.5rem,6vw,4.5rem); font-weight:800; letter-spacing:-0.03em; color:#111111 !important; -webkit-text-fill-color:#111111 !important; line-height:1.05; margin-bottom:20px; }
+        .hero-title { font-family:var(--font-display); font-size:clamp(1.8rem,3.5vw,2.8rem); font-weight:800; letter-spacing:-0.02em; color:#111111 !important; -webkit-text-fill-color:#111111 !important; line-height:1.15; margin-bottom:20px; }
         .hero-title span { color:#5B21B6 !important; -webkit-text-fill-color:#5B21B6 !important; }
         .hero-subtitle { font-family:var(--font-body); font-size:clamp(1rem,2vw,1.2rem); font-weight:400; color:#64748b; line-height:1.7; margin-bottom:36px; max-width:520px; }
         .hero-btns { display:flex; gap:14px; flex-wrap:wrap; }
@@ -198,6 +250,9 @@ export default function HomeClient({
         .footer-copy { font-size:12px; color:rgba(255,255,255,0.4); }
         .whatsapp-btn { position:fixed; bottom:30px; right:30px; z-index:999; width:58px; height:58px; border-radius:50%; background:linear-gradient(135deg,#25d366,#128c7e); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 25px rgba(37,211,102,0.5); text-decoration:none; font-size:26px; transition:all 0.3s; }
         .whatsapp-btn:hover { transform:scale(1.1); }
+        @media (max-width: 1024px) and (min-width: 641px) {
+          .slider-hero-inner h1 { font-size: clamp(1.8rem, 3.5vw, 2.4rem); }
+        }
         @media(max-width:768px){
           nav{padding:16px 24px;}
           .nav-links{display:none;}
@@ -207,6 +262,9 @@ export default function HomeClient({
           .home-seo-hero{padding:28px 16px 12px;}
           .home-seo-hero h1{font-size:1.75rem;}
           .home-seo-hero p{font-size:1rem;}
+          .slider-hero-inner h1{font-size:clamp(1.6rem,5vw,2rem);}
+          .slider-hero-btns{flex-direction:column;}
+          .slider-btn-primary,.slider-btn-secondary{width:100%;text-align:center;box-sizing:border-box;}
           .products-header{padding:28px 16px 16px;flex-direction:column;align-items:flex-start;gap:12px;}
           .search-wrap{padding:0 16px 16px;}
           .search-bar{padding:5px 5px 5px 16px;}
@@ -233,13 +291,20 @@ export default function HomeClient({
       <Navbar cartCount={cart.length} cta="cart" />
 
       <div className="page-wrapper">
-        {/* Clean SEO hero — H1 above products */}
-        <section className="home-seo-hero">
-          <div className="home-seo-hero-inner">
+        <HeroSlider slides={slides}>
+          <div className="slider-hero-inner">
             <h1>{formatHeroTitle(topHeroTitle)}</h1>
             <p>{topHeroSubtitle}</p>
+            <div className="slider-hero-btns">
+              <a href={sec.home_hero?.button_link || "/products"} className="slider-btn-primary">
+                {sec.home_hero?.button_text || "Shop Now"} →
+              </a>
+              <a href={sec.home_hero?.secondary_button_link || "/about"} className="slider-btn-secondary">
+                {sec.home_hero?.secondary_button_text || "Learn More"}
+              </a>
+            </div>
           </div>
-        </section>
+        </HeroSlider>
 
         {/* PRODUCTS GRID */}
         <div className="products-header">

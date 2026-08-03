@@ -34,6 +34,10 @@ const DEFAULTS = [
   ['contact_address','United Kingdom','text','contact','Address'],
   ['footer_text','© 2026 Firestick4UK. All rights reserved.','textarea','footer','Footer Text'],
   ['footer_tagline','Premium Firestick Services UK','text','footer','Footer Tagline'],
+  ['hero_slide_1','','image','settings','Hero Slide 1'],
+  ['hero_slide_2','','image','settings','Hero Slide 2'],
+  ['hero_slide_3','','image','settings','Hero Slide 3'],
+  ['hero_slide_4','','image','settings','Hero Slide 4'],
 ];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

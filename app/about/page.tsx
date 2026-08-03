@@ -31,7 +31,7 @@ const styles = `
   /* HERO — light bg, dark text */
   .about-hero { max-width:900px; margin:0 auto; padding:60px 24px 50px; text-align:center; }
   .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; display:block; font-weight:600; }
-  .page-title { font-family:var(--font-display); font-size:clamp(30px,5vw,56px); font-weight:800; letter-spacing:-0.03em; color:#111111; margin-bottom:20px; line-height:1.1; }
+  .page-title { font-family:var(--font-display); font-size:clamp(1.8rem,3vw,2.5rem); font-weight:800; letter-spacing:-0.03em; color:#111111; margin-bottom:20px; line-height:1.1; }
   .page-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
   .hero-text { font-size:clamp(15px,2vw,18px); color:#555555; line-height:1.8; max-width:700px; margin:0 auto 40px; }
 

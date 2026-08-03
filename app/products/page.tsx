@@ -120,7 +120,7 @@ export default function ProductsPage() {
         .page-wrapper { position:relative; z-index:1; padding-top:100px; background:#FFFFFF; }
         .page-header { max-width:1300px; margin:0 auto; padding:60px 60px 30px; }
         .section-tag { font-family:var(--font-body); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; font-weight:700; }
-        .page-title { font-family:var(--font-display); font-size:clamp(26px,3.5vw,44px); font-weight:800; letter-spacing:-0.03em; color:#111111; }
+        .page-title { font-family:var(--font-display); font-size:clamp(1.8rem,3vw,2.5rem); font-weight:800; letter-spacing:-0.03em; color:#111111; }
         .page-title span { color:#5B21B6; }
         .activation-banner { max-width:1300px; margin:0 auto 24px; padding:0 60px; }
         .activation-banner-inner { background:#F5F3FF; border:1px solid #DDD6FE; border-radius:14px; padding:14px 18px; color:#444444; font-size:14px; line-height:1.6; }

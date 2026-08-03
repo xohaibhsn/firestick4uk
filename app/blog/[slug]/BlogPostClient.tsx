@@ -67,7 +67,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
 
         .post-badge{display:inline-block;background:#5B21B6;color:#FFFFFF;font-size:11px;font-weight:700;padding:4px 14px;border-radius:20px;letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;}
 
-        .post-title{font-family:var(--font-display);font-size:clamp(24px,4vw,38px);font-weight:700;color:#111111;line-height:1.25;margin-bottom:16px;}
+        .post-title{font-family:var(--font-display);font-size:clamp(1.5rem,2.5vw,2rem);font-weight:700;color:#111111;line-height:1.25;margin-bottom:16px;}
 
         .post-meta{color:#888888;font-size:13px;margin-bottom:28px;display:flex;gap:18px;flex-wrap:wrap;}
 

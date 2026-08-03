@@ -25,7 +25,7 @@ body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow
   .page-wrapper { position:relative; z-index:1; padding-top:100px; min-height:100vh; }
   .page-header { max-width:800px; margin:0 auto; padding:50px 24px 40px; text-align:center; }
   .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; }
-  .page-title { font-family:var(--font-display); font-size:clamp(28px,4vw,48px); font-weight:800; letter-spacing:-0.03em; color:#111111; margin-bottom:14px; }
+  .page-title { font-family:var(--font-display); font-size:clamp(1.8rem,3vw,2.5rem); font-weight:800; letter-spacing:-0.03em; color:#111111; margin-bottom:14px; }
   .page-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
   .last-updated { color:#666666; font-size:13px; }
 

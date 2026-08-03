@@ -24,7 +24,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isReceipt = cloudinaryFolder.includes('receipt');
     const isLogo = cloudinaryFolder.includes('logo');
     const isWhatsAppIcon = cloudinaryFolder.includes('whatsapp');
-    const preserveImage = isReceipt || isLogo || isWhatsAppIcon;
+    const isHeroSlide = cloudinaryFolder.includes('hero-slides');
+    const preserveImage = isReceipt || isLogo || isWhatsAppIcon || isHeroSlide;
 
     // Use Cloudinary if credentials are configured
     if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
@@ -42,6 +43,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         uploadOptions.transformation = [
           { width: 512, height: 512, crop: 'limit' },
           { quality: 90 },
+        ];
+      } else if (isHeroSlide) {
+        uploadOptions.transformation = [
+          { width: 1920, height: 1080, crop: 'limit' },
+          { quality: 85, fetch_format: 'webp' },
         ];
       } else if (isReceipt) {
         // Receipts: preserve original, no aggressive compression

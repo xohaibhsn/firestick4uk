@@ -262,6 +262,7 @@ export default function AdminPage() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [waIconUploading, setWaIconUploading] = useState(false);
   const [ogImgUploading, setOgImgUploading] = useState(false);
+  const [heroSlideUploading, setHeroSlideUploading] = useState<number | null>(null);
 
   // Page Builder
   type SectionItem = { key:string; label:string; page:string; order:number; visible:boolean; data:any; };
@@ -446,6 +447,39 @@ export default function AdminPage() {
       }
     } catch { setContentMsg("❌ Upload failed"); }
     setLogoUploading(false);
+    setTimeout(() => setContentMsg(""), 3000);
+  };
+
+  const uploadHeroSlideAdmin = async (slideNum: number, file: File) => {
+    const key = `hero_slide_${slideNum}`;
+    setHeroSlideUploading(slideNum);
+    try {
+      const base64 = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result as string);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const data = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+        body: JSON.stringify({ file: base64, name: file.name, folder: "firestick4uk/hero-slides" }),
+      }).then((r) => r.json());
+      if (data.path) {
+        setSiteContent((s) => ({ ...s, [key]: data.path }));
+        await fetch("/api/site-content", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+          body: JSON.stringify({ key, value: data.path }),
+        });
+        setContentMsg(`✅ Slide ${slideNum} saved!`);
+      } else {
+        setContentMsg(`❌ ${data.error || "Upload failed"}`);
+      }
+    } catch {
+      setContentMsg("❌ Upload failed");
+    }
+    setHeroSlideUploading(null);
     setTimeout(() => setContentMsg(""), 3000);
   };
 
@@ -2110,6 +2144,72 @@ export default function AdminPage() {
                       </button>
                     )}
                   </div>
+                </div>
+
+                <div className="modal-field" style={{marginTop:24,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
+                  <label style={{fontSize:15,fontWeight:700,marginBottom:6,display:"block"}}>🖼️ Hero Slider Images</label>
+                  <div style={{fontSize:11,color:"#888888",marginBottom:16}}>
+                    Recommended: <strong>1920×1080px</strong> — homepage background slides (auto-rotate every 3s)
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+                    {[1, 2, 3, 4].map((n) => {
+                      const key = `hero_slide_${n}`;
+                      const url = siteContent[key] || "";
+                      return (
+                        <div key={key} style={{border:"1px solid #E5E5E5",borderRadius:10,padding:14,background:"#FAFAFA"}}>
+                          <div style={{fontSize:13,fontWeight:600,color:"#111",marginBottom:10}}>Slide {n}</div>
+                          {url ? (
+                            <img
+                              src={url}
+                              alt={`Hero slide ${n}`}
+                              style={{width:"100%",height:90,objectFit:"cover",borderRadius:8,border:"1px solid #E5E5E5",marginBottom:10,display:"block"}}
+                            />
+                          ) : (
+                            <div style={{width:"100%",height:90,borderRadius:8,border:"1px dashed #CCC",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",color:"#AAA",fontSize:12,marginBottom:10}}>
+                              No image
+                            </div>
+                          )}
+                          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                            <label style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"6px 12px",borderRadius:8,fontSize:12,color:"#5B21B6",fontWeight:600}}>
+                              {heroSlideUploading === n ? "Uploading..." : "Upload"}
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                style={{display:"none"}}
+                                disabled={heroSlideUploading !== null}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) uploadHeroSlideAdmin(n, file);
+                                  e.target.value = "";
+                                }}
+                              />
+                            </label>
+                            {url && (
+                              <button
+                                type="button"
+                                style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:12}}
+                                onClick={() => {
+                                  setSiteContent((s) => ({ ...s, [key]: "" }));
+                                  saveContent([key]);
+                                }}
+                              >
+                                ✕ Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{marginTop:16}}
+                    disabled={contentSaving}
+                    onClick={() => saveContent(["hero_slide_1", "hero_slide_2", "hero_slide_3", "hero_slide_4"])}
+                  >
+                    {contentSaving ? "Saving..." : "💾 Save All Slides"}
+                  </button>
                 </div>
 
                 <div style={{marginTop:28,paddingTop:24,borderTop:"1px solid #E5E5E5"}}>
