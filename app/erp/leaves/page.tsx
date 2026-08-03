@@ -64,7 +64,7 @@ function LeavesContent({ user, currency: _currency }: { user: any; currency: str
             <div key={b.label} className="erp-stat" style={{textAlign:"center"}}>
               {/* Fix 1 — high-contrast dark text on white card background */}
               <div style={{fontSize:11,color:"#1e293b",fontWeight:700,letterSpacing:"1px",textTransform:"uppercase",marginBottom:8}}>{b.label}</div>
-              <div style={{fontFamily:"'Cinzel',serif",fontSize:28,fontWeight:800,color:b.color}}>{b.limit-b.taken}</div>
+              <div style={{fontFamily:"var(--font-display)",fontSize:28,fontWeight:800,color:b.color}}>{b.limit-b.taken}</div>
               <div style={{fontSize:11,color:"#64748b",fontWeight:500,marginTop:4}}>of {b.limit} remaining</div>
               <div style={{marginTop:8,height:5,background:"#E5E5E5",borderRadius:4}}>
                 <div style={{height:"100%",width:`${Math.min(100,(b.taken/b.limit)*100)}%`,background:b.color,borderRadius:4,transition:"width 0.5s"}} />

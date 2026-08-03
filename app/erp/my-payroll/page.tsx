@@ -47,7 +47,7 @@ function MyPayrollContent({ user, currency: _c }: { user: any; currency: string 
             ].map(s=>(
               <div key={s.label} className="erp-stat">
                 <div className="erp-stat-icon">{s.icon}</div>
-                <div style={{fontFamily:"'Cinzel',serif",fontSize:18,fontWeight:700,color:s.color}}>{s.val}</div>
+                <div style={{fontFamily:"var(--font-display)",fontSize:18,fontWeight:700,color:s.color}}>{s.val}</div>
                 <div className="erp-stat-label">{s.label}</div>
               </div>
             ))}
@@ -72,7 +72,7 @@ function MyPayrollContent({ user, currency: _c }: { user: any; currency: string 
                 ))}
                 <tr>
                   <td style={{padding:"14px",fontWeight:700,fontSize:15}}>Net Pay</td>
-                  <td style={{padding:"14px",fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:900,color:"#5B21B6"}}>{fmt(Number(data.net_pay||0))}</td>
+                  <td style={{padding:"14px",fontFamily:"var(--font-display)",fontSize:20,fontWeight:900,color:"#5B21B6"}}>{fmt(Number(data.net_pay||0))}</td>
                 </tr>
               </tbody>
             </table>

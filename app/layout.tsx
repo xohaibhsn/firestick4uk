@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Playfair_Display, Cinzel } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "./lib/cartContext";
 // import ChatWidget from "@/components/ChatWidget"; // BERLIN TEMPORARILY HIDDEN
@@ -7,14 +7,35 @@ import WhatsAppButton from "@/components/WhatsAppButton";
 import JsonLd from "@/components/JsonLd";
 import { getContactConfig } from "@/lib/contact-config";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+  weight: ["300", "400", "500", "600", "700", "800"],
+});
 
-async function getSiteSettings(): Promise<Record<string,string>> {
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair",
+  display: "swap",
+  weight: ["400", "700", "800", "900"],
+});
+
+/** Logo text fallback only — do not use elsewhere */
+const cinzel = Cinzel({
+  subsets: ["latin"],
+  variable: "--font-cinzel",
+  display: "swap",
+  weight: ["400", "700", "900"],
+});
+
+async function getSiteSettings(): Promise<Record<string, string>> {
   try {
     const pool = (await import("../lib/db")).default;
-    const [rows]: any = await pool.query("SELECT content_key, content_value FROM site_content WHERE page_name='settings'");
-    const result: Record<string,string> = {};
+    const [rows]: any = await pool.query(
+      "SELECT content_key, content_value FROM site_content WHERE page_name='settings'"
+    );
+    const result: Record<string, string> = {};
     for (const r of rows) result[r.content_key] = r.content_value || "";
     return result;
   } catch {
@@ -28,12 +49,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const tagline = settings.site_tagline || "Best Firestick Service in UK";
   const favicon = settings.favicon_url || "/favicon.ico";
   const ogImage = settings.og_default_image || "https://firestick4uk.com/og-default.jpg";
-  const description = "Buy Firestick, streaming subscriptions and Android boxes in the UK. Fast delivery, easy setup, real support.";
+  const description =
+    "Buy Firestick, streaming subscriptions and Android boxes in the UK. Fast delivery, easy setup, real support.";
 
   return {
     title: `${title} — ${tagline}`,
     description,
-    keywords: "Firestick UK, Firestick subscription, Android box, streaming device, buy firestick UK",
+    keywords:
+      "Firestick UK, Firestick subscription, Android box, streaming device, buy firestick UK",
     robots: {
       index: true,
       follow: true,
@@ -65,7 +88,9 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   const settings = await getSiteSettings();
   const contact = await getContactConfig();
   const logoUrl = settings.site_logo_url || "https://firestick4uk.com/logo.png";
@@ -86,7 +111,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   };
 
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${inter.variable} ${playfair.variable} ${cinzel.variable} h-full antialiased`}
+    >
       <head>
         <meta
           name="google-site-verification"

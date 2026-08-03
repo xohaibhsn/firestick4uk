@@ -3,32 +3,24 @@ import Navbar from "@/components/Navbar";
 import { useContactConfig } from "@/hooks/useContactConfig";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-  :root { --purple-deep:#0d0010; --purple-mid:#4a0080; --purple-bright:#8b00ff; --purple-glow:#bf5fff; --purple-light:#e0b3ff; --gold:#ffd700; }
-  body { background:var(--purple-deep); color:#fff; font-family:'Raleway',sans-serif; overflow-x:hidden; }
-  .bg-fixed { position:fixed; inset:0; z-index:0;
-    background:radial-gradient(ellipse at 20% 20%,#2d0050 0%,transparent 50%),
-               radial-gradient(ellipse at 80% 80%,#1a0035 0%,transparent 50%),#0a0010; }
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow-x:hidden; }
+
 
   nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:18px 60px;
     display:flex; align-items:center; justify-content:space-between;
-    background:rgba(13,0,16,0.96); backdrop-filter:blur(20px);
-    border-bottom:1px solid rgba(139,0,255,0.2); }
-  .nav-logo { font-family:'Cinzel',serif; font-size:20px; font-weight:900;
-    background:linear-gradient(135deg,var(--purple-glow),var(--gold));
-    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-    text-decoration:none; letter-spacing:2px; }
+    background:#FFFFFF; border-bottom:1px solid #E5E5E5; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+  .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
   .nav-links { display:flex; gap:36px; list-style:none; }
-  .nav-links a { color:rgba(255,255,255,0.8); text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.3s; }
+  .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.3s; }
   .nav-links a:hover { color:#5B21B6; }
-  .nav-cta { background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright)) !important; color:white !important; padding:10px 24px !important; border-radius:30px !important; font-weight:600 !important; }
+  .nav-cta { background:#5B21B6 !important; color:white !important; padding:10px 24px !important; border-radius:30px !important; font-weight:600 !important; }
   .hamburger { display:none; flex-direction:column; gap:5px; cursor:pointer; background:none; border:none; padding:5px; z-index:101; }
-  .hamburger span { display:block; width:25px; height:2px; background:var(--purple-glow); }
+  .hamburger span { display:block; width:25px; height:2px; background:#111111; }
   @media(max-width:768px){
     nav{padding:16px 24px;}
     .nav-links{display:none;}
-    .nav-links.open{display:flex;flex-direction:column;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(13,0,16,0.98);align-items:center;justify-content:center;gap:28px;z-index:9999;margin:0;padding:0;}
+    .nav-links.open{display:flex;flex-direction:column;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#FFFFFF;align-items:center;justify-content:center;gap:28px;z-index:9999;margin:0;padding:0;}
     .hamburger{display:flex;}
   }
 
@@ -36,9 +28,9 @@ const styles = `
 
   .page-header { max-width:800px; margin:0 auto; padding:50px 24px 40px; text-align:center; }
   .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; }
-  .page-title { font-family:'Cinzel',serif; font-size:clamp(28px,4vw,48px); font-weight:700; color:#111111; margin-bottom:14px; }
-  .page-title span { background:linear-gradient(135deg,var(--purple-glow),var(--gold)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-  .last-updated { color:rgba(255,255,255,0.35); font-size:13px; }
+  .page-title { font-family:var(--font-display); font-size:clamp(28px,4vw,48px); font-weight:700; color:#111111; margin-bottom:14px; }
+  .page-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
+  .last-updated { color:#666666; font-size:13px; }
 
   /* LAYOUT */
   .content-layout { max-width:900px; margin:0 auto; padding:0 24px 80px;
@@ -47,7 +39,7 @@ const styles = `
   /* SIDEBAR */
   .toc { position:sticky; top:110px; background:#FFFFFF;
     border:1px solid rgba(139,0,255,0.2); border-radius:16px; padding:24px; }
-  .toc-title { font-family:'Cinzel',serif; font-size:13px; font-weight:700; color:#5B21B6;
+  .toc-title { font-family:var(--font-display); font-size:13px; font-weight:700; color:#5B21B6;
     letter-spacing:2px; text-transform:uppercase; margin-bottom:16px; }
   .toc-list { list-style:none; display:flex; flex-direction:column; gap:8px; }
   .toc-list a { color:#555555; text-decoration:none; font-size:13px; transition:color 0.3s;
@@ -58,7 +50,7 @@ const styles = `
   /* CONTENT */
   .policy-content { }
   .policy-section { margin-bottom:40px; scroll-margin-top:120px; }
-  .policy-section h2 { font-family:'Cinzel',serif; font-size:20px; font-weight:700; color:#111111;
+  .policy-section h2 { font-family:var(--font-display); font-size:20px; font-weight:700; color:#111111;
     margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid #E5E5E5; }
   .policy-section p { font-size:14px; color:#333333; line-height:1.9; margin-bottom:14px; }
   .policy-section ul { padding-left:20px; margin-bottom:14px; }
@@ -71,9 +63,7 @@ const styles = `
   footer { position:relative; z-index:1; padding:40px 60px;
     border-top:1px solid rgba(139,0,255,0.15);
     display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
-  .footer-logo { font-family:'Cinzel',serif; font-size:16px; font-weight:900;
-    background:linear-gradient(135deg,var(--purple-glow),var(--gold));
-    -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .footer-logo { font-family:var(--font-display); font-size:16px; font-weight:900; color:#FFFFFF; }
   .footer-links { display:flex; gap:20px; list-style:none; flex-wrap:wrap; }
   .footer-links a { color:rgba(255,255,255,0.6); text-decoration:none; font-size:13px; transition:color 0.3s; }
   .footer-links a:hover { color:#5B21B6; }
@@ -98,7 +88,6 @@ export default function PrivacyPolicyPage() {
   return (
     <>
       <style>{styles}</style>
-      <div className="bg-fixed" />
 
       <Navbar cta="shop" shopHref="/" />
 

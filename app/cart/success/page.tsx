@@ -5,11 +5,10 @@ import Navbar from "@/components/Navbar";
 import { useContactConfig } from "@/hooks/useContactConfig";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-  body { background:#FFFFFF; color:#111111; font-family:'Raleway',sans-serif; }
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#FFFFFF; color:#111111; font-family:var(--font-body); }
   nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:18px 60px; display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; border-bottom:1px solid #E5E5E5; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
-  .nav-logo { font-family:'Cinzel',serif; font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
+  .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
   .nav-links { display:flex; gap:28px; list-style:none; }
   .nav-links a { color:#111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; }
   @media(max-width:768px){ nav{padding:16px 24px;} .nav-links{gap:18px;} }
@@ -24,12 +23,12 @@ const styles = `
   @keyframes popIn { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
   @keyframes drawCheck { to { stroke-dashoffset:0 } }
 
-  .title { font-family:'Cinzel',serif; font-size:clamp(22px,4vw,30px); font-weight:700; color:#111; text-align:center; margin-bottom:8px; }
+  .title { font-family:var(--font-display); font-size:clamp(22px,4vw,30px); font-weight:700; color:#111; text-align:center; margin-bottom:8px; }
   .subtitle { color:#666; font-size:15px; text-align:center; line-height:1.7; margin-bottom:24px; }
 
   .order-id-box { background:#F5F3FF; border:1px solid #DDD6FE; border-radius:12px; padding:14px 20px; text-align:center; margin-bottom:24px; }
   .order-id-label { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#7C3AED; margin-bottom:4px; font-weight:700; }
-  .order-id-value { font-family:'Cinzel',serif; font-size:20px; font-weight:700; color:#5B21B6; }
+  .order-id-value { font-family:var(--font-display); font-size:20px; font-weight:700; color:#5B21B6; }
 
   .card { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:14px; overflow:hidden; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
   .card-header { padding:12px 18px; background:#FAFAFA; border-bottom:1px solid #F0F0F0; font-size:11px; letter-spacing:2px; text-transform:uppercase; font-weight:700; color:#555; }
@@ -50,7 +49,7 @@ const styles = `
   .breakdown-discount { color:#16A34A !important; }
   .breakdown-total { padding-top:12px !important; border-top:2px solid #E5E5E5 !important; border-bottom:none !important; margin-top:4px; }
   .breakdown-total .breakdown-label { color:#111; font-weight:700; font-size:15px; }
-  .breakdown-total .breakdown-value { color:#5B21B6 !important; font-size:21px; font-family:'Cinzel',serif; }
+  .breakdown-total .breakdown-value { color:#5B21B6 !important; font-size:21px; font-family:var(--font-display); }
 
   .wa-btn { display:flex; align-items:center; justify-content:center; gap:10px; background:linear-gradient(135deg,#25d366,#128c7e); color:#FFFFFF !important; text-decoration:none; padding:15px 28px; border-radius:50px; font-size:14px; font-weight:700; letter-spacing:0.3px; box-shadow:0 4px 20px rgba(37,211,102,0.4); transition:all 0.2s; margin-bottom:10px; text-align:center; line-height:1.4; }
   .wa-btn:hover { transform:translateY(-2px); box-shadow:0 6px 28px rgba(37,211,102,0.5); }
@@ -62,7 +61,7 @@ const styles = `
   .track-btn:hover { background:#5B21B6; transform:translateY(-1px); }
 
   footer { background:#111; padding:40px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
-  .footer-logo { font-family:'Cinzel',serif; font-size:16px; font-weight:900; color:#fff; }
+  .footer-logo { font-family:var(--font-display); font-size:16px; font-weight:900; color:#fff; }
   .footer-copy { font-size:12px; color:rgba(255,255,255,0.4); }
   @media(max-width:768px){ footer{padding:32px 24px;flex-direction:column;text-align:center;} }
 `;

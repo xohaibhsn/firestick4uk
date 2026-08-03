@@ -27,7 +27,7 @@ export default function Navbar({
       setLogo(logoUrl || "");
       return;
     }
-    fetch("/api/site-content?page=settings")
+    fetch("/api/site-content?page=all")
       .then((r) => r.json())
       .then((d) => {
         if (d && typeof d === "object" && d.site_logo_url) {
@@ -48,18 +48,7 @@ export default function Navbar({
       />
     </a>
   ) : (
-    <a
-      href="/"
-      className="nav-logo"
-      style={{
-        fontFamily: "Cinzel, serif",
-        fontSize: 20,
-        fontWeight: 900,
-        letterSpacing: 2,
-        color: "#111111",
-        textDecoration: "none",
-      }}
-    >
+    <a href="/" className="nav-logo nav-logo-text">
       FIRESTICK4UK
     </a>
   );
@@ -74,15 +63,20 @@ export default function Navbar({
           box-shadow: 0 1px 4px rgba(0,0,0,0.06);
         }
         .site-nav .nav-logo {
-          font-family: 'Cinzel', serif; font-size: 20px; font-weight: 900;
-          color: #111111; text-decoration: none; letter-spacing: 2px;
           display: flex; align-items: center; flex-shrink: 0;
+          text-decoration: none; color: #111111;
+        }
+        .site-nav .nav-logo-text {
+          font-family: var(--font-logo), 'Cinzel', Georgia, serif;
+          font-size: 20px; font-weight: 900; letter-spacing: 2px;
+          color: #111111; text-decoration: none;
         }
         .site-nav .nav-links {
           display: flex; gap: 36px; list-style: none; margin: 0; padding: 0;
           align-items: center;
         }
         .site-nav .nav-links a {
+          font-family: var(--font-body), 'Inter', system-ui, sans-serif;
           color: #111111; text-decoration: none; font-size: 13px; font-weight: 500;
           letter-spacing: 1.5px; text-transform: uppercase; transition: color 0.2s;
         }
@@ -90,6 +84,7 @@ export default function Navbar({
         .site-nav .nav-cta {
           background: #5B21B6 !important; color: #FFFFFF !important;
           padding: 10px 24px !important; border-radius: 30px !important; font-weight: 600 !important;
+          font-family: var(--font-body), 'Inter', system-ui, sans-serif !important;
         }
         .site-nav .nav-cta:hover { background: #4C1D95 !important; }
         .site-nav .hamburger {

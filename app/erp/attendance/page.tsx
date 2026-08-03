@@ -292,7 +292,7 @@ function AttContent({ user, currency: _c }: { user: any; currency: string }) {
             {label:"Hours",val:`${summary.total_hours||0}h`,color:"#bf5fff"},
           ].map(s=>(
             <div key={s.label} className="erp-stat" style={{padding:"12px 10px",textAlign:"center"}}>
-              <div style={{fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:700,color:s.color}}>{s.val}</div>
+              <div style={{fontFamily:"var(--font-display)",fontSize:20,fontWeight:700,color:s.color}}>{s.val}</div>
               <div style={{fontSize:10,color:"#666666",letterSpacing:"0.5px",textTransform:"uppercase",marginTop:3}}>{s.label}</div>
             </div>
           ))}

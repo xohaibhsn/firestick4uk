@@ -3,14 +3,13 @@ import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background:#FFFFFF; color:#111111; font-family:'Raleway',sans-serif; overflow-x:hidden; }
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow-x:hidden; }
 
   nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:18px 60px;
     display:flex; align-items:center; justify-content:space-between;
     background:#FFFFFF; border-bottom:1px solid #E5E5E5; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
-  .nav-logo { font-family:'Cinzel',serif; font-size:20px; font-weight:900; color:#111111;
+  .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111;
     text-decoration:none; letter-spacing:2px; }
   .nav-links { display:flex; gap:36px; list-style:none; }
   .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.2s; }
@@ -32,7 +31,7 @@ const styles = `
   /* HERO — light bg, dark text */
   .about-hero { max-width:900px; margin:0 auto; padding:60px 24px 50px; text-align:center; }
   .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; display:block; font-weight:600; }
-  .page-title { font-family:'Cinzel',serif; font-size:clamp(30px,5vw,56px); font-weight:900; color:#111111; margin-bottom:20px; line-height:1.1; }
+  .page-title { font-family:var(--font-display); font-size:clamp(30px,5vw,56px); font-weight:900; color:#111111; margin-bottom:20px; line-height:1.1; }
   .page-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
   .hero-text { font-size:clamp(15px,2vw,18px); color:#555555; line-height:1.8; max-width:700px; margin:0 auto 40px; }
 
@@ -42,14 +41,14 @@ const styles = `
   .stat-card { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:18px; padding:28px 20px; text-align:center;
     box-shadow:0 2px 8px rgba(0,0,0,0.05); transition:all 0.3s; }
   .stat-card:hover { transform:translateY(-5px); border-color:#5B21B6; box-shadow:0 8px 24px rgba(91,33,182,0.12); }
-  .stat-number { font-family:'Cinzel',serif; font-size:36px; font-weight:900; color:#5B21B6; }
+  .stat-number { font-family:var(--font-display); font-size:36px; font-weight:900; color:#5B21B6; }
   .stat-label { font-size:12px; color:#666666; letter-spacing:2px; text-transform:uppercase; margin-top:6px; }
 
   /* STORY — light bg, dark text, light purple visual card */
   .story-section { max-width:1100px; margin:0 auto; padding:0 24px 80px;
     display:grid; grid-template-columns:1fr 1fr; gap:50px; align-items:center; }
   .story-text .section-tag { text-align:left; }
-  .story-title { font-family:'Cinzel',serif; font-size:clamp(24px,3vw,38px); font-weight:700; color:#111111; margin-bottom:20px; }
+  .story-title { font-family:var(--font-display); font-size:clamp(24px,3vw,38px); font-weight:700; color:#111111; margin-bottom:20px; }
   .story-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
   .story-para { font-size:15px; color:#444444; line-height:1.9; margin-bottom:16px; }
   .story-visual { background:#F5F3FF; border:1px solid #DDD6FE; border-radius:24px; padding:36px;
@@ -63,14 +62,14 @@ const styles = `
   .values-section { background:#F5F5F5; padding:60px 0 80px; }
   .values-inner { max-width:1100px; margin:0 auto; padding:0 24px; }
   .section-header { margin-bottom:40px; }
-  .section-title { font-family:'Cinzel',serif; font-size:clamp(24px,3vw,38px); font-weight:700; color:#111111; }
+  .section-title { font-family:var(--font-display); font-size:clamp(24px,3vw,38px); font-weight:700; color:#111111; }
   .section-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
   .values-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:20px; }
   .value-card { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:16px; padding:28px 24px;
     box-shadow:0 1px 4px rgba(0,0,0,0.04); transition:all 0.3s; }
   .value-card:hover { transform:translateY(-4px); border-color:#5B21B6; box-shadow:0 8px 24px rgba(91,33,182,0.1); }
   .value-icon { font-size:32px; margin-bottom:14px; display:block; }
-  .value-title { font-family:'Cinzel',serif; font-size:16px; font-weight:700; color:#111111; margin-bottom:8px; }
+  .value-title { font-family:var(--font-display); font-size:16px; font-weight:700; color:#111111; margin-bottom:8px; }
   .value-desc { font-size:14px; color:#666666; line-height:1.7; }
 
   /* TIMELINE — light bg, dark text */
@@ -84,13 +83,13 @@ const styles = `
   .tl-line { width:2px; flex:1; min-height:20px; background:#E5E5E5; margin:4px 0; }
   .tl-content { padding:4px 0 32px; flex:1; }
   .tl-year { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#5B21B6; margin-bottom:6px; font-weight:600; }
-  .tl-title { font-family:'Cinzel',serif; font-size:17px; font-weight:700; color:#111111; margin-bottom:6px; }
+  .tl-title { font-family:var(--font-display); font-size:17px; font-weight:700; color:#111111; margin-bottom:6px; }
   .tl-desc { font-size:14px; color:#555555; line-height:1.6; }
 
   /* CTA — DARK section (like homepage CTA) */
   .cta-section { margin:0 60px 80px; }
   .cta-box { background:#111111; border-radius:20px; padding:70px 60px; text-align:center; }
-  .cta-title { font-family:'Cinzel',serif; font-size:clamp(22px,3vw,36px); font-weight:700; color:#FFFFFF; margin-bottom:14px; }
+  .cta-title { font-family:var(--font-display); font-size:clamp(22px,3vw,36px); font-weight:700; color:#FFFFFF; margin-bottom:14px; }
   .cta-sub { color:rgba(255,255,255,0.65); font-size:15px; margin-bottom:36px; }
   .cta-btns { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
   .btn-primary { background:#5B21B6; color:#FFFFFF; padding:15px 40px; border-radius:8px;
@@ -104,7 +103,7 @@ const styles = `
 
   /* FOOTER — dark */
   footer { background:#111111; padding:50px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; }
-  .footer-logo { font-family:'Cinzel',serif; font-size:17px; font-weight:900; color:#FFFFFF; }
+  .footer-logo { font-family:var(--font-display); font-size:17px; font-weight:900; color:#FFFFFF; }
   .footer-links { display:flex; gap:24px; list-style:none; flex-wrap:wrap; }
   .footer-links a { color:rgba(255,255,255,0.6); text-decoration:none; font-size:13px; transition:color 0.2s; }
   .footer-links a:hover { color:#FFFFFF; }

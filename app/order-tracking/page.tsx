@@ -4,13 +4,12 @@ import Navbar from "@/components/Navbar";
 import { useContactConfig } from "@/hooks/useContactConfig";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background:#FFFFFF; color:#111111; font-family:'Raleway',sans-serif; overflow-x:hidden; }
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow-x:hidden; }
   nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:18px 60px;
     display:flex; align-items:center; justify-content:space-between;
     background:#FFFFFF; border-bottom:1px solid #E5E5E5; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
-  .nav-logo { font-family:'Cinzel',serif; font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
+  .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
   .nav-links { display:flex; gap:36px; list-style:none; }
   .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.3s; }
   .nav-links a:hover { color:#5B21B6; }
@@ -27,12 +26,12 @@ const styles = `
   .page-wrapper { position:relative; z-index:1; padding-top:100px; min-height:100vh; background:#FFFFFF; }
   .page-header { max-width:800px; margin:0 auto; padding:50px 24px 30px; text-align:center; }
   .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; }
-  .page-title { font-family:'Cinzel',serif; font-size:clamp(28px,4vw,48px); font-weight:700; color:#111111; margin-bottom:14px; }
+  .page-title { font-family:var(--font-display); font-size:clamp(28px,4vw,48px); font-weight:700; color:#111111; margin-bottom:14px; }
   .page-title span { color:#5B21B6; }
   .page-sub { color:#555555; font-size:15px; line-height:1.7; }
   .search-section { max-width:600px; margin:0 auto; padding:30px 24px 0; }
   .search-box { display:flex; gap:12px; }
-  .search-input { flex:1; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:50px; padding:16px 24px; color:#111111; font-family:'Raleway',sans-serif; font-size:15px; outline:none; transition:all 0.2s; }
+  .search-input { flex:1; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:50px; padding:16px 24px; color:#111111; font-family:var(--font-body); font-size:15px; outline:none; transition:all 0.2s; }
   .search-input::placeholder { color:#999999; }
   .search-input:focus { border-color:#5B21B6; box-shadow:0 0 0 3px rgba(91,33,182,0.1); }
   .search-btn { background:#5B21B6; color:#FFFFFF; border:none; padding:16px 32px; border-radius:50px; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
@@ -43,7 +42,7 @@ const styles = `
   @keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
   .order-card-header { padding:24px 28px; border-bottom:1px solid #E5E5E5; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background:#F9F7FF; }
   .order-id-label { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#666666; margin-bottom:6px; }
-  .order-id-value { font-family:'Cinzel',serif; font-size:20px; font-weight:700; color:#111111; }
+  .order-id-value { font-family:var(--font-display); font-size:20px; font-weight:700; color:#111111; }
   .order-status-badge { padding:8px 18px; border-radius:30px; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
   .status-pending { background:#FEF3C7; border:1px solid rgba(234,179,8,0.3); color:#92400E; }
   .status-confirmed { background:#EDE9FE; border:1px solid rgba(91,33,182,0.3); color:#5B21B6; }
@@ -55,10 +54,10 @@ const styles = `
   .order-item-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #F0F0F0; font-size:14px; }
   .order-item-row:last-child { border:none; }
   .order-item-name { color:#111111; font-weight:500; }
-  .order-item-price { color:#5B21B6; font-weight:700; font-family:'Cinzel',serif; }
+  .order-item-price { color:#5B21B6; font-weight:700; font-family:var(--font-display); }
   .order-total-row { display:flex; justify-content:space-between; padding:14px 0; border-top:2px solid #E5E5E5; font-size:16px; }
-  .order-total-row span:first-child { font-family:'Cinzel',serif; font-weight:700; color:#111111; }
-  .order-total-row span:last-child { font-family:'Cinzel',serif; font-weight:700; color:#5B21B6; font-size:20px; }
+  .order-total-row span:first-child { font-family:var(--font-display); font-weight:700; color:#111111; }
+  .order-total-row span:last-child { font-family:var(--font-display); font-weight:700; color:#5B21B6; font-size:20px; }
   .progress-section { margin-top:24px; }
   .progress-section h4 { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#666666; margin-bottom:20px; font-weight:600; }
   .steps { display:flex; flex-direction:column; gap:0; }
@@ -85,12 +84,12 @@ const styles = `
   .info-row span:last-child { color:#111111; font-weight:500; }
   .help-section { max-width:700px; margin:0 auto 80px; padding:0 24px; }
   .help-card { background:#111111; border-radius:16px; padding:28px 32px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
-  .help-text h4 { font-family:'Cinzel',serif; font-size:16px; margin-bottom:6px; color:#FFFFFF; }
+  .help-text h4 { font-family:var(--font-display); font-size:16px; margin-bottom:6px; color:#FFFFFF; }
   .help-text p { font-size:13px; color:rgba(255,255,255,0.7); }
   .wa-btn { background:linear-gradient(135deg,#25d366,#128c7e); color:#FFFFFF; padding:12px 28px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; transition:all 0.2s; }
   .wa-btn:hover { transform:translateY(-1px); }
   footer { background:#111111; padding:40px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
-  .footer-logo { font-family:'Cinzel',serif; font-size:16px; font-weight:900; color:#FFFFFF; }
+  .footer-logo { font-family:var(--font-display); font-size:16px; font-weight:900; color:#FFFFFF; }
   .footer-links { display:flex; gap:20px; list-style:none; flex-wrap:wrap; }
   .footer-links a { color:rgba(255,255,255,0.6); text-decoration:none; font-size:13px; transition:color 0.2s; }
   .footer-links a:hover { color:#FFFFFF; }

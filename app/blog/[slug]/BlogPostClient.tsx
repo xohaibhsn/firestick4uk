@@ -45,12 +45,11 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
-        body{background:#FFFFFF;color:#111111;font-family:'Raleway',sans-serif;}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+        body{background:#FFFFFF;color:#111111;font-family:var(--font-body);}
 
         nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 60px;display:flex;align-items:center;justify-content:space-between;background:#FFFFFF;border-bottom:1px solid #E5E5E5;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
-        .nav-logo{font-family:'Cinzel',serif;font-size:20px;font-weight:900;color:#111111;text-decoration:none;letter-spacing:2px;}
+        .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
         .nav-links{display:flex;gap:28px;list-style:none;}
         .nav-links a{color:#111111;text-decoration:none;font-size:13px;font-weight:500;letter-spacing:1px;text-transform:uppercase;transition:color 0.2s;}
         .nav-links a:hover{color:#5B21B6;}
@@ -68,7 +67,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
 
         .post-badge{display:inline-block;background:#5B21B6;color:#FFFFFF;font-size:11px;font-weight:700;padding:4px 14px;border-radius:20px;letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;}
 
-        .post-title{font-family:'Cinzel',serif;font-size:clamp(24px,4vw,38px);font-weight:700;color:#111111;line-height:1.25;margin-bottom:16px;}
+        .post-title{font-family:var(--font-display);font-size:clamp(24px,4vw,38px);font-weight:700;color:#111111;line-height:1.25;margin-bottom:16px;}
 
         .post-meta{color:#888888;font-size:13px;margin-bottom:28px;display:flex;gap:18px;flex-wrap:wrap;}
 
@@ -77,9 +76,9 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
         .post-excerpt{font-size:16px;color:#555555;line-height:1.8;margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid #E5E5E5;font-style:italic;}
 
         .post-content{font-size:15px;color:#333333;line-height:1.9;}
-        .post-content h1{font-family:'Cinzel',serif;font-size:2rem;font-weight:700;color:#111111;margin:1.5rem 0 1rem;}
-        .post-content h2{font-family:'Cinzel',serif;font-size:1.75rem;font-weight:700;color:#111111;margin:1.5rem 0 1rem;padding-bottom:8px;border-bottom:1px solid #E5E5E5;}
-        .post-content h3{font-family:'Cinzel',serif;font-size:1.4rem;font-weight:600;color:#5B21B6;margin:1.25rem 0 0.75rem;}
+        .post-content h1{font-family:var(--font-display);font-size:2rem;font-weight:700;color:#111111;margin:1.5rem 0 1rem;}
+        .post-content h2{font-family:var(--font-display);font-size:1.75rem;font-weight:700;color:#111111;margin:1.5rem 0 1rem;padding-bottom:8px;border-bottom:1px solid #E5E5E5;}
+        .post-content h3{font-family:var(--font-display);font-size:1.4rem;font-weight:600;color:#5B21B6;margin:1.25rem 0 0.75rem;}
         .post-content h4{font-size:1.1rem;font-weight:600;color:#111111;margin:1rem 0 0.5rem;}
         .post-content p{margin:0 0 1rem;line-height:1.85;}
         .post-content ul{list-style:disc;padding-left:1.5rem;margin:1rem 0;}
@@ -95,13 +94,13 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
         .post-content pre{background:#F9F9F9;border:1px solid #E5E5E5;border-radius:8px;padding:16px;overflow-x:auto;font-size:14px;}
 
         .cta-box{margin-top:48px;background:#111111;border-radius:16px;padding:36px;text-align:center;}
-        .cta-title{font-family:'Cinzel',serif;font-size:20px;font-weight:700;color:#FFFFFF;margin-bottom:10px;}
+        .cta-title{font-family:var(--font-display);font-size:20px;font-weight:700;color:#FFFFFF;margin-bottom:10px;}
         .cta-sub{color:rgba(255,255,255,0.65);font-size:14px;margin-bottom:22px;}
         .btn-primary{background:#5B21B6;color:#FFFFFF;padding:13px 30px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;display:inline-block;transition:all 0.2s;}
         .btn-primary:hover{background:#4C1D95;transform:translateY(-1px);}
 
         .faq-section{margin-top:44px;}
-        .faq-title{font-family:'Cinzel',serif;font-size:20px;font-weight:700;color:#111111;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid #E5E5E5;}
+        .faq-title{font-family:var(--font-display);font-size:20px;font-weight:700;color:#111111;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid #E5E5E5;}
         .faq-item{border:1px solid #E5E5E5;border-radius:10px;margin-bottom:10px;overflow:hidden;transition:border-color 0.2s;background:#FFFFFF;}
         .faq-item.open{border-color:#5B21B6;}
         .faq-q{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;cursor:pointer;background:#FAFAFA;transition:background 0.2s;}
@@ -118,7 +117,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
         .loading-state a{color:#5B21B6;}
 
         footer{background:#111111;padding:50px 60px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;margin-top:80px;}
-        .footer-logo{font-family:'Cinzel',serif;font-size:17px;font-weight:900;color:#FFFFFF;}
+        .footer-logo { font-family:var(--font-display); font-size:16px; font-weight:900; color:#FFFFFF; }
         .footer-links{display:flex;gap:24px;list-style:none;flex-wrap:wrap;}
         .footer-links a{color:rgba(255,255,255,0.6);text-decoration:none;font-size:13px;transition:color 0.2s;}
         .footer-links a:hover{color:#FFFFFF;}

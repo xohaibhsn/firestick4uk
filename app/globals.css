@@ -9,6 +9,11 @@ html {
 }
 
 :root {
+  --font-display: var(--font-playfair), 'Playfair Display', Georgia, serif;
+  --font-body: var(--font-inter), 'Inter', system-ui, sans-serif;
+  --font-logo: var(--font-cinzel), 'Cinzel', Georgia, serif;
+
+  /* Brand colors */
   --color-bg: #FFFFFF;
   --color-text: #111111;
   --color-purple: #5B21B6;
@@ -24,6 +29,20 @@ html {
 html body {
   background-color: #FFFFFF !important;
   color: #111111 !important;
+  font-family: var(--font-body);
+  font-weight: 400;
+}
+
+html body h1, html body h2, html body h3, html body h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: #111111 !important;
+}
+
+/* Logo text fallback only */
+.nav-logo-text,
+.site-nav .nav-logo-text {
+  font-family: var(--font-logo) !important;
 }
 
 /* Remove dark overlay backgrounds */
@@ -88,10 +107,29 @@ html body .hamburger span {
 html body h1, html body h2, html body h3,
 html body h4, html body h5, html body h6 {
   color: #111111 !important;
+  font-family: var(--font-display);
+}
+
+html body .page-title,
+html body .section-title,
+html body .hero-title,
+html body .home-seo-hero h1,
+html body .product-price,
+html body .footer-logo,
+html body .stat-num,
+html body .stat-number {
+  font-family: var(--font-display);
+}
+
+html body .product-card .product-name,
+html body .card-title {
+  font-family: var(--font-body) !important;
+  font-weight: 600;
 }
 
 html body .section-tag {
   color: #5B21B6 !important;
+  font-family: var(--font-body);
 }
 
 html body .page-title span,

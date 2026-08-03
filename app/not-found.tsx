@@ -9,16 +9,15 @@ export default function NotFound() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
-        body{background:#FFFFFF;color:#111111;font-family:'Raleway',sans-serif;}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+        body{background:#FFFFFF;color:#111111;font-family:var(--font-body);}
         nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 60px;display:flex;align-items:center;justify-content:space-between;background:#FFFFFF;border-bottom:1px solid #E5E5E5;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
-        .nav-logo{font-family:'Cinzel',serif;font-size:20px;font-weight:900;color:#111111;text-decoration:none;letter-spacing:2px;}
+        .nav-logo{font-family:var(--font-display);font-size:20px;font-weight:900;color:#111111;text-decoration:none;letter-spacing:2px;}
         .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:100px 24px 60px;text-align:center;background:#FFFFFF;}
         .content{max-width:560px;}
-        .code{font-family:'Cinzel',serif;font-size:clamp(80px,15vw,140px);font-weight:900;line-height:1;color:#5B21B6;margin-bottom:8px;}
+        .code{font-family:var(--font-display);font-size:clamp(80px,15vw,140px);font-weight:900;line-height:1;color:#5B21B6;margin-bottom:8px;}
         .icon{font-size:48px;margin-bottom:20px;display:block;}
-        .title{font-family:'Cinzel',serif;font-size:clamp(20px,3vw,28px);font-weight:700;color:#111111;margin-bottom:14px;}
+        .title{font-family:var(--font-display);font-size:clamp(20px,3vw,28px);font-weight:700;color:#111111;margin-bottom:14px;}
         .sub{color:#555555;font-size:15px;line-height:1.7;margin-bottom:40px;}
         .btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;}
         .btn-primary{background:#5B21B6;color:#FFFFFF;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;transition:all 0.2s;}

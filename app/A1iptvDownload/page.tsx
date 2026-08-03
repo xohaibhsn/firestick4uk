@@ -14,13 +14,13 @@ export default function A1IPTVDownload() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0a0a0a 0%, #1a0533 50%, #0a0a0a 100%)',
+      background: '#FFFFFF',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: 'sans-serif',
-      color: '#ffffff',
+      fontFamily: 'var(--font-body)',
+      color: '#111111',
       padding: '20px',
       textAlign: 'center'
     }}>
@@ -46,15 +46,14 @@ export default function A1IPTVDownload() {
         fontSize: '32px',
         fontWeight: '700',
         marginBottom: '8px',
-        background: 'linear-gradient(135deg, #ffffff, #a78bfa)',
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent'
+        fontFamily: 'var(--font-display)',
+        color: '#111111'
       }}>
         A1 IPTV Player
       </h1>
 
       <p style={{
-        color: '#a78bfa',
+        color: '#5B21B6',
         marginBottom: '32px',
         fontSize: '16px'
       }}>
@@ -96,7 +95,7 @@ export default function A1IPTVDownload() {
         href="/downloads/A1IPTVPlayer-latest.apk"
         style={{
           background: '#5B21B6',
-          color: '#ffffff',
+          color: '#111111',
           padding: '14px 32px',
           borderRadius: '50px',
           textDecoration: 'none',
@@ -122,7 +121,7 @@ export default function A1IPTVDownload() {
           fontSize: '16px',
           fontWeight: '600',
           marginBottom: '16px',
-          color: '#a78bfa'
+          color: '#5B21B6'
         }}>
           📋 Installation Instructions:
         </h3>

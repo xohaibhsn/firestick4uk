@@ -123,7 +123,7 @@ export default function TipTapEditor({ content, onChange, placeholder = "Write y
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
     editorProps: {
       attributes: {
-        style: "min-height:400px;padding:16px 20px;outline:none;font-family:'Raleway',sans-serif;font-size:15px;line-height:1.8;color:#111111;",
+        style: "min-height:400px;padding:16px 20px;outline:none;font-family:var(--font-body);font-size:15px;line-height:1.8;color:#111111;",
       },
     },
   });

@@ -4,17 +4,16 @@ import dynamic from "next/dynamic";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
   :root { --purple:#5B21B6; --purple-dark:#4C1D95; --black:#1A1A1A; --text:#111111; --border:#E5E5E5; --gray:#F5F5F5; --gray-text:#666666; --green:#16A34A; --red:#DC2626; --orange:#EA580C; --blue:#2563EB; }
-  body { background:#F5F5F5; color:#111111; font-family:'Raleway',sans-serif; overflow-x:hidden; }
+  body { background:#F5F5F5; color:#111111; font-family:var(--font-body); overflow-x:hidden; }
 
   /* LOGIN */
   .login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:#F5F5F5; }
   .login-box { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:16px; padding:48px 40px; width:100%; max-width:420px; text-align:center; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
-  .login-logo { font-family:'Cinzel',serif; font-size:22px; font-weight:900; color:#111111; margin-bottom:6px; }
+  .login-logo { font-family:var(--font-display); font-size:22px; font-weight:900; color:#111111; margin-bottom:6px; }
   .login-sub { font-size:12px; color:#666666; margin-bottom:32px; letter-spacing:2px; text-transform:uppercase; }
-  .login-input { width:100%; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:8px; padding:12px 16px; color:#111111; font-family:'Raleway',sans-serif; font-size:14px; outline:none; margin-bottom:12px; transition:border-color 0.2s; }
+  .login-input { width:100%; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:8px; padding:12px 16px; color:#111111; font-family:var(--font-body); font-size:14px; outline:none; margin-bottom:12px; transition:border-color 0.2s; }
   .login-input:focus { border-color:#5B21B6; box-shadow:0 0 0 3px rgba(91,33,182,0.1); }
   .login-input::placeholder { color:#999999; }
   .login-btn { width:100%; background:#5B21B6; color:#FFFFFF; border:none; padding:14px; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; transition:all 0.2s; margin-top:4px; }
@@ -28,7 +27,7 @@ const styles = `
   .sidebar { width:240px; flex-shrink:0; background:#111111; border-right:none; display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:50; color:#FFFFFF; }
   .sidebar * { color:#FFFFFF; }
   .sidebar-logo { padding:24px 20px 18px; border-bottom:1px solid rgba(255,255,255,0.1); }
-  .sidebar-logo-text { font-family:'Cinzel',serif; font-size:15px; font-weight:900; color:#FFFFFF !important; letter-spacing:1px; }
+  .sidebar-logo-text { font-family:var(--font-display); font-size:15px; font-weight:900; color:#FFFFFF !important; letter-spacing:1px; }
   .sidebar-label { font-size:10px; color:#AAAAAA !important; letter-spacing:3px; text-transform:uppercase; margin-top:3px; }
   .sidebar-nav { flex:1; padding:16px 10px; display:flex; flex-direction:column; gap:3px; }
   .nav-item { display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:8px; cursor:pointer; transition:all 0.15s; color:#CCCCCC !important; font-size:13px; font-weight:500; border:none; background:none; width:100%; text-align:left; }
@@ -44,7 +43,7 @@ const styles = `
   /* MAIN */
   .main-content { margin-left:240px; flex:1; padding:28px; min-height:100vh; background:#F5F5F5; }
   .top-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
-  .page-heading { font-family:'Cinzel',serif; font-size:22px; font-weight:700; color:#111111; }
+  .page-heading { font-family:var(--font-display); font-size:22px; font-weight:700; color:#111111; }
   .page-heading span { color:#5B21B6; }
   .top-right { display:flex; align-items:center; gap:14px; position:relative; }
   .admin-badge { background:#F5F5F5; border:1px solid #E5E5E5; color:#666666; font-size:12px; padding:6px 14px; border-radius:20px; }
@@ -65,13 +64,13 @@ const styles = `
   .stat-card-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
   .stat-icon { font-size:26px; }
   .stat-trend { font-size:11px; color:#16A34A; background:rgba(22,163,74,0.1); padding:3px 8px; border-radius:8px; }
-  .stat-value { font-family:'Cinzel',serif; font-size:26px; font-weight:700; color:#111111; margin-bottom:3px; }
+  .stat-value { font-family:var(--font-display); font-size:26px; font-weight:700; color:#111111; margin-bottom:3px; }
   .stat-label { font-size:11px; color:#666666; letter-spacing:1px; text-transform:uppercase; }
 
   /* TABLE */
   .section-card { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:12px; overflow:hidden; margin-bottom:20px; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
   .section-header { padding:18px 20px; border-bottom:1px solid #E5E5E5; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
-  .section-title { font-family:'Cinzel',serif; font-size:15px; font-weight:700; color:#111111; }
+  .section-title { font-family:var(--font-display); font-size:15px; font-weight:700; color:#111111; }
   .section-actions { display:flex; gap:8px; flex-wrap:wrap; }
   .filter-select { background:#F5F5F5; border:1px solid #E5E5E5; color:#111111; padding:7px 12px; border-radius:8px; font-size:13px; outline:none; cursor:pointer; }
   .filter-select option { background:#FFFFFF; color:#111111; }
@@ -141,10 +140,10 @@ const styles = `
   /* MODAL */
   .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; }
   .modal { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:16px; padding:32px; max-width:550px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.12); }
-  .modal-title { font-family:'Cinzel',serif; font-size:18px; font-weight:700; color:#111111; margin-bottom:24px; }
+  .modal-title { font-family:var(--font-display); font-size:18px; font-weight:700; color:#111111; margin-bottom:24px; }
   .modal-field { margin-bottom:16px; }
   .modal-field label { display:block; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:#666666; margin-bottom:7px; font-weight:600; }
-  .modal-field input, .modal-field select, .modal-field textarea { width:100%; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:8px; padding:11px 14px; color:#111111; font-family:'Raleway',sans-serif; font-size:14px; outline:none; transition:border-color 0.2s; }
+  .modal-field input, .modal-field select, .modal-field textarea { width:100%; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:8px; padding:11px 14px; color:#111111; font-family:var(--font-body); font-size:14px; outline:none; transition:border-color 0.2s; }
   .modal-field input:focus, .modal-field select:focus, .modal-field textarea:focus { border-color:#5B21B6; box-shadow:0 0 0 3px rgba(91,33,182,0.1); }
   .modal-field select option { background:#FFFFFF; color:#111111; }
   .modal-actions { display:flex; gap:12px; justify-content:flex-end; margin-top:24px; }
@@ -996,7 +995,7 @@ export default function AdminPage() {
                   ? <img src={editProduct.image} alt="product" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid rgba(139,0,255,0.3)"}} />
                   : <div style={{width:60,height:60,background:"rgba(139,0,255,0.1)",border:"1px dashed rgba(139,0,255,0.4)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📦</div>
                 }
-                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.35)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"var(--purple-glow)"}}>
+                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.35)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6"}}>
                   {imageUploading ? "Uploading..." : "Upload Image"}
                   <input type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files?.[0] && handleProductImage(e.target.files[0])} disabled={imageUploading} />
                 </label>
@@ -1069,7 +1068,7 @@ export default function AdminPage() {
               <label>Featured Image</label>
               <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
                 {editBlog.featured_image && <img src={editBlog.featured_image} alt="" style={{width:80,height:50,objectFit:"cover",borderRadius:6,border:"1px solid rgba(139,0,255,0.3)"}} />}
-                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.35)",padding:"7px 14px",borderRadius:8,fontSize:13,color:"var(--purple-glow)"}}>
+                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.35)",padding:"7px 14px",borderRadius:8,fontSize:13,color:"#5B21B6"}}>
                   {featImgUploading?"Uploading...":"Upload Image"}
                   <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&handleFeatImg(e.target.files[0])} disabled={featImgUploading} />
                 </label>
@@ -1131,7 +1130,7 @@ export default function AdminPage() {
                   <textarea style={{width:"100%",background:"rgba(139,0,255,0.07)",border:"1px solid rgba(139,0,255,0.2)",borderRadius:8,padding:"8px 12px",color:"white",fontSize:13,resize:"vertical",outline:"none",minHeight:60,fontFamily:"inherit"}} placeholder="Answer" value={faq.answer} onChange={e=>setEditBlog(p=>({...p,faqs:p.faqs.map((f,j)=>j===i?{...f,answer:e.target.value}:f)}))} />
                 </div>
               ))}
-              <button type="button" className="erp-btn" style={{background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",color:"var(--purple-glow)",padding:"7px 16px",borderRadius:8,cursor:"pointer",fontSize:13}} onClick={()=>setEditBlog(p=>({...p,faqs:[...p.faqs,{question:"",answer:""}]}))}>+ Add FAQ</button>
+              <button type="button" className="erp-btn" style={{background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",color:"#5B21B6",padding:"7px 16px",borderRadius:8,cursor:"pointer",fontSize:13}} onClick={()=>setEditBlog(p=>({...p,faqs:[...p.faqs,{question:"",answer:""}]}))}>+ Add FAQ</button>
             </div>
 
             {/* Status + Featured toggles */}
@@ -1273,7 +1272,7 @@ export default function AdminPage() {
                     <tbody>
                       {orders.slice(0,10).map(o => (
                         <tr key={o.id}>
-                          <td style={{fontFamily:"monospace",color:"var(--purple-glow)"}}>{o.id}</td>
+                          <td style={{fontFamily:"monospace",color:"#5B21B6"}}>{o.id}</td>
                           <td>{o.customer}</td>
                           <td style={{maxWidth:"180px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.items}</td>
                           <td style={{fontWeight:700}}>{o.total}</td>
@@ -1330,7 +1329,7 @@ export default function AdminPage() {
                   <tbody>
                     {pagedOrders.map(o => (
                       <tr key={o.id}>
-                        <td style={{fontFamily:"monospace",color:"var(--purple-glow)",whiteSpace:"nowrap"}}>{o.id}</td>
+                        <td style={{fontFamily:"monospace",color:"#5B21B6",whiteSpace:"nowrap"}}>{o.id}</td>
                         <td style={{whiteSpace:"nowrap"}}>{o.customer}</td>
                         <td style={{maxWidth:"140px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.items}</td>
                         <td style={{fontWeight:700,whiteSpace:"nowrap"}}>{o.total}</td>
@@ -1378,7 +1377,7 @@ export default function AdminPage() {
                         <td><div className="product-thumb">{p.emoji}</div></td>
                         <td style={{fontWeight:600}}>{p.name}</td>
                         <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{p.category}</span></td>
-                        <td style={{fontWeight:700,color:"var(--purple-glow)"}}>{p.price}</td>
+                        <td style={{fontWeight:700,color:"#5B21B6"}}>{p.price}</td>
                         <td>{p.stock}</td>
                         <td>
                           <button className="action-btn btn-edit" onClick={() => openEditProduct(p)}>Edit</button>
@@ -1411,7 +1410,7 @@ export default function AdminPage() {
                     {blogPosts.map(p => (
                       <tr key={p.id}>
                         <td>{p.featured_image ? <img src={p.featured_image} alt="" style={{width:44,height:44,objectFit:"cover",borderRadius:6,border:"1px solid rgba(139,0,255,0.3)"}} /> : <span style={{fontSize:"20px"}}>{p.emoji||"📝"}</span>}</td>
-                        <td style={{fontWeight:600,maxWidth:"240px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.featured?<span style={{color:"var(--gold)",marginRight:4}}>⭐</span>:null}{p.title}</td>
+                        <td style={{fontWeight:600,maxWidth:"240px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.featured?<span style={{color:"#5B21B6",marginRight:4}}>⭐</span>:null}{p.title}</td>
                         <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{p.category}</span></td>
                         <td><span style={{fontSize:"11px",padding:"3px 10px",borderRadius:"10px",fontWeight:700,background:p.status==="published"?"rgba(0,200,100,0.12)":"rgba(255,180,0,0.12)",border:p.status==="published"?"1px solid rgba(0,200,100,0.3)":"1px solid rgba(255,180,0,0.3)",color:p.status==="published"?"#00c864":"#ffb400"}}>{p.status==="published"?"Published":"Draft"}</span></td>
                         <td style={{whiteSpace:"nowrap"}}>
@@ -1443,7 +1442,7 @@ export default function AdminPage() {
                         <td style={{fontWeight:600}}>{c.name}</td>
                         <td style={{color:"rgba(255,255,255,0.5)",fontSize:"13px"}}>{c.email}</td>
                         <td style={{fontSize:"13px"}}>{c.phone}</td>
-                        <td><span style={{fontWeight:700,color:"var(--purple-glow)"}}>{c.orders}</span></td>
+                        <td><span style={{fontWeight:700,color:"#5B21B6"}}>{c.orders}</span></td>
                         <td style={{fontWeight:700}}>{c.spent}</td>
                         <td style={{color:"rgba(255,255,255,0.4)",fontSize:"12px"}}>{c.joined}</td>
                         <td>
@@ -1540,7 +1539,7 @@ export default function AdminPage() {
               <div className="section-card" style={{padding:0,marginBottom:20,overflow:"hidden"}}>
                 <div style={{padding:"16px 20px",background:"linear-gradient(135deg,#111111,#4C1D95)",color:"#FFFFFF",display:"flex",justifyContent:"space-between",gap:12,alignItems:"center"}}>
                   <div>
-                    <div style={{fontFamily:"Cinzel,serif",fontWeight:900,fontSize:16,color:"#FFFFFF"}}>Professor ↔ Berlin Training Chat</div>
+                    <div style={{fontFamily:"var(--font-display)",fontWeight:900,fontSize:16,color:"#FFFFFF"}}>Professor ↔ Berlin Training Chat</div>
                     <div style={{fontSize:12,color:"rgba(255,255,255,0.72)",marginTop:4}}>
                       Test Berlin, ask what he knows, then say “save this” or “remember this” to add training automatically.
                     </div>
@@ -1705,7 +1704,7 @@ export default function AdminPage() {
                       {coupons.length===0&&<tr><td colSpan={8} style={{textAlign:"center",color:"rgba(255,255,255,0.25)",padding:24}}>No coupons yet</td></tr>}
                       {coupons.map((c:any)=>(
                         <tr key={c.id}>
-                          <td style={{fontFamily:"monospace",color:"var(--purple-glow)",fontWeight:700}}>{c.code}</td>
+                          <td style={{fontFamily:"monospace",color:"#5B21B6",fontWeight:700}}>{c.code}</td>
                           <td><span className="status-badge status-pending" style={{fontSize:11}}>{c.type==="percentage"?`${c.value}%`:`£${c.value}`}</span></td>
                           <td style={{fontWeight:600}}>{c.type==="percentage"?`${c.value}%`:`£${Number(c.value).toFixed(2)}`}</td>
                           <td>{c.minimum_order>0?`£${c.minimum_order}`:"None"}</td>
@@ -2047,7 +2046,7 @@ export default function AdminPage() {
                   <label>Favicon</label>
                   <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap",marginTop:8}}>
                     {siteContent.favicon_url && <img src={siteContent.favicon_url} alt="favicon" style={{width:32,height:32,borderRadius:4,border:"1px solid rgba(139,0,255,0.3)",objectFit:"contain",background:"rgba(255,255,255,0.05)"}} />}
-                    <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"var(--purple-glow)"}}>
+                    <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6"}}>
                       {faviconUploading ? "Uploading..." : "Upload Favicon (.ico/.png/.svg)"}
                       <input type="file" accept=".ico,.png,.jpg,.svg" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&uploadFaviconAdmin(e.target.files[0])} disabled={faviconUploading} />
                     </label>

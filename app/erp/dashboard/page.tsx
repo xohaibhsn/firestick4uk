@@ -119,7 +119,7 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
               return (
                 <div key={c.key} className="erp-stat" style={{background:c.bg,border:`1px solid ${neg?"rgba(220,38,38,0.2)":c.border}`}}>
                   <div className="erp-stat-icon">{c.icon}</div>
-                  <div style={{fontFamily:"'Cinzel',serif",fontSize:18,fontWeight:700,color:colour,lineHeight:1.2}}>
+                  <div style={{fontFamily:"var(--font-display)",fontSize:18,fontWeight:700,color:colour,lineHeight:1.2}}>
                     {neg ? "−" : ""}Rs.&nbsp;{Math.abs(Math.round(bal)).toLocaleString()}
                   </div>
                   <div className="erp-stat-label">{c.label}</div>
@@ -134,7 +134,7 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12,marginBottom:officeExpSummary.categories?.length?14:0}}>
               <div>
                 <div style={{fontSize:13,fontWeight:700}}>🏢 This Month Office Expenses</div>
-                <div style={{fontFamily:"'Cinzel',serif",fontSize:22,fontWeight:900,color:"#ff8c00",marginTop:4}}>{fmt(officeExpSummary.total||0)}</div>
+                <div style={{fontFamily:"var(--font-display)",fontSize:22,fontWeight:900,color:"#ff8c00",marginTop:4}}>{fmt(officeExpSummary.total||0)}</div>
               </div>
               <a href="/erp/office-expenses" style={{color:"#5B21B6",fontSize:12,textDecoration:"none"}}>View All →</a>
             </div>

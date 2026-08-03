@@ -62,11 +62,10 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
-        body{background:#FFFFFF;color:#111111;font-family:'Raleway',sans-serif;}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+        body{background:#FFFFFF;color:#111111;font-family:var(--font-body);}
         nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 60px;display:flex;align-items:center;justify-content:space-between;background:#FFFFFF;border-bottom:1px solid #E5E5E5;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
-        .nav-logo{font-family:'Cinzel',serif;font-size:20px;font-weight:900;color:#111111;text-decoration:none;letter-spacing:2px;}
+        .nav-logo{font-family:var(--font-display);font-size:20px;font-weight:900;color:#111111;text-decoration:none;letter-spacing:2px;}
         .nav-links{display:flex;gap:36px;list-style:none;}
         .nav-links a{color:#111111;text-decoration:none;font-size:13px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;transition:color 0.2s;}
         .nav-links a:hover{color:#5B21B6;}
@@ -89,21 +88,21 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
         .product-img-box img{width:100%;height:100%;object-fit:cover;}
         .placeholder-img{font-size:80px;text-align:center;}
         .product-category{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#5B21B6;margin-bottom:12px;font-weight:600;}
-        .product-name{font-family:'Cinzel',serif;font-size:clamp(22px,3vw,34px);font-weight:700;color:#111111;margin-bottom:12px;line-height:1.25;}
+        .product-name{font-family:var(--font-display);font-size:clamp(22px,3vw,34px);font-weight:800;color:#111111;margin-bottom:12px;line-height:1.25;}
         .product-short-desc{color:#555555;font-size:15px;line-height:1.8;margin-bottom:18px;}
         .product-description,.product-full-description{color:#444444;font-size:15px;line-height:1.85;}
         .product-description p,.product-full-description p{margin:0 0 1rem;line-height:1.85;}
         .product-description ul,.product-full-description ul{list-style:disc;padding-left:1.5rem;margin:1rem 0;}
         .product-description ol,.product-full-description ol{list-style:decimal;padding-left:1.5rem;margin:1rem 0;}
         .product-description li,.product-full-description li{margin:0.4rem 0;color:#333333;}
-        .product-description h1,.product-full-description h1{font-family:'Cinzel',serif;font-size:1.75rem;font-weight:700;color:#111111;margin:1.25rem 0 0.75rem;}
-        .product-description h2,.product-full-description h2{font-family:'Cinzel',serif;font-size:1.5rem;font-weight:700;color:#111111;margin:1.25rem 0 0.75rem;}
-        .product-description h3,.product-full-description h3{font-family:'Cinzel',serif;font-size:1.25rem;font-weight:600;color:#5B21B6;margin:1rem 0 0.5rem;}
+        .product-description h1,.product-full-description h1{font-family:var(--font-display);font-size:1.75rem;font-weight:700;color:#111111;margin:1.25rem 0 0.75rem;}
+        .product-description h2,.product-full-description h2{font-family:var(--font-display);font-size:1.5rem;font-weight:700;color:#111111;margin:1.25rem 0 0.75rem;}
+        .product-description h3,.product-full-description h3{font-family:var(--font-display);font-size:1.25rem;font-weight:600;color:#5B21B6;margin:1rem 0 0.5rem;}
         .product-description a,.product-full-description a{color:#5B21B6;text-decoration:underline;}
         .product-description strong,.product-full-description strong{font-weight:700;color:#111111;}
         .product-description blockquote,.product-full-description blockquote{border-left:4px solid #5B21B6;padding:1rem 1.5rem;background:#F5F3FF;margin:1.25rem 0;color:#444444;font-style:italic;border-radius:0 8px 8px 0;}
         .product-description img,.product-full-description img{max-width:100%;border-radius:10px;margin:1.25rem 0;display:block;}
-        .product-price{font-family:'Cinzel',serif;font-size:36px;font-weight:900;color:#5B21B6;-webkit-text-fill-color:#5B21B6;margin-bottom:22px;}
+        .product-price{font-family:var(--font-display);font-size:36px;font-weight:900;color:#5B21B6;-webkit-text-fill-color:#5B21B6;margin-bottom:22px;}
         .badge-tag{display:inline-block;background:#5B21B6;color:#FFFFFF;font-size:12px;font-weight:700;padding:4px 14px;border-radius:20px;letter-spacing:1px;margin-bottom:14px;}
         .add-btn{width:100%;background:#5B21B6;color:#FFFFFF;border:none;padding:18px;border-radius:9px;font-size:16px;font-weight:700;letter-spacing:0.5px;cursor:pointer;transition:all 0.2s;}
         .add-btn:hover{background:#4C1D95;transform:translateY(-1px);box-shadow:0 4px 16px rgba(91,33,182,0.35);}
@@ -116,12 +115,12 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
         .loading-state{text-align:center;padding:120px 24px;color:#888888;font-size:18px;}
         .product-sections{max-width:1100px;margin:0 auto;padding:0 60px 80px;}
         .section-block{background:#F9F9F9;border:1px solid #E5E5E5;border-radius:16px;padding:30px;margin-bottom:18px;}
-        .section-heading{font-family:'Cinzel',serif;font-size:17px;font-weight:700;color:#111111;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #E5E5E5;}
+        .section-heading{font-family:var(--font-display);font-size:17px;font-weight:700;color:#111111;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #E5E5E5;}
         .feature-list{list-style:none;display:flex;flex-direction:column;gap:10px;}
         .feature-list li{display:flex;align-items:center;gap:12px;color:#444444;font-size:15px;}
         .feature-list li::before{content:"✅";flex-shrink:0;}
         footer{background:#111111;padding:40px 60px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;}
-        .footer-logo{font-family:'Cinzel',serif;font-size:16px;font-weight:900;color:#FFFFFF;}
+        .footer-logo{font-family:var(--font-display);font-size:16px;font-weight:900;color:#FFFFFF;}
         .footer-copy{font-size:12px;color:rgba(255,255,255,0.4);}
         .whatsapp-btn{position:fixed;bottom:30px;right:30px;z-index:999;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,#25d366,#128c7e);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 25px rgba(37,211,102,0.5);text-decoration:none;font-size:26px;transition:all 0.3s;}
         .whatsapp-btn:hover{transform:scale(1.1);}
@@ -135,7 +134,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
           <div className="loading-state">Loading product...</div>
         ) : !product ? (
           <div className="loading-state">
-            Product not found. <a href="/products" style={{color:"var(--purple-glow)"}}>Browse all products →</a>
+            Product not found. <a href="/products" style={{color:"#5B21B6"}}>Browse all products →</a>
           </div>
         ) : (
           <>

@@ -4,32 +4,24 @@ import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import Navbar from "@/components/Navbar";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-  :root { --purple-deep:#0d0010; --purple-mid:#4a0080; --purple-bright:#8b00ff; --purple-glow:#bf5fff; --purple-light:#e0b3ff; --gold:#ffd700; }
-  body { background:var(--purple-deep); color:#fff; font-family:'Raleway',sans-serif; overflow-x:hidden; }
-  .bg-fixed { position:fixed; inset:0; z-index:0;
-    background:radial-gradient(ellipse at 20% 20%,#2d0050 0%,transparent 50%),
-               radial-gradient(ellipse at 80% 80%,#1a0035 0%,transparent 50%),#0a0010; }
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow-x:hidden; }
+
 
   nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:18px 60px;
     display:flex; align-items:center; justify-content:space-between;
-    background:rgba(13,0,16,0.96); backdrop-filter:blur(20px);
-    border-bottom:1px solid rgba(139,0,255,0.2); }
-  .nav-logo { font-family:'Cinzel',serif; font-size:20px; font-weight:900;
-    background:linear-gradient(135deg,var(--purple-glow),var(--gold));
-    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-    text-decoration:none; letter-spacing:2px; }
+    background:#FFFFFF; border-bottom:1px solid #E5E5E5; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+  .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
   .nav-links { display:flex; gap:36px; list-style:none; }
   .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.3s; }
   .nav-links a:hover { color:#5B21B6; }
-  .nav-cta { background:linear-gradient(135deg,var(--purple-mid),var(--purple-bright)) !important; color:white !important; padding:10px 24px !important; border-radius:30px !important; font-weight:600 !important; }
+  .nav-cta { background:#5B21B6 !important; color:white !important; padding:10px 24px !important; border-radius:30px !important; font-weight:600 !important; }
   .hamburger { display:none; flex-direction:column; gap:5px; cursor:pointer; background:none; border:none; padding:5px; z-index:101; }
-  .hamburger span { display:block; width:25px; height:2px; background:var(--purple-glow); }
+  .hamburger span { display:block; width:25px; height:2px; background:#111111; }
   @media(max-width:768px){
     nav{padding:16px 24px;}
     .nav-links{display:none;}
-    .nav-links.open{display:flex;flex-direction:column;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(13,0,16,0.98);align-items:center;justify-content:center;gap:28px;z-index:9999;margin:0;padding:0;}
+    .nav-links.open{display:flex;flex-direction:column;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#FFFFFF;align-items:center;justify-content:center;gap:28px;z-index:9999;margin:0;padding:0;}
     .hamburger{display:flex;}
   }
 
@@ -37,8 +29,8 @@ const styles = `
 
   .page-header { max-width:900px; margin:0 auto; padding:50px 24px 40px; text-align:center; }
   .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; }
-  .page-title { font-family:'Cinzel',serif; font-size:clamp(28px,4vw,48px); font-weight:700; color:#111111; margin-bottom:14px; }
-  .page-title span { background:linear-gradient(135deg,var(--purple-glow),var(--gold)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .page-title { font-family:var(--font-display); font-size:clamp(28px,4vw,48px); font-weight:700; color:#111111; margin-bottom:14px; }
+  .page-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
   .page-sub { color:#555555; font-size:15px; line-height:1.7; }
 
   /* CATEGORIES */
@@ -68,7 +60,7 @@ const styles = `
   .post-badge.guide { background:#16A34A; color:#FFFFFF !important; }
   .post-badge.news { background:#EA580C; color:#FFFFFF !important; }
   .post-badge.tips { background:#2563EB; color:#FFFFFF !important; }
-  .featured-title { font-family:'Cinzel',serif; font-size:clamp(18px,2.5vw,26px); font-weight:700;
+  .featured-title { font-family:var(--font-display); font-size:clamp(18px,2.5vw,26px); font-weight:700;
     color:#FFFFFF !important; margin-bottom:14px; line-height:1.3; }
   .featured-excerpt { font-size:14px; color:#CCCCCC !important; line-height:1.8; margin-bottom:20px; }
   .post-meta { display:flex; gap:16px; align-items:center; font-size:12px; color:#AAAAAA !important; margin-bottom:20px; }
@@ -87,7 +79,7 @@ const styles = `
     border-bottom:1px solid #E5E5E5; overflow:hidden; }
   .card-image img { width:100%; height:100%; object-fit:cover; }
   .card-body { padding:20px; }
-  .card-title { font-family:'Cinzel',serif; font-size:15px; font-weight:700; color:#111111 !important; margin-bottom:8px; line-height:1.4; }
+  .card-title { font-family:var(--font-display); font-size:15px; font-weight:700; color:#111111 !important; margin-bottom:8px; line-height:1.4; }
   .card-excerpt { font-size:13px; color:#555555 !important; line-height:1.7; margin-bottom:14px; }
   .card-footer { display:flex; justify-content:space-between; align-items:center; }
   .card-meta { font-size:11px; color:#888888 !important; }
@@ -96,11 +88,11 @@ const styles = `
   .newsletter { max-width:700px; margin:0 auto 80px; padding:0 24px; }
   .newsletter-box { background:#111111;
     border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:50px 40px; text-align:center; }
-  .newsletter-title { font-family:'Cinzel',serif; font-size:clamp(20px,3vw,30px); font-weight:700; color:#FFFFFF !important; margin-bottom:12px; }
+  .newsletter-title { font-family:var(--font-display); font-size:clamp(20px,3vw,30px); font-weight:700; color:#FFFFFF !important; margin-bottom:12px; }
   .newsletter-sub { color:#CCCCCC !important; font-size:14px; margin-bottom:28px; }
   .newsletter-form { display:flex; gap:12px; max-width:450px; margin:0 auto; }
   .newsletter-input { flex:1; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
-    border-radius:8px; padding:14px 20px; color:#FFFFFF !important; font-family:'Raleway',sans-serif;
+    border-radius:8px; padding:14px 20px; color:#FFFFFF !important; font-family:var(--font-body);
     font-size:14px; outline:none; transition:all 0.3s; }
   .newsletter-input::placeholder { color:rgba(255,255,255,0.5) !important; }
   .newsletter-input:focus { border-color:#BFA5FF; background:rgba(255,255,255,0.15); }
@@ -112,9 +104,7 @@ const styles = `
   footer { position:relative; z-index:1; padding:40px 60px;
     border-top:1px solid rgba(139,0,255,0.15);
     display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
-  .footer-logo { font-family:'Cinzel',serif; font-size:16px; font-weight:900;
-    background:linear-gradient(135deg,var(--purple-glow),var(--gold));
-    -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .footer-logo { font-family:var(--font-display); font-size:16px; font-weight:900; color:#FFFFFF; }
   .footer-links { display:flex; gap:20px; list-style:none; flex-wrap:wrap; }
   .footer-links a { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; transition:color 0.3s; }
   .footer-links a:hover { color:#5B21B6; }
@@ -225,7 +215,6 @@ export default function BlogPage() {
         ]}
       />
       <style>{styles}</style>
-      <div className="bg-fixed" />
 
       <Navbar cta="shop" shopHref="/" />
 
@@ -297,7 +286,7 @@ export default function BlogPage() {
             <div className="newsletter-title">Stay in the Loop</div>
             <p className="newsletter-sub">Get the latest guides, tips and offers delivered to your inbox.</p>
             {subscribed ? (
-              <p style={{ color: "var(--purple-glow)", fontWeight: 600, fontSize: "15px" }}>✅ You&apos;re subscribed! Thank you.</p>
+              <p style={{ color: "#5B21B6", fontWeight: 600, fontSize: "15px" }}>✅ You&apos;re subscribed! Thank you.</p>
             ) : (
               <div className="newsletter-form">
                 <input className="newsletter-input" type="email" placeholder="your@email.com"

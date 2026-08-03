@@ -4,14 +4,13 @@ import Navbar from "@/components/Navbar";
 import { useContactConfig } from "@/hooks/useContactConfig";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-  body { background:#FFFFFF; color:#111111; font-family:'Raleway',sans-serif; overflow-x:hidden; }
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow-x:hidden; }
 
   nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:18px 60px;
     display:flex; align-items:center; justify-content:space-between;
     background:#FFFFFF; border-bottom:1px solid #E5E5E5; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
-  .nav-logo { font-family:'Cinzel',serif; font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
+  .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
   .nav-links { display:flex; gap:36px; list-style:none; }
   .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.2s; }
   .nav-links a:hover { color:#5B21B6; }
@@ -31,7 +30,7 @@ const styles = `
 
   .page-header { max-width:800px; margin:0 auto; padding:50px 24px 10px; text-align:center; }
   .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; display:block; font-weight:600; }
-  .page-title { font-family:'Cinzel',serif; font-size:clamp(28px,4vw,48px); font-weight:700; color:#111111; margin-bottom:14px; }
+  .page-title { font-family:var(--font-display); font-size:clamp(28px,4vw,48px); font-weight:700; color:#111111; margin-bottom:14px; }
   .page-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
   .page-sub { color:#555555; font-size:15px; line-height:1.7; }
 
@@ -51,7 +50,7 @@ const styles = `
   .contact-card-featured .contact-card-value { color:#111111; font-size:17px; font-weight:800; letter-spacing:0.5px; }
   .contact-card-featured .contact-card-sub { color:#5B21B6; font-weight:600; }
   .contact-card-icon { font-size:38px; margin-bottom:12px; display:block; }
-  .contact-card-title { font-family:'Cinzel',serif; font-size:15px; font-weight:700; color:#5B21B6; margin-bottom:7px; }
+  .contact-card-title { font-family:var(--font-display); font-size:15px; font-weight:700; color:#5B21B6; margin-bottom:7px; }
   .contact-card-value { font-size:14px; color:#5B21B6; font-weight:600; }
   .contact-card-sub { font-size:12px; color:#888888; margin-top:4px; }
 
@@ -62,14 +61,14 @@ const styles = `
   /* FORM */
   .contact-form-box { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:18px; padding:34px;
     box-shadow:0 2px 10px rgba(0,0,0,0.06); }
-  .form-title { font-family:'Cinzel',serif; font-size:19px; font-weight:700; color:#111111;
+  .form-title { font-family:var(--font-display); font-size:19px; font-weight:700; color:#111111;
     margin-bottom:22px; padding-bottom:14px; border-bottom:1px solid #F0F0F0; }
   .form-group { margin-bottom:16px; }
   .form-group label { display:block; font-size:11px; letter-spacing:2px; text-transform:uppercase;
     color:#666666; margin-bottom:7px; font-weight:600; }
   .form-group input, .form-group select, .form-group textarea {
     width:100%; background:#FFFFFF; border:1px solid #E5E5E5;
-    border-radius:9px; padding:12px 14px; color:#111111; font-family:'Raleway',sans-serif;
+    border-radius:9px; padding:12px 14px; color:#111111; font-family:var(--font-body);
     font-size:14px; transition:all 0.2s; outline:none; }
   .form-group input::placeholder, .form-group textarea::placeholder { color:#AAAAAA; }
   .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
@@ -86,7 +85,7 @@ const styles = `
   .form-success { text-align:center; padding:40px 20px; }
   .success-icon { font-size:60px; display:block; margin-bottom:16px; animation:popIn 0.5s ease; }
   @keyframes popIn { from{transform:scale(0)} to{transform:scale(1)} }
-  .success-title { font-family:'Cinzel',serif; font-size:22px; font-weight:700; color:#111111; margin-bottom:10px; }
+  .success-title { font-family:var(--font-display); font-size:22px; font-weight:700; color:#111111; margin-bottom:10px; }
   .success-sub { color:#555555; font-size:14px; line-height:1.7; }
 
   /* RIGHT SIDE INFO */
@@ -96,7 +95,7 @@ const styles = `
   .info-card:hover { border-color:#5B21B6; box-shadow:0 4px 14px rgba(91,33,182,0.08); }
   .info-card-header { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
   .info-card-icon { font-size:26px; }
-  .info-card-title { font-family:'Cinzel',serif; font-size:15px; font-weight:700; color:#5B21B6; }
+  .info-card-title { font-family:var(--font-display); font-size:15px; font-weight:700; color:#5B21B6; }
   .info-card-body { font-size:14px; color:#555555; line-height:1.7; }
   .info-card-body strong { color:#111111; display:block; margin-bottom:4px; font-weight:700; }
   .info-card-link { display:inline-block; margin-top:12px; color:#5B21B6;
@@ -110,7 +109,7 @@ const styles = `
 
   /* FAQ */
   .faq-preview { max-width:1000px; margin:0 auto 80px; padding:0 24px; }
-  .faq-title { font-family:'Cinzel',serif; font-size:clamp(20px,3vw,32px); font-weight:700; color:#111111; margin-bottom:24px; }
+  .faq-title { font-family:var(--font-display); font-size:clamp(20px,3vw,32px); font-weight:700; color:#111111; margin-bottom:24px; }
   .faq-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
   .faq-list { display:flex; flex-direction:column; gap:10px; }
   .faq-item { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:12px; overflow:hidden; transition:border-color 0.2s; }
@@ -124,7 +123,7 @@ const styles = `
     border-top:1px solid #F0F0F0; }
 
   footer { background:#111111; padding:50px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; }
-  .footer-logo { font-family:'Cinzel',serif; font-size:17px; font-weight:900; color:#FFFFFF; }
+  .footer-logo { font-family:var(--font-display); font-size:17px; font-weight:900; color:#FFFFFF; }
   .footer-links { display:flex; gap:24px; list-style:none; flex-wrap:wrap; }
   .footer-links a { color:rgba(255,255,255,0.6); text-decoration:none; font-size:13px; transition:color 0.2s; }
   .footer-links a:hover { color:#FFFFFF; }

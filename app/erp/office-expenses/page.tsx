@@ -148,13 +148,13 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 12, marginBottom: 20 }}>
         <div className="erp-stat">
           <div className="erp-stat-icon">💰</div>
-          <div style={{ fontFamily: "'Cinzel',serif", fontSize: 20, fontWeight: 700, color: "#ff8c00" }}>{fmt(summary.total)}</div>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "#ff8c00" }}>{fmt(summary.total)}</div>
           <div className="erp-stat-label">Paid This Month</div>
         </div>
         {dueExpenses.length > 0 && (
           <div className="erp-stat" style={{ border: "1px solid rgba(220,38,38,0.3)", background: "rgba(220,38,38,0.03)" }}>
             <div className="erp-stat-icon">⚠️</div>
-            <div style={{ fontFamily: "'Cinzel',serif", fontSize: 20, fontWeight: 700, color: "#DC2626" }}>{dueExpenses.length}</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "#DC2626" }}>{dueExpenses.length}</div>
             <div className="erp-stat-label" style={{ color: "#DC2626" }}>Outstanding Bills</div>
           </div>
         )}
@@ -286,7 +286,7 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
                 {paidExpenses.length > 0 && (
                   <tr style={{ borderTop: "2px solid rgba(91,33,182,0.12)" }}>
                     <td colSpan={4} style={{ fontWeight: 700, fontSize: 12, color: "#555555", padding: "12px 14px", textTransform: "uppercase", letterSpacing: "1px" }}>Total</td>
-                    <td style={{ fontWeight: 900, color: "#ff8c00", fontFamily: "'Cinzel',serif", fontSize: 16, padding: "12px 14px" }}>{fmt(paidTotal)}</td>
+                    <td style={{ fontWeight: 900, color: "#ff8c00", fontFamily: "var(--font-display)", fontSize: 16, padding: "12px 14px" }}>{fmt(paidTotal)}</td>
                     <td colSpan={isAdmin ? 4 : 3} />
                   </tr>
                 )}

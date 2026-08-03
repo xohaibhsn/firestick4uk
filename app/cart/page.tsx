@@ -6,14 +6,13 @@ import Navbar from "@/components/Navbar";
 import { useContactConfig } from "@/hooks/useContactConfig";
 
 const navStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-  body { background:#FFFFFF; color:#111111; font-family:'Raleway',sans-serif; overflow-x:hidden; }
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow-x:hidden; }
 
   nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:18px 60px;
     display:flex; align-items:center; justify-content:space-between;
     background:#FFFFFF; border-bottom:1px solid #E5E5E5; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
-  .nav-logo { font-family:'Cinzel',serif; font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
+  .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
   .nav-links { display:flex; gap:36px; list-style:none; }
   .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.2s; }
   .nav-links a:hover { color:#5B21B6; }
@@ -32,7 +31,7 @@ const navStyles = `
   .page-wrapper { padding-top:100px; min-height:100vh; background:#FFFFFF; }
   .page-header { max-width:1200px; margin:0 auto; padding:50px 60px 30px; }
   .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; font-weight:600; }
-  .page-title { font-family:'Cinzel',serif; font-size:clamp(26px,3.5vw,44px); font-weight:700; color:#111111; }
+  .page-title { font-family:var(--font-display); font-size:clamp(26px,3.5vw,44px); font-weight:700; color:#111111; }
   .page-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
 
   /* CART LAYOUT */
@@ -42,7 +41,7 @@ const navStyles = `
   /* CART EMPTY */
   .cart-empty { text-align:center; padding:70px 40px; background:#F5F5F5; border:1px solid #E5E5E5; border-radius:16px; }
   .cart-empty-icon { font-size:60px; margin-bottom:20px; display:block; }
-  .cart-empty h3 { font-family:'Cinzel',serif; font-size:22px; color:#111111; margin-bottom:10px; }
+  .cart-empty h3 { font-family:var(--font-display); font-size:22px; color:#111111; margin-bottom:10px; }
   .cart-empty p { color:#666666; font-size:14px; margin-bottom:28px; }
 
   /* CART ITEM */
@@ -50,8 +49,8 @@ const navStyles = `
   .cart-item:hover { border-color:#5B21B6; box-shadow:0 4px 14px rgba(91,33,182,0.1); }
   .cart-item-image { width:100px; height:100px; border-radius:10px; background:#F5F3FF; border:1px solid #DDD6FE; display:flex; align-items:center; justify-content:center; font-size:36px; flex-shrink:0; }
   .cart-item-details { flex:1; }
-  .cart-item-name { font-family:'Cinzel',serif; font-size:16px; font-weight:700; color:#111111; margin-bottom:6px; }
-  .cart-item-price { font-size:17px; font-weight:700; color:#5B21B6; font-family:'Cinzel',serif; }
+  .cart-item-name { font-family:var(--font-display); font-size:16px; font-weight:700; color:#111111; margin-bottom:6px; }
+  .cart-item-price { font-size:17px; font-weight:700; color:#5B21B6; font-family:var(--font-display); }
   .cart-item-actions { display:flex; flex-direction:column; align-items:flex-end; gap:12px; }
   .qty-control { display:flex; align-items:center; gap:10px; }
   .qty-btn { width:32px; height:32px; border-radius:50%; border:1px solid #E5E5E5; background:#F5F5F5; color:#111111; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
@@ -63,14 +62,14 @@ const navStyles = `
   /* ORDER SUMMARY */
   .order-summary { position:sticky; top:100px; height:fit-content; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:16px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,0.06); }
   .summary-header { padding:22px 26px; border-bottom:1px solid #F0F0F0; background:#FAFAFA; }
-  .summary-header h3 { font-family:'Cinzel',serif; font-size:17px; font-weight:700; color:#111111; }
+  .summary-header h3 { font-family:var(--font-display); font-size:17px; font-weight:700; color:#111111; }
   .summary-body { padding:20px 26px; display:flex; flex-direction:column; gap:12px; }
   .summary-row { display:flex; justify-content:space-between; align-items:center; font-size:14px; }
   .summary-row span:first-child { color:#666666; }
   .summary-row span:last-child { color:#111111; font-weight:500; }
   .summary-divider { border:none; border-top:1px solid #F0F0F0; margin:4px 0; }
-  .summary-total span:first-child { color:#111111 !important; font-weight:700; font-family:'Cinzel',serif; font-size:15px; }
-  .summary-total span:last-child { color:#5B21B6 !important; font-weight:700; font-family:'Cinzel',serif; font-size:22px; }
+  .summary-total span:first-child { color:#111111 !important; font-weight:700; font-family:var(--font-display); font-size:15px; }
+  .summary-total span:last-child { color:#5B21B6 !important; font-weight:700; font-family:var(--font-display); font-size:22px; }
   .checkout-btn { margin:0 20px 20px; background:#5B21B6; color:#FFFFFF; border:none; padding:15px; border-radius:8px; width:calc(100% - 40px); font-size:15px; font-weight:600; cursor:pointer; transition:all 0.2s; }
   .checkout-btn:hover { background:#4C1D95; transform:translateY(-1px); box-shadow:0 4px 12px rgba(91,33,182,0.3); }
   .checkout-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
@@ -79,10 +78,10 @@ const navStyles = `
   .checkout-section { max-width:1200px; margin:0 auto; padding:0 60px 80px; }
   .checkout-grid { display:grid; grid-template-columns:1fr 1fr; gap:28px; }
   .form-section { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:16px; padding:30px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
-  .form-section h3 { font-family:'Cinzel',serif; font-size:17px; font-weight:700; color:#111111; margin-bottom:22px; padding-bottom:14px; border-bottom:1px solid #F0F0F0; }
+  .form-section h3 { font-family:var(--font-display); font-size:17px; font-weight:700; color:#111111; margin-bottom:22px; padding-bottom:14px; border-bottom:1px solid #F0F0F0; }
   .form-group { margin-bottom:16px; }
   .form-group label { display:block; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#666666; margin-bottom:7px; font-weight:600; }
-  .form-group input, .form-group textarea { width:100%; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:9px; padding:11px 14px; color:#111111; font-family:'Raleway',sans-serif; font-size:14px; transition:all 0.2s; outline:none; }
+  .form-group input, .form-group textarea { width:100%; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:9px; padding:11px 14px; color:#111111; font-family:var(--font-body); font-size:14px; transition:all 0.2s; outline:none; }
   .form-group input:focus, .form-group textarea:focus { border-color:#5B21B6; box-shadow:0 0 0 3px rgba(91,33,182,0.1); }
   .form-group input::placeholder, .form-group textarea::placeholder { color:#AAAAAA; }
   .form-group textarea { resize:vertical; min-height:80px; }
@@ -122,10 +121,10 @@ const navStyles = `
   .success-screen { max-width:600px; margin:60px auto; padding:0 24px 80px; text-align:center; }
   .success-icon { font-size:80px; margin-bottom:24px; display:block; animation:popIn 0.5s ease; }
   @keyframes popIn { from{transform:scale(0)} to{transform:scale(1)} }
-  .success-title { font-family:'Cinzel',serif; font-size:32px; font-weight:700; color:#111111; margin-bottom:14px; }
+  .success-title { font-family:var(--font-display); font-size:32px; font-weight:700; color:#111111; margin-bottom:14px; }
   .success-title span { color:#5B21B6; }
   .success-sub { color:#555555; font-size:15px; line-height:1.7; margin-bottom:10px; }
-  .order-id-box { font-family:'Cinzel',serif; font-size:17px; color:#5B21B6; background:#F5F3FF; border:1px solid #DDD6FE; border-radius:10px; padding:12px 20px; margin:20px 0; display:inline-block; }
+  .order-id-box { font-family:var(--font-display); font-size:17px; color:#5B21B6; background:#F5F3FF; border:1px solid #DDD6FE; border-radius:10px; padding:12px 20px; margin:20px 0; display:inline-block; }
   .status-box { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:14px; padding:22px; margin:24px 0; text-align:left; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
   .status-step { display:flex; align-items:center; gap:14px; padding:10px 0; border-bottom:1px solid #F5F5F5; }
   .status-step:last-child { border:none; }
@@ -139,7 +138,7 @@ const navStyles = `
 
   /* FOOTER */
   footer { background:#111111; padding:50px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; }
-  .footer-logo { font-family:'Cinzel',serif; font-size:17px; font-weight:900; color:#FFFFFF; }
+  .footer-logo { font-family:var(--font-display); font-size:17px; font-weight:900; color:#FFFFFF; }
   .footer-copy { font-size:12px; color:rgba(255,255,255,0.4); }
 
   .whatsapp-btn { position:fixed; bottom:30px; right:30px; z-index:999; width:58px; height:58px; border-radius:50%; background:linear-gradient(135deg,#25d366,#128c7e); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 25px rgba(37,211,102,0.5); text-decoration:none; font-size:26px; transition:all 0.3s; }
@@ -349,7 +348,7 @@ export default function CartPage() {
               <div style={{padding:"0 20px 16px"}}>
                 <div style={{display:"flex",gap:8,marginBottom:6}}>
                   <input style={{flex:1,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"8px 12px",color:"white",fontSize:13,outline:"none"}} placeholder="Coupon code" value={couponCode} onChange={e=>setCouponCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&applyCoupon()} />
-                  <button style={{background:"rgba(139,0,255,0.2)",border:"1px solid rgba(139,0,255,0.4)",color:"var(--purple-glow)",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,whiteSpace:"nowrap"}} onClick={applyCoupon} disabled={couponChecking}>{couponChecking?"...":"Apply"}</button>
+                  <button style={{background:"rgba(139,0,255,0.2)",border:"1px solid rgba(139,0,255,0.4)",color:"#5B21B6",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,whiteSpace:"nowrap"}} onClick={applyCoupon} disabled={couponChecking}>{couponChecking?"...":"Apply"}</button>
                 </div>
                 {couponApplied && <div style={{fontSize:12,color:"#00c864"}}>✅ {couponApplied.message} — Save £{discountAmount.toFixed(2)}</div>}
                 {couponError && <div style={{fontSize:12,color:"#ff6666"}}>❌ {couponError}</div>}

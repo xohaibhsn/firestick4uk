@@ -6,12 +6,10 @@ import Navbar from "@/components/Navbar";
 import { useContactConfig } from "@/hooks/useContactConfig";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-  :root { --purple-deep:#0d0010; --purple-mid:#4a0080; --purple-bright:#8b00ff; --purple-glow:#bf5fff; --purple-light:#e0b3ff; --gold:#ffd700; }
-  body { background:#FFFFFF; color:#111111; font-family:'Raleway',sans-serif; overflow-x:hidden; }
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow-x:hidden; }
   nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:18px 60px; display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; border-bottom:1px solid #E5E5E5; }
-  .nav-logo { font-family:'Cinzel',serif; font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
+  .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
   .nav-links { display:flex; gap:36px; list-style:none; }
   .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.3s; }
   .nav-links a:hover { color:#5B21B6; }
@@ -27,8 +25,8 @@ const styles = `
   .page-wrapper { position:relative; z-index:1; padding-top:100px; min-height:100vh; background:#FFFFFF; }
   .page-header { max-width:800px; margin:0 auto; padding:50px 24px 40px; text-align:center; }
   .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; }
-  .page-title { font-family:'Cinzel',serif; font-size:clamp(28px,4vw,48px); font-weight:700; color:#111111; margin-bottom:14px; }
-  .page-title span { color:#5B21B6; }
+  .page-title { font-family:var(--font-display); font-size:clamp(28px,4vw,48px); font-weight:700; color:#111111; margin-bottom:14px; }
+  .page-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
   .page-sub { color:#555555; font-size:15px; line-height:1.7; }
   .faq-categories { max-width:900px; margin:0 auto; padding:0 24px 40px; display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
   .cat-btn { padding:8px 22px; border-radius:30px; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s; border:1px solid #E5E5E5; background:#F5F5F5; color:#111111; }
@@ -36,7 +34,7 @@ const styles = `
   .cat-btn.active { background:#5B21B6; color:#FFFFFF !important; border-color:transparent; }
   .faq-section { max-width:800px; margin:0 auto; padding:0 24px; }
   .faq-group { margin-bottom:40px; }
-  .faq-group-title { font-family:'Cinzel',serif; font-size:16px; font-weight:700; color:#111111; margin-bottom:16px; padding-bottom:10px; border-bottom:2px solid #E5E5E5; }
+  .faq-group-title { font-family:var(--font-display); font-size:16px; font-weight:700; color:#111111; margin-bottom:16px; padding-bottom:10px; border-bottom:2px solid #E5E5E5; }
   .faq-list { display:flex; flex-direction:column; gap:8px; }
   .faq-item { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:12px; overflow:hidden; transition:all 0.2s; }
   .faq-item:hover { border-color:#5B21B6; }
@@ -51,7 +49,7 @@ const styles = `
   .faq-answer-text { font-size:14px; color:#444444; line-height:1.8; padding-top:12px; border-top:1px solid #E5E5E5; }
   .help-section { max-width:800px; margin:50px auto 80px; padding:0 24px; }
   .help-box { background:#111111; border-radius:16px; padding:50px 40px; text-align:center; }
-  .help-title { font-family:'Cinzel',serif; font-size:clamp(20px,3vw,28px); font-weight:700; color:#FFFFFF; margin-bottom:12px; }
+  .help-title { font-family:var(--font-display); font-size:clamp(20px,3vw,28px); font-weight:700; color:#FFFFFF; margin-bottom:12px; }
   .help-sub { color:rgba(255,255,255,0.7); font-size:15px; margin-bottom:30px; }
   .help-btns { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
   .btn-whatsapp { background:linear-gradient(135deg,#25d366,#128c7e); color:#FFFFFF; padding:14px 32px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; transition:all 0.2s; }
@@ -59,7 +57,7 @@ const styles = `
   .btn-contact { background:transparent; color:#FFFFFF; padding:14px 32px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; border:2px solid rgba(255,255,255,0.4); transition:all 0.2s; }
   .btn-contact:hover { border-color:#FFFFFF; }
   footer { background:#111111; padding:40px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
-  .footer-logo { font-family:'Cinzel',serif; font-size:16px; font-weight:900; color:#FFFFFF; }
+  .footer-logo { font-family:var(--font-display); font-size:16px; font-weight:900; color:#FFFFFF; }
   .footer-links { display:flex; gap:20px; list-style:none; flex-wrap:wrap; }
   .footer-links a { color:rgba(255,255,255,0.6); text-decoration:none; font-size:13px; transition:color 0.2s; }
   .footer-links a:hover { color:#FFFFFF; }

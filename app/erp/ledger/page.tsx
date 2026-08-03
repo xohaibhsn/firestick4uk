@@ -292,7 +292,7 @@ function LedgerContent({ user }: { user: any }) {
           {loanBalance !== null && loanBalance > 0 && (
             <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(234,179,8,0.08)",border:"1px solid rgba(234,179,8,0.3)",borderRadius:10,padding:"7px 14px"}}>
               <div style={{fontSize:11,fontWeight:700,color:"#92400E",letterSpacing:"0.5px",textTransform:"uppercase",whiteSpace:"nowrap"}}>💳 Owed to Zohaib</div>
-              <div style={{fontFamily:"'Cinzel',serif",fontSize:15,fontWeight:800,color:"#92400E",whiteSpace:"nowrap"}}>Rs.&nbsp;{Math.round(loanBalance).toLocaleString()}</div>
+              <div style={{fontFamily:"var(--font-display)",fontSize:15,fontWeight:800,color:"#92400E",whiteSpace:"nowrap"}}>Rs.&nbsp;{Math.round(loanBalance).toLocaleString()}</div>
             </div>
           )}
           <button
@@ -670,7 +670,7 @@ function PnLPanel({ pnl, loading, onRefresh }: { pnl: any; loading: boolean; onR
         <div style={{fontSize:12,letterSpacing:"2px",textTransform:"uppercase",color:"rgba(255,255,255,0.6)",marginBottom:8,fontWeight:600}}>
           Net {netPos ? "Profit" : "Loss"}
         </div>
-        <div style={{fontFamily:"'Cinzel',serif",fontSize:42,fontWeight:900,color:"#FFFFFF",lineHeight:1,marginBottom:10}}>
+        <div style={{fontFamily:"var(--font-display)",fontSize:42,fontWeight:900,color:"#FFFFFF",lineHeight:1,marginBottom:10}}>
           {netPos ? "" : "−"}{fmt(Math.abs(net))}
         </div>
         <div style={{display:"flex",gap:24,flexWrap:"wrap",marginTop:16}}>
@@ -747,7 +747,7 @@ function PnLPanel({ pnl, loading, onRefresh }: { pnl: any; loading: boolean; onR
             <div style={{fontSize:13,fontWeight:row.bold?700:500,color:row.bold?"#111":"#444"}}>
               {row.minus ? "−  " : ""}{row.label}
             </div>
-            <div style={{fontSize:row.bold?17:14,fontWeight:row.bold?800:600,color:row.colour,fontFamily:row.bold?"'Cinzel',serif":undefined}}>
+            <div style={{fontSize:row.bold?17:14,fontWeight:row.bold?800:600,color:row.colour,fontFamily:row.bold?"var(--font-display)":undefined}}>
               {row.val < 0 ? "−" : ""}{fmt(Math.abs(row.val))}
             </div>
           </div>

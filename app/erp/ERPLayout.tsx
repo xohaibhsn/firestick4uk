@@ -2,16 +2,15 @@
 import { useEffect, useState } from "react";
 
 export const erpStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600&display=swap');
-  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
   :root{--pm:#4a0080;--pb:#8b00ff;--pg:#bf5fff;--gold:#ffd700;--green:#00c864;--red:#ff4444;--orange:#ff8c00;--blue:#4488ff;}
-  body{background:#F5F5F5;color:#111111;font-family:'Raleway',sans-serif;overflow-x:hidden;}
+  body{background:#F5F5F5;color:#111111;font-family:var(--font-body);overflow-x:hidden;}
   .erp-layout{display:flex;min-height:100vh;}
   /* ERP SIDEBAR — dark bg (matching admin), white text */
   .erp-sidebar{width:220px;flex-shrink:0;background:#111111;border-right:none;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50;overflow-y:auto;color:#FFFFFF;}
   .erp-sidebar *{color:#FFFFFF;}
   .erp-logo{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.08);}
-  .erp-logo-text{font-family:'Cinzel',serif;font-size:13px;font-weight:900;color:#FFFFFF !important;-webkit-text-fill-color:#FFFFFF !important;letter-spacing:1px;}
+  .erp-logo-text{font-family:var(--font-display);font-size:13px;font-weight:900;color:#FFFFFF !important;-webkit-text-fill-color:#FFFFFF !important;letter-spacing:1px;}
   .erp-logo-sub{font-size:10px;color:#AAAAAA !important;letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
   .erp-nav{flex:1;padding:14px 10px;display:flex;flex-direction:column;gap:3px;}
   .erp-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;color:#CCCCCC !important;font-size:13px;font-weight:500;text-decoration:none;transition:all 0.15s;border:1px solid transparent;}
@@ -24,27 +23,27 @@ export const erpStyles = `
   .erp-footer-brand{font-size:11px;color:#666666 !important;text-align:center;letter-spacing:1px;}
   /* ERP header user dropdown */
   .erp-header-user-wrap{position:relative;}
-  .erp-header-user-btn{display:flex;align-items:center;gap:6px;font-size:13px;color:#444444;background:#F0F0F0;border:1px solid #E5E5E5;padding:6px 14px;border-radius:20px;cursor:pointer;transition:all 0.15s;font-family:'Raleway',sans-serif;font-weight:600;}
+  .erp-header-user-btn{display:flex;align-items:center;gap:6px;font-size:13px;color:#444444;background:#F0F0F0;border:1px solid #E5E5E5;padding:6px 14px;border-radius:20px;cursor:pointer;transition:all 0.15s;font-family:var(--font-body);font-weight:600;}
   .erp-header-user-btn:hover{background:#E8E0F8;border-color:#5B21B6;color:#5B21B6;}
   .erp-header-dropdown{position:absolute;right:0;top:calc(100% + 6px);background:#FFFFFF;border:1px solid #E5E5E5;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,0.1);min-width:190px;overflow:hidden;z-index:9999;}
   .erp-header-dropdown-header{padding:12px 14px;border-bottom:1px solid #F0F0F0;}
   .erp-header-dropdown-name{font-size:13px;font-weight:700;color:#111111 !important;}
   .erp-header-dropdown-role{font-size:11px;color:#888888 !important;text-transform:capitalize;margin-top:2px;}
-  .erp-header-dropdown-item{display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:13px;cursor:pointer;color:#333333 !important;transition:background 0.15s;border:none;background:none;width:100%;text-align:left;font-family:'Raleway',sans-serif;}
+  .erp-header-dropdown-item{display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:13px;cursor:pointer;color:#333333 !important;transition:background 0.15s;border:none;background:none;width:100%;text-align:left;font-family:var(--font-body);}
   .erp-header-dropdown-item:hover{background:#F9F9F9;}
   .erp-header-dropdown-item.danger{color:#DC2626 !important;}
   .erp-header-dropdown-item.danger:hover{background:#FEF2F2;}
   /* ERP MAIN — light bg */
   .erp-main{margin-left:220px;flex:1;padding:28px;background:#F5F5F5;min-height:100vh;color:#111111;}
   .erp-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;}
-  .erp-page-title{font-family:'Cinzel',serif;font-size:22px;font-weight:700;color:#111111 !important;}
+  .erp-page-title{font-family:var(--font-display);font-size:22px;font-weight:700;color:#111111 !important;}
   .erp-page-title span{color:#5B21B6 !important;-webkit-text-fill-color:#5B21B6 !important;}
   .erp-card{background:#FFFFFF;border:1px solid #E5E5E5;border-radius:12px;padding:22px;color:#111111;}
   .erp-card *{color:#111111;}
   .erp-stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:24px;}
   .erp-stat{background:#FFFFFF;border:1px solid #E5E5E5;border-radius:12px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,0.04);}
   .erp-stat-icon{font-size:26px;margin-bottom:8px;}
-  .erp-stat-val{font-family:'Cinzel',serif;font-size:26px;font-weight:700;color:#111111 !important;}
+  .erp-stat-val{font-family:var(--font-display);font-size:26px;font-weight:700;color:#111111 !important;}
   .erp-stat-label{font-size:11px;color:#666666 !important;letter-spacing:1px;text-transform:uppercase;margin-top:3px;}
   .erp-table-wrap,.chunks-scrollbar{overflow-x:auto;width:100%;-webkit-overflow-scrolling:touch;}
   .erp-table-wrap::-webkit-scrollbar,.chunks-scrollbar::-webkit-scrollbar{height:4px;}
@@ -73,7 +72,7 @@ export const erpStyles = `
   .erp-btn-red:hover{background:rgba(220,38,38,0.15);}
   .erp-btn-outline{background:transparent;color:#444444 !important;border:1px solid #CCCCCC;}
   .erp-btn-outline:hover{border-color:#5B21B6;color:#5B21B6 !important;}
-  .erp-input,.erp-select,.erp-textarea{width:100%;background:#FFFFFF;border:1px solid #E5E5E5;border-radius:9px;padding:10px 14px;color:#111111 !important;font-family:'Raleway',sans-serif;font-size:13px;outline:none;transition:all 0.2s;}
+  .erp-input,.erp-select,.erp-textarea{width:100%;background:#FFFFFF;border:1px solid #E5E5E5;border-radius:9px;padding:10px 14px;color:#111111 !important;font-family:var(--font-body);font-size:13px;outline:none;transition:all 0.2s;}
   .erp-input:focus,.erp-select:focus,.erp-textarea:focus{border-color:#5B21B6;box-shadow:0 0 0 3px rgba(91,33,182,0.1);}
   .erp-input::placeholder,.erp-textarea::placeholder{color:#999999 !important;}
   .erp-select option{background:#FFFFFF;color:#111111;}
@@ -85,7 +84,7 @@ export const erpStyles = `
   .erp-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;}
   .erp-modal{background:#FFFFFF;border:1px solid #E5E5E5;border-radius:16px;padding:28px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;color:#111111;box-shadow:0 8px 32px rgba(0,0,0,0.12);}
   .erp-modal *{color:#111111;}
-  .erp-modal-title{font-family:'Cinzel',serif;font-size:17px;font-weight:700;color:#111111 !important;margin-bottom:20px;}
+  .erp-modal-title{font-family:var(--font-display);font-size:17px;font-weight:700;color:#111111 !important;margin-bottom:20px;}
   .erp-modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
   .erp-empty{text-align:center;padding:40px;color:#888888 !important;font-size:14px;}
   .erp-clock-btn{padding:14px 32px;border-radius:50px;font-size:15px;font-weight:700;cursor:pointer;border:none;letter-spacing:0.5px;transition:all 0.2s;color:#FFFFFF !important;}
