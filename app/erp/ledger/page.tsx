@@ -339,7 +339,7 @@ function LedgerContent({ user }: { user: any }) {
 
       {/* Print-only statement header */}
       <div className="print-header" style={{marginBottom:20,paddingBottom:14,borderBottom:"2px solid #111"}}>
-        <div style={{fontSize:22,fontWeight:900,fontFamily:"serif"}}>FIRESTICK4UK — Employee Ledger Statement</div>
+        <div style={{fontSize:22,fontWeight:800,fontFamily:"serif"}}>FIRESTICK4UK — Employee Ledger Statement</div>
         <div style={{fontSize:13,color:"#444",marginTop:4}}>Employee: <strong>{selected?.name}</strong> · Generated: {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
       </div>
 
@@ -670,7 +670,7 @@ function PnLPanel({ pnl, loading, onRefresh }: { pnl: any; loading: boolean; onR
         <div style={{fontSize:12,letterSpacing:"2px",textTransform:"uppercase",color:"rgba(255,255,255,0.6)",marginBottom:8,fontWeight:600}}>
           Net {netPos ? "Profit" : "Loss"}
         </div>
-        <div style={{fontFamily:"var(--font-display)",fontSize:42,fontWeight:900,color:"#FFFFFF",lineHeight:1,marginBottom:10}}>
+        <div style={{fontFamily:"var(--font-display)",fontSize:42,fontWeight:800,color:"#FFFFFF",lineHeight:1,marginBottom:10}}>
           {netPos ? "" : "−"}{fmt(Math.abs(net))}
         </div>
         <div style={{display:"flex",gap:24,flexWrap:"wrap",marginTop:16}}>

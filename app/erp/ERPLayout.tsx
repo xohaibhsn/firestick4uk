@@ -10,7 +10,7 @@ export const erpStyles = `
   .erp-sidebar{width:220px;flex-shrink:0;background:#111111;border-right:none;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50;overflow-y:auto;color:#FFFFFF;}
   .erp-sidebar *{color:#FFFFFF;}
   .erp-logo{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.08);}
-  .erp-logo-text{font-family:var(--font-display);font-size:13px;font-weight:900;color:#FFFFFF !important;-webkit-text-fill-color:#FFFFFF !important;letter-spacing:1px;}
+  .erp-logo-text{font-family:var(--font-display);font-size:13px;font-weight:800;color:#FFFFFF !important;-webkit-text-fill-color:#FFFFFF !important;letter-spacing:1px;}
   .erp-logo-sub{font-size:10px;color:#AAAAAA !important;letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
   .erp-nav{flex:1;padding:14px 10px;display:flex;flex-direction:column;gap:3px;}
   .erp-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;color:#CCCCCC !important;font-size:13px;font-weight:500;text-decoration:none;transition:all 0.15s;border:1px solid transparent;}

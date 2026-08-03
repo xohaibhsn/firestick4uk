@@ -110,7 +110,7 @@ export default function ProductsPage() {
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
         body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow-x:hidden; }
         nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:18px 60px; display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; border-bottom:1px solid #E5E5E5; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
-        .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
+        .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:800; color:#111111; text-decoration:none; letter-spacing:2px; }
         .nav-links { display:flex; gap:36px; list-style:none; }
         .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.3s; }
         .nav-links a:hover { color:#5B21B6; }
@@ -120,7 +120,7 @@ export default function ProductsPage() {
         .page-wrapper { position:relative; z-index:1; padding-top:100px; background:#FFFFFF; }
         .page-header { max-width:1300px; margin:0 auto; padding:60px 60px 30px; }
         .section-tag { font-family:var(--font-body); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; font-weight:700; }
-        .page-title { font-family:var(--font-display); font-size:clamp(26px,3.5vw,44px); font-weight:900; letter-spacing:-0.03em; color:#111111; }
+        .page-title { font-family:var(--font-display); font-size:clamp(26px,3.5vw,44px); font-weight:800; letter-spacing:-0.03em; color:#111111; }
         .page-title span { color:#5B21B6; }
         .activation-banner { max-width:1300px; margin:0 auto 24px; padding:0 60px; }
         .activation-banner-inner { background:#F5F3FF; border:1px solid #DDD6FE; border-radius:14px; padding:14px 18px; color:#444444; font-size:14px; line-height:1.6; }
@@ -154,7 +154,7 @@ export default function ProductsPage() {
         .add-btn.added { background:#16A34A; }
         .loading { text-align:center; padding:60px; color:#666666; font-size:18px; }
         footer { background:#111111; padding:50px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; }
-        .footer-logo { font-family:var(--font-display); font-size:17px; font-weight:900; color:#FFFFFF; }
+        .footer-logo { font-family:var(--font-display); font-size:17px; font-weight:800; color:#FFFFFF; }
         .footer-links { display:flex; gap:24px; list-style:none; flex-wrap:wrap; }
         .footer-links a { color:rgba(255,255,255,0.6); text-decoration:none; font-size:13px; transition:color 0.2s; }
         .footer-links a:hover { color:#FFFFFF; }

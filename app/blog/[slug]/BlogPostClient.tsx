@@ -49,7 +49,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
         body{background:#FFFFFF;color:#111111;font-family:var(--font-body);}
 
         nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 60px;display:flex;align-items:center;justify-content:space-between;background:#FFFFFF;border-bottom:1px solid #E5E5E5;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
-        .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
+        .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:800; color:#111111; text-decoration:none; letter-spacing:2px; }
         .nav-links{display:flex;gap:28px;list-style:none;}
         .nav-links a{color:#111111;text-decoration:none;font-size:13px;font-weight:500;letter-spacing:1px;text-transform:uppercase;transition:color 0.2s;}
         .nav-links a:hover{color:#5B21B6;}
@@ -117,7 +117,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
         .loading-state a{color:#5B21B6;}
 
         footer{background:#111111;padding:50px 60px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;margin-top:80px;}
-        .footer-logo { font-family:var(--font-display); font-size:16px; font-weight:900; color:#FFFFFF; }
+        .footer-logo { font-family:var(--font-display); font-size:16px; font-weight:800; color:#FFFFFF; }
         .footer-links{display:flex;gap:24px;list-style:none;flex-wrap:wrap;}
         .footer-links a{color:rgba(255,255,255,0.6);text-decoration:none;font-size:13px;transition:color 0.2s;}
         .footer-links a:hover{color:#FFFFFF;}

@@ -42,7 +42,7 @@ export default function ERPLoginPage() {
         body{background:#F5F5F5;color:#111111;font-family:var(--font-body);}
         .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#F5F5F5;}
         .box{background:#FFFFFF;border:1px solid #E5E5E5;border-radius:16px;padding:48px 40px;width:100%;max-width:420px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
-        .logo{font-family:var(--font-display);font-size:22px;font-weight:900;color:#111111;margin-bottom:6px;}
+        .logo{font-family:var(--font-display);font-size:22px;font-weight:800;color:#111111;margin-bottom:6px;}
         .sub{font-size:12px;color:#666666;letter-spacing:2px;text-transform:uppercase;margin-bottom:32px;}
         .title{font-family:var(--font-display);font-size:18px;font-weight:700;color:#111111;margin-bottom:6px;}
         .desc{color:#888888;font-size:13px;margin-bottom:24px;}

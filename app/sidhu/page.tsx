@@ -11,7 +11,7 @@ const styles = `
   /* LOGIN */
   .login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:#F5F5F5; }
   .login-box { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:16px; padding:48px 40px; width:100%; max-width:420px; text-align:center; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
-  .login-logo { font-family:var(--font-display); font-size:22px; font-weight:900; color:#111111; margin-bottom:6px; }
+  .login-logo { font-family:var(--font-display); font-size:22px; font-weight:800; color:#111111; margin-bottom:6px; }
   .login-sub { font-size:12px; color:#666666; margin-bottom:32px; letter-spacing:2px; text-transform:uppercase; }
   .login-input { width:100%; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:8px; padding:12px 16px; color:#111111; font-family:var(--font-body); font-size:14px; outline:none; margin-bottom:12px; transition:border-color 0.2s; }
   .login-input:focus { border-color:#5B21B6; box-shadow:0 0 0 3px rgba(91,33,182,0.1); }
@@ -27,7 +27,7 @@ const styles = `
   .sidebar { width:240px; flex-shrink:0; background:#111111; border-right:none; display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:50; color:#FFFFFF; }
   .sidebar * { color:#FFFFFF; }
   .sidebar-logo { padding:24px 20px 18px; border-bottom:1px solid rgba(255,255,255,0.1); }
-  .sidebar-logo-text { font-family:var(--font-display); font-size:15px; font-weight:900; color:#FFFFFF !important; letter-spacing:1px; }
+  .sidebar-logo-text { font-family:var(--font-display); font-size:15px; font-weight:800; color:#FFFFFF !important; letter-spacing:1px; }
   .sidebar-label { font-size:10px; color:#AAAAAA !important; letter-spacing:3px; text-transform:uppercase; margin-top:3px; }
   .sidebar-nav { flex:1; padding:16px 10px; display:flex; flex-direction:column; gap:3px; }
   .nav-item { display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:8px; cursor:pointer; transition:all 0.15s; color:#CCCCCC !important; font-size:13px; font-weight:500; border:none; background:none; width:100%; text-align:left; }
@@ -1539,7 +1539,7 @@ export default function AdminPage() {
               <div className="section-card" style={{padding:0,marginBottom:20,overflow:"hidden"}}>
                 <div style={{padding:"16px 20px",background:"linear-gradient(135deg,#111111,#4C1D95)",color:"#FFFFFF",display:"flex",justifyContent:"space-between",gap:12,alignItems:"center"}}>
                   <div>
-                    <div style={{fontFamily:"var(--font-display)",fontWeight:900,fontSize:16,color:"#FFFFFF"}}>Professor ↔ Berlin Training Chat</div>
+                    <div style={{fontFamily:"var(--font-display)",fontWeight:800,fontSize:16,color:"#FFFFFF"}}>Professor ↔ Berlin Training Chat</div>
                     <div style={{fontSize:12,color:"rgba(255,255,255,0.72)",marginTop:4}}>
                       Test Berlin, ask what he knows, then say “save this” or “remember this” to add training automatically.
                     </div>

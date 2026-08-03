@@ -134,7 +134,7 @@ function DashboardContent({ user, currency }: { user: any; currency: string }) {
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12,marginBottom:officeExpSummary.categories?.length?14:0}}>
               <div>
                 <div style={{fontSize:13,fontWeight:700}}>🏢 This Month Office Expenses</div>
-                <div style={{fontFamily:"var(--font-display)",fontSize:22,fontWeight:900,color:"#ff8c00",marginTop:4}}>{fmt(officeExpSummary.total||0)}</div>
+                <div style={{fontFamily:"var(--font-display)",fontSize:22,fontWeight:800,color:"#ff8c00",marginTop:4}}>{fmt(officeExpSummary.total||0)}</div>
               </div>
               <a href="/erp/office-expenses" style={{color:"#5B21B6",fontSize:12,textDecoration:"none"}}>View All →</a>
             </div>

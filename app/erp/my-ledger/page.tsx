@@ -104,7 +104,7 @@ function MyLedgerContent({ user }: { user: any }) {
 
     {/* Print-only employee statement header */}
     <div className="print-header-emp" style={{marginBottom:20,paddingBottom:14,borderBottom:"2px solid #111"}}>
-      <div style={{fontSize:22,fontWeight:900,fontFamily:"serif"}}>FIRESTICK4UK — Personal Ledger Statement</div>
+      <div style={{fontSize:22,fontWeight:800,fontFamily:"serif"}}>FIRESTICK4UK — Personal Ledger Statement</div>
       <div style={{fontSize:13,color:"#444",marginTop:4}}>Employee: <strong>{user.name}</strong> · Generated: {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
     </div>
 
@@ -118,7 +118,7 @@ function MyLedgerContent({ user }: { user: any }) {
         </div>
         <div style={{textAlign:"right"}}>
           <div style={{fontSize:11,color:"#888",letterSpacing:"1px",textTransform:"uppercase"}}>Net Receivable</div>
-          <div style={{fontSize:24,fontWeight:900,color:netBal>=0?"#16A34A":"#DC2626"}}>{fmt(Math.abs(netBal))}</div>
+          <div style={{fontSize:24,fontWeight:800,color:netBal>=0?"#16A34A":"#DC2626"}}>{fmt(Math.abs(netBal))}</div>
           <div style={{fontSize:11,color:netBal>=0?"#16A34A":"#DC2626",marginBottom:10}}>{netBal>=0?"Company owes you":"You owe company"}</div>
           <button className="no-print" onClick={()=>window.print()} style={{background:"#5B21B6",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
             📥 Export PDF / Print

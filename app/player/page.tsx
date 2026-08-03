@@ -376,7 +376,7 @@ export default function PlayerPage() {
         {appState==='login' && (
           <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:24,background:'radial-gradient(ellipse at 50% 0%,#0d0d0d 0%,#000 70%)'}}>
             <div style={{background:'#0f0f0f',border:'1px solid #1e1e1e',borderRadius:18,padding:'36px 32px',width:'100%',maxWidth:440,boxShadow:'0 24px 64px rgba(0,0,0,0.8)'}}>
-              <div style={{fontSize:24,fontWeight:900,color:'#fff',marginBottom:6,textAlign:'center'}}>Connect Your Playlist</div>
+              <div style={{fontSize:24,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>Connect Your Playlist</div>
               <div style={{fontSize:13,color:'#555',textAlign:'center',marginBottom:28}}>Xtream Codes API or M3U format</div>
 
               <div style={{display:'flex',gap:3,background:'#1a1a1a',padding:3,borderRadius:10,marginBottom:24}}>
@@ -443,7 +443,7 @@ export default function PlayerPage() {
                 <div style={{fontSize:56,marginBottom:16}}>📺</div>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:10}}>
                   <span style={{width:9,height:9,borderRadius:'50%',background:'#00e676',display:'inline-block',animation:'glow 2s ease-in-out infinite'}}/>
-                  <span style={{fontSize:18,fontWeight:900,color:'#fff',letterSpacing:'1px'}}>LIVE TV</span>
+                  <span style={{fontSize:18,fontWeight:800,color:'#fff',letterSpacing:'1px'}}>LIVE TV</span>
                 </div>
                 <div style={{fontSize:12,color:'#3a3a3a',marginBottom:4}}>
                   {Object.values(liveMap).flat().length.toLocaleString()} channels
@@ -455,7 +455,7 @@ export default function PlayerPage() {
               {/* ── MOVIES ── */}
               <div className="hub-card" onClick={()=>navTo('vod')} style={{flex:'1 1 260px',maxWidth:300,background:'#0d0d0d',border:'1px solid #1a1a1a',borderRadius:20,padding:'36px 28px',cursor:'pointer',textAlign:'center',transition:'all 0.22s'}}>
                 <div style={{fontSize:56,marginBottom:16}}>🎬</div>
-                <div style={{fontSize:18,fontWeight:900,color:'#fff',letterSpacing:'1px',marginBottom:10}}>MOVIES</div>
+                <div style={{fontSize:18,fontWeight:800,color:'#fff',letterSpacing:'1px',marginBottom:10}}>MOVIES</div>
                 <div style={{fontSize:12,color:'#3a3a3a',marginBottom:4}}>
                   {vodLoaded ? `${Object.values(vodMap).flat().length.toLocaleString()} titles` : isXtream ? 'Loads on first click' : 'No VOD detected'}
                 </div>
@@ -466,7 +466,7 @@ export default function PlayerPage() {
               {/* ── SERIES ── */}
               <div className="hub-card" onClick={()=>navTo('series')} style={{flex:'1 1 260px',maxWidth:300,background:'#0d0d0d',border:'1px solid #1a1a1a',borderRadius:20,padding:'36px 28px',cursor:'pointer',textAlign:'center',transition:'all 0.22s'}}>
                 <div style={{fontSize:56,marginBottom:16}}>🍿</div>
-                <div style={{fontSize:18,fontWeight:900,color:'#fff',letterSpacing:'1px',marginBottom:10}}>SERIES</div>
+                <div style={{fontSize:18,fontWeight:800,color:'#fff',letterSpacing:'1px',marginBottom:10}}>SERIES</div>
                 <div style={{fontSize:12,color:'#3a3a3a',marginBottom:4}}>
                   {seriesLoaded ? `${Object.values(seriesMap).flat().length.toLocaleString()} shows` : isXtream ? 'Loads on first click' : 'No series detected'}
                 </div>

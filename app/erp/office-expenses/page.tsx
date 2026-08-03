@@ -286,7 +286,7 @@ function OEContent({ user, currency: _c }: { user: any; currency: string }) {
                 {paidExpenses.length > 0 && (
                   <tr style={{ borderTop: "2px solid rgba(91,33,182,0.12)" }}>
                     <td colSpan={4} style={{ fontWeight: 700, fontSize: 12, color: "#555555", padding: "12px 14px", textTransform: "uppercase", letterSpacing: "1px" }}>Total</td>
-                    <td style={{ fontWeight: 900, color: "#ff8c00", fontFamily: "var(--font-display)", fontSize: 16, padding: "12px 14px" }}>{fmt(paidTotal)}</td>
+                    <td style={{ fontWeight: 800, color: "#ff8c00", fontFamily: "var(--font-display)", fontSize: 16, padding: "12px 14px" }}>{fmt(paidTotal)}</td>
                     <td colSpan={isAdmin ? 4 : 3} />
                   </tr>
                 )}

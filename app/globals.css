@@ -41,7 +41,7 @@ html body h1, html body h2, html body h3, html body h4 {
 }
 
 html body h1 {
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1.1;
 }
@@ -85,7 +85,7 @@ html body .nav-logo {
   -webkit-background-clip: unset !important;
   -webkit-text-fill-color: #111111 !important;
   color: #111111 !important;
-  font-weight: 900 !important;
+  font-weight: 800 !important;
 }
 
 html body .nav-links a {
@@ -164,7 +164,7 @@ html body .hero-title {
 }
 
 html body .page-title {
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: -0.03em;
 }
 

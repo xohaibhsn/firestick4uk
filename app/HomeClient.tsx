@@ -105,7 +105,7 @@ export default function HomeClient({
         :root { --purple:#5B21B6; --purple-dark:#4C1D95; --black:#1A1A1A; --text:#111111; --border:#E5E5E5; --gray:#F5F5F5; --gray-text:#666666; }
         body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow-x:hidden; }
         nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:18px 60px; display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; border-bottom:1px solid #E5E5E5; box-shadow:0 1px 4px rgba(0,0,0,0.06); transition:all 0.3s; }
-        .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
+        .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:800; color:#111111; text-decoration:none; letter-spacing:2px; }
         .nav-links { display:flex; gap:36px; list-style:none; }
         .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.2s; }
         .nav-links a:hover { color:#5B21B6; }
@@ -117,7 +117,7 @@ export default function HomeClient({
         /* SEO HERO — clean, above products */
         .home-seo-hero { background:#FFFFFF; padding:40px 20px; text-align:center; }
         .home-seo-hero-inner { max-width:800px; margin:0 auto; }
-        .home-seo-hero h1 { font-family:var(--font-display); font-size:clamp(2.5rem,6vw,4.5rem); color:#111111; line-height:1.05; margin:0 0 14px; font-weight:900; letter-spacing:-0.03em; }
+        .home-seo-hero h1 { font-family:var(--font-display); font-size:clamp(2.5rem,6vw,4.5rem); color:#111111; line-height:1.05; margin:0 0 14px; font-weight:800; letter-spacing:-0.03em; }
         .home-seo-hero h1 span { color:#5B21B6; }
         .home-seo-hero p { font-family:var(--font-body); color:#64748b; font-size:clamp(1rem,2vw,1.2rem); font-weight:400; line-height:1.7; margin:0; max-width:520px; margin-left:auto; margin-right:auto; }
         /* PRODUCTS HEADER */
@@ -145,7 +145,7 @@ export default function HomeClient({
         .hero { background:transparent; padding:70px 60px 80px; max-width:1300px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center; }
         .hero-content {}
         .hero-tag { font-family:var(--font-body); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5B21B6; margin-bottom:16px; display:block; font-weight:700; }
-        .hero-title { font-family:var(--font-display); font-size:clamp(2.5rem,6vw,4.5rem); font-weight:900; letter-spacing:-0.03em; color:#111111 !important; -webkit-text-fill-color:#111111 !important; line-height:1.05; margin-bottom:20px; }
+        .hero-title { font-family:var(--font-display); font-size:clamp(2.5rem,6vw,4.5rem); font-weight:800; letter-spacing:-0.03em; color:#111111 !important; -webkit-text-fill-color:#111111 !important; line-height:1.05; margin-bottom:20px; }
         .hero-title span { color:#5B21B6 !important; -webkit-text-fill-color:#5B21B6 !important; }
         .hero-subtitle { font-family:var(--font-body); font-size:clamp(1rem,2vw,1.2rem); font-weight:400; color:#64748b; line-height:1.7; margin-bottom:36px; max-width:520px; }
         .hero-btns { display:flex; gap:14px; flex-wrap:wrap; }
@@ -156,7 +156,7 @@ export default function HomeClient({
         .hero-visual { background:linear-gradient(135deg,#EDE9FE,#F5F3FF); border-radius:24px; aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; font-size:80px; border:1px solid #DDD6FE; overflow:hidden; }
         .hero-stats { display:flex; gap:32px; margin-top:40px; padding-top:32px; border-top:1px solid #E5E5E5; }
         .stat-item {}
-        .stat-num { font-family:var(--font-display); font-size:2rem; font-weight:900; color:#111111; letter-spacing:-0.02em; display:block; }
+        .stat-num { font-family:var(--font-display); font-size:2rem; font-weight:800; color:#111111; letter-spacing:-0.02em; display:block; }
         .stat-label { font-family:var(--font-body); font-size:0.75rem; font-weight:600; color:#64748b; letter-spacing:0.08em; text-transform:uppercase; }
         /* FEATURES — LIGHT SECTION */
         .features-outer { background:#F5F5F5; }
@@ -191,7 +191,7 @@ export default function HomeClient({
         .feature-title { font-weight:700; font-size:15px; color:#111111; margin-bottom:7px; }
         .feature-desc { font-size:13px; color:#666666; line-height:1.6; }
         footer { background:#111111; padding:50px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; }
-        .footer-logo { font-family:var(--font-display); font-size:17px; font-weight:900; color:#FFFFFF; }
+        .footer-logo { font-family:var(--font-display); font-size:17px; font-weight:800; color:#FFFFFF; }
         .footer-links { display:flex; gap:24px; list-style:none; flex-wrap:wrap; }
         .footer-links a { color:rgba(255,255,255,0.6); text-decoration:none; font-size:13px; transition:color 0.2s; }
         .footer-links a:hover { color:#FFFFFF; }

@@ -72,7 +72,7 @@ function MyPayrollContent({ user, currency: _c }: { user: any; currency: string 
                 ))}
                 <tr>
                   <td style={{padding:"14px",fontWeight:700,fontSize:15}}>Net Pay</td>
-                  <td style={{padding:"14px",fontFamily:"var(--font-display)",fontSize:20,fontWeight:900,color:"#5B21B6"}}>{fmt(Number(data.net_pay||0))}</td>
+                  <td style={{padding:"14px",fontFamily:"var(--font-display)",fontSize:20,fontWeight:800,color:"#5B21B6"}}>{fmt(Number(data.net_pay||0))}</td>
                 </tr>
               </tbody>
             </table>

@@ -193,7 +193,7 @@ function SubscriptionsHubContent({ user }: { user:any }) {
               <div key={s.id} style={{background:c.bg,border:`1px solid ${low?"#FECACA":c.border}`,borderRadius:14,padding:"14px 20px",minWidth:148,flex:"1 1 135px",position:"relative",overflow:"hidden"}}>
                 {low && <div style={{position:"absolute",top:7,right:9,fontSize:10,fontWeight:700,color:"#DC2626",letterSpacing:"0.5px"}}>LOW</div>}
                 <div style={{fontSize:10,fontWeight:700,color:c.text,letterSpacing:"1.2px",textTransform:"uppercase",marginBottom:6}}>📡 {s.server_name}</div>
-                <div style={{fontFamily:"var(--font-display)",fontSize:30,fontWeight:900,color:low?"#DC2626":c.accent,lineHeight:1,marginBottom:3}}>
+                <div style={{fontFamily:"var(--font-display)",fontSize:30,fontWeight:800,color:low?"#DC2626":c.accent,lineHeight:1,marginBottom:3}}>
                   {s.available_credits.toLocaleString()}
                 </div>
                 <div style={{fontSize:10,color:c.text,opacity:0.65}}>credits in stock</div>
@@ -272,7 +272,7 @@ function SubscriptionsHubContent({ user }: { user:any }) {
           {pTotal !== null && (
             <div style={{marginBottom:14,padding:"10px 14px",background:"rgba(91,33,182,0.05)",border:"1px solid rgba(91,33,182,0.18)",borderRadius:9,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span style={{fontSize:12,color:"#5B21B6",fontWeight:600}}>Total Payable</span>
-              <span style={{fontFamily:"var(--font-display)",fontSize:19,fontWeight:900,color:"#5B21B6"}}>{fmt(pTotal)}</span>
+              <span style={{fontFamily:"var(--font-display)",fontSize:19,fontWeight:800,color:"#5B21B6"}}>{fmt(pTotal)}</span>
             </div>
           )}
 
@@ -347,7 +347,7 @@ function SubscriptionsHubContent({ user }: { user:any }) {
                     </div>
                   )}
                 </div>
-                <span style={{fontFamily:"var(--font-display)",fontSize:19,fontWeight:900,color:"#15803D"}}>{fmt(sTotal)}</span>
+                <span style={{fontFamily:"var(--font-display)",fontSize:19,fontWeight:800,color:"#15803D"}}>{fmt(sTotal)}</span>
               </div>
               <div style={{fontSize:11,color:"#166534",fontFamily:"monospace"}}>
                 DR {assetAccounts.find((a:any)=>String(a.id)===sForm.destination_account_id)?.account_name||"…"} ↑ &nbsp;·&nbsp; CR IPTV Manual Sales Revenue ↑
@@ -492,7 +492,7 @@ function SubscriptionsHubContent({ user }: { user:any }) {
 
             <div style={{marginBottom:18,padding:"14px 16px",background:"#F9F9F9",border:"1px solid #E5E5E5",borderRadius:10}}>
               <div style={{fontSize:11,color:"#888",marginBottom:4}}>Order #{payingOrder.id} · {payingOrder.server_name} · {fmtD(payingOrder.created_at)}</div>
-              <div style={{fontFamily:"var(--font-display)",fontSize:24,fontWeight:900,color:"#5B21B6"}}>{fmt(Number(payingOrder.total_amount))}</div>
+              <div style={{fontFamily:"var(--font-display)",fontSize:24,fontWeight:800,color:"#5B21B6"}}>{fmt(Number(payingOrder.total_amount))}</div>
               <div style={{fontSize:10,color:"#AAA",marginTop:4,fontFamily:"monospace"}}>{payingOrder.voucher_ref}</div>
               {payingOrder.vendor_name && <div style={{fontSize:12,color:"#5B21B6",marginTop:5,fontWeight:600}}>Vendor: {payingOrder.vendor_name}</div>}
               {payingOrder.vendor_description && <div style={{fontSize:12,color:"#666",marginTop:3}}>{payingOrder.vendor_description}</div>}
@@ -555,7 +555,7 @@ function SubscriptionsHubContent({ user }: { user:any }) {
             {editTotal !== null && (
               <div style={{marginBottom:14,padding:"10px 14px",background:"rgba(91,33,182,0.05)",border:"1px solid rgba(91,33,182,0.18)",borderRadius:9,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span style={{fontSize:12,color:"#5B21B6",fontWeight:600}}>New Total</span>
-                <span style={{fontFamily:"var(--font-display)",fontSize:19,fontWeight:900,color:"#5B21B6"}}>{fmt(editTotal)}</span>
+                <span style={{fontFamily:"var(--font-display)",fontSize:19,fontWeight:800,color:"#5B21B6"}}>{fmt(editTotal)}</span>
               </div>
             )}
 

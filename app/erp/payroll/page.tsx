@@ -217,7 +217,7 @@ function PayrollContent({ user }: { user: any }) {
                         <td style={{fontWeight:700}}>{fmt(total.base)}</td>
                         <td style={{fontWeight:700,color:"#16A34A"}}>+{fmt(total.expenses)}</td>
                         <td style={{fontWeight:700,color:"#DC2626"}}>-{fmt(total.advances)}</td>
-                        <td style={{fontWeight:900,color:"#5B21B6",fontSize:15}}>{fmt(total.net)}</td>
+                        <td style={{fontWeight:800,color:"#5B21B6",fontSize:15}}>{fmt(total.net)}</td>
                         <td/>
                       </tr>
                     )}
@@ -276,7 +276,7 @@ function PayrollContent({ user }: { user: any }) {
                 {/* Net Pay */}
                 <div style={{background:"#EDE9FE",border:"1px solid #DDD6FE",borderRadius:10,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
                   <span style={{fontWeight:700,fontSize:14,color:"#5B21B6"}}>NET PAY</span>
-                  <span style={{fontFamily:"var(--font-display)",fontSize:20,fontWeight:900,color:"#5B21B6"}}>{fmt(p.net_pay||0)}</span>
+                  <span style={{fontFamily:"var(--font-display)",fontSize:20,fontWeight:800,color:"#5B21B6"}}>{fmt(p.net_pay||0)}</span>
                 </div>
 
                 {/* Actions */}

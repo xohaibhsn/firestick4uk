@@ -12,7 +12,7 @@ const navStyles = `
   nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:18px 60px;
     display:flex; align-items:center; justify-content:space-between;
     background:#FFFFFF; border-bottom:1px solid #E5E5E5; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
-  .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:900; color:#111111; text-decoration:none; letter-spacing:2px; }
+  .nav-logo { font-family:var(--font-logo); font-size:20px; font-weight:800; color:#111111; text-decoration:none; letter-spacing:2px; }
   .nav-links { display:flex; gap:36px; list-style:none; }
   .nav-links a { color:#111111; text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.2s; }
   .nav-links a:hover { color:#5B21B6; }
@@ -31,7 +31,7 @@ const navStyles = `
   .page-wrapper { padding-top:100px; min-height:100vh; background:#FFFFFF; }
   .page-header { max-width:1200px; margin:0 auto; padding:50px 60px 30px; }
   .section-tag { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; font-weight:600; }
-  .page-title { font-family:var(--font-display); font-size:clamp(26px,3.5vw,44px); font-weight:900; letter-spacing:-0.03em; color:#111111; }
+  .page-title { font-family:var(--font-display); font-size:clamp(26px,3.5vw,44px); font-weight:800; letter-spacing:-0.03em; color:#111111; }
   .page-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
 
   /* CART LAYOUT */
@@ -138,7 +138,7 @@ const navStyles = `
 
   /* FOOTER */
   footer { background:#111111; padding:50px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; }
-  .footer-logo { font-family:var(--font-display); font-size:17px; font-weight:900; color:#FFFFFF; }
+  .footer-logo { font-family:var(--font-display); font-size:17px; font-weight:800; color:#FFFFFF; }
   .footer-copy { font-size:12px; color:rgba(255,255,255,0.4); }
 
   .whatsapp-btn { position:fixed; bottom:30px; right:30px; z-index:999; width:58px; height:58px; border-radius:50%; background:linear-gradient(135deg,#25d366,#128c7e); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 25px rgba(37,211,102,0.5); text-decoration:none; font-size:26px; transition:all 0.3s; }
