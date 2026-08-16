@@ -150,9 +150,11 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
         @media (max-width: 640px) {
           .hero-slider-stage {
             height: auto;
-            min-height: 500px;
-            padding-bottom: 60px;
+            min-height: 0;
+            padding: 28px 0 24px;
             overflow: hidden;
+            display: flex;
+            align-items: center;
           }
           .hero-slider-content {
             position: relative;
@@ -160,7 +162,8 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
             left: auto;
             right: auto;
             transform: none;
-            padding: 24px 20px 20px 20px;
+            padding: 0 20px;
+            width: 100%;
           }
           /* Mobile: dots OUTSIDE stage (sibling), relative */
           .hero-slider-dots {

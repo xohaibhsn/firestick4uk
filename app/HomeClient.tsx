@@ -316,8 +316,14 @@ export default function HomeClient({
           .home-seo-hero h1{font-size:1.75rem;}
           .home-seo-hero p{font-size:1rem;}
           .slider-hero-inner h1{font-size:clamp(1.6rem,5vw,2rem);}
-          .slider-hero-inner p{display:none;}
-          .slider-hero-btns{flex-direction:column;}
+          .slider-hero-inner p{
+            display:block;
+            margin:0 0 20px;
+            font-size:0.95rem;
+            line-height:1.55;
+            max-width:100%;
+          }
+          .slider-hero-btns{flex-direction:column;gap:10px;}
           .slider-btn-primary,.slider-btn-secondary{width:100%;text-align:center;box-sizing:border-box;}
           .products-header{padding:28px 16px 16px;flex-direction:column;align-items:flex-start;gap:12px;}
           .search-wrap{padding:0 16px 16px;}
