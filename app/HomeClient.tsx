@@ -240,6 +240,9 @@ export default function HomeClient({
           gap:12px;
           align-content:start;
         }
+        .hero-feature-scroll-hint {
+          display:none;
+        }
         .hero-feature-item {
           display:flex;
           align-items:flex-start;
@@ -344,6 +347,34 @@ export default function HomeClient({
           .hero-stats{gap:20px;}
           .features-section{padding:40px 24px 50px;}
           footer{padding:36px 24px;flex-direction:column;text-align:center;}
+        }
+        @media (max-width: 640px) {
+          .hero-features.feature-list {
+            max-height: 220px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+            padding-right: 8px;
+            grid-template-columns: 1fr;
+          }
+          .hero-features.feature-list::-webkit-scrollbar {
+            width: 4px;
+          }
+          .hero-features.feature-list::-webkit-scrollbar-track {
+            background: #F5F5F5;
+            border-radius: 4px;
+          }
+          .hero-features.feature-list::-webkit-scrollbar-thumb {
+            background: #5B21B6;
+            border-radius: 4px;
+          }
+          .hero-feature-scroll-hint {
+            display: block;
+            color: #9CA3AF;
+            font-size: 11px;
+            text-align: center;
+            margin-top: 4px;
+            font-family: var(--font-body);
+          }
         }
       `}</style>
 
@@ -475,13 +506,16 @@ export default function HomeClient({
                 <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
               </div>
             </div>
-            <div className="hero-features">
-              {featureList.map((item, i) => (
-                <div className="hero-feature-item" key={`${item}-${i}`}>
-                  <span className="hero-feature-check" aria-hidden>✓</span>
-                  <span>{item}</span>
-                </div>
-              ))}
+            <div className="hero-features-wrap">
+              <div className="hero-features feature-list">
+                {featureList.map((item, i) => (
+                  <div className="hero-feature-item" key={`${item}-${i}`}>
+                    <span className="hero-feature-check" aria-hidden>✓</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="hero-feature-scroll-hint">scroll for more ↓</div>
             </div>
           </div>
         </div>
