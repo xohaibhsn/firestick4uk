@@ -492,15 +492,26 @@ html body .product-category { color: #5B21B6 !important; }
 html body .product-name, html body .product-name * { color: #111111 !important; -webkit-text-fill-color: #111111 !important; }
 html body .product-short-desc { color: #444444 !important; }
 html body .full-desc { color: #333333 !important; }
-html body .hero-features-wrap .hero-features.feature-list {
-  height: 100px !important;
-  max-height: 100px !important;
+html body .hero-combined-scroll {
+  height: 360px !important;
+  max-height: 360px !important;
   overflow-y: scroll !important;
 }
+html body .hero-features-wrap .hero-features.feature-list {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+@media (max-width: 768px) {
+  html body .hero-combined-scroll {
+    height: 420px !important;
+    max-height: 420px !important;
+  }
+}
 @media (max-width: 640px) {
-  html body .hero-features-wrap .hero-features.feature-list {
-    height: 140px !important;
-    max-height: 140px !important;
+  html body .hero-combined-scroll {
+    height: 400px !important;
+    max-height: 400px !important;
   }
 }
 html body .meta-pill { color: #444444 !important; background: #F5F5F5 !important; border-color: #E5E5E5 !important; }

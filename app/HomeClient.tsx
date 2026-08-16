@@ -227,15 +227,40 @@ export default function HomeClient({
         .view-all-wrap { max-width:1300px; margin:0 auto; padding:20px 60px 50px; text-align:center; }
         .view-all-btn { display:inline-block; background:#111111; color:#FFFFFF; padding:14px 40px; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; transition:all 0.2s; }
         .view-all-btn:hover { background:#5B21B6; transform:translateY(-1px); }
-        /* HERO — LIGHT SECTION */
+        /* HERO — LIGHT SECTION (combined scroll panel) */
         .hero-outer { background:#FFFFFF; border-top:1px solid #E5E5E5; }
-        .hero { background:transparent; padding:70px 60px 80px; max-width:1300px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center; }
-        .hero-content {}
+        .hero {
+          background:transparent;
+          padding:50px 60px 60px;
+          max-width:1300px;
+          margin:0 auto;
+          display:block;
+        }
+        .hero-combined {
+          border:1px solid #E5E5E5;
+          border-radius:16px;
+          background:#FAFAFA;
+          overflow:hidden;
+        }
+        .hero-combined-scroll {
+          height: 360px;
+          max-height: 360px;
+          overflow-x: hidden;
+          overflow-y: scroll;
+          scroll-behavior: smooth;
+          padding: 28px 28px 20px;
+          box-sizing: border-box;
+          -webkit-overflow-scrolling: touch;
+        }
+        .hero-combined-scroll::-webkit-scrollbar { width: 5px; }
+        .hero-combined-scroll::-webkit-scrollbar-track { background: #F5F5F5; border-radius: 4px; }
+        .hero-combined-scroll::-webkit-scrollbar-thumb { background: #5B21B6; border-radius: 4px; }
+        .hero-content { max-width: 720px; }
         .hero-tag { font-family:var(--font-body); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5B21B6; margin-bottom:16px; display:block; font-weight:700; }
         .hero-title { font-family:var(--font-display); font-size:clamp(1.8rem,3.5vw,2.8rem); font-weight:800; letter-spacing:-0.02em; color:#111111 !important; -webkit-text-fill-color:#111111 !important; line-height:1.15; margin-bottom:20px; }
         .hero-title span { color:#5B21B6 !important; -webkit-text-fill-color:#5B21B6 !important; }
-        .hero-subtitle { font-family:var(--font-body); font-size:clamp(1rem,2vw,1.2rem); font-weight:400; color:#64748b; line-height:1.7; margin-bottom:36px; max-width:520px; }
-        .hero-btns { display:flex; gap:14px; flex-wrap:wrap; }
+        .hero-subtitle { font-family:var(--font-body); font-size:clamp(1rem,2vw,1.2rem); font-weight:400; color:#64748b; line-height:1.7; margin-bottom:28px; max-width:640px; }
+        .hero-btns { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:28px; }
         .hero-btn-primary { font-family:var(--font-body); background:#5B21B6; color:#FFFFFF; padding:16px 36px; border-radius:8px; font-size:15px; font-weight:600; letter-spacing:0.01em; text-decoration:none; transition:all 0.2s; display:inline-block; }
         .hero-btn-primary:hover { background:#4C1D95; transform:translateY(-2px); box-shadow:0 6px 20px rgba(91,33,182,0.35); }
         .hero-btn-secondary { font-family:var(--font-body); background:#111111; color:#FFFFFF; padding:16px 36px; border-radius:8px; font-size:15px; font-weight:600; letter-spacing:0.01em; text-decoration:none; transition:all 0.2s; display:inline-block; }
@@ -243,36 +268,22 @@ export default function HomeClient({
         .hero-features-wrap {
           min-width: 0;
           width: 100%;
+          margin-bottom: 8px;
         }
         .hero-features {
           display:grid;
           grid-template-columns:1fr 1fr;
-          gap:10px 12px;
+          gap:10px 16px;
           align-content:start;
         }
         .hero-features.feature-list {
-          height: 100px;
-          max-height: 100px;
-          overflow-x: hidden;
-          overflow-y: scroll;
-          scroll-behavior: smooth;
-          padding: 8px 10px 8px 4px;
-          border: 1px solid #E5E5E5;
-          border-radius: 10px;
-          background: #FAFAFA;
-          box-sizing: border-box;
-          -webkit-overflow-scrolling: touch;
-        }
-        .hero-features.feature-list::-webkit-scrollbar {
-          width: 5px;
-        }
-        .hero-features.feature-list::-webkit-scrollbar-track {
-          background: #F5F5F5;
-          border-radius: 4px;
-        }
-        .hero-features.feature-list::-webkit-scrollbar-thumb {
-          background: #5B21B6;
-          border-radius: 4px;
+          height: auto;
+          max-height: none;
+          overflow: visible;
+          padding: 0;
+          border: none;
+          border-radius: 0;
+          background: transparent;
         }
         .hero-feature-scroll-hint {
           display: block;
@@ -280,7 +291,8 @@ export default function HomeClient({
           font-size: 12px;
           font-weight: 600;
           text-align: center;
-          margin-top: 8px;
+          margin-top: 10px;
+          padding-bottom: 4px;
           font-family: var(--font-body);
         }
         .hero-feature-item {
@@ -302,7 +314,7 @@ export default function HomeClient({
           font-size:16px;
           line-height:1;
         }
-        .hero-stats { display:flex; gap:32px; margin-top:40px; padding-top:32px; border-top:1px solid #E5E5E5; }
+        .hero-stats { display:flex; gap:32px; margin-top:24px; padding-top:24px; border-top:1px solid #E5E5E5; }
         .stat-item {}
         .stat-num { font-family:var(--font-display); font-size:2rem; font-weight:800; color:#111111; letter-spacing:-0.02em; display:block; }
         .stat-label { font-family:var(--font-body); font-size:0.75rem; font-weight:600; color:#64748b; letter-spacing:0.08em; text-transform:uppercase; }
@@ -382,17 +394,20 @@ export default function HomeClient({
           .add-btn{padding:7px 10px;font-size:11px;}
           .badge{font-size:9px;padding:3px 7px;top:6px;right:6px;}
           .view-all-wrap{padding:14px 16px 36px;}
-          .hero{grid-template-columns:1fr;padding:48px 16px 52px;gap:28px;}
+          .hero{padding:36px 16px 44px;}
+          .hero-combined-scroll{height:420px;max-height:420px;padding:20px 16px 16px;}
           .hero-features{grid-template-columns:1fr;}
-          .hero-stats{gap:20px;}
+          .hero-stats{gap:20px;flex-wrap:wrap;}
           .features-section{padding:40px 24px 50px;}
           footer{padding:36px 24px;flex-direction:column;text-align:center;}
         }
         @media (max-width: 640px) {
-          .hero-features.feature-list {
+          .hero-combined-scroll {
+            height: 400px;
+            max-height: 400px;
+          }
+          .hero-features {
             grid-template-columns: 1fr;
-            height: 140px;
-            max-height: 140px;
           }
         }
       `}</style>
@@ -509,30 +524,34 @@ export default function HomeClient({
         {/* HERO — DARK section */}
         <div className="hero-outer">
           <div className="hero">
-            <div className="hero-content">
-              <span className="hero-tag">✦ UK&apos;s #1 Firestick Service</span>
-              <h2 className="hero-title">
-                {formatHeroTitle(heroTitle)}
-              </h2>
-              <p className="hero-subtitle">{heroSubtitle}</p>
-              <div className="hero-btns">
-                <a href={sec.home_hero?.button_link||"/products"} className="hero-btn-primary">{sec.home_hero?.button_text||"Shop Now"} →</a>
-                <a href={sec.home_hero?.secondary_button_link||"/about"} className="hero-btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>
-              </div>
-              <div className="hero-stats">
-                <div className="stat-item"><span className="stat-num">500+</span><span className="stat-label">Happy Customers</span></div>
-                <div className="stat-item"><span className="stat-num">4.9★</span><span className="stat-label">Average Rating</span></div>
-                <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
-              </div>
-            </div>
-            <div className="hero-features-wrap">
-              <div className="hero-features feature-list">
-                {featureList.map((item, i) => (
-                  <div className="hero-feature-item" key={`${item}-${i}`}>
-                    <span className="hero-feature-check" aria-hidden>✓</span>
-                    <span>{item}</span>
+            <div className="hero-combined">
+              <div className="hero-combined-scroll">
+                <div className="hero-content">
+                  <span className="hero-tag">✦ UK&apos;s #1 Firestick Service</span>
+                  <h2 className="hero-title">
+                    {formatHeroTitle(heroTitle)}
+                  </h2>
+                  <p className="hero-subtitle">{heroSubtitle}</p>
+                  <div className="hero-btns">
+                    <a href={sec.home_hero?.button_link||"/products"} className="hero-btn-primary">{sec.home_hero?.button_text||"Shop Now"} →</a>
+                    <a href={sec.home_hero?.secondary_button_link||"/about"} className="hero-btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>
                   </div>
-                ))}
+                </div>
+                <div className="hero-features-wrap">
+                  <div className="hero-features feature-list">
+                    {featureList.map((item, i) => (
+                      <div className="hero-feature-item" key={`${item}-${i}`}>
+                        <span className="hero-feature-check" aria-hidden>✓</span>
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="hero-stats">
+                  <div className="stat-item"><span className="stat-num">500+</span><span className="stat-label">Happy Customers</span></div>
+                  <div className="stat-item"><span className="stat-num">4.9★</span><span className="stat-label">Average Rating</span></div>
+                  <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
+                </div>
               </div>
               <div className="hero-feature-scroll-hint">scroll for more ↓</div>
             </div>
