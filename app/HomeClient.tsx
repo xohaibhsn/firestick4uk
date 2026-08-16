@@ -305,27 +305,21 @@ export default function HomeClient({
           box-shadow:0 4px 24px rgba(0,0,0,0.04);
         }
         .hero-combined-scroll {
-          height: 320px;
-          max-height: 320px;
-          overflow-x: hidden;
-          overflow-y: auto;
-          scroll-behavior: smooth;
-          padding: 32px 36px;
+          height: auto;
+          max-height: none;
+          overflow: visible;
+          padding: 40px 48px 48px;
           box-sizing: border-box;
-          -webkit-overflow-scrolling: touch;
-          display: grid;
-          grid-template-columns: 1.1fr 0.9fr;
-          gap: 40px;
-          align-items: start;
+          display: flex;
+          flex-direction: column;
+          gap: 0;
+          align-items: stretch;
         }
-        .hero-combined-scroll::-webkit-scrollbar { width: 5px; }
-        .hero-combined-scroll::-webkit-scrollbar-track { background: #F3F4F6; border-radius: 4px; }
-        .hero-combined-scroll::-webkit-scrollbar-thumb { background: #5B21B6; border-radius: 4px; }
-        .hero-content { max-width: none; }
+        .hero-content { max-width: 820px; }
         .hero-tag { font-family:var(--font-body); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5B21B6; margin-bottom:14px; display:block; font-weight:700; }
         .hero-title { font-family:var(--font-display); font-size:clamp(1.7rem,3.2vw,2.5rem); font-weight:800; letter-spacing:-0.02em; color:#111111 !important; -webkit-text-fill-color:#111111 !important; line-height:1.15; margin-bottom:16px; }
         .hero-title span { color:#5B21B6 !important; -webkit-text-fill-color:#5B21B6 !important; }
-        .hero-subtitle { font-family:var(--font-body); font-size:clamp(0.95rem,1.6vw,1.1rem); font-weight:400; color:#64748b; line-height:1.7; margin-bottom:24px; max-width:520px; }
+        .hero-subtitle { font-family:var(--font-body); font-size:clamp(0.95rem,1.6vw,1.15rem); font-weight:400; color:#64748b; line-height:1.7; margin-bottom:22px; max-width:720px; }
         .hero-btns { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:0; }
         .hero-btn-primary { font-family:var(--font-body); background:#5B21B6; color:#FFFFFF; padding:14px 28px; border-radius:8px; font-size:14px; font-weight:600; letter-spacing:0.01em; text-decoration:none; transition:all 0.2s; display:inline-block; }
         .hero-btn-primary:hover { background:#4C1D95; transform:translateY(-2px); box-shadow:0 6px 20px rgba(91,33,182,0.35); }
@@ -334,15 +328,17 @@ export default function HomeClient({
         .hero-features-wrap {
           min-width: 0;
           width: 100%;
-          margin: 0;
-          padding: 8px 0 0;
+          max-width: 820px;
+          margin: 28px 0 0;
+          padding: 28px 0 0;
+          border-top: 1px solid #E5E5E5;
         }
         .hero-service-content {
           font-family: var(--font-body);
-          font-size: 15px;
+          font-size: 16px;
           font-weight: 500;
           color: #374151;
-          line-height: 1.65;
+          line-height: 1.75;
         }
         .hero-service-content h1,
         .hero-service-content h2,
@@ -352,21 +348,22 @@ export default function HomeClient({
           color: #111111;
           font-weight: 800;
           letter-spacing: -0.02em;
-          line-height: 1.25;
-          margin: 0 0 10px;
+          line-height: 1.3;
+          margin: 0 0 12px;
         }
-        .hero-service-content h2 { font-size: 1.25rem; }
-        .hero-service-content h3 { font-size: 1.1rem; }
-        .hero-service-content h4 { font-size: 1rem; }
-        .hero-service-content p { margin: 0 0 10px; }
+        .hero-service-content h2 { font-size: 1.35rem; }
+        .hero-service-content h3 { font-size: 1.15rem; }
+        .hero-service-content h4 { font-size: 1.05rem; }
+        .hero-service-content p { margin: 0 0 14px; }
+        .hero-service-content p:last-child { margin-bottom: 0; }
         .hero-service-content ul,
-        .hero-service-content ol { margin: 0 0 12px; padding-left: 1.2em; }
-        .hero-service-content li { margin-bottom: 6px; }
+        .hero-service-content ol { margin: 0 0 14px; padding-left: 1.25em; }
+        .hero-service-content li { margin-bottom: 8px; }
         .hero-service-content a { color: #5B21B6; text-decoration: underline; }
         .hero-service-content strong, .hero-service-content b { color: #111111; font-weight: 700; }
         .hero-service-content blockquote {
-          margin: 0 0 12px;
-          padding: 8px 12px;
+          margin: 0 0 14px;
+          padding: 10px 14px;
           border-left: 3px solid #5B21B6;
           background: #F5F3FF;
           color: #4C1D95;
@@ -499,12 +496,17 @@ export default function HomeClient({
           .view-all-wrap{padding:14px 16px 36px;}
           .hero{padding:36px 16px 44px;}
           .hero-combined-scroll{
-            height:380px;
-            max-height:380px;
-            padding:22px 18px;
-            grid-template-columns:1fr;
-            gap:22px;
+            height:auto;
+            max-height:none;
+            overflow:visible;
+            padding:26px 18px 30px;
           }
+          .hero-features-wrap{
+            margin-top:22px;
+            padding-top:22px;
+            max-width:none;
+          }
+          .hero-service-content{font-size:15px;line-height:1.7;}
           .hero-features{grid-template-columns:1fr;}
           .hero-stats{gap:20px;flex-wrap:wrap;margin-top:22px;justify-content:space-around;}
           .features-section{padding:40px 24px 50px;}
@@ -512,11 +514,10 @@ export default function HomeClient({
         }
         @media (max-width: 640px) {
           .hero-combined-scroll {
-            height: 360px;
-            max-height: 360px;
-            padding: 18px 14px;
-            gap: 18px;
+            padding: 20px 14px 24px;
           }
+          .hero-content { max-width: none; }
+          .hero-subtitle { max-width: none; }
           .hero-btns { flex-direction: column; }
           .hero-btn-primary, .hero-btn-secondary { width: 100%; text-align: center; box-sizing: border-box; }
           .hero-stats { gap: 16px; }
