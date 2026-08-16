@@ -38,7 +38,7 @@ const DEFAULTS = [
   ['hero_slide_2','','image','settings','Hero Slide 2'],
   ['hero_slide_3','','image','settings','Hero Slide 3'],
   ['hero_slide_4','','image','settings','Hero Slide 4'],
-  ['home_features_list','HD & 4K Streaming Quality\nLive Sports & Entertainment\nMovies & TV Series On Demand\nCatch-up TV Available\nCompatible with All Devices\nFast Setup & Activation\n24/7 Customer Support\nUK Based Service','textarea','home','Features List'],
+  ['home_features_list','HD & 4K Streaming Quality\nLive Sports & Entertainment\nMovies & TV Series On Demand\nCatch-up TV Available\nCompatible with All Devices\nFast Setup & Activation\n24/7 Customer Support\nUK Based Service\nEasy Remote Setup Help\nNo Hidden Fees\nSame-Day Order Processing\nSecure Payment Options\nMulti-Device Compatibility\nRegular Channel Updates','textarea','home','Features List'],
 ];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

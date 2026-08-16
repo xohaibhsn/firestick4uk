@@ -70,6 +70,12 @@ export default function HomeClient({
     "Fast Setup & Activation",
     "24/7 Customer Support",
     "UK Based Service",
+    "Easy Remote Setup Help",
+    "No Hidden Fees",
+    "Same-Day Order Processing",
+    "Secure Payment Options",
+    "Multi-Device Compatibility",
+    "Regular Channel Updates",
   ]);
   const { addToCart, removeFromCart, cart } = useCart();
 
@@ -234,20 +240,31 @@ export default function HomeClient({
         .hero-btn-primary:hover { background:#4C1D95; transform:translateY(-2px); box-shadow:0 6px 20px rgba(91,33,182,0.35); }
         .hero-btn-secondary { font-family:var(--font-body); background:#111111; color:#FFFFFF; padding:16px 36px; border-radius:8px; font-size:15px; font-weight:600; letter-spacing:0.01em; text-decoration:none; transition:all 0.2s; display:inline-block; }
         .hero-btn-secondary:hover { background:#5B21B6; transform:translateY(-2px); }
+        .hero-features-wrap {
+          min-width: 0;
+          width: 100%;
+        }
         .hero-features {
           display:grid;
           grid-template-columns:1fr 1fr;
-          gap:12px;
+          gap:10px 12px;
           align-content:start;
         }
         .hero-features.feature-list {
-          max-height: 130px;
-          overflow-y: auto;
+          height: 100px;
+          max-height: 100px;
+          overflow-x: hidden;
+          overflow-y: scroll;
           scroll-behavior: smooth;
-          padding-right: 8px;
+          padding: 8px 10px 8px 4px;
+          border: 1px solid #E5E5E5;
+          border-radius: 10px;
+          background: #FAFAFA;
+          box-sizing: border-box;
+          -webkit-overflow-scrolling: touch;
         }
         .hero-features.feature-list::-webkit-scrollbar {
-          width: 4px;
+          width: 5px;
         }
         .hero-features.feature-list::-webkit-scrollbar-track {
           background: #F5F5F5;
@@ -259,10 +276,11 @@ export default function HomeClient({
         }
         .hero-feature-scroll-hint {
           display: block;
-          color: #9CA3AF;
-          font-size: 11px;
+          color: #5B21B6;
+          font-size: 12px;
+          font-weight: 600;
           text-align: center;
-          margin-top: 4px;
+          margin-top: 8px;
           font-family: var(--font-body);
         }
         .hero-feature-item {
@@ -373,7 +391,8 @@ export default function HomeClient({
         @media (max-width: 640px) {
           .hero-features.feature-list {
             grid-template-columns: 1fr;
-            max-height: 160px;
+            height: 140px;
+            max-height: 140px;
           }
         }
       `}</style>
