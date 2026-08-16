@@ -47,7 +47,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings();
   const title = settings.site_title || "Firestick4UK";
   const tagline = settings.site_tagline || "Best Firestick Service in UK";
-  const favicon = settings.favicon_url || "/favicon.ico";
+  const rawFavicon = (settings.favicon_url || "").trim();
+  const faviconBase = rawFavicon || "/favicon.ico";
+  // Cache-bust so browsers/mobile pick up a newly uploaded favicon
+  const faviconUrl = faviconBase.startsWith("http")
+    ? (faviconBase.includes("?")
+        ? `${faviconBase}&v=${Date.now()}`
+        : `${faviconBase}?v=${Date.now()}`)
+    : faviconBase;
   const ogImage = settings.og_default_image || "https://firestick4uk.com/og-default.jpg";
   const description =
     "Buy Firestick, streaming subscriptions and Android boxes in the UK. Fast delivery, easy setup, real support.";
@@ -69,7 +76,15 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: "https://firestick4uk.com",
     },
     authors: [{ name: title }],
-    icons: { icon: favicon },
+    icons: {
+      icon: [
+        { url: faviconUrl, sizes: "32x32" },
+        { url: faviconUrl, sizes: "48x48" },
+        { url: faviconUrl, sizes: "192x192" },
+      ],
+      apple: faviconUrl,
+      shortcut: faviconUrl,
+    },
     openGraph: {
       title: `${title} — ${tagline}`,
       description,
