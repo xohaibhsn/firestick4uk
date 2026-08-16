@@ -80,8 +80,10 @@ export default function HomeClient({
   const [heroBtns, setHeroBtns] = useState({
     primaryText: "Shop Now",
     primaryLink: "/products",
+    primaryShow: true,
     secondaryText: "Learn More",
     secondaryLink: "/about",
+    secondaryShow: true,
   });
   const [heroStats, setHeroStats] = useState([
     { num: "500+", label: "Happy Customers" },
@@ -139,8 +141,10 @@ export default function HomeClient({
         setHeroBtns({
           primaryText: (data.home_hero_btn_text || "").trim() || "Shop Now",
           primaryLink: (data.home_hero_btn_link || "").trim() || "/products",
+          primaryShow: data.home_hero_btn_show !== "0",
           secondaryText: (data.home_hero_btn2_text || "").trim() || "Learn More",
           secondaryLink: (data.home_hero_btn2_link || "").trim() || "/about",
+          secondaryShow: data.home_hero_btn2_show !== "0",
         });
         setHeroStats([
           {
@@ -468,14 +472,20 @@ export default function HomeClient({
           <div className="slider-hero-inner">
             <h1>{formatHeroTitle(topHeroTitle)}</h1>
             <p>{topHeroSubtitle}</p>
-            <div className="slider-hero-btns">
-              <a href={heroBtns.primaryLink} className="slider-btn-primary">
-                {heroBtns.primaryText} →
-              </a>
-              <a href={heroBtns.secondaryLink} className="slider-btn-secondary">
-                {heroBtns.secondaryText}
-              </a>
-            </div>
+            {(heroBtns.primaryShow || heroBtns.secondaryShow) && (
+              <div className="slider-hero-btns">
+                {heroBtns.primaryShow && (
+                  <a href={heroBtns.primaryLink} className="slider-btn-primary">
+                    {heroBtns.primaryText} →
+                  </a>
+                )}
+                {heroBtns.secondaryShow && (
+                  <a href={heroBtns.secondaryLink} className="slider-btn-secondary">
+                    {heroBtns.secondaryText}
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </HeroSlider>
 
@@ -581,10 +591,16 @@ export default function HomeClient({
                     {formatHeroTitle(heroTitle)}
                   </h2>
                   <p className="hero-subtitle">{heroSubtitle}</p>
-                  <div className="hero-btns">
-                    <a href={heroBtns.primaryLink} className="hero-btn-primary">{heroBtns.primaryText} →</a>
-                    <a href={heroBtns.secondaryLink} className="hero-btn-secondary">{heroBtns.secondaryText}</a>
-                  </div>
+                  {(heroBtns.primaryShow || heroBtns.secondaryShow) && (
+                    <div className="hero-btns">
+                      {heroBtns.primaryShow && (
+                        <a href={heroBtns.primaryLink} className="hero-btn-primary">{heroBtns.primaryText} →</a>
+                      )}
+                      {heroBtns.secondaryShow && (
+                        <a href={heroBtns.secondaryLink} className="hero-btn-secondary">{heroBtns.secondaryText}</a>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="hero-features-wrap">
                   <div className="hero-features feature-list">

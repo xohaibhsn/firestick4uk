@@ -2458,8 +2458,28 @@ export default function AdminPage() {
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
                     <div className="modal-field"><label>Primary Button Text</label><input style={{width:"100%"}} value={siteContent.home_hero_btn_text||""} onChange={e=>setSiteContent(s=>({...s,home_hero_btn_text:e.target.value}))} placeholder="Shop Now" /></div>
                     <div className="modal-field"><label>Primary Button Link</label><input style={{width:"100%"}} value={siteContent.home_hero_btn_link||""} onChange={e=>setSiteContent(s=>({...s,home_hero_btn_link:e.target.value}))} placeholder="/products" /></div>
+                    <div className="modal-field" style={{gridColumn:"1 / -1"}}>
+                      <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
+                        <input
+                          type="checkbox"
+                          checked={(siteContent.home_hero_btn_show ?? "1") !== "0"}
+                          onChange={e=>setSiteContent(s=>({...s,home_hero_btn_show:e.target.checked?"1":"0"}))}
+                        />
+                        Show Primary Button (Shop Now) on website
+                      </label>
+                    </div>
                     <div className="modal-field"><label>Secondary Button Text</label><input style={{width:"100%"}} value={siteContent.home_hero_btn2_text||""} onChange={e=>setSiteContent(s=>({...s,home_hero_btn2_text:e.target.value}))} placeholder="Learn More" /></div>
                     <div className="modal-field"><label>Secondary Button Link</label><input style={{width:"100%"}} value={siteContent.home_hero_btn2_link||""} onChange={e=>setSiteContent(s=>({...s,home_hero_btn2_link:e.target.value}))} placeholder="/about" /></div>
+                    <div className="modal-field" style={{gridColumn:"1 / -1"}}>
+                      <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
+                        <input
+                          type="checkbox"
+                          checked={(siteContent.home_hero_btn2_show ?? "1") !== "0"}
+                          onChange={e=>setSiteContent(s=>({...s,home_hero_btn2_show:e.target.checked?"1":"0"}))}
+                        />
+                        Show Secondary Button (Learn More) on website
+                      </label>
+                    </div>
                   </div>
                   <div className="modal-field">
                     <label>Features List (one feature per line)</label>
