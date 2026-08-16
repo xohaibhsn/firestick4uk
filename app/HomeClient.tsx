@@ -305,16 +305,22 @@ export default function HomeClient({
           box-shadow:0 4px 24px rgba(0,0,0,0.04);
         }
         .hero-combined-scroll {
-          height: auto;
-          max-height: none;
-          overflow: visible;
-          padding: 40px 48px 48px;
+          height: 420px;
+          max-height: 420px;
+          overflow-x: hidden;
+          overflow-y: auto;
+          scroll-behavior: smooth;
+          padding: 36px 40px 32px;
           box-sizing: border-box;
+          -webkit-overflow-scrolling: touch;
           display: flex;
           flex-direction: column;
           gap: 0;
           align-items: stretch;
         }
+        .hero-combined-scroll::-webkit-scrollbar { width: 5px; }
+        .hero-combined-scroll::-webkit-scrollbar-track { background: #F3F4F6; border-radius: 4px; }
+        .hero-combined-scroll::-webkit-scrollbar-thumb { background: #5B21B6; border-radius: 4px; }
         .hero-content { max-width: 820px; }
         .hero-tag { font-family:var(--font-body); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5B21B6; margin-bottom:14px; display:block; font-weight:700; }
         .hero-title { font-family:var(--font-display); font-size:clamp(1.7rem,3.2vw,2.5rem); font-weight:800; letter-spacing:-0.02em; color:#111111 !important; -webkit-text-fill-color:#111111 !important; line-height:1.15; margin-bottom:16px; }
@@ -496,10 +502,11 @@ export default function HomeClient({
           .view-all-wrap{padding:14px 16px 36px;}
           .hero{padding:36px 16px 44px;}
           .hero-combined-scroll{
-            height:auto;
-            max-height:none;
-            overflow:visible;
-            padding:26px 18px 30px;
+            height:380px;
+            max-height:380px;
+            overflow-x:hidden;
+            overflow-y:auto;
+            padding:24px 18px 22px;
           }
           .hero-features-wrap{
             margin-top:22px;
@@ -514,7 +521,9 @@ export default function HomeClient({
         }
         @media (max-width: 640px) {
           .hero-combined-scroll {
-            padding: 20px 14px 24px;
+            height: 360px;
+            max-height: 360px;
+            padding: 20px 14px 18px;
           }
           .hero-content { max-width: none; }
           .hero-subtitle { max-width: none; }
