@@ -32,8 +32,16 @@ const cinzel = Cinzel({
 async function getSiteSettings(): Promise<Record<string, string>> {
   try {
     const pool = (await import("../lib/db")).default;
+    // Fetch settings page + asset keys explicitly (never mix keys)
     const [rows]: any = await pool.query(
-      "SELECT content_key, content_value FROM site_content WHERE page_name='settings'"
+      `SELECT content_key, content_value FROM site_content
+       WHERE page_name = 'settings'
+          OR content_key IN (
+            'favicon_url',
+            'og_default_image',
+            'whatsapp_icon_url',
+            'site_logo_url'
+          )`
     );
     const result: Record<string, string> = {};
     for (const r of rows) result[r.content_key] = r.content_value || "";
@@ -43,19 +51,41 @@ async function getSiteSettings(): Promise<Record<string, string>> {
   }
 }
 
+function withCacheBust(url: string): string {
+  const raw = (url || "").trim();
+  if (!raw) return raw;
+  if (!raw.startsWith("http") && !raw.startsWith("/")) return raw;
+  const base = raw.split("#")[0];
+  // Replace existing v= or append fresh bust
+  if (/[?&]v=/.test(base)) {
+    return base.replace(/([?&])v=[^&]*/, `$1v=${Date.now()}`);
+  }
+  return `${base}${base.includes("?") ? "&" : "?"}v=${Date.now()}`;
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings();
   const title = settings.site_title || "Firestick4UK";
   const tagline = settings.site_tagline || "Best Firestick Service in UK";
-  const rawFavicon = (settings.favicon_url || "").trim();
-  const faviconBase = rawFavicon || "/favicon.ico";
-  // Cache-bust so browsers/mobile pick up a newly uploaded favicon
-  const faviconUrl = faviconBase.startsWith("http")
-    ? (faviconBase.includes("?")
-        ? `${faviconBase}&v=${Date.now()}`
-        : `${faviconBase}?v=${Date.now()}`)
-    : faviconBase;
-  const ogImage = settings.og_default_image || "https://firestick4uk.com/og-default.jpg";
+
+  // EACH KEY SEPARATE — never reuse across roles
+  const faviconUrl = (settings.favicon_url || "").trim(); // favicon ONLY
+  const ogImageUrl = (settings.og_default_image || "").trim(); // OG ONLY
+  const logoUrl = (settings.site_logo_url || "").trim(); // logo ONLY
+  const whatsappIconUrl = (settings.whatsapp_icon_url || "").trim(); // WA ONLY
+
+  console.log("[site-assets] favicon:", faviconUrl || "(empty)");
+  console.log("[site-assets] og:", ogImageUrl || "(empty)");
+  console.log("[site-assets] logo:", logoUrl || "(empty)");
+  console.log("[site-assets] whatsapp:", whatsappIconUrl || "(empty)");
+
+  const faviconFinal = faviconUrl
+    ? withCacheBust(faviconUrl)
+    : "/favicon.ico";
+  const ogFinal = ogImageUrl
+    ? withCacheBust(ogImageUrl)
+    : "https://firestick4uk.com/og-default.jpg";
+
   const description =
     "Buy Firestick, streaming subscriptions and Android boxes in the UK. Fast delivery, easy setup, real support.";
 
@@ -77,13 +107,9 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     authors: [{ name: title }],
     icons: {
-      icon: [
-        { url: faviconUrl, sizes: "32x32" },
-        { url: faviconUrl, sizes: "48x48" },
-        { url: faviconUrl, sizes: "192x192" },
-      ],
-      apple: faviconUrl,
-      shortcut: faviconUrl,
+      icon: faviconFinal,
+      apple: faviconFinal,
+      shortcut: faviconFinal,
     },
     openGraph: {
       title: `${title} — ${tagline}`,
@@ -91,13 +117,13 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://firestick4uk.com",
       siteName: title,
       type: "website",
-      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
+      images: [{ url: ogFinal, width: 1200, height: 630, alt: title }],
     },
     twitter: {
       card: "summary_large_image",
       title: `${title} — ${tagline}`,
       description,
-      images: [ogImage],
+      images: [ogFinal],
     },
     metadataBase: new URL("https://firestick4uk.com"),
   };
