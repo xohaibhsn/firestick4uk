@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       public_id: `favicon-${stamp}`,
       overwrite: true,
       invalidate: true,
-      transformation: [{ width: 512, height: 512, crop: 'fit', quality: 90 }],
+      transformation: [{ width: 180, height: 180, crop: "fit", quality: "auto", fetch_format: "png" }],
     });
 
     const publicUrl = `${result.secure_url}?v=${result.version || stamp}`;

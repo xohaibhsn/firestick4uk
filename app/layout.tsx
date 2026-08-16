@@ -56,11 +56,22 @@ function withCacheBust(url: string): string {
   if (!raw) return raw;
   if (!raw.startsWith("http") && !raw.startsWith("/")) return raw;
   const base = raw.split("#")[0];
-  // Replace existing v= or append fresh bust
   if (/[?&]v=/.test(base)) {
     return base.replace(/([?&])v=[^&]*/, `$1v=${Date.now()}`);
   }
   return `${base}${base.includes("?") ? "&" : "?"}v=${Date.now()}`;
+}
+
+/** Cloudinary on-the-fly resize — browsers need small PNGs, not 200KB originals */
+function faviconSizeUrl(url: string, size: number): string {
+  const clean = (url || "").trim().split("?")[0];
+  if (!clean) return "/api/favicon";
+  if (clean.includes("res.cloudinary.com") && clean.includes("/upload/")) {
+    return withCacheBust(
+      clean.replace("/upload/", `/upload/c_fit,w_${size},h_${size},f_png,q_auto/`)
+    );
+  }
+  return withCacheBust(clean);
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -69,19 +80,19 @@ export async function generateMetadata(): Promise<Metadata> {
   const tagline = settings.site_tagline || "Best Firestick Service in UK";
 
   // EACH KEY SEPARATE — never reuse across roles
-  const faviconUrl = (settings.favicon_url || "").trim(); // favicon ONLY
-  const ogImageUrl = (settings.og_default_image || "").trim(); // OG ONLY
-  const logoUrl = (settings.site_logo_url || "").trim(); // logo ONLY
-  const whatsappIconUrl = (settings.whatsapp_icon_url || "").trim(); // WA ONLY
+  const faviconUrl = (settings.favicon_url || "").trim();
+  const ogImageUrl = (settings.og_default_image || "").trim();
+  const logoUrl = (settings.site_logo_url || "").trim();
+  const whatsappIconUrl = (settings.whatsapp_icon_url || "").trim();
 
   console.log("[site-assets] favicon:", faviconUrl || "(empty)");
   console.log("[site-assets] og:", ogImageUrl || "(empty)");
   console.log("[site-assets] logo:", logoUrl || "(empty)");
   console.log("[site-assets] whatsapp:", whatsappIconUrl || "(empty)");
 
-  const faviconFinal = faviconUrl
-    ? withCacheBust(faviconUrl)
-    : "/favicon.ico";
+  const icon32 = faviconUrl ? faviconSizeUrl(faviconUrl, 32) : "/api/favicon";
+  const icon48 = faviconUrl ? faviconSizeUrl(faviconUrl, 48) : "/api/favicon";
+  const icon180 = faviconUrl ? faviconSizeUrl(faviconUrl, 180) : "/api/favicon";
   const ogFinal = ogImageUrl
     ? withCacheBust(ogImageUrl)
     : "https://firestick4uk.com/og-default.jpg";
@@ -107,9 +118,13 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     authors: [{ name: title }],
     icons: {
-      icon: faviconFinal,
-      apple: faviconFinal,
-      shortcut: faviconFinal,
+      icon: [
+        { url: icon32, sizes: "32x32", type: "image/png" },
+        { url: icon48, sizes: "48x48", type: "image/png" },
+        { url: icon180, sizes: "180x180", type: "image/png" },
+      ],
+      apple: [{ url: icon180, sizes: "180x180", type: "image/png" }],
+      shortcut: icon48,
     },
     openGraph: {
       title: `${title} — ${tagline}`,

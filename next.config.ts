@@ -19,6 +19,12 @@ const nextConfig: NextConfig = {
     ],
   },
   compress: true,
+  async rewrites() {
+    return [
+      // Browsers auto-request /favicon.ico — serve dynamic DB favicon
+      { source: "/favicon.ico", destination: "/api/favicon" },
+    ];
+  },
   async headers() {
     return [
       {
