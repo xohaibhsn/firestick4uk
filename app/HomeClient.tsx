@@ -61,6 +61,16 @@ export default function HomeClient({
   const [searchTerm, setSearchTerm] = useState("");
   const [hoveringId, setHoveringId] = useState<number | null>(null);
   const [slides, setSlides] = useState<string[]>([]);
+  const [featureList, setFeatureList] = useState<string[]>([
+    "HD & 4K Streaming Quality",
+    "Live Sports & Entertainment",
+    "Movies & TV Series On Demand",
+    "Catch-up TV Available",
+    "Compatible with All Devices",
+    "Fast Setup & Activation",
+    "24/7 Customer Support",
+    "UK Based Service",
+  ]);
   const { addToCart, removeFromCart, cart } = useCart();
 
   const handleSearch = () => {
@@ -102,6 +112,13 @@ export default function HomeClient({
           data.hero_slide_4,
         ].filter((u): u is string => typeof u === 'string' && !!u.trim());
         setSlides(slideUrls);
+        if (typeof data.home_features_list === 'string' && data.home_features_list.trim()) {
+          const items = data.home_features_list
+            .split(/\r?\n/)
+            .map((s: string) => s.trim())
+            .filter(Boolean);
+          if (items.length) setFeatureList(items);
+        }
       })
       .catch(() => {});
     return () => {};
@@ -217,7 +234,31 @@ export default function HomeClient({
         .hero-btn-primary:hover { background:#4C1D95; transform:translateY(-2px); box-shadow:0 6px 20px rgba(91,33,182,0.35); }
         .hero-btn-secondary { font-family:var(--font-body); background:#111111; color:#FFFFFF; padding:16px 36px; border-radius:8px; font-size:15px; font-weight:600; letter-spacing:0.01em; text-decoration:none; transition:all 0.2s; display:inline-block; }
         .hero-btn-secondary:hover { background:#5B21B6; transform:translateY(-2px); }
-        .hero-visual { background:linear-gradient(135deg,#EDE9FE,#F5F3FF); border-radius:24px; aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; font-size:80px; border:1px solid #DDD6FE; overflow:hidden; }
+        .hero-features {
+          display:grid;
+          grid-template-columns:1fr 1fr;
+          gap:12px;
+          align-content:start;
+        }
+        .hero-feature-item {
+          display:flex;
+          align-items:flex-start;
+          gap:10px;
+          font-family:var(--font-body);
+          font-size:15px;
+          font-weight:500;
+          color:#374151;
+          line-height:1.4;
+        }
+        .hero-feature-check {
+          flex-shrink:0;
+          width:20px;
+          height:20px;
+          margin-top:1px;
+          color:#16A34A;
+          font-size:16px;
+          line-height:1;
+        }
         .hero-stats { display:flex; gap:32px; margin-top:40px; padding-top:32px; border-top:1px solid #E5E5E5; }
         .stat-item {}
         .stat-num { font-family:var(--font-display); font-size:2rem; font-weight:800; color:#111111; letter-spacing:-0.02em; display:block; }
@@ -275,6 +316,7 @@ export default function HomeClient({
           .home-seo-hero h1{font-size:1.75rem;}
           .home-seo-hero p{font-size:1rem;}
           .slider-hero-inner h1{font-size:clamp(1.6rem,5vw,2rem);}
+          .slider-hero-inner p{display:none;}
           .slider-hero-btns{flex-direction:column;}
           .slider-btn-primary,.slider-btn-secondary{width:100%;text-align:center;box-sizing:border-box;}
           .products-header{padding:28px 16px 16px;flex-direction:column;align-items:flex-start;gap:12px;}
@@ -292,8 +334,7 @@ export default function HomeClient({
           .badge{font-size:9px;padding:3px 7px;top:6px;right:6px;}
           .view-all-wrap{padding:14px 16px 36px;}
           .hero{grid-template-columns:1fr;padding:48px 16px 52px;gap:28px;}
-          .hero-visual{display:none;}
-          .hero-visual{display:none;}
+          .hero-features{grid-template-columns:1fr;}
           .hero-stats{gap:20px;}
           .features-section{padding:40px 24px 50px;}
           footer{padding:36px 24px;flex-direction:column;text-align:center;}
@@ -428,12 +469,14 @@ export default function HomeClient({
                 <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
               </div>
             </div>
-            <div className="hero-visual">
-            {sec.home_hero?.hero_image
-              ? <img src={sec.home_hero.hero_image} alt="Hero" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:24}} />
-              : <span style={{fontSize:80}}>📺</span>
-            }
-          </div>
+            <div className="hero-features">
+              {featureList.map((item, i) => (
+                <div className="hero-feature-item" key={`${item}-${i}`}>
+                  <span className="hero-feature-check" aria-hidden>✓</span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

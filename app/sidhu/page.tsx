@@ -2303,9 +2303,19 @@ export default function AdminPage() {
                   <div style={{margin:"20px 0 12px",paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.08)",fontSize:13,fontWeight:700,color:"#5B21B6"}}>MAIN HERO (left aligned + buttons)</div>
                   <div className="modal-field"><label>Main Hero Title</label><input style={{width:"100%"}} value={siteContent.home_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_hero_title:e.target.value}))} placeholder="Premium UK Streaming Service" /></div>
                   <div className="modal-field"><label>Main Hero Subtitle</label><textarea rows={3} style={{width:"100%",resize:"vertical"}} value={siteContent.home_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_hero_subtitle:e.target.value}))} placeholder="Firestick4UK provides premium UK streaming services for Firestick and Android Box users." /></div>
+                  <div className="modal-field">
+                    <label>Features List (one feature per line)</label>
+                    <textarea
+                      rows={8}
+                      style={{width:"100%",resize:"vertical",fontFamily:"inherit",lineHeight:1.5}}
+                      value={siteContent.home_features_list||""}
+                      onChange={e=>setSiteContent(s=>({...s,home_features_list:e.target.value}))}
+                      placeholder={"HD & 4K Streaming Quality\nLive Sports & Entertainment\nMovies & TV Series On Demand\nCatch-up TV Available\nCompatible with All Devices\nFast Setup & Activation\n24/7 Customer Support\nUK Based Service"}
+                    />
+                  </div>
 
                   <div className="modal-field"><label>Tagline</label><input style={{width:"100%"}} value={siteContent.home_tagline||""} onChange={e=>setSiteContent(s=>({...s,home_tagline:e.target.value}))} placeholder="Fast. Reliable. Affordable." /></div>
-                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["home_meta_title","home_meta_description","home_top_hero_title","home_top_hero_subtitle","home_hero_title","home_hero_subtitle","home_tagline"])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["home_meta_title","home_meta_description","home_top_hero_title","home_top_hero_subtitle","home_hero_title","home_hero_subtitle","home_features_list","home_tagline"])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
                 </div>
               )}
 

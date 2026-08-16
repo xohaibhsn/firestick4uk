@@ -148,11 +148,21 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
           .hero-slider-content { padding: 32px 40px; }
         }
         @media (max-width: 640px) {
-          .hero-slider-stage { height: 380px; }
-          .hero-slider-content {
-            padding: 28px 20px 20px;
+          .hero-slider-stage {
+            height: auto;
+            min-height: 500px;
+            padding-bottom: 60px;
+            overflow: hidden;
           }
-          /* Mobile: dots sit below stage, not over buttons */
+          .hero-slider-content {
+            position: relative;
+            top: auto;
+            left: auto;
+            right: auto;
+            transform: none;
+            padding: 24px 20px 20px 20px;
+          }
+          /* Mobile: dots OUTSIDE stage (sibling), relative */
           .hero-slider-dots {
             position: relative;
             left: auto;
@@ -161,7 +171,7 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
             display: flex;
             justify-content: center;
             padding: 12px 0;
-            background: #111111;
+            background: #0a0010;
             gap: 12px;
           }
           .hero-slider-dot {
