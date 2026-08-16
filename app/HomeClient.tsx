@@ -77,6 +77,17 @@ export default function HomeClient({
     "Multi-Device Compatibility",
     "Regular Channel Updates",
   ]);
+  const [heroBtns, setHeroBtns] = useState({
+    primaryText: "Shop Now",
+    primaryLink: "/products",
+    secondaryText: "Learn More",
+    secondaryLink: "/about",
+  });
+  const [heroStats, setHeroStats] = useState([
+    { num: "500+", label: "Happy Customers" },
+    { num: "4.9★", label: "Average Rating" },
+    { num: "24/7", label: "Support" },
+  ]);
   const { addToCart, removeFromCart, cart } = useCart();
 
   const handleSearch = () => {
@@ -125,6 +136,26 @@ export default function HomeClient({
             .filter(Boolean);
           if (items.length) setFeatureList(items);
         }
+        setHeroBtns({
+          primaryText: (data.home_hero_btn_text || "").trim() || "Shop Now",
+          primaryLink: (data.home_hero_btn_link || "").trim() || "/products",
+          secondaryText: (data.home_hero_btn2_text || "").trim() || "Learn More",
+          secondaryLink: (data.home_hero_btn2_link || "").trim() || "/about",
+        });
+        setHeroStats([
+          {
+            num: (data.home_stat1_num || "").trim() || "500+",
+            label: (data.home_stat1_label || "").trim() || "Happy Customers",
+          },
+          {
+            num: (data.home_stat2_num || "").trim() || "4.9★",
+            label: (data.home_stat2_label || "").trim() || "Average Rating",
+          },
+          {
+            num: (data.home_stat3_num || "").trim() || "24/7",
+            label: (data.home_stat3_label || "").trim() || "Support",
+          },
+        ]);
       })
       .catch(() => {});
     return () => {};
@@ -438,11 +469,11 @@ export default function HomeClient({
             <h1>{formatHeroTitle(topHeroTitle)}</h1>
             <p>{topHeroSubtitle}</p>
             <div className="slider-hero-btns">
-              <a href={sec.home_hero?.button_link || "/products"} className="slider-btn-primary">
-                {sec.home_hero?.button_text || "Shop Now"} →
+              <a href={heroBtns.primaryLink} className="slider-btn-primary">
+                {heroBtns.primaryText} →
               </a>
-              <a href={sec.home_hero?.secondary_button_link || "/about"} className="slider-btn-secondary">
-                {sec.home_hero?.secondary_button_text || "Learn More"}
+              <a href={heroBtns.secondaryLink} className="slider-btn-secondary">
+                {heroBtns.secondaryText}
               </a>
             </div>
           </div>
@@ -551,8 +582,8 @@ export default function HomeClient({
                   </h2>
                   <p className="hero-subtitle">{heroSubtitle}</p>
                   <div className="hero-btns">
-                    <a href={sec.home_hero?.button_link||"/products"} className="hero-btn-primary">{sec.home_hero?.button_text||"Shop Now"} →</a>
-                    <a href={sec.home_hero?.secondary_button_link||"/about"} className="hero-btn-secondary">{sec.home_hero?.secondary_button_text||"Learn More"}</a>
+                    <a href={heroBtns.primaryLink} className="hero-btn-primary">{heroBtns.primaryText} →</a>
+                    <a href={heroBtns.secondaryLink} className="hero-btn-secondary">{heroBtns.secondaryText}</a>
                   </div>
                 </div>
                 <div className="hero-features-wrap">
@@ -568,9 +599,12 @@ export default function HomeClient({
               </div>
             </div>
             <div className="hero-stats">
-              <div className="stat-item"><span className="stat-num">500+</span><span className="stat-label">Happy Customers</span></div>
-              <div className="stat-item"><span className="stat-num">4.9★</span><span className="stat-label">Average Rating</span></div>
-              <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
+              {heroStats.map((s, i) => (
+                <div className="stat-item" key={`${s.num}-${i}`}>
+                  <span className="stat-num">{s.num}</span>
+                  <span className="stat-label">{s.label}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

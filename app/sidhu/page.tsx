@@ -1280,7 +1280,7 @@ export default function AdminPage() {
               { id:"coupons",   icon:"🎟️", label:"Coupons",      roles:["super_admin"] },
               { id:"builder",   icon:"🎨", label:"Page Builder", roles:["super_admin"] },
               { id:"faqadmin",  icon:"❓", label:"FAQs",         roles:["super_admin","manager"] },
-              { id:"pages",     icon:"📄", label:"Pages",        roles:["super_admin"] },
+              { id:"pages",     icon:"✏️", label:"Content Editor", roles:["super_admin","manager"] },
               { id:"staff",     icon:"👤", label:"Staff Users",  roles:["super_admin"] },
               { id:"settings",  icon:"⚙️", label:"Site Settings",roles:["super_admin"] },
             ] as const).filter(item => ([...item.roles] as string[]).includes(adminRole)).map(item => (
@@ -1314,7 +1314,7 @@ export default function AdminPage() {
                 {tab==="coupons" && <>Manage <span>Coupons</span></>}
                 {tab==="builder" && <>Page <span>Builder</span></>}
                 {tab==="faqadmin" && <>Manage <span>FAQs</span></>}
-                {tab==="pages" && <>Page <span>Editor</span></>}
+                {tab==="pages" && <>Content <span>Editor</span></>}
                 {tab==="settings" && <>Site <span>Settings</span></>}
               </h1>
             </div>
@@ -1891,6 +1891,11 @@ export default function AdminPage() {
                 {/* HERO */}
                 {['hero','_hero'].some(k=>sectionModal.key.includes(k)) && (
                   <div>
+                    {sectionModal.key === "home_hero" && (
+                      <div style={{marginBottom:14,padding:"10px 12px",background:"#F5F3FF",border:"1px solid #DDD6FE",borderRadius:10,fontSize:12,color:"#4C1D95",lineHeight:1.5}}>
+                        Main Hero title, subtitle, Shop/Learn buttons, features list aur stats ab <strong>Content Editor → Home</strong> se update karein. Yahan se sirf section visibility / advanced JSON fields.
+                      </div>
+                    )}
                     <div className="modal-field"><label>Title</label><input value={sectionEditing.title||""} onChange={e=>setSectionEditing((p:any)=>({...p,title:e.target.value}))} /></div>
                     <div className="modal-field"><label>Subtitle</label><textarea rows={2} value={sectionEditing.subtitle||""} onChange={e=>setSectionEditing((p:any)=>({...p,subtitle:e.target.value}))} /></div>
                     <div className="modal-field"><label>Primary Button Text</label><input value={sectionEditing.button_text||""} onChange={e=>setSectionEditing((p:any)=>({...p,button_text:e.target.value}))} /></div>
@@ -2415,10 +2420,14 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* 📄 PAGES EDITOR */}
+          {/* ✏️ CONTENT EDITOR */}
           {tab==="pages" && (
             <div>
               {contentMsg && <div style={{marginBottom:16,padding:"10px 16px",background:contentMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${contentMsg.startsWith("✅")?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,borderRadius:10,fontSize:13,color:contentMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{contentMsg}</div>}
+
+              <div style={{marginBottom:18,padding:"14px 16px",background:"#F5F3FF",border:"1px solid #DDD6FE",borderRadius:12,fontSize:13,color:"#4C1D95",lineHeight:1.55}}>
+                <strong>Website text yahan se update hota hai.</strong> Left menu → <strong>Content Editor</strong> → neeche page tab choose karein (Home / About / Contact / Footer) → fields edit karein → Save dabayein. Homepage Main Hero (title, subtitle, buttons, features list, stats) sab <strong>Home</strong> tab mein hain.
+              </div>
 
               <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
                 {[["home","🏠 Home"],["about","ℹ️ About"],["contact","📞 Contact"],["footer","🔻 Footer"]].map(([k,l])=>(
@@ -2439,13 +2448,19 @@ export default function AdminPage() {
                     <textarea rows={3} style={{width:"100%",resize:"vertical"}} maxLength={180} value={siteContent.home_meta_description||""} onChange={e=>setSiteContent(s=>({...s,home_meta_description:e.target.value}))} placeholder="Premium Firestick subscriptions and streaming services in the UK..." />
                   </div>
 
-                  <div style={{margin:"20px 0 12px",paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.08)",fontSize:13,fontWeight:700,color:"#5B21B6"}}>TOP HERO (centered)</div>
+                  <div style={{margin:"20px 0 12px",paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.08)",fontSize:13,fontWeight:700,color:"#5B21B6"}}>TOP HERO / SLIDER (title + subtitle above products)</div>
                   <div className="modal-field"><label>Top Hero Title</label><input style={{width:"100%"}} value={siteContent.home_top_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_top_hero_title:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
                   <div className="modal-field"><label>Top Hero Subtitle</label><textarea rows={2} style={{width:"100%",resize:"vertical"}} value={siteContent.home_top_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_top_hero_subtitle:e.target.value}))} placeholder="Premium Streaming Solutions for the UK" /></div>
 
-                  <div style={{margin:"20px 0 12px",paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.08)",fontSize:13,fontWeight:700,color:"#5B21B6"}}>MAIN HERO (left aligned + buttons)</div>
+                  <div style={{margin:"20px 0 12px",paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.08)",fontSize:13,fontWeight:700,color:"#5B21B6"}}>MAIN HERO (below products — title, buttons, features, stats)</div>
                   <div className="modal-field"><label>Main Hero Title</label><input style={{width:"100%"}} value={siteContent.home_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_hero_title:e.target.value}))} placeholder="Premium UK Streaming Service" /></div>
                   <div className="modal-field"><label>Main Hero Subtitle</label><textarea rows={3} style={{width:"100%",resize:"vertical"}} value={siteContent.home_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_hero_subtitle:e.target.value}))} placeholder="Firestick4UK provides premium UK streaming services for Firestick and Android Box users." /></div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+                    <div className="modal-field"><label>Primary Button Text</label><input style={{width:"100%"}} value={siteContent.home_hero_btn_text||""} onChange={e=>setSiteContent(s=>({...s,home_hero_btn_text:e.target.value}))} placeholder="Shop Now" /></div>
+                    <div className="modal-field"><label>Primary Button Link</label><input style={{width:"100%"}} value={siteContent.home_hero_btn_link||""} onChange={e=>setSiteContent(s=>({...s,home_hero_btn_link:e.target.value}))} placeholder="/products" /></div>
+                    <div className="modal-field"><label>Secondary Button Text</label><input style={{width:"100%"}} value={siteContent.home_hero_btn2_text||""} onChange={e=>setSiteContent(s=>({...s,home_hero_btn2_text:e.target.value}))} placeholder="Learn More" /></div>
+                    <div className="modal-field"><label>Secondary Button Link</label><input style={{width:"100%"}} value={siteContent.home_hero_btn2_link||""} onChange={e=>setSiteContent(s=>({...s,home_hero_btn2_link:e.target.value}))} placeholder="/about" /></div>
+                  </div>
                   <div className="modal-field">
                     <label>Features List (one feature per line)</label>
                     <textarea
@@ -2457,8 +2472,26 @@ export default function AdminPage() {
                     />
                   </div>
 
+                  <div style={{margin:"16px 0 10px",fontSize:13,fontWeight:700,color:"#5B21B6"}}>STATS (shown under Main Hero)</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+                    <div className="modal-field"><label>Stat 1 Number</label><input style={{width:"100%"}} value={siteContent.home_stat1_num||""} onChange={e=>setSiteContent(s=>({...s,home_stat1_num:e.target.value}))} placeholder="500+" /></div>
+                    <div className="modal-field"><label>Stat 1 Label</label><input style={{width:"100%"}} value={siteContent.home_stat1_label||""} onChange={e=>setSiteContent(s=>({...s,home_stat1_label:e.target.value}))} placeholder="Happy Customers" /></div>
+                    <div className="modal-field"><label>Stat 2 Number</label><input style={{width:"100%"}} value={siteContent.home_stat2_num||""} onChange={e=>setSiteContent(s=>({...s,home_stat2_num:e.target.value}))} placeholder="4.9★" /></div>
+                    <div className="modal-field"><label>Stat 2 Label</label><input style={{width:"100%"}} value={siteContent.home_stat2_label||""} onChange={e=>setSiteContent(s=>({...s,home_stat2_label:e.target.value}))} placeholder="Average Rating" /></div>
+                    <div className="modal-field"><label>Stat 3 Number</label><input style={{width:"100%"}} value={siteContent.home_stat3_num||""} onChange={e=>setSiteContent(s=>({...s,home_stat3_num:e.target.value}))} placeholder="24/7" /></div>
+                    <div className="modal-field"><label>Stat 3 Label</label><input style={{width:"100%"}} value={siteContent.home_stat3_label||""} onChange={e=>setSiteContent(s=>({...s,home_stat3_label:e.target.value}))} placeholder="Support" /></div>
+                  </div>
+
                   <div className="modal-field"><label>Tagline</label><input style={{width:"100%"}} value={siteContent.home_tagline||""} onChange={e=>setSiteContent(s=>({...s,home_tagline:e.target.value}))} placeholder="Fast. Reliable. Affordable." /></div>
-                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["home_meta_title","home_meta_description","home_top_hero_title","home_top_hero_subtitle","home_hero_title","home_hero_subtitle","home_features_list","home_tagline"])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent([
+                    "home_meta_title","home_meta_description",
+                    "home_top_hero_title","home_top_hero_subtitle",
+                    "home_hero_title","home_hero_subtitle",
+                    "home_hero_btn_text","home_hero_btn_link","home_hero_btn2_text","home_hero_btn2_link",
+                    "home_features_list",
+                    "home_stat1_num","home_stat1_label","home_stat2_num","home_stat2_label","home_stat3_num","home_stat3_label",
+                    "home_tagline",
+                  ])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
                 </div>
               )}
 
