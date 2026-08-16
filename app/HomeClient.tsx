@@ -241,7 +241,7 @@ export default function HomeClient({
           align-content:start;
         }
         .hero-features.feature-list {
-          max-height: 220px;
+          max-height: 130px;
           overflow-y: auto;
           scroll-behavior: smooth;
           padding-right: 8px;
@@ -373,6 +373,7 @@ export default function HomeClient({
         @media (max-width: 640px) {
           .hero-features.feature-list {
             grid-template-columns: 1fr;
+            max-height: 160px;
           }
         }
       `}</style>
