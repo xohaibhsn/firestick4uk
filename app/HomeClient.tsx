@@ -227,11 +227,11 @@ export default function HomeClient({
         .view-all-wrap { max-width:1300px; margin:0 auto; padding:20px 60px 50px; text-align:center; }
         .view-all-btn { display:inline-block; background:#111111; color:#FFFFFF; padding:14px 40px; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; transition:all 0.2s; }
         .view-all-btn:hover { background:#5B21B6; transform:translateY(-1px); }
-        /* HERO — LIGHT SECTION (combined scroll panel) */
+        /* HERO — LIGHT SECTION (combined scroll + stats outside) */
         .hero-outer { background:#FFFFFF; border-top:1px solid #E5E5E5; }
         .hero {
           background:transparent;
-          padding:50px 60px 60px;
+          padding:56px 60px 64px;
           max-width:1300px;
           margin:0 auto;
           display:block;
@@ -239,41 +239,47 @@ export default function HomeClient({
         .hero-combined {
           border:1px solid #E5E5E5;
           border-radius:16px;
-          background:#FAFAFA;
+          background:linear-gradient(180deg,#FFFFFF 0%,#FAFAFA 100%);
           overflow:hidden;
+          box-shadow:0 4px 24px rgba(0,0,0,0.04);
         }
         .hero-combined-scroll {
-          height: 360px;
-          max-height: 360px;
+          height: 320px;
+          max-height: 320px;
           overflow-x: hidden;
-          overflow-y: scroll;
+          overflow-y: auto;
           scroll-behavior: smooth;
-          padding: 28px 28px 20px;
+          padding: 32px 36px;
           box-sizing: border-box;
           -webkit-overflow-scrolling: touch;
+          display: grid;
+          grid-template-columns: 1.1fr 0.9fr;
+          gap: 40px;
+          align-items: start;
         }
         .hero-combined-scroll::-webkit-scrollbar { width: 5px; }
-        .hero-combined-scroll::-webkit-scrollbar-track { background: #F5F5F5; border-radius: 4px; }
+        .hero-combined-scroll::-webkit-scrollbar-track { background: #F3F4F6; border-radius: 4px; }
         .hero-combined-scroll::-webkit-scrollbar-thumb { background: #5B21B6; border-radius: 4px; }
-        .hero-content { max-width: 720px; }
-        .hero-tag { font-family:var(--font-body); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5B21B6; margin-bottom:16px; display:block; font-weight:700; }
-        .hero-title { font-family:var(--font-display); font-size:clamp(1.8rem,3.5vw,2.8rem); font-weight:800; letter-spacing:-0.02em; color:#111111 !important; -webkit-text-fill-color:#111111 !important; line-height:1.15; margin-bottom:20px; }
+        .hero-content { max-width: none; }
+        .hero-tag { font-family:var(--font-body); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5B21B6; margin-bottom:14px; display:block; font-weight:700; }
+        .hero-title { font-family:var(--font-display); font-size:clamp(1.7rem,3.2vw,2.5rem); font-weight:800; letter-spacing:-0.02em; color:#111111 !important; -webkit-text-fill-color:#111111 !important; line-height:1.15; margin-bottom:16px; }
         .hero-title span { color:#5B21B6 !important; -webkit-text-fill-color:#5B21B6 !important; }
-        .hero-subtitle { font-family:var(--font-body); font-size:clamp(1rem,2vw,1.2rem); font-weight:400; color:#64748b; line-height:1.7; margin-bottom:28px; max-width:640px; }
-        .hero-btns { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:28px; }
-        .hero-btn-primary { font-family:var(--font-body); background:#5B21B6; color:#FFFFFF; padding:16px 36px; border-radius:8px; font-size:15px; font-weight:600; letter-spacing:0.01em; text-decoration:none; transition:all 0.2s; display:inline-block; }
+        .hero-subtitle { font-family:var(--font-body); font-size:clamp(0.95rem,1.6vw,1.1rem); font-weight:400; color:#64748b; line-height:1.7; margin-bottom:24px; max-width:520px; }
+        .hero-btns { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:0; }
+        .hero-btn-primary { font-family:var(--font-body); background:#5B21B6; color:#FFFFFF; padding:14px 28px; border-radius:8px; font-size:14px; font-weight:600; letter-spacing:0.01em; text-decoration:none; transition:all 0.2s; display:inline-block; }
         .hero-btn-primary:hover { background:#4C1D95; transform:translateY(-2px); box-shadow:0 6px 20px rgba(91,33,182,0.35); }
-        .hero-btn-secondary { font-family:var(--font-body); background:#111111; color:#FFFFFF; padding:16px 36px; border-radius:8px; font-size:15px; font-weight:600; letter-spacing:0.01em; text-decoration:none; transition:all 0.2s; display:inline-block; }
+        .hero-btn-secondary { font-family:var(--font-body); background:#111111; color:#FFFFFF; padding:14px 28px; border-radius:8px; font-size:14px; font-weight:600; letter-spacing:0.01em; text-decoration:none; transition:all 0.2s; display:inline-block; }
         .hero-btn-secondary:hover { background:#5B21B6; transform:translateY(-2px); }
         .hero-features-wrap {
           min-width: 0;
           width: 100%;
-          margin-bottom: 8px;
+          margin: 0;
+          padding: 8px 0 0;
         }
         .hero-features {
           display:grid;
-          grid-template-columns:1fr 1fr;
-          gap:10px 16px;
+          grid-template-columns:1fr;
+          gap:12px;
           align-content:start;
         }
         .hero-features.feature-list {
@@ -285,16 +291,6 @@ export default function HomeClient({
           border-radius: 0;
           background: transparent;
         }
-        .hero-feature-scroll-hint {
-          display: block;
-          color: #5B21B6;
-          font-size: 12px;
-          font-weight: 600;
-          text-align: center;
-          margin-top: 10px;
-          padding-bottom: 4px;
-          font-family: var(--font-body);
-        }
         .hero-feature-item {
           display:flex;
           align-items:flex-start;
@@ -303,7 +299,11 @@ export default function HomeClient({
           font-size:15px;
           font-weight:500;
           color:#374151;
-          line-height:1.4;
+          line-height:1.45;
+          padding:8px 12px;
+          background:#FFFFFF;
+          border:1px solid #EEE;
+          border-radius:10px;
         }
         .hero-feature-check {
           flex-shrink:0;
@@ -314,8 +314,16 @@ export default function HomeClient({
           font-size:16px;
           line-height:1;
         }
-        .hero-stats { display:flex; gap:32px; margin-top:24px; padding-top:24px; border-top:1px solid #E5E5E5; }
-        .stat-item {}
+        .hero-stats {
+          display:flex;
+          justify-content:center;
+          gap:48px;
+          margin-top:28px;
+          padding:22px 16px 0;
+          border-top:1px solid #E5E5E5;
+          text-align:center;
+        }
+        .stat-item { min-width: 110px; }
         .stat-num { font-family:var(--font-display); font-size:2rem; font-weight:800; color:#111111; letter-spacing:-0.02em; display:block; }
         .stat-label { font-family:var(--font-body); font-size:0.75rem; font-weight:600; color:#64748b; letter-spacing:0.08em; text-transform:uppercase; }
         /* FEATURES — LIGHT SECTION */
@@ -395,20 +403,30 @@ export default function HomeClient({
           .badge{font-size:9px;padding:3px 7px;top:6px;right:6px;}
           .view-all-wrap{padding:14px 16px 36px;}
           .hero{padding:36px 16px 44px;}
-          .hero-combined-scroll{height:420px;max-height:420px;padding:20px 16px 16px;}
+          .hero-combined-scroll{
+            height:380px;
+            max-height:380px;
+            padding:22px 18px;
+            grid-template-columns:1fr;
+            gap:22px;
+          }
           .hero-features{grid-template-columns:1fr;}
-          .hero-stats{gap:20px;flex-wrap:wrap;}
+          .hero-stats{gap:20px;flex-wrap:wrap;margin-top:22px;justify-content:space-around;}
           .features-section{padding:40px 24px 50px;}
           footer{padding:36px 24px;flex-direction:column;text-align:center;}
         }
         @media (max-width: 640px) {
           .hero-combined-scroll {
-            height: 400px;
-            max-height: 400px;
+            height: 360px;
+            max-height: 360px;
+            padding: 18px 14px;
+            gap: 18px;
           }
-          .hero-features {
-            grid-template-columns: 1fr;
-          }
+          .hero-btns { flex-direction: column; }
+          .hero-btn-primary, .hero-btn-secondary { width: 100%; text-align: center; box-sizing: border-box; }
+          .hero-stats { gap: 16px; }
+          .stat-item { min-width: 90px; }
+          .stat-num { font-size: 1.6rem; }
         }
       `}</style>
 
@@ -547,13 +565,12 @@ export default function HomeClient({
                     ))}
                   </div>
                 </div>
-                <div className="hero-stats">
-                  <div className="stat-item"><span className="stat-num">500+</span><span className="stat-label">Happy Customers</span></div>
-                  <div className="stat-item"><span className="stat-num">4.9★</span><span className="stat-label">Average Rating</span></div>
-                  <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
-                </div>
               </div>
-              <div className="hero-feature-scroll-hint">scroll for more ↓</div>
+            </div>
+            <div className="hero-stats">
+              <div className="stat-item"><span className="stat-num">500+</span><span className="stat-label">Happy Customers</span></div>
+              <div className="stat-item"><span className="stat-num">4.9★</span><span className="stat-label">Average Rating</span></div>
+              <div className="stat-item"><span className="stat-num">24/7</span><span className="stat-label">Support</span></div>
             </div>
           </div>
         </div>

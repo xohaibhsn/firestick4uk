@@ -493,9 +493,9 @@ html body .product-name, html body .product-name * { color: #111111 !important; 
 html body .product-short-desc { color: #444444 !important; }
 html body .full-desc { color: #333333 !important; }
 html body .hero-combined-scroll {
-  height: 360px !important;
-  max-height: 360px !important;
-  overflow-y: scroll !important;
+  height: 320px !important;
+  max-height: 320px !important;
+  overflow-y: auto !important;
 }
 html body .hero-features-wrap .hero-features.feature-list {
   height: auto !important;
@@ -504,14 +504,14 @@ html body .hero-features-wrap .hero-features.feature-list {
 }
 @media (max-width: 768px) {
   html body .hero-combined-scroll {
-    height: 420px !important;
-    max-height: 420px !important;
+    height: 380px !important;
+    max-height: 380px !important;
   }
 }
 @media (max-width: 640px) {
   html body .hero-combined-scroll {
-    height: 400px !important;
-    max-height: 400px !important;
+    height: 360px !important;
+    max-height: 360px !important;
   }
 }
 html body .meta-pill { color: #444444 !important; background: #F5F5F5 !important; border-color: #E5E5E5 !important; }
