@@ -1,6 +1,32 @@
 "use client";
 import { useState, useEffect } from "react";
+import xss from "xss";
+import { fixContentLinkRels } from "@/lib/seoLinks";
+import { looksLikeHtml } from "@/lib/contentHtml";
 import Navbar from "@/components/Navbar";
+
+const richXss = {
+  whiteList: {
+    h1: [], h2: [], h3: [], h4: [],
+    p: ["style", "class"],
+    strong: [], em: [], u: [], s: [], b: [], i: [],
+    ul: [], ol: [], li: [],
+    blockquote: [],
+    a: ["href", "target", "rel"],
+    br: [], hr: [],
+    span: ["style", "class"],
+    div: ["style", "class"],
+  } as Record<string, string[]>,
+  stripIgnoreTag: true,
+};
+
+function renderRichOrPlain(htmlOrText: string, fallback: string) {
+  const value = (htmlOrText || "").trim() || fallback;
+  if (looksLikeHtml(value)) {
+    return { __html: fixContentLinkRels(xss(value, richXss)) };
+  }
+  return { __html: xss(`<p>${value}</p>`, richXss) };
+}
 
 const styles = `
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -34,6 +60,10 @@ const styles = `
   .page-title { font-family:var(--font-display); font-size:clamp(1.8rem,3vw,2.5rem); font-weight:800; letter-spacing:-0.03em; color:#111111; margin-bottom:20px; line-height:1.1; }
   .page-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
   .hero-text { font-size:clamp(15px,2vw,18px); color:#555555; line-height:1.8; max-width:700px; margin:0 auto 40px; }
+  .hero-text p { margin:0 0 12px; }
+  .hero-text a { color:#5B21B6; }
+  .hero-text ul, .hero-text ol { text-align:left; margin:0 auto 12px; max-width:640px; padding-left:1.2em; }
+  .hero-text strong { color:#111111; }
 
   /* STATS — white cards, dark text */
   .stats-bar { max-width:900px; margin:0 auto; padding:0 24px 70px;
@@ -51,6 +81,11 @@ const styles = `
   .story-title { font-family:var(--font-display); font-size:clamp(24px,3vw,38px); font-weight:700; color:#111111; margin-bottom:20px; }
   .story-title span { color:#5B21B6; -webkit-text-fill-color:#5B21B6; }
   .story-para { font-size:15px; color:#444444; line-height:1.9; margin-bottom:16px; }
+  .story-para p { margin:0 0 12px; }
+  .story-para a { color:#5B21B6; }
+  .story-para ul, .story-para ol { margin:0 0 12px; padding-left:1.2em; }
+  .story-para strong { color:#111111; }
+  .story-para h2, .story-para h3, .story-para h4 { color:#111111; font-family:var(--font-display); margin:0 0 10px; }
   .story-visual { background:#F5F3FF; border:1px solid #DDD6FE; border-radius:24px; padding:36px;
     display:flex; flex-direction:column; gap:16px; }
   .story-point { display:flex; gap:14px; align-items:flex-start; }
@@ -142,9 +177,13 @@ export default function AboutPage() {
         <div className="about-hero">
           <div className="section-tag">✦ Our Story</div>
           <h1 className="page-title">The UK&apos;s Most Trusted<br /><span>Tech Store</span></h1>
-          <p className="hero-text">
-            {sc.about_description || "We started Firestick4UK with one goal — to make premium streaming devices and subscription plans accessible, affordable, and hassle-free for everyone in the UK."}
-          </p>
+          <div
+            className="hero-text"
+            dangerouslySetInnerHTML={renderRichOrPlain(
+              sc.about_description || "",
+              "We started Firestick4UK with one goal — to make premium streaming devices and subscription plans accessible, affordable, and hassle-free for everyone in the UK."
+            )}
+          />
         </div>
 
         {/* STATS */}
@@ -168,9 +207,13 @@ export default function AboutPage() {
           <div className="story-text">
             <div className="section-tag">✦ Who We Are</div>
             <h2 className="story-title">Built on <span>Trust</span></h2>
-            <p className="story-para">
-              {sc.about_mission || "Firestick4UK was founded by a team of tech enthusiasts who were frustrated with overpriced, complicated streaming setups. We wanted something simple — great devices, fair prices, and real human support."}
-            </p>
+            <div
+              className="story-para"
+              dangerouslySetInnerHTML={renderRichOrPlain(
+                sc.about_mission || "",
+                "Firestick4UK was founded by a team of tech enthusiasts who were frustrated with overpriced, complicated streaming setups. We wanted something simple — great devices, fair prices, and real human support."
+              )}
+            />
             <p className="story-para">
               Today, we serve hundreds of customers across the United Kingdom, offering carefully selected Firestick devices, powerful Android boxes, and flexible subscription plans — all backed by our dedicated WhatsApp and Telegram support team.
             </p>

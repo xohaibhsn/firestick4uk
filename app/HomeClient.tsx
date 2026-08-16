@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
+import { looksLikeHtml, plainLinesToListHtml } from "@/lib/contentHtml";
 import { useCart } from "./lib/cartContext";
 import Navbar from "@/components/Navbar";
 import HeroSlider from "@/components/HeroSlider";
@@ -11,6 +12,21 @@ const cardDescXss = {
     p: [], strong: [], em: [], u: [],
     br: [], span: [], a: ["href"],
     ul: [], ol: [], li: [],
+  } as Record<string, string[]>,
+  stripIgnoreTag: true,
+};
+
+const richContentXss = {
+  whiteList: {
+    h1: [], h2: [], h3: [], h4: [],
+    p: ["style", "class"],
+    strong: [], em: [], u: [], s: [], b: [], i: [],
+    ul: [], ol: [], li: [],
+    blockquote: [],
+    a: ["href", "target", "rel"],
+    br: [], hr: [],
+    span: ["style", "class"],
+    div: ["style", "class"],
   } as Record<string, string[]>,
   stripIgnoreTag: true,
 };
@@ -77,6 +93,7 @@ export default function HomeClient({
     "Multi-Device Compatibility",
     "Regular Channel Updates",
   ]);
+  const [featuresHtml, setFeaturesHtml] = useState("");
   const [heroBtns, setHeroBtns] = useState({
     primaryText: "Shop Now",
     primaryLink: "/products",
@@ -132,11 +149,20 @@ export default function HomeClient({
         ].filter((u): u is string => typeof u === 'string' && !!u.trim());
         setSlides(slideUrls);
         if (typeof data.home_features_list === 'string' && data.home_features_list.trim()) {
-          const items = data.home_features_list
-            .split(/\r?\n/)
-            .map((s: string) => s.trim())
-            .filter(Boolean);
-          if (items.length) setFeatureList(items);
+          const raw = data.home_features_list.trim();
+          if (looksLikeHtml(raw)) {
+            setFeaturesHtml(raw);
+            setFeatureList([]);
+          } else {
+            const items = raw
+              .split(/\r?\n/)
+              .map((s: string) => s.trim())
+              .filter(Boolean);
+            if (items.length) {
+              setFeatureList(items);
+              setFeaturesHtml(plainLinesToListHtml(raw));
+            }
+          }
         }
         setHeroBtns({
           primaryText: (data.home_hero_btn_text || "").trim() || "Shop Now",
@@ -310,6 +336,40 @@ export default function HomeClient({
           width: 100%;
           margin: 0;
           padding: 8px 0 0;
+        }
+        .hero-service-content {
+          font-family: var(--font-body);
+          font-size: 15px;
+          font-weight: 500;
+          color: #374151;
+          line-height: 1.65;
+        }
+        .hero-service-content h1,
+        .hero-service-content h2,
+        .hero-service-content h3,
+        .hero-service-content h4 {
+          font-family: var(--font-display);
+          color: #111111;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          line-height: 1.25;
+          margin: 0 0 10px;
+        }
+        .hero-service-content h2 { font-size: 1.25rem; }
+        .hero-service-content h3 { font-size: 1.1rem; }
+        .hero-service-content h4 { font-size: 1rem; }
+        .hero-service-content p { margin: 0 0 10px; }
+        .hero-service-content ul,
+        .hero-service-content ol { margin: 0 0 12px; padding-left: 1.2em; }
+        .hero-service-content li { margin-bottom: 6px; }
+        .hero-service-content a { color: #5B21B6; text-decoration: underline; }
+        .hero-service-content strong, .hero-service-content b { color: #111111; font-weight: 700; }
+        .hero-service-content blockquote {
+          margin: 0 0 12px;
+          padding: 8px 12px;
+          border-left: 3px solid #5B21B6;
+          background: #F5F3FF;
+          color: #4C1D95;
         }
         .hero-features {
           display:grid;
@@ -603,14 +663,23 @@ export default function HomeClient({
                   )}
                 </div>
                 <div className="hero-features-wrap">
-                  <div className="hero-features feature-list">
-                    {featureList.map((item, i) => (
-                      <div className="hero-feature-item" key={`${item}-${i}`}>
-                        <span className="hero-feature-check" aria-hidden>✓</span>
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {featuresHtml ? (
+                    <div
+                      className="hero-service-content"
+                      dangerouslySetInnerHTML={{
+                        __html: fixContentLinkRels(xss(featuresHtml, richContentXss)),
+                      }}
+                    />
+                  ) : (
+                    <div className="hero-features feature-list">
+                      {featureList.map((item, i) => (
+                        <div className="hero-feature-item" key={`${item}-${i}`}>
+                          <span className="hero-feature-check" aria-hidden>✓</span>
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

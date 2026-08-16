@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
+import { toEditorHtml } from "@/lib/contentHtml";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
 const styles = `
@@ -2426,7 +2427,9 @@ export default function AdminPage() {
               {contentMsg && <div style={{marginBottom:16,padding:"10px 16px",background:contentMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${contentMsg.startsWith("✅")?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,borderRadius:10,fontSize:13,color:contentMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{contentMsg}</div>}
 
               <div style={{marginBottom:18,padding:"14px 16px",background:"#F5F3FF",border:"1px solid #DDD6FE",borderRadius:12,fontSize:13,color:"#4C1D95",lineHeight:1.55}}>
-                <strong>Website text yahan se update hota hai.</strong> Left menu → <strong>Content Editor</strong> → neeche page tab choose karein (Home / About / Contact / Footer) → fields edit karein → Save dabayein. Homepage Main Hero (title, subtitle, buttons, features list, stats) sab <strong>Home</strong> tab mein hain.
+                <strong>Yahan se website ka saara text update hota hai</strong> (Products jaisa rich editor — bold, headings, links, lists).
+                <br />Left menu → <strong>Content Editor</strong> → Home / About / Contact / Footer → Save.
+                <br /><span style={{opacity:0.85}}>Page Builder alag hai — sirf “Why Choose Us” cards / Testimonials icons ke liye. Service info, features, buttons, stats yahan Content Editor mein likhein.</span>
               </div>
 
               <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
@@ -2482,13 +2485,14 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <div className="modal-field">
-                    <label>Features List (one feature per line)</label>
-                    <textarea
-                      rows={8}
-                      style={{width:"100%",resize:"vertical",fontFamily:"inherit",lineHeight:1.5}}
-                      value={siteContent.home_features_list||""}
-                      onChange={e=>setSiteContent(s=>({...s,home_features_list:e.target.value}))}
-                      placeholder={"HD & 4K Streaming Quality\nLive Sports & Entertainment\nMovies & TV Series On Demand\nCatch-up TV Available\nCompatible with All Devices\nFast Setup & Activation\n24/7 Customer Support\nUK Based Service"}
+                    <label>Service / Features Content (rich editor — headings, bold, links, lists)</label>
+                    <p style={{fontSize:12,color:"#666",margin:"0 0 8px",lineHeight:1.4}}>
+                      Product description jaisa editor. Full service info, headings, bullet lists aur links add kar sakte ho. Ye Main Hero ke right side pe dikhega.
+                    </p>
+                    <TipTapEditor
+                      content={toEditorHtml(siteContent.home_features_list || "")}
+                      onChange={(html) => setSiteContent((s) => ({ ...s, home_features_list: html }))}
+                      placeholder="Write about your service… Use headings, bold, lists, and links."
                     />
                   </div>
 
@@ -2520,8 +2524,22 @@ export default function AdminPage() {
                 <div className="section-card" style={{padding:24}}>
                   <div className="section-header" style={{marginBottom:20}}><div className="section-title">ℹ️ About Page Content</div></div>
                   <div className="modal-field"><label>Page Title</label><input style={{width:"100%"}} value={siteContent.about_title||""} onChange={e=>setSiteContent(s=>({...s,about_title:e.target.value}))} /></div>
-                  <div className="modal-field"><label>Main Description</label><textarea rows={4} style={{width:"100%",resize:"vertical"}} value={siteContent.about_description||""} onChange={e=>setSiteContent(s=>({...s,about_description:e.target.value}))} /></div>
-                  <div className="modal-field"><label>Mission Statement</label><textarea rows={3} style={{width:"100%",resize:"vertical"}} value={siteContent.about_mission||""} onChange={e=>setSiteContent(s=>({...s,about_mission:e.target.value}))} /></div>
+                  <div className="modal-field">
+                    <label>Main Description (rich editor)</label>
+                    <TipTapEditor
+                      content={toEditorHtml(siteContent.about_description || "")}
+                      onChange={(html) => setSiteContent((s) => ({ ...s, about_description: html }))}
+                      placeholder="Full about / service story with formatting..."
+                    />
+                  </div>
+                  <div className="modal-field">
+                    <label>Mission Statement (rich editor)</label>
+                    <TipTapEditor
+                      content={toEditorHtml(siteContent.about_mission || "")}
+                      onChange={(html) => setSiteContent((s) => ({ ...s, about_mission: html }))}
+                      placeholder="Mission text with headings, bold, links..."
+                    />
+                  </div>
                   <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["about_title","about_description","about_mission"])}>{contentSaving?"Saving...":"💾 Save About"}</button>
                 </div>
               )}
