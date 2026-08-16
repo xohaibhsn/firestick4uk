@@ -2507,7 +2507,7 @@ export default function AdminPage() {
                     "home_meta_title","home_meta_description",
                     "home_top_hero_title","home_top_hero_subtitle",
                     "home_hero_title","home_hero_subtitle",
-                    "home_hero_btn_text","home_hero_btn_link","home_hero_btn2_text","home_hero_btn2_link",
+                    "home_hero_btn_text","home_hero_btn_link","home_hero_btn_show","home_hero_btn2_text","home_hero_btn2_link","home_hero_btn2_show",
                     "home_features_list",
                     "home_stat1_num","home_stat1_label","home_stat2_num","home_stat2_label","home_stat3_num","home_stat3_label",
                     "home_tagline",
