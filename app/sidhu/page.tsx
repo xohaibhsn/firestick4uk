@@ -394,6 +394,17 @@ export default function AdminPage() {
     }
   }, [tab, trainingChat, trainingChatLoading]);
 
+  // Refresh all site_content (incl. OG + WhatsApp icon) when Site Settings opens
+  useEffect(() => {
+    if (!loggedIn || tab !== "settings") return;
+    fetch("/api/site-content?page=all")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && typeof d === "object") setSiteContent(d);
+      })
+      .catch(() => {});
+  }, [loggedIn, tab]);
+
   // Helper: pass role in all admin API headers (SSR-safe)
   const getRoleHeaders = () => ({
     "x-admin-session": typeof window !== "undefined" ? localStorage.getItem("sAdminSession")||"" : "",
@@ -513,11 +524,12 @@ export default function AdminPage() {
         body: JSON.stringify({ file: base64, name: file.name, folder: "firestick4uk/whatsapp-icon" }),
       }).then(r => r.json());
       if (data.path) {
-        setSiteContent(s => ({ ...s, whatsapp_icon_url: data.path }));
+        const url = `${data.path}${data.path.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        setSiteContent(s => ({ ...s, whatsapp_icon_url: url }));
         await fetch("/api/site-content", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...getRoleHeaders() },
-          body: JSON.stringify({ key: "whatsapp_icon_url", value: data.path }),
+          body: JSON.stringify({ key: "whatsapp_icon_url", value: url }),
         });
         setContentMsg("✅ WhatsApp icon saved!");
       } else {
@@ -525,6 +537,39 @@ export default function AdminPage() {
       }
     } catch { setContentMsg("❌ Upload failed"); }
     setWaIconUploading(false);
+    setTimeout(() => setContentMsg(""), 3000);
+  };
+
+  const uploadOgImageAdmin = async (file: File) => {
+    setOgImgUploading(true);
+    try {
+      const base64 = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result as string);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const data = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+        body: JSON.stringify({ file: base64, name: file.name, folder: "firestick4uk/og" }),
+      }).then((r) => r.json());
+      if (data.path) {
+        const url = `${data.path}${data.path.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        setSiteContent((s) => ({ ...s, og_default_image: url }));
+        await fetch("/api/site-content", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+          body: JSON.stringify({ key: "og_default_image", value: url }),
+        });
+        setContentMsg("✅ OG image saved!");
+      } else {
+        setContentMsg(`❌ ${data.error || "Upload failed"}`);
+      }
+    } catch {
+      setContentMsg("❌ Upload failed");
+    }
+    setOgImgUploading(false);
     setTimeout(() => setContentMsg(""), 3000);
   };
 
@@ -2150,27 +2195,48 @@ export default function AdminPage() {
                     📐 Recommended: <strong>1200×630px</strong> — shown when sharing homepage on WhatsApp/Facebook
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
-                    {siteContent.og_default_image && <img src={siteContent.og_default_image} alt="OG preview" style={{width:120,height:63,borderRadius:6,border:"1px solid #E5E5E5",objectFit:"cover"}} />}
+                    {siteContent.og_default_image ? (
+                      <img
+                        key={siteContent.og_default_image}
+                        src={siteContent.og_default_image}
+                        alt="OG preview"
+                        style={{width:200,height:105,borderRadius:8,border:"1px solid #E5E5E5",objectFit:"cover",background:"#fff"}}
+                      />
+                    ) : (
+                      <div style={{width:200,height:105,borderRadius:8,border:"1px dashed #CCC",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#AAA",background:"#FAFAFA"}}>
+                        No OG image
+                      </div>
+                    )}
                     <label style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}>
-                      {ogImgUploading ? "⏳ Uploading..." : "📷 Upload OG Image"}
-                      <input type="file" accept="image/*" style={{display:"none"}} disabled={ogImgUploading} onChange={async(e)=>{
-                        const file=e.target.files?.[0]; if(!file) return;
-                        setOgImgUploading(true);
-                        try {
-                          const base64=await new Promise<string>((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result as string); r.onerror=rej; r.readAsDataURL(file); });
-                          const data=await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file:base64,name:file.name,folder:"firestick4uk/og"})}).then(r=>r.json());
-                          if(data.path){
-                            setSiteContent(s=>({...s,og_default_image:data.path}));
-                            await fetch("/api/site-content",{method:"POST",headers:{"Content-Type":"application/json",...getRoleHeaders()},body:JSON.stringify({key:"og_default_image",value:data.path})});
-                            setContentMsg("✅ OG image saved!");
-                          }
-                        } catch { setContentMsg("❌ Upload failed"); }
-                        setOgImgUploading(false);
-                        setTimeout(()=>setContentMsg(""),3000);
-                      }} />
+                      {ogImgUploading ? "⏳ Uploading..." : "📷 UPLOAD OG IMAGE"}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/*"
+                        style={{display:"none"}}
+                        disabled={ogImgUploading}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) uploadOgImageAdmin(file);
+                          e.target.value = "";
+                        }}
+                      />
                     </label>
-                    {siteContent.og_default_image && <button type="button" style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:12}} onClick={()=>{setSiteContent(s=>({...s,og_default_image:""}));saveContent(["og_default_image"]);}}>✕ Remove</button>}
+                    {siteContent.og_default_image && (
+                      <button
+                        type="button"
+                        style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:12}}
+                        onClick={() => {
+                          setSiteContent((s) => ({ ...s, og_default_image: "" }));
+                          saveContent(["og_default_image"]);
+                        }}
+                      >
+                        ✕ Remove
+                      </button>
+                    )}
                   </div>
+                  {siteContent.og_default_image && (
+                    <div style={{fontSize:11,color:"#888",marginTop:8,wordBreak:"break-all"}}>{siteContent.og_default_image}</div>
+                  )}
                 </div>
 
                 <div className="modal-field" style={{marginTop:8}}>
@@ -2179,27 +2245,48 @@ export default function AdminPage() {
                     Recommended: <strong>512×512px PNG</strong>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
-                    {siteContent.whatsapp_icon_url && (
+                    {siteContent.whatsapp_icon_url ? (
                       <img
+                        key={siteContent.whatsapp_icon_url}
                         src={siteContent.whatsapp_icon_url}
                         alt="WhatsApp icon"
-                        style={{width:48,height:48,borderRadius:"50%",border:"1px solid #E5E5E5",objectFit:"cover"}}
+                        style={{width:60,height:60,borderRadius:"50%",border:"1px solid #E5E5E5",objectFit:"cover",background:"#fff"}}
                       />
+                    ) : (
+                      <div style={{width:60,height:60,borderRadius:"50%",border:"1px dashed #CCC",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#AAA",background:"#FAFAFA"}}>
+                        None
+                      </div>
                     )}
                     <label style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}>
-                      {waIconUploading ? "Uploading..." : "Upload Icon"}
-                      <input type="file" accept="image/png,image/jpeg,image/webp" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&uploadWhatsAppIconAdmin(e.target.files[0])} disabled={waIconUploading} />
+                      {waIconUploading ? "Uploading..." : "UPLOAD ICON"}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        style={{display:"none"}}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadWhatsAppIconAdmin(f);
+                          e.target.value = "";
+                        }}
+                        disabled={waIconUploading}
+                      />
                     </label>
                     {siteContent.whatsapp_icon_url && (
                       <button
                         type="button"
                         style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:12}}
-                        onClick={()=>{ setSiteContent(s=>({...s,whatsapp_icon_url:""})); saveContent(["whatsapp_icon_url"]); }}
+                        onClick={() => {
+                          setSiteContent((s) => ({ ...s, whatsapp_icon_url: "" }));
+                          saveContent(["whatsapp_icon_url"]);
+                        }}
                       >
                         ✕ Remove
                       </button>
                     )}
                   </div>
+                  {siteContent.whatsapp_icon_url && (
+                    <div style={{fontSize:11,color:"#888",marginTop:8,wordBreak:"break-all"}}>{siteContent.whatsapp_icon_url}</div>
+                  )}
                 </div>
 
                 <div className="modal-field" style={{marginTop:24,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>

@@ -25,7 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isLogo = cloudinaryFolder.includes('logo');
     const isWhatsAppIcon = cloudinaryFolder.includes('whatsapp');
     const isHeroSlide = cloudinaryFolder.includes('hero-slides');
-    const preserveImage = isReceipt || isLogo || isWhatsAppIcon || isHeroSlide;
+    const isOg = cloudinaryFolder.includes('firestick4uk/og') || cloudinaryFolder.endsWith('/og');
+    const preserveImage = isReceipt || isLogo || isWhatsAppIcon || isHeroSlide || isOg;
 
     // Use Cloudinary if credentials are configured
     if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
@@ -42,6 +43,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else if (isWhatsAppIcon) {
         uploadOptions.transformation = [
           { width: 512, height: 512, crop: 'limit' },
+          { quality: 90 },
+        ];
+      } else if (isOg) {
+        // OG share image: keep 1200×630 aspect, no square crop
+        uploadOptions.transformation = [
+          { width: 1200, height: 630, crop: 'limit' },
           { quality: 90 },
         ];
       } else if (isHeroSlide) {
