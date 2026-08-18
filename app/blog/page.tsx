@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 const styles = `
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -177,6 +179,7 @@ export default function BlogPage() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
   const [allPosts, setAllPosts] = useState(posts);
+  const { t } = useSiteContent();
 
   useEffect(() => {
     fetch("/api/blog")
@@ -220,9 +223,9 @@ export default function BlogPage() {
 
       <div className="page-wrapper">
         <div className="page-header">
-          <div className="section-tag">✦ Our Blog</div>
-          <h1 className="page-title">Tips, Guides & <span>Updates</span></h1>
-          <p className="page-sub">Everything you need to get the most out of your devices and subscription plans.</p>
+          <div className="section-tag">✦ {t("blog_tag", "Our Blog")}</div>
+          <h1 className="page-title">{t("blog_title", "Tips, Guides & Updates")}</h1>
+          <p className="page-sub">{t("blog_subtitle", "Everything you need to get the most out of your devices and subscription plans.")}</p>
         </div>
 
         {/* CATEGORIES */}
@@ -252,7 +255,7 @@ export default function BlogPage() {
                   <span>📅 {featuredPost.date}</span>
                   <span>⏱ {featuredPost.readTime}</span>
                 </div>
-                <a href={`/blog/${(featuredPost as any).slug || featuredPost.id}`} className="read-more">Read Article →</a>
+                <a href={`/blog/${(featuredPost as any).slug || featuredPost.id}`} className="read-more">{t("blog_read", "Read Article →")}</a>
               </div>
             </div>
           </div>
@@ -273,7 +276,7 @@ export default function BlogPage() {
                 <p className="card-excerpt">{post.excerpt}</p>
                 <div className="card-footer">
                   <div className="card-meta">📅 {post.date} · ⏱ {post.readTime}</div>
-                  <a href={`/blog/${(post as any).slug||post.id}`} className="read-more" onClick={e=>e.stopPropagation()}>Read →</a>
+                  <a href={`/blog/${(post as any).slug||post.id}`} className="read-more" onClick={e=>e.stopPropagation()}>{t("blog_read_short", "Read →")}</a>
                 </div>
               </div>
             </div>
@@ -283,30 +286,20 @@ export default function BlogPage() {
         {/* NEWSLETTER */}
         <div className="newsletter">
           <div className="newsletter-box">
-            <div className="newsletter-title">Stay in the Loop</div>
-            <p className="newsletter-sub">Get the latest guides, tips and offers delivered to your inbox.</p>
+            <div className="newsletter-title">{t("blog_newsletter_title", "Stay in the Loop")}</div>
+            <p className="newsletter-sub">{t("blog_newsletter_sub", "Get the latest guides, tips and offers delivered to your inbox.")}</p>
             {subscribed ? (
-              <p style={{ color: "#5B21B6", fontWeight: 600, fontSize: "15px" }}>✅ You&apos;re subscribed! Thank you.</p>
+              <p style={{ color: "#5B21B6", fontWeight: 600, fontSize: "15px" }}>✅ {t("blog_subscribed", "You are subscribed! Thank you.")}</p>
             ) : (
               <div className="newsletter-form">
                 <input className="newsletter-input" type="email" placeholder="your@email.com"
                   value={email} onChange={e => setEmail(e.target.value)} />
-                <button className="newsletter-btn" onClick={() => email && setSubscribed(true)}>Subscribe</button>
+                <button className="newsletter-btn" onClick={() => email && setSubscribed(true)}>{t("blog_subscribe", "Subscribe")}</button>
               </div>
             )}
           </div>
         </div>
-
-        <footer>
-          <div className="footer-logo">FIRESTICK4UK</div>
-          <ul className="footer-links">
-            <li><a href="/privacy-policy">Privacy Policy</a></li>
-            <li><a href="/terms">Terms & Conditions</a></li>
-            <li><a href="/refund-policy">Refund Policy</a></li>
-            <li><a href="/faq">FAQ</a></li>
-          </ul>
-          <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
-        </footer>
+        <Footer />
       </div>
 
     </>

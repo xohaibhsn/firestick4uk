@@ -21,20 +21,31 @@ export default function Navbar({
 }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logo, setLogo] = useState(logoUrl || "");
+  const [labels, setLabels] = useState({
+    alt: "Firestick4UK",
+    text: "FIRESTICK4UK",
+    cart: "Cart",
+    shop: "Shop Now",
+  });
 
   useEffect(() => {
-    if (logoUrl !== undefined) {
-      setLogo(logoUrl || "");
-      return;
-    }
     fetch("/api/site-content?page=all")
       .then((r) => r.json())
       .then((d) => {
-        if (d && typeof d === "object" && d.site_logo_url) {
-          setLogo(String(d.site_logo_url));
-        }
+        if (!d || typeof d !== "object") return;
+        if (logoUrl === undefined && d.site_logo_url) setLogo(String(d.site_logo_url));
+        setLabels({
+          alt: (d.nav_logo_alt || d.site_title || "Firestick4UK").trim() || "Firestick4UK",
+          text: (d.nav_logo_text || d.site_title || "FIRESTICK4UK").trim() || "FIRESTICK4UK",
+          cart: (d.nav_cart_label || "Cart").trim() || "Cart",
+          shop: (d.nav_shop_label || "Shop Now").trim() || "Shop Now",
+        });
       })
       .catch(() => {});
+  }, [logoUrl]);
+
+  useEffect(() => {
+    if (logoUrl !== undefined) setLogo(logoUrl || "");
   }, [logoUrl]);
 
   const close = () => setMenuOpen(false);
@@ -43,13 +54,13 @@ export default function Navbar({
     <a href="/" className="nav-logo nav-logo-img">
       <img
         src={logo}
-        alt="Firestick4UK"
+        alt={labels.alt}
         style={{ height: 36, width: "auto", objectFit: "contain", display: "block" }}
       />
     </a>
   ) : (
     <a href="/" className="nav-logo nav-logo-text">
-      FIRESTICK4UK
+      {labels.text}
     </a>
   );
 
@@ -120,14 +131,14 @@ export default function Navbar({
           {cta === "cart" && (
             <li>
               <a href="/cart" className="nav-cta" onClick={close}>
-                🛒 Cart{cartCount > 0 ? ` (${cartCount})` : ""}
+                {labels.cart}{cartCount > 0 ? ` (${cartCount})` : ""}
               </a>
             </li>
           )}
           {cta === "shop" && (
             <li>
               <a href={shopHref} className="nav-cta" onClick={close}>
-                Shop Now
+                {labels.shop}
               </a>
             </li>
           )}

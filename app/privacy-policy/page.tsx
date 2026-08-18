@@ -1,6 +1,9 @@
 "use client";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import CmsBody from "@/components/CmsBody";
 import { useContactConfig } from "@/hooks/useContactConfig";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 const styles = `
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -56,6 +59,12 @@ body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow
   .policy-section ul { padding-left:20px; margin-bottom:14px; }
   .policy-section ul li { font-size:14px; color:#333333; line-height:1.9; margin-bottom:6px; }
   .policy-section ul li::marker { color:#5B21B6; }
+  .cms-legal-body { max-width:900px; margin:0 auto; padding:0 24px 80px; }
+  .cms-legal-body h2 { font-family:var(--font-display); font-size:20px; font-weight:700; color:#111111; margin:1.5rem 0 16px; padding-bottom:10px; border-bottom:1px solid #E5E5E5; }
+  .cms-legal-body p { font-size:14px; color:#333333; line-height:1.9; margin-bottom:14px; }
+  .cms-legal-body ul, .cms-legal-body ol { padding-left:20px; margin-bottom:14px; }
+  .cms-legal-body li { font-size:14px; color:#333333; line-height:1.9; margin-bottom:6px; }
+  .cms-legal-body a { color:#5B21B6; }
   .highlight-box { background:rgba(139,0,255,0.08); border:1px solid rgba(139,0,255,0.2);
     border-radius:12px; padding:18px 20px; margin-bottom:16px; }
   .highlight-box p { margin-bottom:0; color:#444444; }
@@ -84,6 +93,8 @@ body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow
 
 export default function PrivacyPolicyPage() {
   const contact = useContactConfig();
+  const { t } = useSiteContent();
+  const bodyHtml = t("privacy_body", "");
 
   return (
     <>
@@ -93,11 +104,14 @@ export default function PrivacyPolicyPage() {
 
       <div className="page-wrapper">
         <div className="page-header">
-          <div className="section-tag">✦ Legal</div>
-          <h1 className="page-title">Privacy <span>Policy</span></h1>
-          <p className="last-updated">Last updated: 30 May 2026</p>
+          <div className="section-tag">✦ {t("privacy_tag", "Legal")}</div>
+          <h1 className="page-title">{t("privacy_title", "Privacy Policy")}</h1>
+          <p className="last-updated">{t("privacy_updated", "Last updated: 30 May 2026")}</p>
         </div>
 
+        {bodyHtml ? (
+          <CmsBody html={bodyHtml} className="cms-legal-body" />
+        ) : (
         <div className="content-layout">
           {/* SIDEBAR */}
           <aside className="toc">
@@ -212,17 +226,8 @@ export default function PrivacyPolicyPage() {
             </div>
           </div>
         </div>
-
-        <footer>
-          <div className="footer-logo">FIRESTICK4UK</div>
-          <ul className="footer-links">
-            <li><a href="/privacy-policy">Privacy Policy</a></li>
-            <li><a href="/terms">Terms & Conditions</a></li>
-            <li><a href="/refund-policy">Refund Policy</a></li>
-            <li><a href="/faq">FAQ</a></li>
-          </ul>
-          <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
-        </footer>
+        )}
+        <Footer />
       </div>
 
     </>

@@ -6,6 +6,8 @@ import { looksLikeHtml, plainLinesToListHtml } from "@/lib/contentHtml";
 import { useCart } from "./lib/cartContext";
 import Navbar from "@/components/Navbar";
 import HeroSlider from "@/components/HeroSlider";
+import Footer from "@/components/Footer";
+import { cms } from "@/lib/cms";
 
 const cardDescXss = {
   whiteList: {
@@ -93,6 +95,7 @@ export default function HomeClient({
     "Multi-Device Compatibility",
     "Regular Channel Updates",
   ]);
+  const [cmsData, setCmsData] = useState<Record<string, string>>({});
   const [featuresHtml, setFeaturesHtml] = useState("");
   const [heroBtns, setHeroBtns] = useState({
     primaryText: "Shop Now",
@@ -109,6 +112,7 @@ export default function HomeClient({
   ]);
   const { addToCart, removeFromCart, cart } = useCart();
 
+  const t = (key: string, fallback = "") => cms(cmsData, key, fallback);
   const handleSearch = () => {
     const q = searchTerm.trim();
     if (q) window.location.href = `/products?q=${encodeURIComponent(q)}`;
@@ -141,6 +145,7 @@ export default function HomeClient({
       .then(r => r.json())
       .then(data => {
         if (!data || typeof data !== 'object') return;
+        setCmsData(data);
         const slideUrls = [
           data.hero_slide_1,
           data.hero_slide_2,
@@ -562,10 +567,10 @@ export default function HomeClient({
         {/* PRODUCTS GRID */}
         <div className="products-header">
           <div className="products-header-left">
-            <span className="section-tag">✦ Our Store</span>
-            <h2 className="section-title">Featured <span>Products</span></h2>
+            <span className="section-tag">✦ {t("home_store_tag", "Our Store")}</span>
+            <h2 className="section-title">{t("home_store_title", "Featured Products")}</h2>
           </div>
-          <a href="/products" className="view-all-link">View All Products →</a>
+          <a href={t("home_view_all_link", "/products")} className="view-all-link">{t("home_view_all_text", "View All Products →")}</a>
         </div>
 
         <div className="search-wrap">
@@ -573,20 +578,20 @@ export default function HomeClient({
             <input
               className="search-input"
               type="text"
-              placeholder="Search products..."
+              placeholder={t("home_search_placeholder", "Search products...")}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSearch()}
             />
-            <button className="search-btn" onClick={handleSearch}>🔍 Search</button>
+            <button className="search-btn" onClick={handleSearch}>{t("home_search_btn", "Search")}</button>
           </div>
         </div>
 
         <div className="products-grid">
           {loading ? (
-            <div className="loading">Loading products...</div>
+            <div className="loading">{t("home_loading", "Loading products...")}</div>
           ) : products.length === 0 ? (
-            <div className="loading">No products found.</div>
+            <div className="loading">{t("home_empty", "No products found.")}</div>
           ) : (
             products.slice(0, 8).map((p) => (
               <div className="product-card" key={p.id} style={{cursor:"pointer"}} onClick={()=>window.location.href=`/products/${p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`}>
@@ -634,7 +639,7 @@ export default function HomeClient({
                         onMouseLeave={() => setHoveringId(null)}
                         onClick={(e) => { e.stopPropagation(); e.preventDefault(); inCart ? removeFromCart(p.id) : handleAddToCart(p); }}
                       >
-                        {inCart ? (hovering ? "✕ Remove" : "✅ Added!") : "Add to Cart →"}
+                        {inCart ? (hovering ? t("home_remove", "Remove") : t("home_added", "Added!")) : t("home_add_cart", "Add to Cart →")}
                       </button>
                       );
                     })()}
@@ -646,7 +651,7 @@ export default function HomeClient({
         </div>
 
         <div className="view-all-wrap">
-          <a href="/products" className="view-all-btn">View All Products →</a>
+          <a href={t("home_view_all_link", "/products")} className="view-all-btn">{t("home_view_all_text", "View All Products →")}</a>
         </div>
 
         {/* HERO — DARK section */}
@@ -656,7 +661,7 @@ export default function HomeClient({
             <div className="hero-combined">
               <div className="hero-combined-scroll">
                 <div className="hero-content">
-                  <span className="hero-tag">✦ UK&apos;s #1 Firestick Service</span>
+                  <span className="hero-tag">✦ {t("home_hero_tag", "UK's #1 Firestick Service")}</span>
                   <h2 className="hero-title">
                     {formatHeroTitle(heroTitle)}
                   </h2>
@@ -701,13 +706,16 @@ export default function HomeClient({
                 </div>
               ))}
             </div>
+            {t("home_tagline", "") ? (
+              <p style={{textAlign:"center",marginTop:16,color:"#64748b",fontWeight:600,letterSpacing:"0.04em"}}>{t("home_tagline")}</p>
+            ) : null}
           </div>
         </div>
 
         {/* Features + Testimonials — LIGHT section */}
         <div className="features-outer">
           <div className="features-section">
-            <div className="section-tag">✦ Why Choose Us</div>
+            <div className="section-tag">✦ {t("home_why_tag", "Why Choose Us")}</div>
             <h2 className="section-title">{sec.home_features?.title || "Why Choose Us"}</h2>
             <div className="features-grid">
               {(sec.home_features?.items || []).map((f:any,i:number)=>(
@@ -723,28 +731,25 @@ export default function HomeClient({
             <div className="features-section" style={{paddingTop:0}}>
               <h2 className="section-title" style={{marginBottom:32}}>{sec.home_testimonials.title || "What Our Customers Say"}</h2>
               <div className="features-grid">
-                {sec.home_testimonials.items.map((t:any,i:number)=>(
+                {sec.home_testimonials.items.map((item:any,i:number)=>(
                   <div className="feature-item" key={i}>
-                    <div style={{fontSize:20,marginBottom:8}}>{"⭐".repeat(t.rating||5)}</div>
-                    <div className="feature-desc" style={{marginBottom:10}}>"{t.text}"</div>
-                    <div className="feature-title" style={{fontSize:14}}>— {t.name}</div>
+                    <div style={{fontSize:20,marginBottom:8}}>{"⭐".repeat(item.rating||5)}</div>
+                    <div className="feature-desc" style={{marginBottom:10}}>"{item.text}"</div>
+                    <div className="feature-title" style={{fontSize:14}}>— {item.name}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
+          {sec.home_newsletter && (
+            <div className="features-section" style={{paddingTop:0}}>
+              <h2 className="section-title">{sec.home_newsletter.title || "Stay in the Loop"}</h2>
+              <p className="hero-subtitle" style={{maxWidth:640}}>{sec.home_newsletter.subtitle || ""}</p>
+            </div>
+          )}
         </div>
 
-        <footer>
-          <div className="footer-logo">FIRESTICK4UK</div>
-          <ul className="footer-links">
-            <li><a href="/privacy-policy">Privacy Policy</a></li>
-            <li><a href="/terms">Terms & Conditions</a></li>
-            <li><a href="/refund-policy">Refund Policy</a></li>
-            <li><a href="/faq">FAQ</a></li>
-          </ul>
-          <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
-        </footer>
+        <Footer />
       </div>
 
     </>

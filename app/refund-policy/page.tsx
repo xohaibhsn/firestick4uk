@@ -1,6 +1,9 @@
 "use client";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import CmsBody from "@/components/CmsBody";
 import { useContactConfig } from "@/hooks/useContactConfig";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 const styles = `
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -50,6 +53,12 @@ body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow
   .policy-section ul { padding-left:20px; margin-bottom:14px; }
   .policy-section ul li { font-size:14px; color:#333333; line-height:1.9; margin-bottom:6px; }
   .policy-section ul li::marker { color:#5B21B6; }
+  .cms-legal-body { max-width:900px; margin:0 auto; padding:0 24px 80px; }
+  .cms-legal-body h2 { font-family:var(--font-display); font-size:20px; font-weight:700; color:#111111; margin:1.5rem 0 16px; padding-bottom:10px; border-bottom:1px solid #E5E5E5; }
+  .cms-legal-body p { font-size:14px; color:#333333; line-height:1.9; margin-bottom:14px; }
+  .cms-legal-body ul, .cms-legal-body ol { padding-left:20px; margin-bottom:14px; }
+  .cms-legal-body li { font-size:14px; color:#333333; line-height:1.9; margin-bottom:6px; }
+  .cms-legal-body a { color:#5B21B6; }
   .highlight-box { background:#EDE9FE; border:1px solid rgba(91,33,182,0.25); border-radius:12px; padding:18px 20px; margin-bottom:16px; }
   .highlight-box p { margin-bottom:0; color:#444444; }
   .warning-box { background:#FEF3C7; border:1px solid rgba(234,179,8,0.3); border-radius:12px; padding:18px 20px; margin-bottom:16px; }
@@ -80,6 +89,8 @@ body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow
 
 export default function RefundPolicyPage() {
   const contact = useContactConfig();
+  const { t } = useSiteContent();
+  const bodyHtml = t("refund_body", "");
 
   return (
     <>
@@ -88,11 +99,15 @@ export default function RefundPolicyPage() {
 
       <div className="page-wrapper">
         <div className="page-header">
-          <div className="section-tag">✦ Legal</div>
-          <h1 className="page-title">Refund <span>Policy</span></h1>
-          <p className="last-updated">Last updated: 30 May 2026</p>
+          <div className="section-tag">✦ {t("refund_tag", "Legal")}</div>
+          <h1 className="page-title">{t("refund_title", "Refund Policy")}</h1>
+          <p className="last-updated">{t("refund_updated", "Last updated: 30 May 2026")}</p>
         </div>
 
+        {bodyHtml ? (
+          <CmsBody html={bodyHtml} className="cms-legal-body" />
+        ) : (
+        <>
         {/* SUMMARY CARDS */}
         <div className="summary-cards">
           {[
@@ -224,30 +239,22 @@ export default function RefundPolicyPage() {
             </div>
           </div>
         </div>
+        </>
+        )}
 
         {/* CTA */}
         <div className="contact-cta">
           <div className="cta-box">
-            <div className="cta-title">Need Help With a Return?</div>
-            <p className="cta-sub">Our team is here to help. Contact us via WhatsApp or Telegram for the fastest response.</p>
+            <div className="cta-title">{t("refund_cta_title", "Need Help With a Return?")}</div>
+            <p className="cta-sub">{t("refund_cta_sub", "Our team is here to help. Contact us via WhatsApp or Telegram for the fastest response.")}</p>
             <div className="cta-btns">
-              <a href={contact.whatsappUrl} className="btn-wa" target="_blank" rel="noopener noreferrer">💬 WhatsApp Us</a>
+              <a href={contact.whatsappUrl} className="btn-wa" target="_blank" rel="noopener noreferrer">💬 {t("refund_wa_btn", "WhatsApp Us")}</a>
               <a href={contact.telegramUrl} className="btn-contact" target="_blank" rel="noopener noreferrer">✈️ Telegram {contact.telegram}</a>
-              <a href="/contact" className="btn-contact">📧 Email Us</a>
+              <a href="/contact" className="btn-contact">📧 {t("refund_email_btn", "Email Us")}</a>
             </div>
           </div>
         </div>
-
-        <footer>
-          <div className="footer-logo">FIRESTICK4UK</div>
-          <ul className="footer-links">
-            <li><a href="/privacy-policy">Privacy Policy</a></li>
-            <li><a href="/terms">Terms & Conditions</a></li>
-            <li><a href="/refund-policy">Refund Policy</a></li>
-            <li><a href="/faq">FAQ</a></li>
-          </ul>
-          <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
-        </footer>
+        <Footer />
       </div>
 
     </>

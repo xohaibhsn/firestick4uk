@@ -3,6 +3,8 @@ import { useState } from "react";
 import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 // Allowed HTML tags from TipTap editor output
 const xssOptions = {
@@ -33,6 +35,7 @@ interface Post {
 
 export default function BlogPostClient({ post }: { post: Post | null }) {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const { t } = useSiteContent();
 
   const dateStr = post?.created_at
     ? new Date(post.created_at).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" })
@@ -136,7 +139,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
       <div className="wrap">
         {!post ? (
           <div className="loading-state">
-            Post not found. <a href="/blog">← Back to Blog</a>
+            {t("blog_not_found", "Post not found.")} <a href="/blog">{t("blog_back", "← Back to Blog")}</a>
           </div>
         ) : (
           <>
@@ -145,7 +148,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
               <a href="/blog">Blog</a><span>›</span>
               <span style={{color:"#444444"}}>{post.title}</span>
             </div>
-            <a href="/blog" className="back">← Back to Blog</a>
+            <a href="/blog" className="back">{t("blog_back", "← Back to Blog")}</a>
             {post.badgeText && <div className="post-badge">{post.badgeText}</div>}
             <h1 className="post-title">{post.title}</h1>
             <div className="post-meta">
@@ -162,7 +165,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
 
             {faqs.length > 0 && (
               <div className="faq-section">
-                <div className="faq-title">Frequently Asked Questions</div>
+                <div className="faq-title">{t("blog_faq_heading", "Frequently Asked Questions")}</div>
                 {faqs.map((faq, i) => (
                   <div key={i} className={`faq-item ${openFaq === i ? "open" : ""}`}>
                     <div className="faq-q" onClick={() => setOpenFaq(openFaq === i ? null : i)}>
@@ -178,24 +181,14 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
             )}
 
             <div className="cta-box">
-              <div className="cta-title">Ready to Shop?</div>
-              <div className="cta-sub">Browse our full range of Firestick devices and Streaming Plans.</div>
-              <a href="/products" className="btn-primary">View Products →</a>
+              <div className="cta-title">{t("blog_cta_title", "Ready to Shop?")}</div>
+              <div className="cta-sub">{t("blog_cta_sub", "Browse our full range of Firestick devices and Streaming Plans.")}</div>
+              <a href={t("blog_cta_link", "/products")} className="btn-primary">{t("blog_cta_btn", "View Products →")}</a>
             </div>
           </>
         )}
       </div>
-
-      <footer>
-        <div className="footer-logo">FIRESTICK4UK</div>
-        <ul className="footer-links">
-          <li><a href="/privacy-policy">Privacy Policy</a></li>
-          <li><a href="/terms">Terms & Conditions</a></li>
-          <li><a href="/refund-policy">Refund Policy</a></li>
-          <li><a href="/faq">FAQ</a></li>
-        </ul>
-        <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
-      </footer>
+        <Footer />
 
     </>
   );

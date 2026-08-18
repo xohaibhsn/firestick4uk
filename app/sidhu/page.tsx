@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { toEditorHtml } from "@/lib/contentHtml";
+import AdminContentPanel from "@/components/admin/AdminContentPanel";
+import { keysForPage } from "@/lib/adminContentFields";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
 const styles = `
@@ -2428,12 +2430,24 @@ export default function AdminPage() {
 
               <div style={{marginBottom:18,padding:"14px 16px",background:"#F5F3FF",border:"1px solid #DDD6FE",borderRadius:12,fontSize:13,color:"#4C1D95",lineHeight:1.55}}>
                 <strong>Yahan se website ka saara text update hota hai</strong> (Products jaisa rich editor — bold, headings, links, lists).
-                <br />Left menu → <strong>Content Editor</strong> → Home / About / Contact / Footer → Save.
+                <br />Left menu → <strong>Content Editor</strong> → Home / About / Contact / FAQ / Footer / Products / Cart / Tracking / Blog / Legal / Global → Save.
                 <br /><span style={{opacity:0.85}}>Page Builder alag hai — sirf “Why Choose Us” cards / Testimonials icons ke liye. Service info, features, buttons, stats yahan Content Editor mein likhein.</span>
               </div>
 
               <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
-                {[["home","🏠 Home"],["about","ℹ️ About"],["contact","📞 Contact"],["footer","🔻 Footer"]].map(([k,l])=>(
+                {[
+                  ["home","🏠 Home"],
+                  ["about","ℹ️ About"],
+                  ["contact","📞 Contact"],
+                  ["faq","❓ FAQ"],
+                  ["footer","🔻 Footer"],
+                  ["products","📦 Products"],
+                  ["cart","🛒 Cart"],
+                  ["tracking","📍 Tracking"],
+                  ["blog","📝 Blog"],
+                  ["legal","⚖️ Legal"],
+                  ["global","🌐 Global"],
+                ].map(([k,l])=>(
                   <button key={k} className={`action-btn ${activePage===k?"btn-verify":"btn-view"}`} style={{padding:"10px 20px",fontSize:13}} onClick={()=>setActivePage(k)}>{l}</button>
                 ))}
               </div>
@@ -2516,6 +2530,17 @@ export default function AdminPage() {
                     "home_stat1_num","home_stat1_label","home_stat2_num","home_stat2_label","home_stat3_num","home_stat3_label",
                     "home_tagline",
                   ])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
+                  <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
+                    <div style={{marginBottom:16,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Additional home labels</div>
+                    <AdminContentPanel
+                      page="home"
+                      siteContent={siteContent}
+                      setSiteContent={setSiteContent}
+                      onSave={saveContent}
+                      saving={contentSaving}
+                      saveLabel="💾 Save Home Labels"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -2540,7 +2565,18 @@ export default function AdminPage() {
                       placeholder="Mission text with headings, bold, links..."
                     />
                   </div>
-                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["about_title","about_description","about_mission"])}>{contentSaving?"Saving...":"💾 Save About"}</button>
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["about_title","about_description","about_mission", ...keysForPage("about")])}>{contentSaving?"Saving...":"💾 Save About"}</button>
+                  <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
+                    <div style={{marginBottom:16,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Additional about copy & JSON</div>
+                    <AdminContentPanel
+                      page="about"
+                      siteContent={siteContent}
+                      setSiteContent={setSiteContent}
+                      onSave={saveContent}
+                      saving={contentSaving}
+                      saveLabel="💾 Save About Labels"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -2557,16 +2593,30 @@ export default function AdminPage() {
                     <div className="modal-field"><label>Address</label><input style={{width:"100%"}} value={siteContent.contact_address||""} onChange={e=>setSiteContent(s=>({...s,contact_address:e.target.value}))} /></div>
                   </div>
                   <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["contact_phone","contact_email","contact_whatsapp","whatsapp_number","contact_telegram","contact_hours","contact_address"])}>{contentSaving?"Saving...":"💾 Save Contact"}</button>
+                  <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
+                    <div style={{marginBottom:16,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Contact page labels</div>
+                    <AdminContentPanel
+                      page="contact"
+                      siteContent={siteContent}
+                      setSiteContent={setSiteContent}
+                      onSave={saveContent}
+                      saving={contentSaving}
+                      saveLabel="💾 Save Contact Labels"
+                    />
+                  </div>
                 </div>
               )}
 
-              {/* FOOTER */}
-              {activePage==="footer" && (
+              {/* FOOTER / FAQ / PRODUCTS / CART / TRACKING / BLOG / LEGAL / GLOBAL */}
+              {["footer","faq","products","cart","tracking","blog","legal","global"].includes(activePage) && (
                 <div className="section-card" style={{padding:24}}>
-                  <div className="section-header" style={{marginBottom:20}}><div className="section-title">🔻 Footer Content</div></div>
-                  <div className="modal-field"><label>Footer Text (copyright)</label><input style={{width:"100%"}} value={siteContent.footer_text||""} onChange={e=>setSiteContent(s=>({...s,footer_text:e.target.value}))} /></div>
-                  <div className="modal-field"><label>Footer Tagline</label><input style={{width:"100%"}} value={siteContent.footer_tagline||""} onChange={e=>setSiteContent(s=>({...s,footer_tagline:e.target.value}))} /></div>
-                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["footer_text","footer_tagline"])}>{contentSaving?"Saving...":"💾 Save Footer"}</button>
+                  <AdminContentPanel
+                    page={activePage}
+                    siteContent={siteContent}
+                    setSiteContent={setSiteContent}
+                    onSave={saveContent}
+                    saving={contentSaving}
+                  />
                 </div>
               )}
             </div>

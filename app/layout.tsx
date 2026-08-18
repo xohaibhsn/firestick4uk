@@ -98,6 +98,7 @@ export async function generateMetadata(): Promise<Metadata> {
     : "https://firestick4uk.com/og-default.jpg";
 
   const description =
+    (settings.site_meta_description || "").trim() ||
     "Buy Firestick, streaming subscriptions and Android boxes in the UK. Fast delivery, easy setup, real support.";
 
   return {

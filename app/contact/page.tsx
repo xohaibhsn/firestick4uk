@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { useContactConfig } from "@/hooks/useContactConfig";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 const styles = `
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -143,28 +145,38 @@ const styles = `
   }
 `;
 
-const faqs = [
-  { q: "How do I place an order?", a: "Browse our products, add items to your cart, fill in your details, and complete payment via bank transfer or cash on delivery. You'll receive an Order ID to track your order." },
-  { q: "How long does delivery take?", a: "Physical items (Firestick, Android Boxes) are delivered within 2-3 working days across the UK. Subscription plans are active within 1 hour of payment confirmation." },
-  { q: "How do I pay via bank transfer?", a: "During checkout, our UK bank account details will be shown. Transfer the exact amount, take a screenshot of your receipt, and upload it during checkout." },
-  { q: "How can I track my order?", a: "Use your Order ID (e.g. FK44-12345) on our Order Tracking page to check your order status in real time." },
-];
-
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
   const [submitting, setSubmitting] = useState(false);
-  const [sc, setSc] = useState<Record<string,string>>({});
+  const [formError, setFormError] = useState("");
+  const [faqs, setFaqs] = useState<{ id: number; question: string; answer: string }[]>([]);
   const contact = useContactConfig();
+  const { t, j } = useSiteContent();
+  const hoursFallback = [
+    { day: "Monday – Friday", hours: "9AM – 10PM" },
+    { day: "Saturday", hours: "10AM – 8PM" },
+    { day: "Sunday", hours: "11AM – 6PM" },
+    { day: "Bank Holidays", hours: "Limited hours" },
+  ];
+  const hoursParsed = j<{ day: string; hours: string }[]>("contact_hours_grid_json", hoursFallback);
+  const hoursGrid = Array.isArray(hoursParsed) ? hoursParsed : hoursFallback;
 
   useEffect(() => {
-    fetch("/api/site-content?page=contact").then(r=>r.json()).then(d=>{ if(d&&typeof d==="object") setSc(d); }).catch(()=>{});
+    fetch("/api/faqs")
+      .then((r) => r.json())
+      .then((d) => {
+        const list = Array.isArray(d) ? d : [];
+        setFaqs(list.slice(0, 4));
+      })
+      .catch(() => {});
   }, []);
 
   const handleSubmit = async () => {
     if (!form.name || !form.email || !form.message) return;
     setSubmitting(true);
+    setFormError("");
     try {
       const res = await fetch('/api/contact', {
         method: 'POST',
@@ -173,9 +185,9 @@ export default function ContactPage() {
       });
       const data = await res.json();
       if (data.success || res.ok) setSubmitted(true);
-      else alert('Failed to send message. Please try WhatsApp or Telegram instead.');
+      else setFormError(t("contact_error", "Failed to send message. Please try WhatsApp or Telegram instead."));
     } catch {
-      alert('Failed to send message. Please try WhatsApp or Telegram instead.');
+      setFormError(t("contact_error", "Failed to send message. Please try WhatsApp or Telegram instead."));
     }
     setSubmitting(false);
   };
@@ -188,42 +200,42 @@ export default function ContactPage() {
 
       <div className="page-wrapper">
         <div className="page-header">
-          <div className="section-tag">✦ Get In Touch</div>
-          <h1 className="page-title">Contact <span>Us</span></h1>
-          <p className="page-sub">Have a question or need help? We&apos;re here for you — reach out anytime.</p>
+          <div className="section-tag">✦ {t("contact_tag", "Get In Touch")}</div>
+          <h1 className="page-title">{t("contact_title", "Contact Us")}</h1>
+          <p className="page-sub">{t("contact_subtitle", "Have a question or need help? We are here for you — reach out anytime.")}</p>
         </div>
 
         {/* CONTACT CARDS */}
         <div className="contact-cards">
           <a href={contact.whatsappUrl} className="contact-card-featured" target="_blank" rel="noopener noreferrer">
             <span className="contact-card-icon">💬</span>
-            <div className="contact-card-title">WhatsApp</div>
+            <div className="contact-card-title">{t("contact_wa_title", "WhatsApp")}</div>
             <div className="contact-card-value">{contact.phone}</div>
-            <div className="contact-card-sub">✦ Fastest response</div>
+            <div className="contact-card-sub">✦ {t("contact_wa_sub", "Fastest response")}</div>
           </a>
           <a href={contact.telegramUrl} className="contact-card" target="_blank" rel="noopener noreferrer">
             <span className="contact-card-icon">✈️</span>
-            <div className="contact-card-title">Telegram</div>
+            <div className="contact-card-title">{t("contact_tg_title", "Telegram")}</div>
             <div className="contact-card-value">{contact.telegram}</div>
-            <div className="contact-card-sub">Message us anytime</div>
+            <div className="contact-card-sub">{t("contact_tg_sub", "Message us anytime")}</div>
           </a>
           <a href={`mailto:${contact.email}`} className="contact-card">
             <span className="contact-card-icon">📧</span>
-            <div className="contact-card-title">Email</div>
+            <div className="contact-card-title">{t("contact_email_title", "Email")}</div>
             <div className="contact-card-value">{contact.email}</div>
-            <div className="contact-card-sub">Reply within 24 hours</div>
+            <div className="contact-card-sub">{t("contact_email_sub", "Reply within 24 hours")}</div>
           </a>
           <div className="contact-card">
             <span className="contact-card-icon">🕐</span>
-            <div className="contact-card-title">Support Hours</div>
-            <div className="contact-card-value">{sc.contact_hours||"9AM – 10PM"}</div>
-            <div className="contact-card-sub">7 days a week</div>
+            <div className="contact-card-title">{t("contact_hours_title", "Support Hours")}</div>
+            <div className="contact-card-value">{t("contact_hours", "9AM – 10PM")}</div>
+            <div className="contact-card-sub">{t("contact_hours_sub", "7 days a week")}</div>
           </div>
           <div className="contact-card">
             <span className="contact-card-icon">📍</span>
-            <div className="contact-card-title">Based In</div>
-            <div className="contact-card-value">{sc.contact_address||"United Kingdom"}</div>
-            <div className="contact-card-sub">UK based support</div>
+            <div className="contact-card-title">{t("contact_loc_title", "Based In")}</div>
+            <div className="contact-card-value">{t("contact_address", "United Kingdom")}</div>
+            <div className="contact-card-sub">{t("contact_loc_sub", "UK based support")}</div>
           </div>
         </div>
 
@@ -234,29 +246,29 @@ export default function ContactPage() {
             {submitted ? (
               <div className="form-success">
                 <span className="success-icon">✅</span>
-                <div className="success-title">Message Sent!</div>
-                <p className="success-sub">Thank you for reaching out. We&apos;ll get back to you within 24 hours. For urgent queries, please WhatsApp us or message us on Telegram directly.</p>
+                <div className="success-title">{t("contact_success_title", "Message Sent!")}</div>
+                <p className="success-sub">{t("contact_success_body", "Thank you for reaching out. We will get back to you within 24 hours. For urgent queries, please WhatsApp us or message us on Telegram directly.")}</p>
               </div>
             ) : (
               <>
-                <div className="form-title">Send Us a Message</div>
+                <div className="form-title">{t("contact_form_title", "Send Us a Message")}</div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Your Name *</label>
+                    <label>{t("contact_lbl_name", "Your Name *")}</label>
                     <input type="text" placeholder="John Smith" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label>Email *</label>
+                    <label>{t("contact_lbl_email", "Email *")}</label>
                     <input type="email" placeholder="john@example.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
                   </div>
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Phone / WhatsApp</label>
+                    <label>{t("contact_lbl_phone", "Phone / WhatsApp")}</label>
                     <input type="tel" placeholder={contact.phone} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label>Subject</label>
+                    <label>{t("contact_lbl_subject", "Subject")}</label>
                     <select value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })}>
                       <option value="">Select a topic</option>
                       <option>Order Query</option>
@@ -268,12 +280,13 @@ export default function ContactPage() {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>Message *</label>
+                  <label>{t("contact_lbl_message", "Message *")}</label>
                   <textarea placeholder="How can we help you?" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} />
                 </div>
+                {formError && <p style={{ color: "#DC2626", fontSize: 13, marginBottom: 10 }}>{formError}</p>}
                 <button className="submit-btn" onClick={handleSubmit}
                   disabled={submitting || !form.name || !form.email || !form.message}>
-                  {submitting ? 'Sending...' : 'Send Message →'}
+                  {submitting ? t("contact_sending", "Sending...") : t("contact_send", "Send Message →")}
                 </button>
               </>
             )}
@@ -284,14 +297,13 @@ export default function ContactPage() {
             <div className="info-card">
               <div className="info-card-header">
                 <span className="info-card-icon">💬</span>
-                <div className="info-card-title">WhatsApp Support</div>
+                <div className="info-card-title">{t("contact_sidebar_wa_title", "WhatsApp Support")}</div>
               </div>
               <div className="info-card-body">
-                <strong>Fastest way to reach us</strong>
-                Send us a message on WhatsApp or Telegram for instant support. We typically reply within minutes during business hours.
+                {t("contact_sidebar_wa_body", "Send us a message on WhatsApp or Telegram for instant support. We typically reply within minutes during business hours.")}
               </div>
               <a href={contact.whatsappUrl} className="info-card-link" target="_blank" rel="noopener noreferrer">
-                Chat Now on WhatsApp →
+                {t("contact_sidebar_wa_btn", "Chat Now on WhatsApp →")}
               </a>
               <br />
               <a href={contact.telegramUrl} className="info-card-link" target="_blank" rel="noopener noreferrer">
@@ -302,14 +314,13 @@ export default function ContactPage() {
             <div className="info-card">
               <div className="info-card-header">
                 <span className="info-card-icon">🕐</span>
-                <div className="info-card-title">Support Hours</div>
+                <div className="info-card-title">{t("contact_hours_title", "Support Hours")}</div>
               </div>
               <div className="info-card-body">
                 <div className="hours-grid">
-                  <div className="hours-row"><span>Monday – Friday</span><span>9AM – 10PM</span></div>
-                  <div className="hours-row"><span>Saturday</span><span>10AM – 8PM</span></div>
-                  <div className="hours-row"><span>Sunday</span><span>11AM – 6PM</span></div>
-                  <div className="hours-row"><span>Bank Holidays</span><span>Limited hours</span></div>
+                  {hoursGrid.map((row, i) => (
+                    <div className="hours-row" key={i}><span>{row.day}</span><span>{row.hours}</span></div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -317,43 +328,33 @@ export default function ContactPage() {
             <div className="info-card">
               <div className="info-card-header">
                 <span className="info-card-icon">📦</span>
-                <div className="info-card-title">Track Your Order</div>
+                <div className="info-card-title">{t("contact_track_title", "Track Your Order")}</div>
               </div>
               <div className="info-card-body">
-                Already placed an order? Use your Order ID to check your delivery status in real time.
+                {t("contact_track_body", "Already placed an order? Use your Order ID to check your delivery status in real time.")}
               </div>
-              <a href="/order-tracking" className="info-card-link">Track Order →</a>
+              <a href={t("contact_track_link", "/order-tracking")} className="info-card-link">{t("contact_track_btn", "Track Order →")}</a>
             </div>
           </div>
         </div>
 
         {/* FAQ */}
         <div className="faq-preview">
-          <div className="section-tag">✦ Quick Answers</div>
-          <h2 className="faq-title">Frequently Asked <span>Questions</span></h2>
+          <div className="section-tag">✦ {t("contact_faq_tag", "Quick Answers")}</div>
+          <h2 className="faq-title">{t("contact_faq_title", "Frequently Asked Questions")}</h2>
           <div className="faq-list">
             {faqs.map((faq, i) => (
-              <div className="faq-item" key={i}>
+              <div className="faq-item" key={faq.id ?? i}>
                 <div className="faq-question" onClick={() => setOpenFaq(openFaq === i ? null : i)}>
-                  <span>{faq.q}</span>
+                  <span>{faq.question}</span>
                   <span className={`faq-arrow ${openFaq === i ? "open" : ""}`}>▼</span>
                 </div>
-                {openFaq === i && <div className="faq-answer">{faq.a}</div>}
+                {openFaq === i && <div className="faq-answer">{faq.answer}</div>}
               </div>
             ))}
           </div>
         </div>
-
-        <footer>
-          <div className="footer-logo">FIRESTICK4UK</div>
-          <ul className="footer-links">
-            <li><a href="/privacy-policy">Privacy Policy</a></li>
-            <li><a href="/terms">Terms & Conditions</a></li>
-            <li><a href="/refund-policy">Refund Policy</a></li>
-            <li><a href="/faq">FAQ</a></li>
-          </ul>
-          <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
-        </footer>
+        <Footer />
       </div>
 
     </>

@@ -4,7 +4,10 @@ import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "../../lib/cartContext";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { useContactConfig } from "@/hooks/useContactConfig";
+import { useSiteContent } from "@/hooks/useSiteContent";
+import { fillVars } from "@/lib/cms";
 
 const xssOptions = {
   whiteList: {
@@ -37,6 +40,8 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
   const [hovering, setHovering] = useState(false);
   const { addToCart, removeFromCart, cart } = useCart();
   const contact = useContactConfig();
+  const { t } = useSiteContent();
+  const vars = { phone: contact.phone, telegram: contact.telegram };
 
   useEffect(() => {
     if (initialProduct) return;
@@ -134,11 +139,11 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
           <div className="loading-state">Loading product...</div>
         ) : !product ? (
           <div className="loading-state">
-            Product not found. <a href="/products" style={{color:"#5B21B6"}}>Browse all products →</a>
+            <a href="/products" style={{color:"#5B21B6"}}>{t("pd_not_found", "Product not found. Browse all products →")}</a>
           </div>
         ) : (
           <>
-            <a href="/products" className="back-link">← Back to Products</a>
+            <a href="/products" className="back-link">{t("pd_back", "← Back to Products")}</a>
             <div className="product-layout">
               <div className="product-img-box">
                 {product.image
@@ -160,13 +165,13 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
                 )}
                 <div className="product-price">£{Number(product.price).toFixed(2)}</div>
                 <div className="meta-row">
-                  <span className="meta-pill">📦 {product.stock || "In Stock"}</span>
-                  <span className="meta-pill">🚚 Fast Delivery</span>
-                  <span className="meta-pill">⚡ Active within 1 hour</span>
-                  <span className="meta-pill">✅ UK Based</span>
+                  <span className="meta-pill">📦 {product.stock || t("pd_stock_fallback", "In Stock")}</span>
+                  <span className="meta-pill">🚚 {t("pd_pill_delivery", "Fast Delivery")}</span>
+                  <span className="meta-pill">⚡ {t("pd_pill_active", "Active within 1 hour")}</span>
+                  <span className="meta-pill">✅ {t("pd_pill_uk", "UK Based")}</span>
                 </div>
                 <div className="activation-note">
-                  Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp {contact.phone} or Telegram {contact.telegram}.
+                  {fillVars(t("pd_activation", "Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp {phone} or Telegram {telegram}."), vars)}
                 </div>
                 <button
                   className="add-btn"
@@ -175,9 +180,9 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
                   onMouseLeave={() => setHovering(false)}
                   onClick={() => isInCart ? removeFromCart(product!.id) : handleAdd()}
                 >
-                  {isInCart ? (hovering ? "✕ Remove from Cart" : "✅ Added to Cart!") : "Add to Cart →"}
+                  {isInCart ? (hovering ? t("pd_remove", "Remove from Cart") : t("pd_added", "Added to Cart!")) : t("pd_add_cart", "Add to Cart →")}
                 </button>
-                <a href="/cart" className="cart-link">View Cart & Checkout →</a>
+                <a href={t("pd_view_cart_link", "/cart")} className="cart-link">{t("pd_view_cart", "View Cart & Checkout →")}</a>
               </div>
             </div>
           </>
@@ -188,7 +193,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
         <div className="product-sections">
           {product.full_description && (
             <div className="section-block">
-              <div className="section-heading">About This Product</div>
+              <div className="section-heading">{t("pd_about_heading", "About This Product")}</div>
               <div
                 className="product-full-description"
                 dangerouslySetInnerHTML={{
@@ -199,7 +204,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
           )}
           {featureList.length > 0 && (
             <div className="section-block">
-              <div className="section-heading">What&apos;s Included</div>
+              <div className="section-heading">{t("pd_included_heading", "What's Included")}</div>
               <ul className="feature-list">
                 {featureList.map((f, i) => (
                   <li key={i}>{f.replace(/^[✅✔️•\-*]\s*/,'')}</li>
@@ -209,11 +214,7 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
           )}
         </div>
       )}
-
-      <footer>
-        <div className="footer-logo">FIRESTICK4UK</div>
-        <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
-      </footer>
+        <Footer />
 
     </>
   );

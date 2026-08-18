@@ -2,7 +2,9 @@
 export const dynamic = 'force-dynamic';
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { useContactConfig } from "@/hooks/useContactConfig";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 const styles = `
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -84,6 +86,7 @@ export default function CartSuccessPage() {
   const [snap, setSnap] = useState<OrderSnapshot | null>(null);
   const [ready, setReady] = useState(false);
   const contact = useContactConfig();
+  const { t } = useSiteContent();
 
   useEffect(() => {
     try {
@@ -103,11 +106,12 @@ export default function CartSuccessPage() {
         <div className="page">
           <div className="container" style={{ textAlign: 'center', paddingTop: 60 }}>
             <div style={{ fontSize: 52, marginBottom: 16 }}>🛒</div>
-            <h2 className="title">No order found</h2>
-            <p className="subtitle">It looks like you navigated here directly.</p>
-            <a href="/products" style={{ background: '#5B21B6', color: '#fff', textDecoration: 'none', padding: '13px 32px', borderRadius: 9, fontWeight: 700, fontSize: 14, display: 'inline-block' }}>Browse Products</a>
+            <h2 className="title">{t("success_none_title", "No order found")}</h2>
+            <p className="subtitle">{t("success_none_body", "It looks like you navigated here directly.")}</p>
+            <a href="/products" style={{ background: '#5B21B6', color: '#fff', textDecoration: 'none', padding: '13px 32px', borderRadius: 9, fontWeight: 700, fontSize: 14, display: 'inline-block' }}>{t("success_none_btn", "Browse Products")}</a>
           </div>
         </div>
+        <Footer />
       </>
     );
   }
@@ -132,21 +136,20 @@ export default function CartSuccessPage() {
             </div>
           </div>
 
-          <h1 className="title">Thank you for your order!</h1>
+          <h1 className="title">{t("success_title", "Thank you for your order!")}</h1>
           <p className="subtitle">
-            Your order has been received and is being processed.<br />
-            You&apos;ll receive confirmation once payment is verified. Subscription services are active within 1 hour of payment confirmation.
+            {t("success_body", "Your order has been received and is being processed. You will receive confirmation once payment is verified. Subscription services are active within 1 hour of payment confirmation.")}
           </p>
 
           {/* Order ID */}
           <div className="order-id-box">
-            <div className="order-id-label">Order Reference</div>
+            <div className="order-id-label">{t("success_order_label", "Order Reference")}</div>
             <div className="order-id-value">{snap.orderId}</div>
           </div>
 
           {/* Items */}
           <div className="card">
-            <div className="card-header">Order Items</div>
+            <div className="card-header">{t("success_items", "Order Items")}</div>
             <div className="card-body">
               <table className="items-table">
                 <thead>
@@ -172,28 +175,28 @@ export default function CartSuccessPage() {
 
           {/* Cost breakdown */}
           <div className="card">
-            <div className="card-header">Cost Breakdown</div>
+            <div className="card-header">{t("success_cost", "Cost Breakdown")}</div>
             <div className="card-body">
               <div className="breakdown-row">
-                <span className="breakdown-label">Subtotal</span>
+                <span className="breakdown-label">{t("cart_subtotal", "Subtotal")}</span>
                 <span className="breakdown-value">£{Number(snap.subtotal).toFixed(2)}</span>
               </div>
               <div className="breakdown-row">
-                <span className="breakdown-label">Shipping</span>
-                <span className="breakdown-value">{snap.shipping === 0 ? 'Free' : `£${Number(snap.shipping).toFixed(2)}`}</span>
+                <span className="breakdown-label">{t("cart_shipping", "Shipping")}</span>
+                <span className="breakdown-value">{snap.shipping === 0 ? t("cart_shipping_free", "Free") : `£${Number(snap.shipping).toFixed(2)}`}</span>
               </div>
               <div className="breakdown-row">
-                <span className="breakdown-label">VAT (20%)</span>
+                <span className="breakdown-label">{t("cart_vat_label", "VAT (20%)")}</span>
                 <span className="breakdown-value">£{Number(snap.vatAmount).toFixed(2)}</span>
               </div>
               {snap.couponApplied && snap.discountAmount > 0 && (
                 <div className="breakdown-row">
-                  <span className="breakdown-label">Discount ({snap.couponApplied.code})</span>
+                  <span className="breakdown-label">{t("cart_discount", "Discount")} ({snap.couponApplied.code})</span>
                   <span className="breakdown-value breakdown-discount">&minus;£{Number(snap.discountAmount).toFixed(2)}</span>
                 </div>
               )}
               <div className="breakdown-row breakdown-total">
-                <span className="breakdown-label">Grand Total</span>
+                <span className="breakdown-label">{t("cart_total", "Total")}</span>
                 <span className="breakdown-value">£{Number(snap.grandTotal).toFixed(2)}</span>
               </div>
             </div>
@@ -201,25 +204,20 @@ export default function CartSuccessPage() {
 
           {/* Optional WhatsApp CTA */}
           <a href={waUrl} target="_blank" rel="noopener noreferrer" className="wa-btn">
-            💬 Need Instant Activation? Chat with Support via WhatsApp (Optional)
+            💬 {t("success_wa", "Need Instant Activation? Chat with Support via WhatsApp (Optional)")}
           </a>
           <a href={contact.telegramUrl} target="_blank" rel="noopener noreferrer" className="telegram-btn">
             ✈️ Message Telegram {contact.telegram}
           </a>
           <p className="wa-optional">
-            This is completely optional — your order is already confirmed and being processed above.<br />
-            Click only if you need immediate assistance.
+            {t("success_optional", "This is completely optional — your order is already confirmed.")}
           </p>
 
           {/* Track order */}
-          <a href="/order-tracking" className="track-btn">Track My Order &rarr;</a>
+          <a href={t("success_track_link", "/order-tracking")} className="track-btn">{t("success_track", "Track My Order →")}</a>
         </div>
       </div>
-
-      <footer>
-        <div className="footer-logo">FIRESTICK4UK</div>
-        <div className="footer-copy">&copy; 2026 Firestick4UK. All rights reserved.</div>
-      </footer>
+        <Footer />
     </>
   );
 }

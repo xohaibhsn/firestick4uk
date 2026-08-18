@@ -6,6 +6,7 @@ export default function WhatsAppButton() {
   const [config, setConfig] = useState({
     number: "447518787653",
     iconUrl: "",
+    title: "Chat on WhatsApp",
   });
 
   useEffect(() => {
@@ -15,6 +16,7 @@ export default function WhatsAppButton() {
         setConfig({
           number: data.contact_whatsapp || data.whatsapp_number || "447518787653",
           iconUrl: data.whatsapp_icon_url || "",
+          title: (data.wa_chat_title || "Chat on WhatsApp").trim() || "Chat on WhatsApp",
         });
       })
       .catch(() => {});
@@ -43,7 +45,7 @@ export default function WhatsAppButton() {
         overflow: "hidden",
         background: config.iconUrl ? "transparent" : "#25D366",
       }}
-      title="Chat on WhatsApp"
+      title={config.title}
     >
       {config.iconUrl ? (
         <img

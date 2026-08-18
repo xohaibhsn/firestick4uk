@@ -3,7 +3,9 @@ export const dynamic = 'force-dynamic';
 import { useState } from "react";
 import { useCart } from "../lib/cartContext";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { useContactConfig } from "@/hooks/useContactConfig";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 const navStyles = `
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -163,6 +165,7 @@ type Step = "cart" | "checkout" | "success";
 export default function CartPage() {
   const { cart, removeFromCart, updateQty, clearCart, total } = useCart();
   const contact = useContactConfig();
+  const { t } = useSiteContent();
   const [step, setStep] = useState<Step>("cart");
   const [paymentMethod, setPaymentMethod] = useState<"bank" | "cod">("bank");
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -283,11 +286,11 @@ export default function CartPage() {
         window.location.href = '/cart/success';
       } else {
         setOrderError(data.error?.includes("connect") || data.error?.includes("timeout")
-          ? "Our system is temporarily unavailable. Please try again in a moment."
-          : "Order could not be placed. Please try again or contact us on WhatsApp or Telegram.");
+          ? t("cart_err_unavailable", "Our system is temporarily unavailable. Please try again in a moment.")
+          : t("cart_err_failed", "Order could not be placed. Please try again or contact us on WhatsApp or Telegram."));
       }
     } catch {
-      setOrderError("Network error. Please check your connection and try again.");
+      setOrderError(t("cart_err_network", "Network error. Please check your connection and try again."));
     }
     setPlacing(false);
   };
@@ -300,8 +303,8 @@ export default function CartPage() {
 
       <div className="page-wrapper">
         <div className="page-header">
-          <div className="section-tag">✦ {step === "cart" ? "Your Cart" : "Checkout"}</div>
-          <h1 className="page-title">{step === "cart" ? <>My <span>Cart</span></> : <>Complete <span>Order</span></>}</h1>
+          <div className="section-tag">✦ {step === "cart" ? t("cart_tag", "Your Cart") : t("checkout_tag", "Checkout")}</div>
+          <h1 className="page-title">{step === "cart" ? t("cart_title", "My Cart") : t("checkout_title", "Complete Order")}</h1>
         </div>
 
         {step === "cart" && (
@@ -310,9 +313,9 @@ export default function CartPage() {
               {cart.length === 0 ? (
                 <div className="cart-empty">
                   <span className="cart-empty-icon">🛒</span>
-                  <h3>Your cart is empty</h3>
-                  <p>Add some products to get started!</p>
-                  <a href="/" className="btn-primary">Browse Products</a>
+                  <h3>{t("cart_empty_title", "Your cart is empty")}</h3>
+                  <p>{t("cart_empty_body", "Add some products to get started!")}</p>
+                  <a href={t("cart_empty_link", "/products")} className="btn-primary">{t("cart_empty_btn", "Browse Products")}</a>
                 </div>
               ) : (
                 cart.map(item => (
@@ -328,33 +331,33 @@ export default function CartPage() {
                         <span className="qty-num">{item.qty}</span>
                         <button className="qty-btn" onClick={() => updateQty(item.id, 1)}>+</button>
                       </div>
-                      <button className="remove-btn" onClick={() => removeFromCart(item.id)}>✕ Remove</button>
+                      <button className="remove-btn" onClick={() => removeFromCart(item.id)}>✕ {t("cart_remove", "Remove")}</button>
                     </div>
                   </div>
                 ))
               )}
             </div>
             <div className="order-summary">
-              <div className="summary-header"><h3>Order Summary</h3></div>
+              <div className="summary-header"><h3>{t("cart_summary", "Order Summary")}</h3></div>
               <div className="summary-body">
-                <div className="summary-row"><span>Subtotal</span><span>£{subtotal.toFixed(2)}</span></div>
-                <div className="summary-row"><span>Shipping</span><span>{shipping === 0 ? "Free" : `£${shipping.toFixed(2)}`}</span></div>
-                <div className="summary-row"><span>VAT (20%)</span><span>£{vatAmount.toFixed(2)}</span></div>
-                {couponApplied && <div className="summary-row" style={{color:"#00c864"}}><span>Discount ({couponApplied.code})</span><span>-£{discountAmount.toFixed(2)}</span></div>}
+                <div className="summary-row"><span>{t("cart_subtotal", "Subtotal")}</span><span>£{subtotal.toFixed(2)}</span></div>
+                <div className="summary-row"><span>{t("cart_shipping", "Shipping")}</span><span>{shipping === 0 ? t("cart_shipping_free", "Free") : `£${shipping.toFixed(2)}`}</span></div>
+                <div className="summary-row"><span>{t("cart_vat_label", "VAT (20%)")}</span><span>£{vatAmount.toFixed(2)}</span></div>
+                {couponApplied && <div className="summary-row" style={{color:"#00c864"}}><span>{t("cart_discount", "Discount")} ({couponApplied.code})</span><span>-£{discountAmount.toFixed(2)}</span></div>}
                 <hr className="summary-divider" />
-                <div className="summary-row summary-total"><span>Total</span><span>£{grandTotal.toFixed(2)}</span></div>
+                <div className="summary-row summary-total"><span>{t("cart_total", "Total")}</span><span>£{grandTotal.toFixed(2)}</span></div>
               </div>
               {/* Coupon input */}
               <div style={{padding:"0 20px 16px"}}>
                 <div style={{display:"flex",gap:8,marginBottom:6}}>
-                  <input style={{flex:1,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"8px 12px",color:"white",fontSize:13,outline:"none"}} placeholder="Coupon code" value={couponCode} onChange={e=>setCouponCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&applyCoupon()} />
-                  <button style={{background:"rgba(139,0,255,0.2)",border:"1px solid rgba(139,0,255,0.4)",color:"#5B21B6",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,whiteSpace:"nowrap"}} onClick={applyCoupon} disabled={couponChecking}>{couponChecking?"...":"Apply"}</button>
+                  <input style={{flex:1,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"8px 12px",color:"white",fontSize:13,outline:"none"}} placeholder={t("cart_coupon_ph", "Coupon code")} value={couponCode} onChange={e=>setCouponCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&applyCoupon()} />
+                  <button style={{background:"rgba(139,0,255,0.2)",border:"1px solid rgba(139,0,255,0.4)",color:"#5B21B6",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,whiteSpace:"nowrap"}} onClick={applyCoupon} disabled={couponChecking}>{couponChecking?"...":t("cart_apply", "Apply")}</button>
                 </div>
                 {couponApplied && <div style={{fontSize:12,color:"#00c864"}}>✅ {couponApplied.message} — Save £{discountAmount.toFixed(2)}</div>}
                 {couponError && <div style={{fontSize:12,color:"#ff6666"}}>❌ {couponError}</div>}
               </div>
               <button className="checkout-btn" disabled={cart.length === 0} onClick={() => setStep("checkout")}>
-                Proceed to Checkout →
+                {t("cart_checkout_btn", "Proceed to Checkout →")}
               </button>
             </div>
           </div>
@@ -365,12 +368,12 @@ export default function CartPage() {
             <div className="checkout-grid">
               <div>
                 <div className="form-section">
-                  <h3>Your Details</h3>
+                  <h3>{t("cart_details", "Your Details")}</h3>
                   {[
-                    {label:"Full Name", key:"name", type:"text", placeholder:"John Smith"},
-                    {label:"Email Address", key:"email", type:"email", placeholder:"john@example.com"},
-                    {label:"WhatsApp / Phone", key:"phone", type:"tel", placeholder:contact.phone},
-                    {label:"Delivery Address", key:"address", type:"text", placeholder:"123 High Street"},
+                    {label: t("cart_lbl_name", "Full Name"), key:"name", type:"text", placeholder:"John Smith"},
+                    {label: t("cart_lbl_email", "Email Address"), key:"email", type:"email", placeholder:"john@example.com"},
+                    {label: t("cart_lbl_phone", "WhatsApp / Phone"), key:"phone", type:"tel", placeholder:contact.phone},
+                    {label: t("cart_lbl_address", "Delivery Address"), key:"address", type:"text", placeholder:"123 High Street"},
                   ].map(f => (
                     <div className="form-group" key={f.key}>
                       <label>{f.label}</label>
@@ -381,16 +384,16 @@ export default function CartPage() {
                   ))}
                   <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px"}}>
                     <div className="form-group">
-                      <label>City</label>
+                      <label>{t("cart_lbl_city", "City")}</label>
                       <input type="text" placeholder="London" value={form.city} onChange={e => setForm({...form, city: e.target.value})} />
                     </div>
                     <div className="form-group">
-                      <label>Postcode</label>
+                      <label>{t("cart_lbl_postcode", "Postcode")}</label>
                       <input type="text" placeholder="SW1A 1AA" value={form.postcode} onChange={e => setForm({...form, postcode: e.target.value})} />
                     </div>
                   </div>
                   <div className="form-group">
-                    <label>Order Notes (Optional)</label>
+                    <label>{t("cart_lbl_notes", "Order Notes (Optional)")}</label>
                     <textarea placeholder="Any special instructions..." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
                   </div>
                 </div>
@@ -398,11 +401,11 @@ export default function CartPage() {
 
               <div>
                 <div className="form-section">
-                  <h3>Payment Method</h3>
+                  <h3>{t("cart_pay_heading", "Payment Method")}</h3>
                   <div className="payment-options">
                     {[
-                      {val:"bank", label:"🏦 Bank Transfer", sub:"Transfer to our UK bank & upload receipt"},
-                      {val:"cod", label:"💵 Cash on Delivery", sub:"Pay when your order arrives"},
+                      {val:"bank", label: t("cart_pay_bank", "Bank Transfer"), sub: t("cart_pay_bank_sub", "Transfer to our UK bank & upload receipt")},
+                      {val:"cod", label: t("cart_pay_cod", "Cash on Delivery"), sub: t("cart_pay_cod_sub", "Pay when your order arrives")},
                     ].map(p => (
                       <div key={p.val} className={`payment-option ${paymentMethod === p.val ? "selected" : ""}`} onClick={() => setPaymentMethod(p.val as any)}>
                         <input type="radio" readOnly checked={paymentMethod === p.val} />
@@ -417,33 +420,33 @@ export default function CartPage() {
                   {paymentMethod === "bank" && (
                     <>
                       <div className="bank-details">
-                        <h4>Bank Account Details</h4>
-                        <div className="bank-row"><span>Account Name</span><span>Robert George Bennett</span></div>
-                        <div className="bank-row"><span>Sort Code</span><span>60-84-07</span></div>
-                        <div className="bank-row"><span>Account No.</span><span>70745518</span></div>
-                        <div className="bank-row"><span>Reference</span><span>Your name only</span></div>
-                        <div className="bank-row"><span>Amount</span><span>£{grandTotal.toFixed(2)}</span></div>
+                        <h4>{t("bank_heading", "Bank Account Details")}</h4>
+                        <div className="bank-row"><span>{t("bank_lbl_name", "Account Name")}</span><span>{t("bank_account_name", "Robert George Bennett")}</span></div>
+                        <div className="bank-row"><span>{t("bank_lbl_sort", "Sort Code")}</span><span>{t("bank_sort_code", "60-84-07")}</span></div>
+                        <div className="bank-row"><span>{t("bank_lbl_no", "Account No.")}</span><span>{t("bank_account_no", "70745518")}</span></div>
+                        <div className="bank-row"><span>{t("bank_lbl_ref", "Reference")}</span><span>{t("bank_reference_value", "Your name only")}</span></div>
+                        <div className="bank-row"><span>{t("bank_lbl_amount", "Amount")}</span><span>£{grandTotal.toFixed(2)}</span></div>
                       </div>
                       <div className="form-group">
-                        <label>Upload Payment Receipt (Optional)</label>
+                        <label>{t("bank_upload_label", "Upload Payment Receipt (Optional)")}</label>
                         <div className={`upload-area ${receiptFile ? "has-file" : ""}`}>
                           <span className="upload-icon">{receiptFile ? "✅" : "📎"}</span>
                           <div className="upload-text">
-                            {receiptFile ? <strong>{receiptFile.name}</strong> : <><strong>Click to upload</strong> your receipt</>}
+                            {receiptFile ? <strong>{receiptFile.name}</strong> : t("bank_upload_text", "Click to upload your receipt")}
                           </div>
                           <input type="file" accept="image/*,.pdf" onChange={e => setReceiptFile(e.target.files?.[0] || null)} />
                         </div>
                       </div>
                       <div className="form-group">
-                        <label>Payment Reference</label>
+                        <label>{t("bank_ref_input_label", "Payment Reference")}</label>
                         <input
                           type="text"
-                          placeholder="Enter your first name as payment reference"
+                          placeholder={t("bank_ref_ph", "Enter your first name as payment reference")}
                           value={paymentReference}
                           onChange={e => setPaymentReference(e.target.value)}
                         />
                         <div style={{fontSize:12,color:"#666666",marginTop:6,lineHeight:1.5}}>
-                          💡 Use your first name as the payment reference when making the bank transfer — this helps us identify your payment quickly!
+                          💡 {t("bank_ref_hint", "Use your first name as the payment reference when making the bank transfer — this helps us identify your payment quickly!")}
                         </div>
                       </div>
                     </>
@@ -451,37 +454,37 @@ export default function CartPage() {
 
                   {paymentMethod === "cod" && (
                     <div className="bank-details">
-                      <h4>Cash on Delivery</h4>
-                      <div className="bank-row"><span>Amount Due</span><span>£{grandTotal.toFixed(2)}</span></div>
+                      <h4>{t("cart_cod_heading", "Cash on Delivery")}</h4>
+                      <div className="bank-row"><span>{t("cart_amount_due", "Amount Due")}</span><span>£{grandTotal.toFixed(2)}</span></div>
                     </div>
                   )}
 
                   <div className="summary-body" style={{background:"rgba(139,0,255,0.05)", borderRadius:"12px", marginBottom:"16px"}}>
-                    <div className="summary-row"><span>Subtotal</span><span>£{subtotal.toFixed(2)}</span></div>
-                    <div className="summary-row"><span>Shipping</span><span>{shipping === 0 ? "Free" : `£${shipping.toFixed(2)}`}</span></div>
-                    <div className="summary-row"><span>VAT (20%)</span><span>£{vatAmount.toFixed(2)}</span></div>
-                    {couponApplied && <div className="summary-row" style={{color:"#00c864"}}><span>Discount ({couponApplied.code})</span><span>-£{discountAmount.toFixed(2)}</span></div>}
+                    <div className="summary-row"><span>{t("cart_subtotal", "Subtotal")}</span><span>£{subtotal.toFixed(2)}</span></div>
+                    <div className="summary-row"><span>{t("cart_shipping", "Shipping")}</span><span>{shipping === 0 ? t("cart_shipping_free", "Free") : `£${shipping.toFixed(2)}`}</span></div>
+                    <div className="summary-row"><span>{t("cart_vat_label", "VAT (20%)")}</span><span>£{vatAmount.toFixed(2)}</span></div>
+                    {couponApplied && <div className="summary-row" style={{color:"#00c864"}}><span>{t("cart_discount", "Discount")} ({couponApplied.code})</span><span>-£{discountAmount.toFixed(2)}</span></div>}
                     <hr className="summary-divider" />
-                    <div className="summary-row summary-total"><span>Total</span><span>£{grandTotal.toFixed(2)}</span></div>
+                    <div className="summary-row summary-total"><span>{t("cart_total", "Total")}</span><span>£{grandTotal.toFixed(2)}</span></div>
                   </div>
                   <div style={{background:"rgba(91,33,182,0.08)",border:"1px solid rgba(91,33,182,0.2)",borderRadius:"12px",padding:"12px 14px",fontSize:"13px",lineHeight:1.6,color:"#444444",marginBottom:"16px"}}>
-                    Subscription services are active within 1 hour of payment confirmation.
+                    {t("cart_activation", "Subscription services are active within 1 hour of payment confirmation.")}
                   </div>
 
                   <button className="place-order-btn"
                     disabled={placing || cart.length === 0}
                     onClick={handleOrder}>
-                    {placing ? "Placing Order..." : "Place Order →"}
+                    {placing ? t("cart_placing", "Placing Order...") : t("cart_place_order", "Place Order →")}
                   </button>
                   {orderError && (
                     <div style={{marginTop:"14px",background:"rgba(255,68,68,0.1)",border:"1px solid rgba(255,68,68,0.3)",borderRadius:"12px",padding:"14px 16px"}}>
                       <p style={{color:"#ff8888",fontSize:"13px",marginBottom:"10px"}}>⚠️ {orderError}</p>
                       <div style={{display:"flex",gap:"10px",flexWrap:"wrap"}}>
                         <button onClick={handleOrder} style={{background:"rgba(255,68,68,0.2)",border:"1px solid rgba(255,68,68,0.4)",color:"#ff8888",padding:"7px 16px",borderRadius:"8px",fontSize:"12px",cursor:"pointer"}}>
-                          🔄 Retry
+                          🔄 {t("cart_retry", "Retry")}
                         </button>
                         <a href={contact.whatsappUrl} target="_blank" rel="noopener noreferrer" style={{background:"rgba(37,211,102,0.15)",border:"1px solid rgba(37,211,102,0.3)",color:"#25d366",padding:"7px 16px",borderRadius:"8px",fontSize:"12px",textDecoration:"none"}}>
-                          💬 WhatsApp Us
+                          💬 {t("cart_wa_btn", "WhatsApp Us")}
                         </a>
                         <a href={contact.telegramUrl} target="_blank" rel="noopener noreferrer" style={{background:"rgba(34,158,217,0.15)",border:"1px solid rgba(34,158,217,0.3)",color:"#229ED9",padding:"7px 16px",borderRadius:"8px",fontSize:"12px",textDecoration:"none"}}>
                           ✈️ Telegram {contact.telegram}
@@ -490,18 +493,14 @@ export default function CartPage() {
                     </div>
                   )}
                   <button onClick={() => setStep("cart")} style={{width:"100%", background:"none", border:"none", color:"rgba(255,255,255,0.4)", fontSize:"13px", marginTop:"12px", cursor:"pointer"}}>
-                    ← Back to Cart
+                    {t("cart_back", "← Back to Cart")}
                   </button>
                 </div>
               </div>
             </div>
           </div>
         )}
-
-        <footer>
-          <div className="footer-logo">FIRESTICK4UK</div>
-          <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
-        </footer>
+        <Footer />
       </div>
     </>
   );

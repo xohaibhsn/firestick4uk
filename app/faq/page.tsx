@@ -3,7 +3,9 @@ import { useState, useEffect } from "react";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import JsonLd from "@/components/JsonLd";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { useContactConfig } from "@/hooks/useContactConfig";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 const styles = `
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -75,6 +77,8 @@ export default function FAQPage() {
   const [faqData, setFaqData] = useState<FaqItem[]>([]);
   const [loadingFaqs, setLoadingFaqs] = useState(true);
   const contact = useContactConfig();
+  const { t } = useSiteContent();
+  const allLabel = t("faq_all", "All");
 
   useEffect(() => {
     fetch("/api/faqs")
@@ -115,25 +119,25 @@ export default function FAQPage() {
 
       <div className="page-wrapper">
         <div className="page-header">
-          <div className="section-tag">✦ Help Centre</div>
-          <h1 className="page-title">Frequently Asked <span>Questions</span></h1>
-          <p className="page-sub">Find answers to the most common questions about our products and services.</p>
+          <div className="section-tag">✦ {t("faq_tag", "Help Centre")}</div>
+          <h1 className="page-title">{t("faq_title", "Frequently Asked Questions")}</h1>
+          <p className="page-sub">{t("faq_subtitle", "Find answers to the most common questions about our products and services.")}</p>
         </div>
 
         {/* Category filters */}
         <div className="faq-categories">
           {categories.map(cat => (
             <button key={cat} className={`cat-btn ${activeCategory === cat ? "active" : ""}`} onClick={() => setActiveCategory(cat)}>
-              {cat}
+              {cat === "All" ? allLabel : cat}
             </button>
           ))}
         </div>
 
         <div className="faq-section">
           {loadingFaqs ? (
-            <div className="loading-state">Loading FAQs...</div>
+            <div className="loading-state">{t("faq_loading", "Loading FAQs...")}</div>
           ) : faqData.length === 0 ? (
-            <div className="loading-state">No FAQs available yet.</div>
+            <div className="loading-state">{t("faq_empty", "No FAQs available yet.")}</div>
           ) : (
             Object.entries(groupedFaqs).map(([category, items]) => (
               <div className="faq-group" key={category}>
@@ -158,30 +162,21 @@ export default function FAQPage() {
 
         <div className="help-section">
           <div className="help-box">
-            <h2 className="help-title">Still Need Help?</h2>
-            <p className="help-sub">Can&apos;t find the answer you&apos;re looking for? Our team is happy to help.</p>
+            <h2 className="help-title">{t("faq_help_title", "Still Need Help?")}</h2>
+            <p className="help-sub">{t("faq_help_sub", "Cannot find the answer you are looking for? Our team is happy to help.")}</p>
             <div className="help-btns">
               <a href={contact.whatsappUrl} className="btn-whatsapp" target="_blank" rel="noopener noreferrer">
-                💬 WhatsApp Us
+                {t("faq_wa_btn", "WhatsApp Us")}
               </a>
               <a href={contact.telegramUrl} className="btn-telegram" target="_blank" rel="noopener noreferrer">
-                ✈️ Telegram {contact.telegram}
+                Telegram {contact.telegram}
               </a>
-              <a href="/contact" className="btn-contact">📧 Contact Form</a>
+              <a href={t("faq_contact_link", "/contact")} className="btn-contact">{t("faq_contact_btn", "Contact Form")}</a>
             </div>
           </div>
         </div>
 
-        <footer>
-          <div className="footer-logo">FIRESTICK4UK</div>
-          <ul className="footer-links">
-            <li><a href="/privacy-policy">Privacy Policy</a></li>
-            <li><a href="/terms">Terms & Conditions</a></li>
-            <li><a href="/refund-policy">Refund Policy</a></li>
-            <li><a href="/faq">FAQ</a></li>
-          </ul>
-          <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
-        </footer>
+        <Footer />
       </div>
 
     </>

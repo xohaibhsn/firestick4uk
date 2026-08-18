@@ -6,7 +6,10 @@ import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "../lib/cartContext";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { useContactConfig } from "@/hooks/useContactConfig";
+import { useSiteContent } from "@/hooks/useSiteContent";
+import { fillVars } from "@/lib/cms";
 
 const cardDescXss = {
   whiteList: {
@@ -48,6 +51,8 @@ export default function ProductsPage() {
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const contact = useContactConfig();
+  const { t } = useSiteContent();
+  const vars = { phone: contact.phone, telegram: contact.telegram };
   // Live search
   const [searchQ, setSearchQ] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -216,13 +221,13 @@ export default function ProductsPage() {
 
       <div className="page-wrapper">
         <div className="page-header">
-          <div className="section-tag">✦ Our Store</div>
-          <h1 className="page-title">All <span>Products</span></h1>
+          <div className="section-tag">✦ {t("products_tag", "Our Store")}</div>
+          <h1 className="page-title">{t("products_title", "All")} <span>Products</span></h1>
         </div>
 
         <div className="activation-banner">
           <div className="activation-banner-inner">
-            Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp {contact.phone} or Telegram {contact.telegram}.
+            {fillVars(t("products_activation", "Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp {phone} or Telegram {telegram}."), vars)}
           </div>
         </div>
 
@@ -230,35 +235,35 @@ export default function ProductsPage() {
         <div style={{maxWidth:1300,margin:"0 auto",padding:"0 60px 20px",display:"flex",flexWrap:"wrap",gap:12,alignItems:"center"}}>
           <div className="filters" style={{margin:0,padding:0,flex:1,minWidth:200}}>
             {["All","Subscription","Device","Bundle"].map(cat => (
-              <button key={cat} className={`filter-btn ${filter===cat?"active":""}`} onClick={()=>applyFilter(cat)}>{cat}</button>
+              <button key={cat} className={`filter-btn ${filter===cat?"active":""}`} onClick={()=>applyFilter(cat)}>{cat === "All" ? t("products_filter_all", "All") : cat}</button>
             ))}
           </div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-            <input type="number" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none"}} placeholder="Min £" value={minPrice} onChange={e=>setMinPrice(e.target.value)} />
+            <input type="number" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none"}} placeholder={t("products_min_ph", "Min £")} value={minPrice} onChange={e=>setMinPrice(e.target.value)} />
             <span style={{color:"rgba(255,255,255,0.3)",fontSize:13}}>—</span>
-            <input type="number" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none"}} placeholder="Max £" value={maxPrice} onChange={e=>setMaxPrice(e.target.value)} />
-            <button style={{background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",color:"#5B21B6",padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600}} onClick={applyPrice}>Apply</button>
+            <input type="number" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none"}} placeholder={t("products_max_ph", "Max £")} value={maxPrice} onChange={e=>setMaxPrice(e.target.value)} />
+            <button style={{background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",color:"#5B21B6",padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600}} onClick={applyPrice}>{t("products_apply", "Apply")}</button>
             <select style={{background:"rgba(13,0,20,0.9)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none",cursor:"pointer"}} value={sort} onChange={e=>applySort(e.target.value)}>
-              <option value="featured">Featured</option>
-              <option value="price_asc">Price: Low → High</option>
-              <option value="price_desc">Price: High → Low</option>
-              <option value="newest">Newest</option>
+              <option value="featured">{t("products_sort_featured", "Featured")}</option>
+              <option value="price_asc">{t("products_sort_low", "Price: Low → High")}</option>
+              <option value="price_desc">{t("products_sort_high", "Price: High → Low")}</option>
+              <option value="newest">{t("products_sort_newest", "Newest")}</option>
             </select>
           </div>
         </div>
 
         <div className="products-grid">
           {loading ? (
-            <div className="loading">Loading products...</div>
+            <div className="loading">{t("products_loading", "Loading products...")}</div>
           ) : loadError ? (
             <div className="loading" style={{textAlign:"center",padding:"40px 0"}}>
               <div style={{fontSize:"32px",marginBottom:"12px"}}>⚠️</div>
-              <div style={{color:"rgba(255,255,255,0.7)",marginBottom:"8px"}}>Could not load products right now.</div>
-              <div style={{color:"rgba(255,255,255,0.4)",fontSize:"13px",marginBottom:"20px"}}>Please try again in a moment or contact us via WhatsApp or Telegram {contact.telegram}.</div>
-              <button onClick={() => window.location.reload()} style={{background:"linear-gradient(135deg,#4a0080,#8b00ff)",color:"white",border:"none",padding:"10px 24px",borderRadius:"30px",cursor:"pointer",fontSize:"14px"}}>Try Again</button>
+              <div style={{color:"rgba(255,255,255,0.7)",marginBottom:"8px"}}>{t("products_error", "Could not load products right now.")}</div>
+              <div style={{color:"rgba(255,255,255,0.4)",fontSize:"13px",marginBottom:"20px"}}>{fillVars(t("products_error_help", "Please try again in a moment or contact us via WhatsApp or Telegram {telegram}."), vars)}</div>
+              <button onClick={() => window.location.reload()} style={{background:"linear-gradient(135deg,#4a0080,#8b00ff)",color:"white",border:"none",padding:"10px 24px",borderRadius:"30px",cursor:"pointer",fontSize:"14px"}}>{t("products_retry", "Try Again")}</button>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="loading">No products found.</div>
+            <div className="loading">{t("products_empty", "No products found.")}</div>
           ) : (
             filtered.map((p) => (
               <div className="product-card" key={p.id} onClick={() => window.location.href=`/products/${p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`} style={{cursor:"pointer"}}>
@@ -306,7 +311,7 @@ export default function ProductsPage() {
                         onMouseLeave={()=>setHoveringId(null)}
                         onClick={e=>{e.stopPropagation();e.preventDefault();inCart?removeFromCart(p.id):handleAddToCart(p);}}
                       >
-                        {inCart?(hovering?"✕ Remove":"✅ Added!"):"Add to Cart →"}
+                        {inCart?(hovering?`✕ ${t("products_remove", "Remove")}`:`✅ ${t("products_added", "Added!")}`):t("products_add_cart", "Add to Cart →")}
                       </button>
                       );
                     })()}
@@ -316,17 +321,7 @@ export default function ProductsPage() {
             ))
           )}
         </div>
-
-        <footer>
-          <div className="footer-logo">FIRESTICK4UK</div>
-          <ul className="footer-links">
-            <li><a href="/privacy-policy">Privacy Policy</a></li>
-            <li><a href="/terms">Terms & Conditions</a></li>
-            <li><a href="/refund-policy">Refund Policy</a></li>
-            <li><a href="/faq">FAQ</a></li>
-          </ul>
-          <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
-        </footer>
+        <Footer />
       </div>
 
     </>

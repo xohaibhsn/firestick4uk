@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { useContactConfig } from "@/hooks/useContactConfig";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 const styles = `
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -111,13 +113,6 @@ type OrderResult = {
   total: number; name: string; email: string; phone: string; address: string; date: string;
 };
 
-const statusSteps = [
-  { key: "pending", icon: "🕐", title: "Order Received", desc: "We have received your order and payment receipt." },
-  { key: "confirmed", icon: "✅", title: "Payment Verified", desc: "Your payment has been verified and order confirmed." },
-  { key: "dispatched", icon: "🚚", title: "Dispatched", desc: "Your order is on its way! Delivery in 2-3 working days." },
-  { key: "delivered", icon: "📦", title: "Delivered", desc: "Your order has been delivered. Enjoy!" },
-];
-
 const statusOrder = ["pending", "confirmed", "dispatched", "delivered"];
 
 export default function OrderTrackingPage() {
@@ -126,6 +121,14 @@ export default function OrderTrackingPage() {
   const [notFound, setNotFound] = useState(false);
   const [searching, setSearching] = useState(false);
   const contact = useContactConfig();
+  const { t } = useSiteContent();
+
+  const statusSteps = [
+    { key: "pending", icon: "🕐", title: t("track_step1_title", "Order Received"), desc: t("track_step1_desc", "We have received your order and payment receipt.") },
+    { key: "confirmed", icon: "✅", title: t("track_step2_title", "Payment Verified"), desc: t("track_step2_desc", "Your payment has been verified and order confirmed.") },
+    { key: "dispatched", icon: "🚚", title: t("track_step3_title", "Dispatched"), desc: t("track_step3_desc", "Your order is on its way! Delivery in 2-3 working days.") },
+    { key: "delivered", icon: "📦", title: t("track_step4_title", "Delivered"), desc: t("track_step4_desc", "Your order has been delivered. Enjoy!") },
+  ];
 
   const handleSearch = async () => {
     const trimmed = query.trim();
@@ -173,10 +176,10 @@ export default function OrderTrackingPage() {
   };
 
   const statusLabel = (status: string) => {
-    if (status === "pending") return "⏳ Pending Verification";
-    if (status === "confirmed") return "✅ Confirmed";
-    if (status === "dispatched") return "🚚 Dispatched";
-    return "📦 Delivered";
+    if (status === "pending") return t("track_status_pending", "Pending Verification");
+    if (status === "confirmed") return t("track_status_confirmed", "Confirmed");
+    if (status === "dispatched") return t("track_status_dispatched", "Dispatched");
+    return t("track_status_delivered", "Delivered");
   };
 
   return (
@@ -187,9 +190,9 @@ export default function OrderTrackingPage() {
 
       <div className="page-wrapper">
         <div className="page-header">
-          <div className="section-tag">✦ Order Tracking</div>
-          <h1 className="page-title">Track Your <span>Order</span></h1>
-          <p className="page-sub">Enter your Order ID to check the latest status of your order.</p>
+          <div className="section-tag">✦ {t("track_tag", "Order Tracking")}</div>
+          <h1 className="page-title">{t("track_title", "Track Your Order")}</h1>
+          <p className="page-sub">{t("track_subtitle", "Enter your Order ID to check the latest status of your order.")}</p>
         </div>
 
         <div className="search-section">
@@ -197,14 +200,14 @@ export default function OrderTrackingPage() {
             <input
               className="search-input"
               type="text"
-              placeholder="e.g. FK44-62305"
+              placeholder={t("track_placeholder", "e.g. FK44-62305")}
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSearch()}
             />
-            <button className="search-btn" onClick={handleSearch} disabled={searching}>{searching ? "Searching..." : "Track Order"}</button>
+            <button className="search-btn" onClick={handleSearch} disabled={searching}>{searching ? t("track_searching", "Searching...") : t("track_btn", "Track Order")}</button>
           </div>
-          {notFound && <p className="error-msg">❌ Order not found. Please check your Order ID and try again.</p>}
+          {notFound && <p className="error-msg">❌ {t("track_not_found", "Order not found. Please check your Order ID and try again.")}</p>}
         </div>
 
         {result && (
@@ -282,28 +285,18 @@ export default function OrderTrackingPage() {
         <div className="help-section" style={{ marginTop: result ? "24px" : "50px" }}>
           <div className="help-card">
             <div className="help-text">
-              <h4>Need Help?</h4>
-              <p>Can&apos;t find your order or have a question? Chat with us on WhatsApp or Telegram.</p>
+              <h4>{t("track_help_title", "Need Help?")}</h4>
+              <p>{t("track_help_body", "Cannot find your order or have a question? Chat with us on WhatsApp or Telegram.")}</p>
             </div>
             <a href={contact.whatsappUrl} className="wa-btn" target="_blank" rel="noopener noreferrer">
-              💬 WhatsApp Us
+              💬 {t("track_wa_btn", "WhatsApp Us")}
             </a>
             <a href={contact.telegramUrl} className="wa-btn" target="_blank" rel="noopener noreferrer" style={{background:"#229ED9"}}>
               ✈️ Telegram {contact.telegram}
             </a>
           </div>
         </div>
-
-        <footer>
-          <div className="footer-logo">FIRESTICK4UK</div>
-          <ul className="footer-links">
-            <li><a href="/privacy-policy">Privacy Policy</a></li>
-            <li><a href="/terms">Terms & Conditions</a></li>
-            <li><a href="/refund-policy">Refund Policy</a></li>
-            <li><a href="/faq">FAQ</a></li>
-          </ul>
-          <div className="footer-copy">© 2026 Firestick4UK. All rights reserved.</div>
-        </footer>
+        <Footer />
       </div>
 
     </>
