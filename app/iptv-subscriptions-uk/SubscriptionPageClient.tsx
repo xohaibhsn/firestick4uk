@@ -127,15 +127,36 @@ const styles = `
 .how-content { padding: 4px 0 26px; }
 .how-content h3 { font-family: var(--font-display), Georgia, serif; font-size: 16px; margin: 0 0 6px; }
 .how-content p { margin: 0; font-size: 14px; color: #555; line-height: 1.65; }
-.rich-block { max-width: 760px; }
+.guide-scroll-box {
+  max-width: 800px;
+  max-height: 520px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  background: #FFFFFF;
+  border: 2px solid #dc2626;
+  border-radius: 16px;
+  padding: 24px 26px;
+  box-shadow: 0 2px 12px rgba(220, 38, 38, 0.08);
+  scrollbar-width: thin;
+  scrollbar-color: #fca5a5 #fef2f2;
+}
+.guide-scroll-box::-webkit-scrollbar { width: 8px; }
+.guide-scroll-box::-webkit-scrollbar-track { background: #fef2f2; border-radius: 8px; }
+.guide-scroll-box::-webkit-scrollbar-thumb { background: #fca5a5; border-radius: 8px; }
+.guide-scroll-box .sub-tag { margin-bottom: 10px; }
+.guide-scroll-box .sub-h2 { margin-bottom: 16px; }
+.rich-block { max-width: 100%; word-break: break-word; overflow-wrap: anywhere; }
 .rich-block h2 { font-family: var(--font-display), Georgia, serif; font-size: 1.45rem; margin: 28px 0 12px; color: #111; }
+.rich-block h2:first-child { margin-top: 0; }
 .rich-block h3 { font-family: var(--font-display), Georgia, serif; font-size: 1.15rem; margin: 22px 0 10px; color: #111; }
 .rich-block h4 { font-size: 1rem; margin: 18px 0 8px; color: #222; }
 .rich-block p { font-size: 15px; color: #444; line-height: 1.8; margin: 0 0 14px; }
 .rich-block ul, .rich-block ol { margin: 0 0 16px; padding-left: 1.25em; color: #444; }
 .rich-block li { margin-bottom: 6px; line-height: 1.7; }
-.rich-block a { color: #5B21B6; }
-.rich-block img { max-width: 100%; height: auto; border-radius: 12px; margin: 12px 0; }
+.rich-block a { color: #5B21B6; word-break: break-word; }
+.rich-block img { max-width: 100%; height: auto; border-radius: 12px; margin: 12px 0; display: block; }
 .faq-list { display: flex; flex-direction: column; gap: 10px; max-width: 800px; }
 .faq-item { border: 1px solid #E5E5E5; border-radius: 12px; background: #fff; overflow: hidden; padding: 0; }
 .faq-item summary { list-style: none; cursor: pointer; padding: 16px 18px; font-size: 15px; font-weight: 700; color: #111; display: flex; justify-content: space-between; gap: 12px; }
@@ -155,6 +176,11 @@ const styles = `
   .sub-section { padding: 44px 0; }
   .cta-band { margin: 10px 16px 60px; }
   .cta-box { padding: 44px 22px; }
+  .guide-scroll-box {
+    max-height: 420px;
+    padding: 18px 16px;
+    border-radius: 14px;
+  }
 }
 `;
 
@@ -344,9 +370,11 @@ export default function SubscriptionPageClient({
 
         <section className="sub-section alt">
           <div className="sub-wrap">
-            <span className="sub-tag">Guide</span>
-            <h2 className="sub-h2">{t("subscription_rich_title", "About IPTV Subscriptions in the UK")}</h2>
-            <div className="rich-block" dangerouslySetInnerHTML={{ __html: richHtml }} />
+            <div className="guide-scroll-box">
+              <span className="sub-tag">Guide</span>
+              <h2 className="sub-h2">{t("subscription_rich_title", "About IPTV Subscriptions in the UK")}</h2>
+              <div className="rich-block" dangerouslySetInnerHTML={{ __html: richHtml }} />
+            </div>
           </div>
         </section>
 
