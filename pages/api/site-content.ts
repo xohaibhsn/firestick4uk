@@ -129,7 +129,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
     } catch (_) {}
 
-    // Replace public IPTV wording with Streaming
+    // Replace legacy public IPTV wording with Streaming on older site_content rows.
+    // Exclude subscription_* keys used by the intentional IPTV Subscription UK landing page SEO.
     for (const [from, to] of [
       ['Premium IPTV & Streaming', 'Premium Streaming'],
       ['IPTV & Streaming Solutions', 'Streaming Solutions'],
@@ -139,7 +140,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ] as const) {
       try {
         await pool.query(
-          'UPDATE site_content SET content_value = REPLACE(content_value, ?, ?) WHERE content_value LIKE ?',
+          `UPDATE site_content
+           SET content_value = REPLACE(content_value, ?, ?)
+           WHERE content_value LIKE ?
+             AND content_key NOT LIKE 'subscription_%'`,
           [from, to, `%${from}%`]
         );
       } catch (_) {}

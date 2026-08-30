@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { toEditorHtml } from "@/lib/contentHtml";
 import AdminContentPanel from "@/components/admin/AdminContentPanel";
+import SubscriptionContentEditor from "@/components/admin/SubscriptionContentEditor";
 import { keysForPage } from "@/lib/adminContentFields";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
@@ -2430,7 +2431,7 @@ export default function AdminPage() {
 
               <div style={{marginBottom:18,padding:"14px 16px",background:"#F5F3FF",border:"1px solid #DDD6FE",borderRadius:12,fontSize:13,color:"#4C1D95",lineHeight:1.55}}>
                 <strong>Yahan se website ka saara text update hota hai</strong> (Products jaisa rich editor — bold, headings, links, lists).
-                <br />Left menu → <strong>Content Editor</strong> → Home / About / Contact / FAQ / Footer / Products / Cart / Tracking / Blog / Legal / Global → Save.
+                <br />Left menu → <strong>Content Editor</strong> → Home / About / Subscription / Contact / FAQ / Footer / Products / Cart / Tracking / Blog / Legal / Global → Save.
                 <br /><span style={{opacity:0.85}}>Page Builder alag hai — sirf “Why Choose Us” cards / Testimonials icons ke liye. Service info, features, buttons, stats yahan Content Editor mein likhein.</span>
               </div>
 
@@ -2438,6 +2439,7 @@ export default function AdminPage() {
                 {[
                   ["home","🏠 Home"],
                   ["about","ℹ️ About"],
+                  ["subscription","📺 Subscription"],
                   ["contact","📞 Contact"],
                   ["faq","❓ FAQ"],
                   ["footer","🔻 Footer"],
@@ -2451,6 +2453,16 @@ export default function AdminPage() {
                   <button key={k} className={`action-btn ${activePage===k?"btn-verify":"btn-view"}`} style={{padding:"10px 20px",fontSize:13}} onClick={()=>setActivePage(k)}>{l}</button>
                 ))}
               </div>
+
+              {/* SUBSCRIPTION LANDING */}
+              {activePage==="subscription" && (
+                <SubscriptionContentEditor
+                  siteContent={siteContent}
+                  setSiteContent={setSiteContent}
+                  onSave={saveContent}
+                  saving={contentSaving}
+                />
+              )}
 
               {/* HOME */}
               {activePage==="home" && (

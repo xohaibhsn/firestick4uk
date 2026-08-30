@@ -36,16 +36,10 @@ const REQUIRED_FAQS = [
   ['Does it work outside UK?','Yes, the service is available outside UK but we cannot guarantee performance due to regional restrictions.','Policies',3],
 ];
 
-async function upsertFaq(question: string, answer: string, category: string, sortOrder: number) {
+/** Insert only if question is missing — never overwrite admin-edited answers. */
+async function ensureFaqExists(question: string, answer: string, category: string, sortOrder: number) {
   const [rows]: any = await pool.query('SELECT id FROM faqs WHERE question=? LIMIT 1', [question]);
-  if (Array.isArray(rows) && rows.length > 0) {
-    await pool.query(
-      'UPDATE faqs SET answer=?,category=?,sort_order=?,is_visible=1 WHERE id=?',
-      [answer, category, sortOrder, rows[0].id]
-    );
-    return;
-  }
-
+  if (Array.isArray(rows) && rows.length > 0) return;
   await pool.query('INSERT INTO faqs (question,answer,category,sort_order) VALUES (?,?,?,?)', [question, answer, category, sortOrder]);
 }
 
@@ -67,16 +61,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const [count]: any = await pool.query('SELECT COUNT(*) as c FROM faqs');
     if (Number(count[0]?.c || 0) === 0) {
-      for (const [q,a,cat,ord] of DEFAULT_FAQS) {
-        await pool.query('INSERT INTO faqs (question,answer,category,sort_order) VALUES (?,?,?,?)', [q,a,cat,ord]);
+      for (const [q, a, cat, ord] of DEFAULT_FAQS) {
+        await pool.query('INSERT INTO faqs (question,answer,category,sort_order) VALUES (?,?,?,?)', [q, a, cat, ord]);
       }
     }
 
-    for (const [q,a,cat,ord] of DEFAULT_FAQS) {
-      await upsertFaq(q as string, a as string, cat as string, ord as number);
-    }
-    for (const [q,a,cat,ord] of REQUIRED_FAQS) {
-      await upsertFaq(q as string, a as string, cat as string, ord as number);
+    // Ensure required questions exist once; do not overwrite existing admin edits on GET/runtime.
+    for (const [q, a, cat, ord] of REQUIRED_FAQS) {
+      await ensureFaqExists(q as string, a as string, cat as string, ord as number);
     }
 
     if (req.method === 'GET') {

@@ -546,6 +546,7 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
         { key: "nav_logo_text", label: "Navbar text logo" },
         { key: "nav_cart_label", label: "Navbar cart button" },
         { key: "nav_shop_label", label: "Navbar shop button" },
+        { key: "nav_subscription_label", label: "Navbar subscription link" },
         { key: "wa_chat_title", label: "WhatsApp button title" },
       ],
     },

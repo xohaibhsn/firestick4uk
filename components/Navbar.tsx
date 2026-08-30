@@ -26,6 +26,7 @@ export default function Navbar({
     text: "FIRESTICK4UK",
     cart: "Cart",
     shop: "Shop Now",
+    subscription: "IPTV Subscription",
   });
 
   useEffect(() => {
@@ -39,6 +40,8 @@ export default function Navbar({
           text: (d.nav_logo_text || d.site_title || "FIRESTICK4UK").trim() || "FIRESTICK4UK",
           cart: (d.nav_cart_label || "Cart").trim() || "Cart",
           shop: (d.nav_shop_label || "Shop Now").trim() || "Shop Now",
+          subscription:
+            (d.nav_subscription_label || "IPTV Subscription").trim() || "IPTV Subscription",
         });
       })
       .catch(() => {});
@@ -125,6 +128,11 @@ export default function Navbar({
         <ul className={`nav-links ${menuOpen ? "open" : ""}`}>
           <li><a href="/" onClick={close}>Home</a></li>
           <li><a href="/products" onClick={close}>Products</a></li>
+          <li>
+            <a href="/iptv-subscriptions-uk/" onClick={close}>
+              {labels.subscription}
+            </a>
+          </li>
           <li><a href="/order-tracking" onClick={close}>Track Order</a></li>
           <li><a href="/blog" onClick={close}>Blog</a></li>
           <li><a href="/contact" onClick={close}>Contact</a></li>

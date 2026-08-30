@@ -65,7 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (_) {}
     }
 
-    // Replace IPTV wording in section JSON content
+    // Replace IPTV wording in legacy home/about section JSON only — never subscription_* landing keys.
     for (const [from, to] of [
       ['Premium IPTV & Streaming', 'Premium Streaming'],
       ['IPTV & Streaming Solutions', 'Streaming Solutions'],
@@ -75,7 +75,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         await pool.query(
           `UPDATE site_content SET content_value = REPLACE(content_value, ?, ?)
-           WHERE content_type='json' AND content_value LIKE ?`,
+           WHERE content_type='json'
+             AND content_value LIKE ?
+             AND content_key NOT LIKE 'subscription_%'`,
           [from, to, `%${from}%`]
         );
       } catch (_) {}
