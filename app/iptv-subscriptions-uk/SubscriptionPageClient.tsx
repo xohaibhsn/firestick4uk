@@ -128,23 +128,26 @@ const styles = `
 .how-content h3 { font-family: var(--font-display), Georgia, serif; font-size: 16px; margin: 0 0 6px; }
 .how-content p { margin: 0; font-size: 14px; color: #555; line-height: 1.65; }
 .guide-scroll-box {
-  max-width: 800px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
   max-height: 520px;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   background: #FFFFFF;
-  border: 2px solid #dc2626;
+  border: 1px solid #DDD6FE;
+  border-top: 3px solid #5B21B6;
   border-radius: 16px;
-  padding: 24px 26px;
-  box-shadow: 0 2px 12px rgba(220, 38, 38, 0.08);
+  padding: 24px 28px;
+  box-shadow: 0 2px 10px rgba(91, 33, 182, 0.08);
   scrollbar-width: thin;
-  scrollbar-color: #fca5a5 #fef2f2;
+  scrollbar-color: #5B21B6 #F5F3FF;
 }
 .guide-scroll-box::-webkit-scrollbar { width: 8px; }
-.guide-scroll-box::-webkit-scrollbar-track { background: #fef2f2; border-radius: 8px; }
-.guide-scroll-box::-webkit-scrollbar-thumb { background: #fca5a5; border-radius: 8px; }
+.guide-scroll-box::-webkit-scrollbar-track { background: #F5F3FF; border-radius: 8px; }
+.guide-scroll-box::-webkit-scrollbar-thumb { background: #5B21B6; border-radius: 8px; }
 .guide-scroll-box .sub-tag { margin-bottom: 10px; }
 .guide-scroll-box .sub-h2 { margin-bottom: 16px; }
 .rich-block { max-width: 100%; word-break: break-word; overflow-wrap: anywhere; }
