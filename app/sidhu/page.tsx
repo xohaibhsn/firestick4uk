@@ -415,17 +415,29 @@ export default function AdminPage() {
     "x-admin-role": adminRole,
   });
 
-  const saveContent = async (keys: string[]) => {
+  const saveContent = async (keys: string[], overrides?: Record<string, string>) => {
     setContentSaving(true); setContentMsg("");
-    const updates = keys.map(k => ({ key: k, value: siteContent[k] || "" }));
+    const updates = keys.map(k => ({ key: k, value: overrides?.[k] ?? siteContent[k] ?? "" }));
     const res = await fetch("/api/site-content", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getRoleHeaders() },
       body: JSON.stringify({ updates }),
     }).then(r => r.json()).catch(() => ({}));
     setContentSaving(false);
+    if (res.success && res.subscription_slug) {
+      setSiteContent((s) => ({
+        ...s,
+        subscription_slug: res.subscription_slug,
+        ...(res.subscription_previous_slug
+          ? {
+              subscription_previous_slug: res.subscription_previous_slug,
+              subscription_canonical: "",
+            }
+          : {}),
+      }));
+    }
     setContentMsg(res.success ? "✅ Saved!" : `❌ ${res.error || "Save failed"}`);
-    setTimeout(() => setContentMsg(""), 3000);
+    setTimeout(() => setContentMsg(""), 4000);
   };
 
   const uploadFaviconAdmin = async (file: File) => {

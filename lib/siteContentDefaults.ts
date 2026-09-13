@@ -286,8 +286,10 @@ export const EXTRA_CONTENT_DEFAULTS: Array<[string, string, string, string, stri
   ['refund_wa_btn','WhatsApp Us','text','legal','Refund WhatsApp Button'],
   ['refund_email_btn','Email Us','text','legal','Refund Email Button'],
 
-  // Subscription landing page (/iptv-subscriptions-uk)
+  // Subscription landing page (CMS-editable slug; default /iptv-subscriptions-uk/)
   ['nav_subscription_label','IPTV Subscription','text','settings','Navbar Subscription Link'],
+  ['subscription_slug','iptv-subscriptions-uk','text','subscription','Page Slug'],
+  ['subscription_previous_slug','','text','subscription','Previous Page Slug'],
   ['subscription_hero_eyebrow','UK Streaming Subscriptions','text','subscription','Hero Eyebrow'],
   ['subscription_hero_title','IPTV Subscriptions UK — Flexible Plans for Firestick & Smart Devices','text','subscription','Hero H1'],
   ['subscription_hero_intro','Choose a Firestick4UK streaming subscription that suits your household. Order through our secure checkout, then get setup support from our UK team when you need it.','textarea','subscription','Hero Intro'],
@@ -320,6 +322,6 @@ export const EXTRA_CONTENT_DEFAULTS: Array<[string, string, string, string, stri
   ['subscription_meta_title','IPTV Subscriptions UK | Firestick Streaming Plans | Firestick4UK','text','subscription','SEO Title'],
   ['subscription_meta_description','Compare Firestick4UK IPTV subscriptions and UK streaming plans for Firestick, Smart TV and Android devices. Order online with UK support.','textarea','subscription','Meta Description'],
   ['subscription_focus_keyword','IPTV Subscription UK','text','subscription','Focus Keyword'],
-  ['subscription_canonical','https://firestick4uk.com/iptv-subscriptions-uk/','text','subscription','Canonical URL'],
+  ['subscription_canonical','','text','subscription','Canonical URL'],
   ['subscription_og_image','','image','subscription','OG Image URL'],
 ];

@@ -27,6 +27,7 @@ export default function Navbar({
     cart: "Cart",
     shop: "Shop Now",
     subscription: "IPTV Subscription",
+    subscriptionHref: "/iptv-subscriptions-uk/",
   });
 
   useEffect(() => {
@@ -35,6 +36,15 @@ export default function Navbar({
       .then((d) => {
         if (!d || typeof d !== "object") return;
         if (logoUrl === undefined && d.site_logo_url) setLogo(String(d.site_logo_url));
+        const slug =
+          String(d.subscription_slug || "iptv-subscriptions-uk")
+            .trim()
+            .toLowerCase()
+            .replace(/^\/+|\/+$/g, "")
+            .replace(/[\s_]+/g, "-")
+            .replace(/[^a-z0-9-]/g, "")
+            .replace(/-+/g, "-")
+            .replace(/^-+|-+$/g, "") || "iptv-subscriptions-uk";
         setLabels({
           alt: (d.nav_logo_alt || d.site_title || "Firestick4UK").trim() || "Firestick4UK",
           text: (d.nav_logo_text || d.site_title || "FIRESTICK4UK").trim() || "FIRESTICK4UK",
@@ -42,6 +52,7 @@ export default function Navbar({
           shop: (d.nav_shop_label || "Shop Now").trim() || "Shop Now",
           subscription:
             (d.nav_subscription_label || "IPTV Subscription").trim() || "IPTV Subscription",
+          subscriptionHref: `/${slug}`,
         });
       })
       .catch(() => {});
@@ -129,7 +140,7 @@ export default function Navbar({
           <li><a href="/" onClick={close}>Home</a></li>
           <li><a href="/products" onClick={close}>Products</a></li>
           <li>
-            <a href="/iptv-subscriptions-uk/" onClick={close}>
+            <a href={labels.subscriptionHref} onClick={close}>
               {labels.subscription}
             </a>
           </li>

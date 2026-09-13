@@ -1,6 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
 import { EXTRA_CONTENT_DEFAULTS } from '../../lib/siteContentDefaults';
+import {
+  DEFAULT_SUBSCRIPTION_SLUG,
+  isAutoSubscriptionCanonical,
+  normalizeSubscriptionSlug,
+  subscriptionPageUrl,
+  validateSubscriptionSlug,
+} from '../../lib/subscriptionSlug';
 
 function checkAdminAuth(req: any): boolean {
   const session = req.headers['x-admin-session'] || req.cookies?.sAdminSession;
@@ -143,7 +150,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           `UPDATE site_content
            SET content_value = REPLACE(content_value, ?, ?)
            WHERE content_value LIKE ?
-             AND content_key NOT LIKE 'subscription_%'`,
+             AND content_key NOT LIKE 'subscription_%'
+             AND content_key <> 'nav_subscription_label'`,
           [from, to, `%${from}%`]
         );
       } catch (_) {}
@@ -185,17 +193,93 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
       };
 
+      const updateList: Array<{ key: string; value: string }> = [];
       if (updates && Array.isArray(updates)) {
         for (const u of updates) {
           if (!u?.key) continue;
-          await upsert(String(u.key), String(u.value ?? ''));
+          // previous slug is managed server-side only
+          if (String(u.key) === 'subscription_previous_slug') continue;
+          updateList.push({ key: String(u.key), value: String(u.value ?? '') });
         }
       } else if (key) {
-        await upsert(String(key), String(value ?? ''));
+        if (String(key) === 'subscription_previous_slug') {
+          return res.status(400).json({ error: 'subscription_previous_slug is managed automatically' });
+        }
+        updateList.push({ key: String(key), value: String(value ?? '') });
       } else {
         return res.status(400).json({ error: 'No content keys provided' });
       }
-      return res.status(200).json({ success: true });
+
+      const slugUpdate = updateList.find((u) => u.key === 'subscription_slug');
+      let slugChangePrevious: string | undefined;
+      if (slugUpdate) {
+        const validated = validateSubscriptionSlug(slugUpdate.value);
+        if (!validated.ok) {
+          return res.status(400).json({ error: validated.error });
+        }
+
+        const [slugRows]: any = await pool.query(
+          `SELECT content_key, content_value
+           FROM site_content
+           WHERE content_key IN (
+             'subscription_slug',
+             'subscription_previous_slug',
+             'subscription_canonical'
+           )`
+        );
+        const currentMap: Record<string, string> = {};
+        for (const row of slugRows || []) {
+          currentMap[row.content_key] = row.content_value || '';
+        }
+
+        const currentSlug =
+          normalizeSubscriptionSlug(currentMap.subscription_slug || '') ||
+          DEFAULT_SUBSCRIPTION_SLUG;
+        const nextSlug = validated.slug;
+        slugUpdate.value = nextSlug;
+
+        if (nextSlug !== currentSlug) {
+          await upsert('subscription_previous_slug', currentSlug);
+          await upsert('subscription_slug', nextSlug);
+          slugChangePrevious = currentSlug;
+
+          const incomingCanonical = updateList.find((u) => u.key === 'subscription_canonical');
+          const canonicalCandidate =
+            incomingCanonical?.value ?? currentMap.subscription_canonical ?? '';
+          if (
+            isAutoSubscriptionCanonical(
+              canonicalCandidate,
+              currentSlug,
+              normalizeSubscriptionSlug(currentMap.subscription_previous_slug || '')
+            ) ||
+            isAutoSubscriptionCanonical(canonicalCandidate, nextSlug, currentSlug)
+          ) {
+            if (incomingCanonical) incomingCanonical.value = '';
+            await upsert('subscription_canonical', '');
+          }
+        } else {
+          await upsert('subscription_slug', nextSlug);
+        }
+      }
+
+      for (const u of updateList) {
+        // Slug already persisted above when present in this request
+        if (u.key === 'subscription_slug' && slugUpdate) continue;
+        await upsert(u.key, u.value);
+      }
+
+      return res.status(200).json({
+        success: true,
+        ...(slugUpdate
+          ? {
+              subscription_slug: slugUpdate.value,
+              preview_url: subscriptionPageUrl(slugUpdate.value),
+              ...(slugChangePrevious
+                ? { subscription_previous_slug: slugChangePrevious }
+                : {}),
+            }
+          : {}),
+      });
     }
 
     if (req.method === 'PUT') {

@@ -3,13 +3,19 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { toEditorHtml } from "@/lib/contentHtml";
+import {
+  DEFAULT_SUBSCRIPTION_SLUG,
+  normalizeSubscriptionSlug,
+  subscriptionPageUrl,
+  validateSubscriptionSlug,
+} from "@/lib/subscriptionSlug";
 
 const TipTapEditor = dynamic(() => import("./TipTapEditor"), { ssr: false });
 
 type Props = {
   siteContent: Record<string, string>;
   setSiteContent: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  onSave: (keys: string[]) => void;
+  onSave: (keys: string[], overrides?: Record<string, string>) => void;
   saving: boolean;
 };
 
@@ -18,6 +24,7 @@ type ProductOpt = { id: number; name: string; price: number | string; slug?: str
 type FaqOpt = { id: number; question: string; category?: string; is_visible?: number };
 
 const SAVE_KEYS = [
+  "subscription_slug",
   "subscription_hero_eyebrow",
   "subscription_hero_title",
   "subscription_hero_intro",
@@ -228,9 +235,30 @@ export default function SubscriptionContentEditor({
 }: Props) {
   const [products, setProducts] = useState<ProductOpt[]>([]);
   const [faqs, setFaqs] = useState<FaqOpt[]>([]);
+  const [slugError, setSlugError] = useState("");
 
   const set = (key: string, value: string) =>
     setSiteContent((s) => ({ ...s, [key]: value }));
+
+  const slugPreview = useMemo(() => {
+    const normalized =
+      normalizeSubscriptionSlug(siteContent.subscription_slug || "") ||
+      DEFAULT_SUBSCRIPTION_SLUG;
+    return subscriptionPageUrl(normalized);
+  }, [siteContent.subscription_slug]);
+
+  const handleSave = () => {
+    const validated = validateSubscriptionSlug(
+      siteContent.subscription_slug || DEFAULT_SUBSCRIPTION_SLUG
+    );
+    if (!validated.ok) {
+      setSlugError(validated.error);
+      return;
+    }
+    setSlugError("");
+    set("subscription_slug", validated.slug);
+    onSave(SAVE_KEYS, { subscription_slug: validated.slug });
+  };
 
   const benefits = useMemo(
     () =>
@@ -315,12 +343,42 @@ export default function SubscriptionContentEditor({
         <div className="section-title">📺 Subscription Page (IPTV Subscriptions UK)</div>
       </div>
       <p style={{ fontSize: 13, color: "#555", marginBottom: 18, lineHeight: 1.5 }}>
-        Edits the public page at <code>/iptv-subscriptions-uk/</code>. Plan prices always come from Products —
+        Edits the public Subscription landing page. Plan prices always come from Products —
         only selection/order is stored here. WhatsApp uses Site Settings contact number.
       </p>
 
-      <div style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 700, color: "#5B21B6" }}>Navbar</div>
+      <div style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 700, color: "#5B21B6" }}>
+        Page URL / Slug
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 22 }}>
+        <div className="modal-field" style={{ gridColumn: "1 / -1" }}>
+          <label>Page Slug</label>
+          <p style={{ fontSize: 12, color: "#666", margin: "0 0 6px" }}>
+            Controls the public page URL. Enter only the slug (not the domain). Changing it will
+            permanently redirect the previous URL to the new one.
+          </p>
+          <input
+            style={{ width: "100%" }}
+            value={siteContent.subscription_slug || DEFAULT_SUBSCRIPTION_SLUG}
+            onChange={(e) => {
+              setSlugError("");
+              set("subscription_slug", e.target.value);
+            }}
+            placeholder={DEFAULT_SUBSCRIPTION_SLUG}
+          />
+          <p style={{ fontSize: 12, color: "#5B21B6", margin: "8px 0 0" }}>
+            Preview: <strong>{slugPreview}</strong>
+          </p>
+          {siteContent.subscription_previous_slug ? (
+            <p style={{ fontSize: 12, color: "#666", margin: "6px 0 0" }}>
+              Previous slug (auto redirect):{" "}
+              <code>/{normalizeSubscriptionSlug(siteContent.subscription_previous_slug)}/</code>
+            </p>
+          ) : null}
+          {slugError ? (
+            <p style={{ fontSize: 12, color: "#DC2626", margin: "8px 0 0" }}>{slugError}</p>
+          ) : null}
+        </div>
         <Field
           label="Navbar label"
           value={siteContent.nav_subscription_label || ""}
@@ -519,7 +577,7 @@ export default function SubscriptionContentEditor({
           label="Canonical URL"
           value={siteContent.subscription_canonical || ""}
           onChange={(v) => set("subscription_canonical", v)}
-          hint="Defaults to https://firestick4uk.com/iptv-subscriptions-uk/ when empty."
+          hint="Leave blank to auto-use https://firestick4uk.com/{active-slug}/. Only set a custom URL if you intentionally need a different canonical."
         />
         <Field
           label="OG image URL"
@@ -530,7 +588,7 @@ export default function SubscriptionContentEditor({
         />
       </div>
 
-      <button className="btn-primary" disabled={saving} onClick={() => onSave(SAVE_KEYS)}>
+      <button className="btn-primary" disabled={saving} onClick={handleSave}>
         {saving ? "Saving..." : "💾 Save Subscription Page"}
       </button>
     </div>

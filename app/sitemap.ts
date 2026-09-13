@@ -1,15 +1,24 @@
 import type { MetadataRoute } from "next";
 import pool from "@/lib/db";
+import { getSubscriptionSlugConfig } from "@/lib/subscriptionSlugServer";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://firestick4uk.com";
   const now = new Date();
 
+  let subscriptionUrl = `${baseUrl}/iptv-subscriptions-uk/`;
+  try {
+    const route = await getSubscriptionSlugConfig();
+    subscriptionUrl = route.pageUrl;
+  } catch {
+    // keep default
+  }
+
   const staticPages: MetadataRoute.Sitemap = [
     { url: baseUrl, lastModified: now, changeFrequency: "daily", priority: 1.0 },
     { url: `${baseUrl}/products`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
     {
-      url: `${baseUrl}/iptv-subscriptions-uk/`,
+      url: subscriptionUrl,
       lastModified: now,
       changeFrequency: "weekly",
       priority: 0.9,
