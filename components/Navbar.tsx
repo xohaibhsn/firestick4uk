@@ -27,7 +27,7 @@ export default function Navbar({
     cart: "Cart",
     shop: "Shop Now",
     subscription: "IPTV Subscription",
-    subscriptionHref: "/iptv-subscriptions-uk/",
+    subscriptionHref: "/iptv-subscriptions-uk",
   });
 
   useEffect(() => {

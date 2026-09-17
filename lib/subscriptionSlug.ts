@@ -50,8 +50,8 @@ export function subscriptionPagePath(slug: string): string {
 
 export function subscriptionPageUrl(slug: string): string {
   const s = normalizeSubscriptionSlug(slug) || DEFAULT_SUBSCRIPTION_SLUG;
-  // Canonical / sitemap keep the SEO trailing slash.
-  return `${SITE_ORIGIN}/${s}/`;
+  // Match the live App Router 200 URL (no trailing slash).
+  return `${SITE_ORIGIN}/${s}`;
 }
 
 export type SubscriptionSlugValidation =
@@ -93,6 +93,9 @@ export function resolveSubscriptionCanonical(
   const custom = String(customCanonical || "").trim();
   if (!custom) return auto;
 
+  // Known autos include current + legacy trailing-slash forms (CMS may still
+  // store older slash URLs). Compare without trailing slash so those resolve
+  // to the live no-slash preferred URL without treating them as custom.
   const knownAutos = [
     auto,
     subscriptionPageUrl(DEFAULT_SUBSCRIPTION_SLUG),

@@ -6,7 +6,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://firestick4uk.com";
   const now = new Date();
 
-  let subscriptionUrl = `${baseUrl}/iptv-subscriptions-uk/`;
+  let subscriptionUrl = `${baseUrl}/iptv-subscriptions-uk`;
   try {
     const route = await getSubscriptionSlugConfig();
     subscriptionUrl = route.pageUrl;
