@@ -1,10 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
-
-function checkAdminAuth(req: NextApiRequest): boolean {
-  const session = req.headers['x-admin-session'] || req.cookies?.sAdminSession;
-  return !!session;
-}
+import { requireAdminRole } from '@/lib/adminAuth';
 
 async function ensureBerlinTrainingTable() {
   await pool.query(`
@@ -20,7 +16,8 @@ async function ensureBerlinTrainingTable() {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!checkAdminAuth(req)) return res.status(403).json({ error: 'Forbidden' });
+  const admin = await requireAdminRole(req, res, ['super_admin', 'manager']);
+  if (!admin) return;
 
   try {
     await ensureBerlinTrainingTable();

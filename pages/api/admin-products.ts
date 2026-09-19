@@ -1,10 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
-
-function checkAdminAuth(req: NextApiRequest): boolean {
-  const session = req.headers['x-admin-session'] || req.cookies?.sAdminSession;
-  return !!session;
-}
+import { requireAdminRole } from '../../lib/adminAuth';
 
 function toSlug(value: string): string {
   return String(value || '')
@@ -65,12 +61,9 @@ async function ensureProductSlugColumn() {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!checkAdminAuth(req)) return res.status(403).json({ error: 'Forbidden' });
-  // Writers cannot mutate products
-  const role = req.headers['x-admin-role'] as string;
-  if (req.method !== 'GET' && role === 'writer') {
-    return res.status(403).json({ error: 'Forbidden: Writers cannot modify products' });
-  }
+  const admin = await requireAdminRole(req, res, ['super_admin', 'manager']);
+  if (!admin) return;
+
   try {
     await ensureProductSlugColumn();
 

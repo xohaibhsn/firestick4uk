@@ -294,27 +294,43 @@ export default function AdminPage() {
   ]);
   const [trainingChatInput, setTrainingChatInput] = useState("");
   const [trainingChatLoading, setTrainingChatLoading] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
   const trainingChatInputRef = useRef<HTMLInputElement>(null);
   const trainingChatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (localStorage.getItem("sAdminSession") === "true") {
-      setLoggedIn(true);
-      setAdminRole((localStorage.getItem("sAdminRole") || "super_admin") as AdminRole);
-      setAdminName(localStorage.getItem("sAdminName") || "Admin");
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin-session", { credentials: "include" }).then((r) => r.json());
+        if (cancelled) return;
+        if (res?.authenticated) {
+          setLoggedIn(true);
+          setAdminRole((res.role || "super_admin") as AdminRole);
+          setAdminName(res.name || "Admin");
+        } else {
+          setLoggedIn(false);
+        }
+      } catch {
+        if (!cancelled) setLoggedIn(false);
+      } finally {
+        if (!cancelled) setAuthChecking(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
     if (!loggedIn) return;
-    // Fix 2 — include session header for admin API auth
-    const session = localStorage.getItem("sAdminSession") || "";
-    const adminHeaders = { "x-admin-session": session };
-    fetch("/api/admin-products", { headers: adminHeaders })
+    const adminFetch = (url: string, init?: RequestInit) =>
+      fetch(url, { ...init, credentials: "include", headers: { ...(init?.headers || {}) } });
+    adminFetch("/api/admin-products")
       .then(r => r.json())
       .then(data => { if (Array.isArray(data) && data.length > 0) setProducts(data); })
       .catch(() => {});
-    fetch("/api/admin-orders", { headers: adminHeaders })
+    adminFetch("/api/admin-orders")
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -340,7 +356,7 @@ export default function AdminPage() {
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setBlogPosts(data); })
       .catch(() => {});
-    fetch("/api/admin-orders?customers=1", { headers: adminHeaders })
+    fetch("/api/admin-orders?customers=1", { credentials: "include" })
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -355,14 +371,14 @@ export default function AdminPage() {
         }
       })
       .catch(() => {});
-    fetch("/api/coupons").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setCoupons(d); }).catch(()=>{});
+    fetch("/api/coupons", { credentials: "include" }).then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setCoupons(d); }).catch(()=>{});
     fetch("/api/site-content?page=all")
       .then(r => r.json())
       .then(d => { if (d && typeof d === "object") setSiteContent(d); })
       .catch(() => {});
     fetch("/api/sections?page=home&all=1").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); }).catch(()=>{});
     fetch("/api/faqs?admin=true").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setFaqs(d); }).catch(()=>{});
-    fetch("/api/admin/leads", { headers: adminHeaders })
+    fetch("/api/admin/leads", { credentials: "include" })
       .then(r => r.json())
       .then(d => {
         if (Array.isArray(d)) {
@@ -371,11 +387,11 @@ export default function AdminPage() {
         }
       })
       .catch(() => {});
-    fetch("/api/admin/berlin-training", { headers: adminHeaders })
+    fetch("/api/admin/berlin-training", { credentials: "include" })
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setBerlinTraining(d); })
       .catch(() => {});
-    fetch("/api/admin/berlin-training-chat", { headers: adminHeaders })
+    fetch("/api/admin/berlin-training-chat", { credentials: "include" })
       .then(r => r.json())
       .then(d => {
         if (Array.isArray(d) && d.length > 0) {
@@ -384,10 +400,10 @@ export default function AdminPage() {
       })
       .catch(() => {});
     if (adminRole === "super_admin") {
-      fetch("/api/admin-staff", { headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"", "x-admin-role": "super_admin" } })
+      fetch("/api/admin-staff", { credentials: "include" })
         .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setStaffUsers(d); }).catch(()=>{});
     }
-  }, [loggedIn]);
+  }, [loggedIn, adminRole]);
 
   useEffect(() => {
     if (tab !== "training") return;
@@ -409,18 +425,13 @@ export default function AdminPage() {
       .catch(() => {});
   }, [loggedIn, tab]);
 
-  // Helper: pass role in all admin API headers (SSR-safe)
-  const getRoleHeaders = () => ({
-    "x-admin-session": typeof window !== "undefined" ? localStorage.getItem("sAdminSession")||"" : "",
-    "x-admin-role": adminRole,
-  });
+  // Cookie session carries auth — headers are only for Content-Type / optional metadata
+  const getRoleHeaders = () => ({});
 
   const saveContent = async (keys: string[], overrides?: Record<string, string>) => {
     setContentSaving(true); setContentMsg("");
     const updates = keys.map(k => ({ key: k, value: overrides?.[k] ?? siteContent[k] ?? "" }));
-    const res = await fetch("/api/site-content", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+    const res = await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
       body: JSON.stringify({ updates }),
     }).then(r => r.json()).catch(() => ({}));
     setContentSaving(false);
@@ -449,16 +460,12 @@ export default function AdminPage() {
         r.onerror = rej;
         r.readAsDataURL(file);
       });
-      const data = await fetch("/api/upload-favicon", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+      const data = await fetch("/api/upload-favicon", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
         body: JSON.stringify({ file: base64, name: file.name }),
       }).then((r) => r.json());
       if (data.url) {
         setSiteContent((s) => ({ ...s, favicon_url: data.url }));
-        await fetch("/api/site-content", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+        await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
           body: JSON.stringify({ key: "favicon_url", value: data.url }),
         });
         setContentMsg("✅ Favicon uploaded!");
@@ -476,16 +483,12 @@ export default function AdminPage() {
     setLogoUploading(true);
     try {
       const base64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(file); });
-      const data = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+      const data = await fetch("/api/upload", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
         body: JSON.stringify({ file: base64, name: file.name, folder: "firestick4uk/logo" }),
       }).then(r => r.json());
       if (data.path) {
         setSiteContent(s => ({ ...s, site_logo_url: data.path }));
-        await fetch("/api/site-content", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+        await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
           body: JSON.stringify({ key: "site_logo_url", value: data.path }),
         });
         setContentMsg("✅ Logo saved!");
@@ -507,16 +510,12 @@ export default function AdminPage() {
         r.onerror = rej;
         r.readAsDataURL(file);
       });
-      const data = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+      const data = await fetch("/api/upload", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
         body: JSON.stringify({ file: base64, name: file.name, folder: "firestick4uk/hero-slides" }),
       }).then((r) => r.json());
       if (data.path) {
         setSiteContent((s) => ({ ...s, [key]: data.path }));
-        await fetch("/api/site-content", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+        await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
           body: JSON.stringify({ key, value: data.path }),
         });
         setContentMsg(`✅ Slide ${slideNum} saved!`);
@@ -534,17 +533,13 @@ export default function AdminPage() {
     setWaIconUploading(true);
     try {
       const base64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(file); });
-      const data = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+      const data = await fetch("/api/upload", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
         body: JSON.stringify({ file: base64, name: file.name, folder: "firestick4uk/whatsapp-icon" }),
       }).then(r => r.json());
       if (data.path) {
         const url = `${data.path}${data.path.includes("?") ? "&" : "?"}v=${Date.now()}`;
         setSiteContent(s => ({ ...s, whatsapp_icon_url: url }));
-        await fetch("/api/site-content", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+        await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
           body: JSON.stringify({ key: "whatsapp_icon_url", value: url }),
         });
         setContentMsg("✅ WhatsApp icon saved!");
@@ -565,17 +560,13 @@ export default function AdminPage() {
         r.onerror = rej;
         r.readAsDataURL(file);
       });
-      const data = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+      const data = await fetch("/api/upload", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
         body: JSON.stringify({ file: base64, name: file.name, folder: "firestick4uk/og" }),
       }).then((r) => r.json());
       if (data.path) {
         const url = `${data.path}${data.path.includes("?") ? "&" : "?"}v=${Date.now()}`;
         setSiteContent((s) => ({ ...s, og_default_image: url }));
-        await fetch("/api/site-content", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+        await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
           body: JSON.stringify({ key: "og_default_image", value: url }),
         });
         setContentMsg("✅ OG image saved!");
@@ -593,13 +584,11 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/admin-login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       }).then(r => r.json());
       if (res.success) {
-        localStorage.setItem("sAdminSession", "true");
-        localStorage.setItem("sAdminRole", res.role || "super_admin");
-        localStorage.setItem("sAdminName", res.name || "Admin");
         setAdminRole((res.role || "super_admin") as AdminRole);
         setAdminName(res.name || "Admin");
         setLoggedIn(true);
@@ -612,16 +601,20 @@ export default function AdminPage() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("sAdminSession");
-    localStorage.removeItem("sAdminRole");
-    localStorage.removeItem("sAdminName");
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/admin-logout", { method: "POST", credentials: "include" });
+    } catch {
+      /* ignore */
+    }
     setLoggedIn(false);
     setAdminRole("super_admin");
+    setAdminName("Admin");
+    setTab("dashboard");
   };
 
   const loadStaff = () => {
-    fetch("/api/admin-staff", { headers: getRoleHeaders() })
+    fetch("/api/admin-staff", { credentials: "include", headers: getRoleHeaders() })
       .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setStaffUsers(d); }).catch(()=>{});
   };
 
@@ -630,7 +623,7 @@ export default function AdminPage() {
     if (staffModal==="new" && !staffForm.password) { setStaffMsg("❌ Password required"); return; }
     const method = staffModal==="new" ? "POST" : "PUT";
     const body = staffModal==="new" ? staffForm : { ...staffForm, id: staffModal.id };
-    const res = await fetch("/api/admin-staff",{method,headers:{...getRoleHeaders(),"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json()).catch(()=>({}));
+    const res = await fetch("/api/admin-staff",{method,credentials:"include",headers:{...getRoleHeaders(),"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json()).catch(()=>({}));
     if (res.success) { setStaffMsg("✅ Saved!"); setStaffModal(null); loadStaff(); }
     else setStaffMsg(`❌ ${res.error||"Failed"}`);
     setTimeout(()=>setStaffMsg(""),3000);
@@ -638,14 +631,14 @@ export default function AdminPage() {
 
   const deleteStaff = async (id:number) => {
     if (!confirm("Delete this staff user?")) return;
-    await fetch(`/api/admin-staff?id=${id}`,{method:"DELETE",headers:getRoleHeaders()});
+    await fetch(`/api/admin-staff?id=${id}`, { method: "DELETE", credentials: "include", headers: getRoleHeaders()});
     loadStaff();
   };
 
   const updateStatus = (id: string, status: OrderStatus) => {
     fetch("/api/admin-orders", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      credentials: "include", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ order_id: id, status }),
     }).catch(() => {});
     setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
@@ -659,7 +652,7 @@ export default function AdminPage() {
     if (!confirm(msg)) return;
     const res = await fetch("/api/admin-orders", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      credentials: "include", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ order_id: orderId }),
     }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
@@ -700,7 +693,7 @@ export default function AdminPage() {
     const isNew = blogModal === "new";
     const res = await fetch("/api/blog", {
       method: isNew ? "POST" : "PUT",
-      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      credentials: "include", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(isNew ? payload : { ...payload, id: (blogModal as BlogPost).id }),
     }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
@@ -715,7 +708,7 @@ export default function AdminPage() {
 
   const deleteBlog = async (id: number) => {
     if (!confirm("Delete this blog post?")) return;
-    const res = await fetch(`/api/blog?id=${id}`, { method: "DELETE", headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"" } }).then(r=>r.json()).catch(()=>({}));
+    const res = await fetch(`/api/blog?id=${id}`, { method: "DELETE", credentials: "include" }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
       setBlogPosts(blogPosts.filter(p => p.id !== id));
       setBlogMsg("✅ Post deleted");
@@ -726,7 +719,7 @@ export default function AdminPage() {
   };
 
   const deleteProduct = (id: number) => {
-    fetch(`/api/admin-products?id=${id}`, { method: "DELETE", headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"" } }).catch(() => {});
+    fetch(`/api/admin-products?id=${id}`, { method: "DELETE", credentials: "include" }).catch(() => {});
     setProducts(products.filter(p => p.id !== id));
   };
 
@@ -734,7 +727,7 @@ export default function AdminPage() {
     if (!confirm("Delete this chat lead?")) return;
     const res = await fetch(`/api/admin/leads?id=${id}`, {
       method: "DELETE",
-      headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      credentials: "include",
     }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
       setChatLeads(prev => prev.filter(lead => lead.id !== id));
@@ -756,7 +749,7 @@ export default function AdminPage() {
     if (!confirm(`Delete ${selectedLeadIds.length} selected Berlin chat lead${selectedLeadIds.length === 1 ? "" : "s"}?`)) return;
     const res = await fetch("/api/admin/leads", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      credentials: "include", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids:selectedLeadIds }),
     }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
@@ -769,14 +762,14 @@ export default function AdminPage() {
   };
 
   const loadBerlinTraining = () => {
-    fetch("/api/admin/berlin-training", { headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"" } })
+    fetch("/api/admin/berlin-training", { credentials: "include" })
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setBerlinTraining(d); })
       .catch(() => {});
   };
 
   const loadBerlinTrainingChat = () => {
-    fetch("/api/admin/berlin-training-chat", { headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"" } })
+    fetch("/api/admin/berlin-training-chat", { credentials: "include" })
       .then(r => r.json())
       .then(d => {
         if (Array.isArray(d) && d.length > 0) {
@@ -798,7 +791,7 @@ export default function AdminPage() {
 
     const res = await fetch("/api/admin/berlin-training-chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      credentials: "include", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message }),
     }).then(r => r.json()).catch(() => ({ error:"Training chat failed" }));
 
@@ -823,7 +816,7 @@ export default function AdminPage() {
     const isEdit = trainingForm.id > 0;
     const res = await fetch("/api/admin/berlin-training", {
       method: isEdit ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      credentials: "include", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(trainingForm),
     }).then(r => r.json()).catch(() => ({}));
     if (res.success) {
@@ -844,7 +837,7 @@ export default function AdminPage() {
   const toggleBerlinTraining = async (item: BerlinTraining) => {
     await fetch("/api/admin/berlin-training", {
       method: "PUT",
-      headers: { "Content-Type": "application/json", "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      credentials: "include", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...item, is_active: !item.is_active }),
     });
     loadBerlinTraining();
@@ -854,7 +847,7 @@ export default function AdminPage() {
     if (!confirm("Delete this Berlin training note?")) return;
     await fetch(`/api/admin/berlin-training?id=${id}`, {
       method: "DELETE",
-      headers: { "x-admin-session": localStorage.getItem("sAdminSession")||"" },
+      credentials: "include",
     });
     loadBerlinTraining();
   };
@@ -899,11 +892,10 @@ export default function AdminPage() {
       meta_description: editProduct.meta_description || "",
       focus_keyword: editProduct.focus_keyword || "",
     };
-    const adminSess = localStorage.getItem("sAdminSession")||"";
     if (productModal === "new") {
       const res = await fetch("/api/admin-products", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-session": adminSess },
+        headers: { "Content-Type": "application/json", },
         body: JSON.stringify(payload),
       }).then(r => r.json()).catch(() => ({}));
       if (res.error) { alert(res.error); return; }
@@ -912,7 +904,7 @@ export default function AdminPage() {
     } else if (productModal) {
       const res = await fetch("/api/admin-products", {
         method: "PUT",
-        headers: { "Content-Type": "application/json", "x-admin-session": adminSess },
+        headers: { "Content-Type": "application/json", },
         body: JSON.stringify({ ...payload, id: productModal.id, active: 1 }),
       }).then(r => r.json()).catch(() => ({}));
       if (res.error) { alert(res.error); return; }
@@ -941,6 +933,20 @@ export default function AdminPage() {
   const leadsLast24 = chatLeads.filter(lead => new Date(lead.created_at).getTime() >= leadWindowStart).length;
 
   const statusClass = (s: string) => `status-badge status-${s}`;
+
+  if (authChecking) {
+    return (
+      <>
+        <style>{styles}</style>
+        <div className="login-screen">
+          <div className="login-box">
+            <div className="login-logo">FIRESTICK4UK</div>
+            <div className="login-sub">Checking session…</div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   if (!loggedIn) {
     return (

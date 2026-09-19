@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { RL_GENERAL, getClientIp } from '../../lib/rateLimit';
 import pool from '../../lib/db';
+import { requireAdminRole } from '../../lib/adminAuth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { allowed } = RL_GENERAL(getClientIp(req));
@@ -26,6 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { action } = req.query;
 
+    // Public checkout validation — no admin session required
     if (req.method === 'POST' && action === 'validate') {
       const { code, cart_total } = req.body;
       if (!code) return res.status(400).json({ valid:false, message:"Please enter a coupon code" });
@@ -52,6 +54,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         message: `✅ ${c.code} applied!`,
       });
     }
+
+    // Admin listing + mutations — super_admin only (matches Sidhu UI)
+    const admin = await requireAdminRole(req, res, ['super_admin']);
+    if (!admin) return;
 
     if (req.method === 'GET') {
       const [rows] = await pool.query('SELECT * FROM coupons ORDER BY created_at DESC');

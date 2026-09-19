@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Anthropic from '@anthropic-ai/sdk';
 import pool from '@/lib/db';
+import { requireAdminRole } from '@/lib/adminAuth';
 
 type TrainingChatMessage = {
   role: 'user' | 'assistant';
@@ -12,11 +13,6 @@ type StoredTrainingChatMessage = TrainingChatMessage & {
   id?: number;
   created_at?: unknown;
 };
-
-function checkAdminAuth(req: NextApiRequest): boolean {
-  const session = req.headers['x-admin-session'] || req.cookies?.sAdminSession;
-  return !!session;
-}
 
 async function ensureBerlinTrainingTable() {
   await pool.query(`
@@ -133,7 +129,8 @@ function extractTrainingSave(reply: string) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!checkAdminAuth(req)) return res.status(403).json({ error: 'Forbidden' });
+  const admin = await requireAdminRole(req, res, ['super_admin', 'manager']);
+  if (!admin) return;
 
   try {
     await ensureBerlinTrainingTable();

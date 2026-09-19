@@ -1,10 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
-
-function checkAdminAuth(req: any): boolean {
-  const session = req.headers['x-admin-session'] || req.cookies?.sAdminSession;
-  return !!session;
-}
+import { requireAdminRole } from '../../lib/adminAuth';
 
 
 
@@ -21,7 +17,10 @@ const DEFAULTS = [
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    if (req.method !== 'GET' && !checkAdminAuth(req)) return res.status(403).json({ error: 'Forbidden' });
+    if (req.method !== 'GET') {
+      const admin = await requireAdminRole(req, res, ['super_admin']);
+      if (!admin) return;
+    }
 
     // Create table if it doesn't exist yet
     await pool.query(`
