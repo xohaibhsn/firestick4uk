@@ -2126,8 +2126,22 @@ export default function AdminPage() {
             <div className="section-card" style={{padding:28}}>
               <div className="section-header" style={{marginBottom:24}}>
                 <div className="section-title">Site Settings</div>
-                {contentMsg && <span style={{fontSize:13,color:contentMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{contentMsg}</span>}
               </div>
+              {contentMsg && (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    padding: "10px 16px",
+                    background: contentMsg.startsWith("✅") ? "rgba(0,200,100,0.1)" : "rgba(255,68,68,0.1)",
+                    border: `1px solid ${contentMsg.startsWith("✅") ? "rgba(0,200,100,0.3)" : "rgba(255,68,68,0.25)"}`,
+                    borderRadius: 10,
+                    fontSize: 13,
+                    color: contentMsg.startsWith("✅") ? "#00c864" : "#ff6666",
+                  }}
+                >
+                  {contentMsg}
+                </div>
+              )}
 
               <div style={{maxWidth:600}}>
                 <div className="modal-field"><label>Website Title</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_title||""} onChange={e=>setSiteContent(s=>({...s,site_title:e.target.value}))} placeholder="Firestick4UK" /></div>
@@ -2419,6 +2433,21 @@ export default function AdminPage() {
                       placeholder="@firestick44"
                     />
                   </div>
+                  {contentMsg && (
+                    <div
+                      style={{
+                        margin: "8px 0 10px",
+                        padding: "10px 16px",
+                        background: contentMsg.startsWith("✅") ? "rgba(0,200,100,0.1)" : "rgba(255,68,68,0.1)",
+                        border: `1px solid ${contentMsg.startsWith("✅") ? "rgba(0,200,100,0.3)" : "rgba(255,68,68,0.25)"}`,
+                        borderRadius: 10,
+                        fontSize: 13,
+                        color: contentMsg.startsWith("✅") ? "#00c864" : "#ff6666",
+                      }}
+                    >
+                      {contentMsg}
+                    </div>
+                  )}
                   <button
                     className="btn-primary"
                     style={{marginTop:8}}
@@ -2429,6 +2458,21 @@ export default function AdminPage() {
                   </button>
                 </div>
 
+                {contentMsg && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      padding: "10px 16px",
+                      background: contentMsg.startsWith("✅") ? "rgba(0,200,100,0.1)" : "rgba(255,68,68,0.1)",
+                      border: `1px solid ${contentMsg.startsWith("✅") ? "rgba(0,200,100,0.3)" : "rgba(255,68,68,0.25)"}`,
+                      borderRadius: 10,
+                      fontSize: 13,
+                      color: contentMsg.startsWith("✅") ? "#00c864" : "#ff6666",
+                    }}
+                  >
+                    {contentMsg}
+                  </div>
+                )}
                 <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline"])}>
                   {contentSaving?"Saving...":"💾 Save Settings"}
                 </button>

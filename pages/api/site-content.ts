@@ -87,13 +87,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (_) {}
     }
 
-    // Migrate old email addresses to new one
-    try {
-      await pool.query(
-        "UPDATE site_content SET content_value='firestick4uk@gmail.com' WHERE content_key='contact_email' AND content_value LIKE '%@firestick4uk.com%'"
-      );
-    } catch (_) {}
-
     // Migrate old WhatsApp / phone number to new one (only when old number is still stored)
     try {
       await pool.query(
