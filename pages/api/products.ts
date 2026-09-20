@@ -9,9 +9,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!allowed) return res.status(429).json({ error: 'Too many requests' });
 
   try {
-    // Ensure slug column exists for lookups (safe no-op if already present)
-    try { await pool.query("ALTER TABLE products ADD COLUMN slug VARCHAR(255)"); } catch (_) {}
-
     const { slug, id, category, minPrice, maxPrice, sort } = req.query;
 
     if (id) {

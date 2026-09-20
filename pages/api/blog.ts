@@ -12,72 +12,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       admin = await requireAdminPermission(req, res, 'blog.manage');
       if (!admin) return;
     }
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS blog_posts (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(500) NOT NULL,
-        slug VARCHAR(500),
-        excerpt TEXT,
-        content LONGTEXT,
-        category VARCHAR(100) DEFAULT 'Guides',
-        emoji VARCHAR(10) DEFAULT '📝',
-        badge VARCHAR(50) DEFAULT 'guide',
-        badgeText VARCHAR(50) DEFAULT 'Guide',
-        featured_image VARCHAR(1000),
-        meta_title VARCHAR(500),
-        meta_description VARCHAR(500),
-        focus_keyword VARCHAR(255),
-        status VARCHAR(20) DEFAULT 'published',
-        featured TINYINT(1) DEFAULT 0,
-        active TINYINT(1) DEFAULT 1,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    for (const col of [
-      "ALTER TABLE blog_posts ADD COLUMN slug VARCHAR(500) AFTER title",
-      "ALTER TABLE blog_posts ADD COLUMN content LONGTEXT AFTER excerpt",
-      "ALTER TABLE blog_posts ADD COLUMN featured_image VARCHAR(1000) AFTER badgeText",
-      "ALTER TABLE blog_posts ADD COLUMN meta_title VARCHAR(500)",
-      "ALTER TABLE blog_posts ADD COLUMN meta_description VARCHAR(500)",
-      "ALTER TABLE blog_posts ADD COLUMN focus_keyword VARCHAR(255)",
-      "ALTER TABLE blog_posts ADD COLUMN status VARCHAR(20) DEFAULT 'published'",
-      "ALTER TABLE blog_posts ADD COLUMN featured TINYINT(1) DEFAULT 0",
-      "ALTER TABLE blog_posts ADD COLUMN canonical_url VARCHAR(500)",
-      "ALTER TABLE blog_posts ADD COLUMN faqs TEXT",
-      "ALTER TABLE blog_posts ADD COLUMN active TINYINT(1) DEFAULT 1",
-      "ALTER TABLE blog_posts ADD COLUMN badgeText VARCHAR(50) DEFAULT 'Guide'",
-      "ALTER TABLE blog_posts ADD COLUMN emoji VARCHAR(10) DEFAULT '📝'",
-    ]) { try { await pool.query(col); } catch (_) {} }
-
-    // Activate any existing posts that have NULL active (added before column existed)
-    try { await pool.query("UPDATE blog_posts SET active=1 WHERE active IS NULL"); } catch (_) {}
-
-    // Replace IPTV wording in existing public blog content
-    for (const [from, to] of [
-      ['Premium IPTV & Streaming', 'Premium Streaming'],
-      ['IPTV & Streaming Solutions', 'Streaming Solutions'],
-      ['Premium IPTV', 'Premium Streaming'],
-      ['Best IPTV', 'Best Streaming'],
-      ['IPTV Subscriptions', 'Streaming Subscriptions'],
-      ['IPTV service', 'streaming service'],
-      ['IPTV Plans', 'Streaming Plans'],
-      ['IPTV', 'Streaming'],
-      ['iptv', 'streaming'],
-    ] as const) {
-      try {
-        await pool.query(
-          `UPDATE blog_posts SET
-             title = REPLACE(title, ?, ?),
-             excerpt = REPLACE(excerpt, ?, ?),
-             content = REPLACE(content, ?, ?),
-             meta_title = REPLACE(IFNULL(meta_title,''), ?, ?),
-             meta_description = REPLACE(IFNULL(meta_description,''), ?, ?)
-           WHERE title LIKE ? OR excerpt LIKE ? OR content LIKE ? OR IFNULL(meta_title,'') LIKE ? OR IFNULL(meta_description,'') LIKE ?`,
-          [from, to, from, to, from, to, from, to, from, to, `%${from}%`, `%${from}%`, `%${from}%`, `%${from}%`, `%${from}%`]
-        );
-      } catch (_) {}
-    }
 
     if (req.method === 'GET') {
       const { slug, id } = req.query;
@@ -93,17 +27,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json(rows[0] || null);
       }
       const [rows]: any = await pool.query('SELECT * FROM blog_posts WHERE active = 1 ORDER BY created_at DESC');
-      if (Array.isArray(rows) && rows.length === 0) {
-        await pool.query(`
-          INSERT INTO blog_posts (title, slug, excerpt, content, category, emoji, badge, badgeText, status)
-          VALUES
-          ('How to Set Up Your Firestick in 5 Minutes', 'how-to-set-up-your-firestick', 'Getting started with your new Amazon Firestick is easier than you think. Follow these simple steps to be streaming in minutes.', '<h2>Getting Started</h2><p>Plug your Firestick into your TV HDMI port and connect the power cable. Follow the on-screen setup instructions.</p>', 'Guides', '🔥', 'guide', 'Guide', 'published'),
-          ('Best Streaming Subscriptions in the UK 2026', 'best-streaming-subscriptions-uk-2026', 'Looking for the best streaming service in the UK? We compare the top options so you can pick the right plan.', '<h2>Top Streaming Plans</h2><p>We offer 1 Month, 6 Month and 1 Year subscription plans to suit every budget.</p>', 'Tips', '📺', 'tips', 'Tips', 'published'),
-          ('Firestick4UK — What''s New This Month', 'firestick4uk-whats-new', 'We have added new subscription plans, improved order tracking, and launched faster delivery.', '<h2>New This Month</h2><p>Check out our improved order tracking and new product range.</p>', 'News', '🚀', 'news', 'News', 'published')
-        `);
-        const [fresh] = await pool.query('SELECT * FROM blog_posts WHERE active = 1 ORDER BY created_at DESC');
-        return res.status(200).json(Array.isArray(fresh) ? fresh : []);
-      }
       return res.status(200).json(Array.isArray(rows) ? rows : []);
     }
 

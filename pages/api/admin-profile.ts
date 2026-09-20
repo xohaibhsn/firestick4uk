@@ -3,7 +3,6 @@ import pool from "../../lib/db";
 import {
   clearAdminSessionCookie,
   destroyAdminSessionsForStaff,
-  ensureAdminStaffTable,
   getRequestMeta,
   hashStaffPassword,
   readAdminSessionToken,
@@ -32,7 +31,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      await ensureAdminStaffTable();
       const [rows]: any = await pool.query(
         `SELECT name, email, role, last_login_at
          FROM admin_staff WHERE id = ? LIMIT 1`,
@@ -73,7 +71,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const pwError = validateStaffPassword(new_password);
       if (pwError) return res.status(400).json({ error: pwError });
 
-      await ensureAdminStaffTable();
       const [rows]: any = await pool.query(
         "SELECT id, password_hash FROM admin_staff WHERE id = ? AND active = 1 LIMIT 1",
         [admin.staffId]

@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "../../lib/db";
 import {
   destroyAdminSessionsForStaff,
-  ensureAdminStaffTable,
   getRequestMeta,
   hashStaffPassword,
   requireAdminPermission,
@@ -18,8 +17,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!admin) return;
 
   try {
-    await ensureAdminStaffTable();
-
     const { id, new_password, confirm_password } = req.body || {};
     const staffId = Number(id);
     if (!Number.isFinite(staffId) || staffId <= 0) {

@@ -3,28 +3,11 @@ import pool from '@/lib/db';
 import { getRequestMeta, requireAdminPermission } from '@/lib/adminAuth';
 import { recordAdminAudit } from '@/lib/adminAudit';
 
-async function ensureChatLeadsTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS chat_leads (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      customer_name VARCHAR(255),
-      customer_whatsapp VARCHAR(50),
-      customer_email VARCHAR(255),
-      interested_in VARCHAR(255),
-      chat_history TEXT,
-      ip_address VARCHAR(50),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const admin = await requireAdminPermission(req, res, 'leads.manage');
   if (!admin) return;
 
   try {
-    await ensureChatLeadsTable();
-
     if (req.method === 'GET') {
       const [rows] = await pool.query('SELECT * FROM chat_leads ORDER BY created_at DESC');
       return res.status(200).json(Array.isArray(rows) ? rows : []);

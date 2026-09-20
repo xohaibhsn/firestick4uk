@@ -11,13 +11,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!allowed) return res.status(429).json({ error: 'Too many requests' });
 
   try {
-    for (const col of [
-      "ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(50)",
-      "ALTER TABLE orders ADD COLUMN discount_amount DECIMAL(10,2) DEFAULT 0",
-      "ALTER TABLE orders ADD COLUMN vat_amount DECIMAL(10,2) DEFAULT 0",
-      "ALTER TABLE orders ADD COLUMN payment_reference VARCHAR(255)",
-    ]) { try { await pool.query(col); } catch (_) {} }
-
     const { customer_name, customer_email, customer_phone, delivery_address, city, postcode, notes,
       payment_method, receipt_path, items, total, coupon_code, discount_amount, vat_amount,
       payment_reference } = req.body;

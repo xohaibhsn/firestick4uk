@@ -3,8 +3,6 @@ import { RL_AUTH, getClientIp } from "../../lib/rateLimit";
 import pool from "../../lib/db";
 import {
   createAdminSession,
-  ensureAdminSessionsTable,
-  ensureAdminStaffTable,
   getRequestMeta,
   hashStaffPassword,
   isAdminRole,
@@ -32,9 +30,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const loginId = String(username).trim();
 
   try {
-    await ensureAdminStaffTable();
-    await ensureAdminSessionsTable();
-
     const email = normalizeStaffEmail(loginId);
     const [rows]: any = await pool.query(
       "SELECT id, name, email, role, active, password_hash FROM admin_staff WHERE email = ? LIMIT 1",
@@ -145,7 +140,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    await ensureAdminSessionsTable();
     const { token } = await createAdminSession({
       principalType: "master",
       principalName: "Admin",

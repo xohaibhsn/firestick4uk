@@ -10,64 +10,11 @@ function toSlug(value: string): string {
     .replace(/(^-|-$)/g, '');
 }
 
-async function ensureProductSlugColumn() {
-  for (const col of [
-    "ALTER TABLE products ADD COLUMN short_description TEXT",
-    "ALTER TABLE products ADD COLUMN full_description TEXT",
-    "ALTER TABLE products ADD COLUMN seo_title VARCHAR(60)",
-    "ALTER TABLE products ADD COLUMN meta_description VARCHAR(160)",
-    "ALTER TABLE products ADD COLUMN focus_keyword VARCHAR(100)",
-    "ALTER TABLE products ADD COLUMN features TEXT",
-    "ALTER TABLE products ADD COLUMN og_image VARCHAR(500)",
-    "ALTER TABLE products ADD COLUMN slug VARCHAR(255)",
-  ]) {
-    try { await pool.query(col); } catch (_) {}
-  }
-
-  // Backfill missing slugs from product name (same style as public URLs)
-  try {
-    await pool.query(
-      `UPDATE products
-       SET slug = LOWER(REPLACE(REPLACE(REPLACE(name, ' ', '-'), '/', ''), '--', '-'))
-       WHERE slug IS NULL OR slug = ''`
-    );
-    await pool.query(
-      `UPDATE products
-       SET slug = TRIM(BOTH '-' FROM slug)
-       WHERE slug IS NOT NULL`
-    );
-  } catch (_) {}
-
-  // Resolve duplicate slugs before unique index
-  try {
-    const [rows]: any = await pool.query(
-      `SELECT slug, GROUP_CONCAT(id ORDER BY id) AS ids, COUNT(*) AS c
-       FROM products
-       WHERE slug IS NOT NULL AND slug != ''
-       GROUP BY slug
-       HAVING c > 1`
-    );
-    for (const row of Array.isArray(rows) ? rows : []) {
-      const ids = String(row.ids || '').split(',').map((id: string) => Number(id)).filter(Boolean);
-      // Keep first id's slug; append -id to the rest
-      for (const id of ids.slice(1)) {
-        await pool.query('UPDATE products SET slug = ? WHERE id = ?', [`${row.slug}-${id}`, id]);
-      }
-    }
-  } catch (_) {}
-
-  try {
-    await pool.query('ALTER TABLE products ADD UNIQUE KEY unique_slug (slug)');
-  } catch (_) {}
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const admin = await requireAdminPermission(req, res, 'products.manage');
   if (!admin) return;
 
   try {
-    await ensureProductSlugColumn();
-
     if (req.method === 'GET') {
       const [rows] = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
       return res.status(200).json(Array.isArray(rows) ? rows : []);

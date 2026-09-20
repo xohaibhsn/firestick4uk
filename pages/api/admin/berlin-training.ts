@@ -3,26 +3,11 @@ import pool from '@/lib/db';
 import { getRequestMeta, requireAdminPermission } from '@/lib/adminAuth';
 import { recordAdminAudit } from '@/lib/adminAudit';
 
-async function ensureBerlinTrainingTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS berlin_training (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      title VARCHAR(255) NOT NULL,
-      content TEXT NOT NULL,
-      is_active TINYINT(1) DEFAULT 1,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
-  `);
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const admin = await requireAdminPermission(req, res, 'training.manage');
   if (!admin) return;
 
   try {
-    await ensureBerlinTrainingTable();
-
     if (req.method === 'GET') {
       const [rows] = await pool.query('SELECT * FROM berlin_training ORDER BY is_active DESC, updated_at DESC');
       return res.status(200).json(Array.isArray(rows) ? rows : []);

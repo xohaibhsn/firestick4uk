@@ -68,36 +68,7 @@ type ChatMessage = {
   content: string;
 };
 
-async function ensureChatLeadsTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS chat_leads (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      customer_name VARCHAR(255),
-      customer_whatsapp VARCHAR(50),
-      customer_email VARCHAR(255),
-      interested_in VARCHAR(255),
-      chat_history TEXT,
-      ip_address VARCHAR(50),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-}
-
-async function ensureBerlinTrainingTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS berlin_training (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      title VARCHAR(255) NOT NULL,
-      content TEXT NOT NULL,
-      is_active TINYINT(1) DEFAULT 1,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
-  `);
-}
-
 async function getBerlinTrainingPrompt() {
-  await ensureBerlinTrainingTable();
   const [rows] = await pool.query(
     'SELECT title, content FROM berlin_training WHERE is_active=1 ORDER BY updated_at DESC, id DESC LIMIT 25'
   );
@@ -194,8 +165,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!allowed) return res.status(429).json({ error: 'Too many requests' });
 
   try {
-    await ensureChatLeadsTable();
-
     const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
     if (!message) return res.status(400).json({ error: 'Message is required' });
     if (!process.env.ANTHROPIC_API_KEY) return res.status(500).json({ error: 'Chat is not configured' });

@@ -9,23 +9,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!allowed) return res.status(429).json({ error: 'Too many requests' });
 
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS coupons (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        code VARCHAR(50) UNIQUE NOT NULL,
-        type ENUM('percentage','fixed') NOT NULL,
-        value DECIMAL(10,2) NOT NULL,
-        minimum_order DECIMAL(10,2) DEFAULT 0,
-        usage_limit INT DEFAULT NULL,
-        used_count INT DEFAULT 0,
-        expires_at DATE DEFAULT NULL,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await pool.query(`INSERT IGNORE INTO coupons (code,type,value,minimum_order) VALUES ('WELCOME10','percentage',10,0),('SAVE5','fixed',5,20)`);
-
     const { action } = req.query;
 
     // Public checkout validation — no admin session required

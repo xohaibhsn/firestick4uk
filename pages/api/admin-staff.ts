@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "../../lib/db";
 import {
   destroyAdminSessionsForStaff,
-  ensureAdminStaffTable,
   getRequestMeta,
   hashStaffPassword,
   isAdminRole,
@@ -39,8 +38,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!admin) return;
 
   try {
-    await ensureAdminStaffTable();
-
     if (req.method === "GET") {
       const [rows]: any = await pool.query(
         `SELECT id, name, email, role, active, last_login_at, password_changed_at, created_at, updated_at

@@ -74,66 +74,13 @@ export async function verifyStaffPassword(
   return { ok, needsUpgrade: ok };
 }
 
-export async function ensureAdminSessionsTable(): Promise<void> {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS admin_sessions (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      token_hash VARCHAR(64) NOT NULL,
-      staff_id INT NULL,
-      principal_type ENUM('master','staff') NOT NULL,
-      principal_name VARCHAR(255) NOT NULL,
-      role ENUM('super_admin','manager','writer') NOT NULL,
-      expires_at DATETIME NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      last_seen_at DATETIME NULL,
-      ip_address VARCHAR(64) NULL,
-      user_agent VARCHAR(512) NULL,
-      UNIQUE KEY uniq_admin_session_token (token_hash),
-      KEY idx_admin_session_expires (expires_at),
-      KEY idx_admin_session_staff (staff_id)
-    )
-  `);
-}
-
-export async function ensureAdminStaffTable(): Promise<void> {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS admin_staff (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      email VARCHAR(255) UNIQUE NOT NULL,
-      password_hash VARCHAR(255) NOT NULL,
-      role ENUM('super_admin','manager','writer') DEFAULT 'writer',
-      active TINYINT(1) DEFAULT 1,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      last_login_at DATETIME NULL,
-      password_changed_at DATETIME NULL,
-      updated_at DATETIME NULL
-    )
-  `);
-  // Idempotent additive columns for existing deployments
-  const alters = [
-    "ALTER TABLE admin_staff ADD COLUMN last_login_at DATETIME NULL",
-    "ALTER TABLE admin_staff ADD COLUMN password_changed_at DATETIME NULL",
-    "ALTER TABLE admin_staff ADD COLUMN updated_at DATETIME NULL",
-  ];
-  for (const sql of alters) {
-    try {
-      await pool.query(sql);
-    } catch {
-      /* column already exists */
-    }
-  }
-}
-
 /** Revoke all DB sessions for a staff user (disable / password change / delete). */
 export async function destroyAdminSessionsForStaff(staffId: number): Promise<void> {
   if (!Number.isFinite(staffId) || staffId <= 0) return;
-  await ensureAdminSessionsTable();
   await pool.query("DELETE FROM admin_sessions WHERE staff_id = ?", [staffId]);
 }
 
 export async function countActiveSuperAdmins(): Promise<number> {
-  await ensureAdminStaffTable();
   const [rows]: any = await pool.query(
     "SELECT COUNT(*) AS c FROM admin_staff WHERE role = 'super_admin' AND active = 1"
   );
@@ -148,7 +95,6 @@ export async function wouldLeaveZeroActiveSuperAdmins(
   staffId: number,
   next?: { role?: string; active?: number | boolean; deleting?: boolean }
 ): Promise<boolean> {
-  await ensureAdminStaffTable();
   const [rows]: any = await pool.query(
     "SELECT id, role, active FROM admin_staff WHERE id = ? LIMIT 1",
     [staffId]
@@ -312,7 +258,6 @@ export type CreateSessionInput = {
 export async function createAdminSession(
   input: CreateSessionInput
 ): Promise<{ token: string; expiresAt: Date }> {
-  await ensureAdminSessionsTable();
   const token = generateSessionToken();
   const tokenHash = hashSessionToken(token);
   const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_MS);
@@ -345,7 +290,6 @@ export async function createAdminSession(
 
 export async function destroyAdminSessionByToken(token: string): Promise<void> {
   if (!token) return;
-  await ensureAdminSessionsTable();
   const tokenHash = hashSessionToken(token);
   await pool.query("DELETE FROM admin_sessions WHERE token_hash = ?", [tokenHash]);
 }
@@ -354,7 +298,6 @@ export async function getAdminSession(req: NextApiRequest): Promise<AdminIdentit
   const token = readAdminSessionToken(req);
   if (!token) return null;
 
-  await ensureAdminSessionsTable();
   const tokenHash = hashSessionToken(token);
 
   const [rows]: any = await pool.query(
@@ -384,7 +327,6 @@ export async function getAdminSession(req: NextApiRequest): Promise<AdminIdentit
       await pool.query("DELETE FROM admin_sessions WHERE id = ?", [row.id]).catch(() => {});
       return null;
     }
-    await ensureAdminStaffTable();
     const [staffRows]: any = await pool.query(
       `SELECT id, name, email, role, active
        FROM admin_staff

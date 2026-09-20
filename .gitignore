@@ -40,6 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 tmp_*.json
+.tmp-*/
+.tmp-*.cjs
+.tmp-*.js
 
 # APK downloads: 5GNext exceeds GitHub 100MB — keep on Hostinger only (manual upload).
 # A1IPTVPlayer-latest.apk stays in git (~12MB) so deploy does not remove it from server.

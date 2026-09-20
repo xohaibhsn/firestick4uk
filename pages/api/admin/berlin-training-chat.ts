@@ -14,31 +14,6 @@ type StoredTrainingChatMessage = TrainingChatMessage & {
   created_at?: unknown;
 };
 
-async function ensureBerlinTrainingTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS berlin_training (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      title VARCHAR(255) NOT NULL,
-      content TEXT NOT NULL,
-      is_active TINYINT(1) DEFAULT 1,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
-  `);
-}
-
-async function ensureBerlinTrainingChatTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS berlin_training_chat_messages (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      role ENUM('user','assistant') NOT NULL,
-      content TEXT NOT NULL,
-      saved_training_title VARCHAR(255),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-}
-
 async function getTrainingChatHistory(limit = 80) {
   const [rows] = await pool.query(
     `SELECT * FROM (
@@ -133,9 +108,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!admin) return;
 
   try {
-    await ensureBerlinTrainingTable();
-    await ensureBerlinTrainingChatTable();
-
     if (req.method === 'GET') {
       const history = await getTrainingChatHistory(500);
       return res.status(200).json(history);
