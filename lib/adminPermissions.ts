@@ -107,9 +107,9 @@ const TAB_PERMISSION: Record<SidhuTab, AdminPermission> = {
 };
 
 /**
- * Explicit Super Admin–only Site Settings keys (from Sidhu Site Settings screen).
- * Content Editor keys (home_*, about_*, footer_*, subscription_*, contact copy, etc.) are NOT listed.
- * Note: contact_* phone/email/whatsapp are also editable via Content Editor → treated as content.
+ * Explicit Super Admin–only Site Settings keys (branding + core business contacts).
+ * Content Editor may still edit descriptive contact copy (titles, hours labels, etc.).
+ * Core coordinates are SA-only — especially contact_email (order notification recipient).
  */
 export const SUPER_ADMIN_SITE_SETTINGS_KEYS = new Set<string>([
   "site_title",
@@ -123,6 +123,11 @@ export const SUPER_ADMIN_SITE_SETTINGS_KEYS = new Set<string>([
   "hero_slide_3",
   "hero_slide_4",
   "site_meta_description",
+  "contact_email",
+  "contact_whatsapp",
+  "whatsapp_number",
+  "contact_phone",
+  "contact_telegram",
 ]);
 
 export function isSuperAdminSettingsKey(key: string): boolean {

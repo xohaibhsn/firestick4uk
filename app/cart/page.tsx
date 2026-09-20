@@ -213,13 +213,18 @@ export default function CartPage() {
           reader.onerror = reject;
           reader.readAsDataURL(receiptFile);
         });
-        const uploadRes = await fetch("/api/upload", {
+        const uploadRes = await fetch("/api/upload-receipt", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ file: base64, name: receiptFile.name, folder: "firestick4uk/receipts" }),
+          body: JSON.stringify({ file: base64, name: receiptFile.name }),
         });
-        const uploadData = await uploadRes.json();
-        receiptPath = uploadData.path || "";
+        const uploadData = await uploadRes.json().catch(() => ({}));
+        if (!uploadRes.ok || !uploadData.path) {
+          setOrderError("Payment receipt could not be uploaded. Please try again.");
+          setPlacing(false);
+          return;
+        }
+        receiptPath = uploadData.path;
       }
 
       const res = await fetch("/api/orders", {
@@ -271,7 +276,7 @@ export default function CartPage() {
           `💵 *Total: £${grandTotal.toFixed(2)}*`,
           '',
           `💳 *Payment:* ${paymentMethod === 'bank' ? 'Bank Transfer' : 'Cash on Delivery'}`,
-          paymentMethod === 'bank' ? '✅ Payment receipt uploaded' : '',
+          paymentMethod === 'bank' && receiptPath ? '✅ Payment receipt uploaded' : '',
           paymentReference ? `🏷️ *Payment Reference:* ${paymentReference}` : '💳 *Payment Reference:* Not provided',
           '',
           '📦 *Status:* Pending ⏳',

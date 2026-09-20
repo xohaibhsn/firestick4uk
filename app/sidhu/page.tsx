@@ -3184,15 +3184,29 @@ export default function AdminPage() {
               {activePage==="contact" && (
                 <div className="section-card" style={{padding:24}}>
                   <div className="section-header" style={{marginBottom:20}}><div className="section-title">📞 Contact Page Content</div></div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-                    <div className="modal-field"><label>Phone Number</label><input style={{width:"100%"}} value={siteContent.contact_phone||""} onChange={e=>setSiteContent(s=>({...s,contact_phone:e.target.value}))} /></div>
-                    <div className="modal-field"><label>Email Address</label><input style={{width:"100%"}} value={siteContent.contact_email||""} onChange={e=>setSiteContent(s=>({...s,contact_email:e.target.value}))} /></div>
-                    <div className="modal-field"><label>WhatsApp (numbers only)</label><input style={{width:"100%"}} value={siteContent.contact_whatsapp||""} onChange={e=>setSiteContent(s=>({...s,contact_whatsapp:e.target.value,whatsapp_number:e.target.value}))} placeholder="447518787653" /></div>
-                    <div className="modal-field"><label>Telegram Handle</label><input style={{width:"100%"}} value={siteContent.contact_telegram||""} onChange={e=>setSiteContent(s=>({...s,contact_telegram:e.target.value}))} placeholder="@firestick44" /></div>
-                    <div className="modal-field"><label>Business Hours</label><input style={{width:"100%"}} value={siteContent.contact_hours||""} onChange={e=>setSiteContent(s=>({...s,contact_hours:e.target.value}))} /></div>
-                    <div className="modal-field"><label>Address</label><input style={{width:"100%"}} value={siteContent.contact_address||""} onChange={e=>setSiteContent(s=>({...s,contact_address:e.target.value}))} /></div>
-                  </div>
-                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["contact_phone","contact_email","contact_whatsapp","whatsapp_number","contact_telegram","contact_hours","contact_address"])}>{contentSaving?"Saving...":"💾 Save Contact"}</button>
+                  {can("settings.manage") ? (
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+                      <div className="modal-field"><label>Phone Number</label><input style={{width:"100%"}} value={siteContent.contact_phone||""} onChange={e=>setSiteContent(s=>({...s,contact_phone:e.target.value}))} /></div>
+                      <div className="modal-field"><label>Email Address</label><input style={{width:"100%"}} value={siteContent.contact_email||""} onChange={e=>setSiteContent(s=>({...s,contact_email:e.target.value}))} /></div>
+                      <div className="modal-field"><label>WhatsApp (numbers only)</label><input style={{width:"100%"}} value={siteContent.contact_whatsapp||""} onChange={e=>setSiteContent(s=>({...s,contact_whatsapp:e.target.value,whatsapp_number:e.target.value}))} placeholder="447518787653" /></div>
+                      <div className="modal-field"><label>Telegram Handle</label><input style={{width:"100%"}} value={siteContent.contact_telegram||""} onChange={e=>setSiteContent(s=>({...s,contact_telegram:e.target.value}))} placeholder="@firestick44" /></div>
+                      <div className="modal-field"><label>Business Hours</label><input style={{width:"100%"}} value={siteContent.contact_hours||""} onChange={e=>setSiteContent(s=>({...s,contact_hours:e.target.value}))} /></div>
+                      <div className="modal-field"><label>Address</label><input style={{width:"100%"}} value={siteContent.contact_address||""} onChange={e=>setSiteContent(s=>({...s,contact_address:e.target.value}))} /></div>
+                    </div>
+                  ) : (
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+                      <div className="modal-field" style={{gridColumn:"1 / -1",padding:"10px 12px",background:"#F8F5FF",borderRadius:8,fontSize:12,color:"#5B21B6"}}>
+                        Phone, email, WhatsApp and Telegram coordinates are <strong>Super Admin only</strong> (Site Settings). You can still edit hours, address and page labels.
+                      </div>
+                      <div className="modal-field"><label>Business Hours</label><input style={{width:"100%"}} value={siteContent.contact_hours||""} onChange={e=>setSiteContent(s=>({...s,contact_hours:e.target.value}))} /></div>
+                      <div className="modal-field"><label>Address</label><input style={{width:"100%"}} value={siteContent.contact_address||""} onChange={e=>setSiteContent(s=>({...s,contact_address:e.target.value}))} /></div>
+                    </div>
+                  )}
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(
+                    can("settings.manage")
+                      ? ["contact_phone","contact_email","contact_whatsapp","whatsapp_number","contact_telegram","contact_hours","contact_address"]
+                      : ["contact_hours","contact_address"]
+                  )}>{contentSaving?"Saving...":"💾 Save Contact"}</button>
                   <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
                     <div style={{marginBottom:16,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Contact page labels</div>
                     <AdminContentPanel
