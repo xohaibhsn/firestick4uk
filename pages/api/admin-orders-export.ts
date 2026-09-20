@@ -5,19 +5,13 @@ import { recordAdminAudit } from "../../lib/adminAudit";
 import {
   EXPORT_MAX,
   buildOrderWhere,
+  csvEscapeCell,
   itemsListForOrderIds,
   parseOrderFilters,
 } from "../../lib/adminOrdersQuery";
 
-function csvEscape(value: unknown): string {
-  let s = value == null ? "" : String(value);
-  if (/^[=+\-@]/.test(s)) s = `'${s}`;
-  if (/[",\r\n]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
 function rowToCsv(cols: unknown[]): string {
-  return cols.map(csvEscape).join(",");
+  return cols.map(csvEscapeCell).join(",");
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
