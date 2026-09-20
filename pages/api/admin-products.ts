@@ -42,7 +42,19 @@ function normalizeNullableImage(value: unknown): string | null {
 }
 
 function validatePrice(value: unknown): { ok: true; price: number } | { ok: false; error: string } {
-  const n = typeof value === 'number' ? value : Number(String(value).replace(/[^0-9.\-]/g, ''));
+  if (value === null || value === undefined || value === '') {
+    return { ok: false, error: 'Price must be a finite non-negative number' };
+  }
+  const raw = String(value).trim();
+  const cleaned = raw.replace(/[^0-9.\-]/g, '');
+  if (!cleaned || cleaned === '-' || cleaned === '.' || cleaned === '-.') {
+    return { ok: false, error: 'Price must be a finite non-negative number' };
+  }
+  // Reject if letters/currency junk left only digits after strip but original had no numeric token
+  if (!/[0-9]/.test(raw)) {
+    return { ok: false, error: 'Price must be a finite non-negative number' };
+  }
+  const n = Number(cleaned);
   if (!Number.isFinite(n) || n < 0) {
     return { ok: false, error: 'Price must be a finite non-negative number' };
   }
