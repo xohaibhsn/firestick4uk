@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import { toEditorHtml } from "@/lib/contentHtml";
 import AdminContentPanel from "@/components/admin/AdminContentPanel";
 import SubscriptionContentEditor from "@/components/admin/SubscriptionContentEditor";
+import MediaLibraryPanel from "@/components/admin/MediaLibraryPanel";
+import MediaLibraryPicker, { type MediaAsset } from "@/components/admin/MediaLibraryPicker";
 import { keysForPage } from "@/lib/adminContentFields";
 import {
   canAccessSidhuTab,
@@ -11,6 +13,7 @@ import {
   ROLE_UI_DESCRIPTIONS,
   type SidhuTab,
 } from "@/lib/adminPermissions";
+import type { MediaLibraryPurpose } from "@/lib/mediaLibrary";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
 const styles = `
@@ -218,7 +221,7 @@ const demoCustomers = [
   { name:"Emma Wilson", email:"emma@example.com", phone:"+44 7444 444444", orders:1, spent:"£9.99", joined:"May 2026" },
 ];
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"training"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"training"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media";
 type AdminRole = "super_admin"|"manager"|"writer";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
@@ -287,6 +290,11 @@ export default function AdminPage() {
   const [productModal, setProductModal] = useState<any|null|"new">(null);
   const [editProduct, setEditProduct] = useState({ name:"", slug:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"" });
   const [imageUploading, setImageUploading] = useState(false);
+  const [mediaPicker, setMediaPicker] = useState<{
+    purposes: MediaLibraryPurpose[];
+    onSelect: (asset: MediaAsset) => void;
+    title?: string;
+  } | null>(null);
   const [heroImgUploading, setHeroImgUploading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [customersPage, setCustomersPage] = useState(1);
@@ -1871,6 +1879,17 @@ export default function AdminPage() {
                   {imageUploading ? "Uploading..." : "Upload Image"}
                   <input type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files?.[0] && handleProductImage(e.target.files[0])} disabled={imageUploading} />
                 </label>
+                <button
+                  type="button"
+                  style={{cursor:"pointer",background:"rgba(91,33,182,0.08)",border:"1px solid rgba(91,33,182,0.3)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6"}}
+                  onClick={() => setMediaPicker({
+                    purposes: ["products"],
+                    title: "Choose Product Image",
+                    onSelect: (asset) => setEditProduct((p) => ({ ...p, image: asset.url })),
+                  })}
+                >
+                  Choose from Library
+                </button>
                 {editProduct.image && <button style={{background:"none",border:"none",color:"rgba(255,100,100,0.7)",cursor:"pointer",fontSize:13}} onClick={() => setEditProduct(p=>({...p,image:""}))}>Remove</button>}
               </div>
             </div>
@@ -1944,6 +1963,17 @@ export default function AdminPage() {
                   {featImgUploading?"Uploading...":"Upload Image"}
                   <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&handleFeatImg(e.target.files[0])} disabled={featImgUploading} />
                 </label>
+                <button
+                  type="button"
+                  style={{cursor:"pointer",background:"rgba(91,33,182,0.08)",border:"1px solid rgba(91,33,182,0.3)",padding:"7px 14px",borderRadius:8,fontSize:13,color:"#5B21B6"}}
+                  onClick={() => setMediaPicker({
+                    purposes: ["blog"],
+                    title: "Choose Featured Image",
+                    onSelect: (asset) => setEditBlog((p) => ({ ...p, featured_image: asset.url })),
+                  })}
+                >
+                  Choose from Library
+                </button>
                 {editBlog.featured_image && <button type="button" style={{background:"none",border:"none",color:"rgba(255,100,100,0.7)",cursor:"pointer",fontSize:12}} onClick={()=>setEditBlog(p=>({...p,featured_image:""}))}>Remove</button>}
               </div>
             </div>
@@ -2031,6 +2061,18 @@ export default function AdminPage() {
         </div>
       )}
 
+      <MediaLibraryPicker
+        open={!!mediaPicker}
+        role={adminRole}
+        allowedPurposes={mediaPicker?.purposes}
+        title={mediaPicker?.title}
+        onClose={() => setMediaPicker(null)}
+        onSelect={(asset) => {
+          mediaPicker?.onSelect(asset);
+          setMediaPicker(null);
+        }}
+      />
+
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       {adminDropOpen && <div style={{position:"fixed",inset:0,zIndex:199}} onClick={() => setAdminDropOpen(false)} />}
 
@@ -2050,6 +2092,7 @@ export default function AdminPage() {
               { id:"leads",     icon:"💬", label:"Leads",        badge: leadsLast24 > 0 ? String(leadsLast24) : null, badgeColor:"orange", roles:["super_admin","manager"] },
               { id:"training",  icon:"🧠", label:"Berlin Training", roles:["super_admin","manager"] },
               { id:"blog",      icon:"📝", label:"Blog",         roles:["super_admin","manager","writer"] },
+              { id:"media",     icon:"🖼️", label:"Media Library", roles:["super_admin","manager","writer"] },
               { id:"coupons",   icon:"🎟️", label:"Coupons",      roles:["super_admin"] },
               { id:"builder",   icon:"🎨", label:"Page Builder", roles:["super_admin"] },
               { id:"faqadmin",  icon:"❓", label:"FAQs",         roles:["super_admin","manager"] },
@@ -2085,6 +2128,7 @@ export default function AdminPage() {
                 {tab==="leads" && <>Berlin <span>Leads</span></>}
                 {tab==="training" && <>Berlin <span>Training</span></>}
                 {tab==="blog" && <>Manage <span>Blog</span></>}
+                {tab==="media" && <>Media <span>Library</span></>}
                 {tab==="coupons" && <>Manage <span>Coupons</span></>}
                 {tab==="builder" && <>Page <span>Builder</span></>}
                 {tab==="faqadmin" && <>Manage <span>FAQs</span></>}
@@ -2376,6 +2420,11 @@ export default function AdminPage() {
               </div>
             </div>
             </div>
+          )}
+
+          {/* MEDIA LIBRARY */}
+          {tab==="media" && can("media.view") && (
+            <MediaLibraryPanel role={adminRole} />
           )}
 
           {/* CUSTOMERS */}
@@ -3233,6 +3282,7 @@ export default function AdminPage() {
                       "faq.created","faq.updated","faq.deleted",
                       "coupon.created","coupon.updated","coupon.deleted",
                       "content.updated","settings.updated",
+                      "media.uploaded",
                       "page_builder.updated",
                       "lead.deleted","lead.bulk_deleted",
                       "training.created","training.updated","training.deleted",
@@ -3247,7 +3297,7 @@ export default function AdminPage() {
                     style={{width:"100%",padding:"9px 12px",border:"1px solid #E5E5E5",borderRadius:8,fontSize:13,background:"#fff"}}
                   >
                     <option value="">All entities</option>
-                    {["session","staff","order","product","blog","faq","coupon","content","settings","page_builder","lead","training"].map(e=><option key={e} value={e}>{e}</option>)}
+                    {["session","staff","order","product","blog","faq","coupon","content","settings","page_builder","lead","training","media"].map(e=><option key={e} value={e}>{e}</option>)}
                   </select>
                 </div>
                 <button className="add-btn" onClick={()=>loadAuditLog(1)} disabled={auditLoading}>
@@ -3376,6 +3426,17 @@ export default function AdminPage() {
                       {logoUploading ? "Uploading..." : "Upload Logo"}
                       <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style={{display:"none"}} onChange={e=>e.target.files?.[0]&&uploadLogoAdmin(e.target.files[0])} disabled={logoUploading} />
                     </label>
+                    <button
+                      type="button"
+                      style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}
+                      onClick={() => setMediaPicker({
+                        purposes: ["logo"],
+                        title: "Choose Site Logo",
+                        onSelect: (asset) => setSiteContent((s) => ({ ...s, site_logo_url: asset.url })),
+                      })}
+                    >
+                      Choose from Library
+                    </button>
                     {siteContent.site_logo_url && (
                       <button
                         type="button"
@@ -3468,6 +3529,17 @@ export default function AdminPage() {
                         }}
                       />
                     </label>
+                    <button
+                      type="button"
+                      style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}
+                      onClick={() => setMediaPicker({
+                        purposes: ["og"],
+                        title: "Choose Default OG Image",
+                        onSelect: (asset) => setSiteContent((s) => ({ ...s, og_default_image: asset.url })),
+                      })}
+                    >
+                      Choose from Library
+                    </button>
                     {siteContent.og_default_image && (
                       <button
                         type="button"
@@ -3518,6 +3590,17 @@ export default function AdminPage() {
                         disabled={waIconUploading}
                       />
                     </label>
+                    <button
+                      type="button"
+                      style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}
+                      onClick={() => setMediaPicker({
+                        purposes: ["whatsapp"],
+                        title: "Choose WhatsApp Icon",
+                        onSelect: (asset) => setSiteContent((s) => ({ ...s, whatsapp_icon_url: asset.url })),
+                      })}
+                    >
+                      Choose from Library
+                    </button>
                     {siteContent.whatsapp_icon_url && (
                       <button
                         type="button"
@@ -3574,6 +3657,17 @@ export default function AdminPage() {
                                 }}
                               />
                             </label>
+                            <button
+                              type="button"
+                              style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"6px 12px",borderRadius:8,fontSize:12,color:"#5B21B6",fontWeight:600}}
+                              onClick={() => setMediaPicker({
+                                purposes: ["hero"],
+                                title: `Choose Hero Slide ${n}`,
+                                onSelect: (asset) => setSiteContent((s) => ({ ...s, [key]: asset.url })),
+                              })}
+                            >
+                              Library
+                            </button>
                             {url && (
                               <button
                                 type="button"
@@ -3685,7 +3779,7 @@ export default function AdminPage() {
                     {contentMsg}
                   </div>
                 )}
-                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline"])}>
+                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_logo_url","og_default_image","whatsapp_icon_url"])}>
                   {contentSaving?"Saving...":"💾 Save Settings"}
                 </button>
               </div>
