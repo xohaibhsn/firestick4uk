@@ -1085,6 +1085,35 @@ export default function AdminPage() {
   const roleLabel = (role: string) =>
     role === "super_admin" ? "Super Admin" : role === "manager" ? "Manager" : "Writer";
 
+  const isBlankField = (v: unknown) => !String(v ?? "").trim();
+
+  const productHealth = (p: any) => {
+    const missing: string[] = [];
+    if (isBlankField(p.image)) missing.push("Image");
+    const noContent =
+      isBlankField(p.description) &&
+      isBlankField(p.short_description) &&
+      isBlankField(p.full_description);
+    if (noContent) missing.push("Content");
+    const noSeo =
+      isBlankField(p.meta_description) &&
+      isBlankField(p.short_description) &&
+      isBlankField(p.description);
+    if (noSeo) missing.push("SEO");
+    if (isBlankField(p.features) && isBlankField(p.full_description)) missing.push("Details");
+
+    let label = "Complete";
+    if (missing.length === 0) label = "Complete";
+    else if (missing.length >= 3) label = "Needs Review";
+    else if (missing.includes("Content") && missing.includes("Image")) label = "Needs Review";
+    else if (missing.includes("Content")) label = "Needs Content";
+    else if (missing.includes("Image")) label = "Needs Image";
+    else if (missing.includes("SEO")) label = "Needs SEO";
+    else label = "Needs Review";
+
+    return { label, missing };
+  };
+
   const loadStaff = () => {
     fetch("/api/admin-staff", { credentials: "include", headers: getRoleHeaders() })
       .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setStaffUsers(d); }).catch(()=>{});
@@ -1561,7 +1590,20 @@ export default function AdminPage() {
 
   const openEditProduct = (p: any) => {
     const rawPrice = p.price ? `£${Number(String(p.price).replace(/[^0-9.]/g,'')).toFixed(2)}` : "";
-    setEditProduct({ name:p.name||"", slug:p.slug||toSlug(p.name||""), category:p.category||"Subscription", price:rawPrice, stock:p.stock||"Digital", image:p.image||"", short_description:p.short_description||"", full_description:p.full_description||"", features:p.features||"", seo_title:p.seo_title||"", meta_description:p.meta_description||"", focus_keyword:p.focus_keyword||"" });
+    setEditProduct({
+      name: p.name || "",
+      slug: p.slug || toSlug(p.name || ""),
+      category: p.category || "Subscription",
+      price: rawPrice,
+      stock: p.stock || "Digital",
+      image: p.image || "",
+      short_description: p.short_description || p.description || "",
+      full_description: p.full_description || "",
+      features: p.features || "",
+      seo_title: p.seo_title || "",
+      meta_description: p.meta_description || "",
+      focus_keyword: p.focus_keyword || "",
+    });
     setProductModal(p);
   };
 
@@ -1756,6 +1798,20 @@ export default function AdminPage() {
         <div className="modal-overlay">
           <div className="modal modal-product" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="modal-title">{productModal === "new" ? "Add New Product" : "Edit Product"}</div>
+            {productModal !== "new" && (() => {
+              const health = productHealth({
+                ...productModal,
+                ...editProduct,
+                description: editProduct.short_description,
+              });
+              if (health.label === "Complete") return null;
+              return (
+                <div style={{marginBottom:14,padding:"10px 12px",background:"#FFFBEB",border:"1px solid #F59E0B",borderRadius:8,fontSize:13,color:"#92400E"}}>
+                  This product has incomplete content.
+                  <div style={{marginTop:4,fontSize:12,opacity:0.9}}>Missing: {health.missing.join(", ")}</div>
+                </div>
+              );
+            })()}
 
             {/* Basic Info */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
@@ -2255,21 +2311,32 @@ export default function AdminPage() {
               </div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Content</th><th>Actions</th></tr></thead>
                   <tbody>
-                    {products.map(p => (
+                    {products.map(p => {
+                      const health = productHealth(p);
+                      const badgeColor =
+                        health.label === "Complete" ? { bg:"#ECFDF5", bd:"#A7F3D0", fg:"#047857" } :
+                        health.label === "Needs Image" ? { bg:"#EFF6FF", bd:"#BFDBFE", fg:"#1D4ED8" } :
+                        health.label === "Needs SEO" ? { bg:"#F5F3FF", bd:"#DDD6FE", fg:"#5B21B6" } :
+                        { bg:"#FFFBEB", bd:"#FCD34D", fg:"#B45309" };
+                      return (
                       <tr key={p.id}>
-                        <td><div className="product-thumb">{p.emoji}</div></td>
+                        <td><div className="product-thumb">{p.image ? <img src={p.image} alt="" style={{width:36,height:36,objectFit:"cover",borderRadius:6}} /> : (p.emoji || "📦")}</div></td>
                         <td style={{fontWeight:600}}>{p.name}</td>
                         <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{p.category}</span></td>
                         <td style={{fontWeight:700,color:"#5B21B6"}}>{p.price}</td>
                         <td>{p.stock}</td>
                         <td>
+                          <span title={health.missing.length ? `Missing: ${health.missing.join(", ")}` : "All key fields present"} style={{background:badgeColor.bg,border:`1px solid ${badgeColor.bd}`,color:badgeColor.fg,padding:"3px 8px",borderRadius:8,fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{health.label}</span>
+                        </td>
+                        <td>
                           <button className="action-btn btn-edit" onClick={() => openEditProduct(p)}>Edit</button>
                           <button className="action-btn btn-delete" onClick={() => deleteProduct(p.id)}>Delete</button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
