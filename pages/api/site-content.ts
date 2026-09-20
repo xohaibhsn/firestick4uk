@@ -8,7 +8,8 @@ import {
   subscriptionPageUrl,
   validateSubscriptionSlug,
 } from '../../lib/subscriptionSlug';
-import { requireAdminRole } from '../../lib/adminAuth';
+import { requireAdmin } from '../../lib/adminAuth';
+import { hasAdminPermission, isSuperAdminSettingsKey } from '../../lib/adminPermissions';
 
 const DEFAULTS = [
   ['site_title','Firestick4UK','text','settings','Website Title'],
@@ -59,8 +60,9 @@ const DEFAULTS = [
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method !== 'GET') {
-      const admin = await requireAdminRole(req, res, ['super_admin', 'manager']);
+      const admin = await requireAdmin(req, res);
       if (!admin) return;
+      (req as any).__adminIdentity = admin;
     }
 
     await pool.query(`
@@ -168,6 +170,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
+      const admin = (req as any).__adminIdentity;
       const { key, value, updates } = req.body;
 
       const upsert = async (contentKey: string, contentValue: string) => {
@@ -198,6 +201,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         updateList.push({ key: String(key), value: String(value ?? '') });
       } else {
         return res.status(400).json({ error: 'No content keys provided' });
+      }
+
+      const settingsKeys = updateList.filter((u) => isSuperAdminSettingsKey(u.key)).map((u) => u.key);
+      const contentKeys = updateList.filter((u) => !isSuperAdminSettingsKey(u.key)).map((u) => u.key);
+
+      if (settingsKeys.length && !hasAdminPermission(admin.role, 'settings.manage')) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'You do not have permission for this action.',
+          detail: 'Site Settings keys require Super Admin',
+          blocked_keys: settingsKeys,
+        });
+      }
+      if (contentKeys.length && !hasAdminPermission(admin.role, 'content.manage')) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'You do not have permission for this action.',
+        });
       }
 
       const slugUpdate = updateList.find((u) => u.key === 'subscription_slug');
@@ -273,16 +294,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PUT') {
+      const admin = (req as any).__adminIdentity;
       const { content_key, content_value, content_type, page_name, label } = req.body;
+      const ck = String(content_key || '');
+      if (!ck) return res.status(400).json({ error: 'content_key required' });
+
+      if (isSuperAdminSettingsKey(ck)) {
+        if (!hasAdminPermission(admin.role, 'settings.manage')) {
+          return res.status(403).json({
+            error: 'Forbidden',
+            message: 'You do not have permission for this action.',
+          });
+        }
+      } else if (!hasAdminPermission(admin.role, 'content.manage')) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'You do not have permission for this action.',
+        });
+      }
+
       await pool.query(
         'INSERT INTO site_content (content_key,content_value,content_type,page_name,label) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE content_value=?,label=?',
-        [content_key, content_value||'', content_type||'text', page_name||'', label||content_key, content_value||'', label||content_key]
+        [ck, content_value||'', content_type||'text', page_name||'', label||ck, content_value||'', label||ck]
       );
       return res.status(200).json({ success: true });
     }
 
     if (req.method === 'DELETE') {
-      const { key } = req.query;
+      const admin = (req as any).__adminIdentity;
+      const key = String(req.query.key || '');
+      if (!key) return res.status(400).json({ error: 'key required' });
+
+      if (isSuperAdminSettingsKey(key)) {
+        if (!hasAdminPermission(admin.role, 'settings.manage')) {
+          return res.status(403).json({
+            error: 'Forbidden',
+            message: 'You do not have permission for this action.',
+          });
+        }
+      } else if (!hasAdminPermission(admin.role, 'content.manage')) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'You do not have permission for this action.',
+        });
+      }
+
       await pool.query('DELETE FROM site_content WHERE content_key=?', [key]);
       return res.status(200).json({ success: true });
     }

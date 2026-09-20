@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "../../lib/db";
-import { requireAdminRole } from "../../lib/adminAuth";
+import { requireAdminPermission } from "../../lib/adminAuth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const admin = await requireAdminRole(req, res, ["super_admin", "manager"]);
+  const admin = await requireAdminPermission(req, res, "orders.manage");
   if (!admin) return;
 
   try {

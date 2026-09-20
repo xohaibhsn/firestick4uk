@@ -297,7 +297,7 @@ export default function SubscriptionContentEditor({
         if (Array.isArray(d)) setProducts(d);
       })
       .catch(() => {});
-    fetch("/api/faqs?admin=true")
+    fetch("/api/faqs?admin=true", { credentials: "include" })
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d)) setFaqs(d);

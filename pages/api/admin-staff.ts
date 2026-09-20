@@ -7,7 +7,7 @@ import {
   isAdminRole,
   isValidStaffEmail,
   normalizeStaffEmail,
-  requireAdminRole,
+  requireAdminPermission,
   validateStaffPassword,
   wouldLeaveZeroActiveSuperAdmins,
 } from "../../lib/adminAuth";
@@ -33,7 +33,7 @@ function safeStaffRow(row: any) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const admin = await requireAdminRole(req, res, ["super_admin"]);
+  const admin = await requireAdminPermission(req, res, "staff.manage");
   if (!admin) return;
 
   try {

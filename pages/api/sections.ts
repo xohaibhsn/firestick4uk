@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
-import { requireAdminRole } from '../../lib/adminAuth';
+import { requireAdminPermission } from '../../lib/adminAuth';
 
 
 
@@ -18,7 +18,7 @@ const DEFAULTS = [
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method !== 'GET') {
-      const admin = await requireAdminRole(req, res, ['super_admin']);
+      const admin = await requireAdminPermission(req, res, 'page_builder.manage');
       if (!admin) return;
     }
 
@@ -84,6 +84,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'GET') {
       const { page, all } = req.query;
+      if (all) {
+        const admin = await requireAdminPermission(req, res, 'page_builder.manage', { mutate: false });
+        if (!admin) return;
+      }
       let query = 'SELECT content_key,content_value,content_type,page_name,label,section_order,is_visible FROM site_content WHERE page_name=? AND content_type="json"';
       const params: any[] = [page || 'home'];
       if (!all) query += ' AND is_visible=1';

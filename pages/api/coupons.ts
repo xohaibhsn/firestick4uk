@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { RL_GENERAL, getClientIp } from '../../lib/rateLimit';
 import pool from '../../lib/db';
-import { requireAdminRole } from '../../lib/adminAuth';
+import { requireAdminPermission } from '../../lib/adminAuth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { allowed } = RL_GENERAL(getClientIp(req));
@@ -56,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Admin listing + mutations — super_admin only (matches Sidhu UI)
-    const admin = await requireAdminRole(req, res, ['super_admin']);
+    const admin = await requireAdminPermission(req, res, 'coupons.manage');
     if (!admin) return;
 
     if (req.method === 'GET') {

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
-import { requireAdminRole } from '../../lib/adminAuth';
+import { requireAdminPermission } from '../../lib/adminAuth';
 
 function toSlug(value: string): string {
   return String(value || '')
@@ -61,7 +61,7 @@ async function ensureProductSlugColumn() {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const admin = await requireAdminRole(req, res, ['super_admin', 'manager']);
+  const admin = await requireAdminPermission(req, res, 'products.manage');
   if (!admin) return;
 
   try {

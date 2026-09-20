@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
-import { requireAdminRole } from '../../lib/adminAuth';
+import { requireAdminPermission } from '../../lib/adminAuth';
 
 
 
@@ -42,7 +42,7 @@ async function ensureFaqExists(question: string, answer: string, category: strin
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method !== 'GET') {
-      const admin = await requireAdminRole(req, res, ['super_admin', 'manager']);
+      const admin = await requireAdminPermission(req, res, 'faqs.manage');
       if (!admin) return;
     }
 
@@ -72,6 +72,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'GET') {
       const { admin } = req.query;
+      if (admin) {
+        const identity = await requireAdminPermission(req, res, 'faqs.manage', { mutate: false });
+        if (!identity) return;
+      }
       let query = 'SELECT * FROM faqs';
       if (!admin) query += ' WHERE is_visible=1';
       query += ' ORDER BY category, sort_order ASC';

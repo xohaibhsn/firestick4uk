@@ -4,7 +4,7 @@ import {
   destroyAdminSessionsForStaff,
   ensureAdminStaffTable,
   hashStaffPassword,
-  requireAdminRole,
+  requireAdminPermission,
   validateStaffPassword,
 } from "../../lib/adminAuth";
 
@@ -12,7 +12,7 @@ import {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const admin = await requireAdminRole(req, res, ["super_admin"]);
+  const admin = await requireAdminPermission(req, res, "staff.manage");
   if (!admin) return;
 
   try {

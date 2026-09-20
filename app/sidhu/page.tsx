@@ -5,6 +5,12 @@ import { toEditorHtml } from "@/lib/contentHtml";
 import AdminContentPanel from "@/components/admin/AdminContentPanel";
 import SubscriptionContentEditor from "@/components/admin/SubscriptionContentEditor";
 import { keysForPage } from "@/lib/adminContentFields";
+import {
+  canAccessSidhuTab,
+  hasAdminPermission,
+  ROLE_UI_DESCRIPTIONS,
+  type SidhuTab,
+} from "@/lib/adminPermissions";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
 const styles = `
@@ -310,8 +316,48 @@ export default function AdminPage() {
   const [trainingChatInput, setTrainingChatInput] = useState("");
   const [trainingChatLoading, setTrainingChatLoading] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
+  const [permMsg, setPermMsg] = useState("");
   const trainingChatInputRef = useRef<HTMLInputElement>(null);
   const trainingChatEndRef = useRef<HTMLDivElement>(null);
+
+  const can = (permission: Parameters<typeof hasAdminPermission>[1]) =>
+    hasAdminPermission(adminRole, permission);
+
+  const showPermError = (msg?: string) => {
+    setPermMsg(msg || "You do not have permission for this action.");
+    setTimeout(() => setPermMsg(""), 4000);
+  };
+
+  const handleSessionExpired = () => {
+    setLoggedIn(false);
+    setAdminRole("super_admin");
+    setAdminName("Admin");
+    setAdminPrincipalType("master");
+    setTab("dashboard");
+    setLoginError("Session expired. Please sign in again.");
+  };
+
+  const adminApi = async (url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> => {
+    try {
+      const res = await fetch(url, {
+        ...init,
+        credentials: "include",
+        headers: { ...(init?.headers || {}) },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        handleSessionExpired();
+        return { ok: false, status: 401, data };
+      }
+      if (res.status === 403) {
+        showPermError(data?.message || data?.error);
+        return { ok: false, status: 403, data };
+      }
+      return { ok: res.ok, status: res.status, data };
+    } catch {
+      return { ok: false, status: 0, data: {} };
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -341,86 +387,192 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!loggedIn) return;
-    const adminFetch = (url: string, init?: RequestInit) =>
-      fetch(url, { ...init, credentials: "include", headers: { ...(init?.headers || {}) } });
-    adminFetch("/api/admin-products")
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data) && data.length > 0) setProducts(data); })
-      .catch(() => {});
-    adminFetch("/api/admin-orders")
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setOrders(data.map((o: any) => ({
-            id: o.order_id,
-            customer: o.customer_name,
-            email: o.customer_email,
-            phone: o.customer_phone,
-            items: o.items_list || o.payment_method || "—",
-            total: `£${parseFloat(o.total || 0).toFixed(2)}`,
-            status: o.status,
-            date: o.created_at ? new Date(o.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : "—",
-            receipt: !!o.receipt_path,
-            receipt_path: o.receipt_path || "",
-            address: [o.delivery_address, o.city, o.postcode].filter(Boolean).join(", "),
-            payment: o.payment_method || "",
-            payment_reference: o.payment_reference || "",
-          })));
-        }
-      })
-      .catch(() => {});
-    fetch("/api/blog")
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setBlogPosts(data); })
-      .catch(() => {});
-    fetch("/api/admin-orders?customers=1", { credentials: "include" })
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setCustomers(data.map((c: any) => ({
-            name: c.customer_name || "",
-            email: c.customer_email || "",
-            phone: c.customer_phone || "",
-            orders: Number(c.order_count) || 0,
-            spent: `£${parseFloat(c.total_spent || 0).toFixed(2)}`,
-            joined: c.first_order ? new Date(c.first_order).toLocaleDateString("en-GB",{month:"short",year:"numeric"}) : "—",
-          })));
-        }
-      })
-      .catch(() => {});
-    fetch("/api/coupons", { credentials: "include" }).then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setCoupons(d); }).catch(()=>{});
-    fetch("/api/site-content?page=all")
-      .then(r => r.json())
-      .then(d => { if (d && typeof d === "object") setSiteContent(d); })
-      .catch(() => {});
-    fetch("/api/sections?page=home&all=1").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); }).catch(()=>{});
-    fetch("/api/faqs?admin=true").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setFaqs(d); }).catch(()=>{});
-    fetch("/api/admin/leads", { credentials: "include" })
-      .then(r => r.json())
-      .then(d => {
-        if (Array.isArray(d)) {
-          setChatLeads(d);
-          setSelectedLeadIds([]);
-        }
-      })
-      .catch(() => {});
-    fetch("/api/admin/berlin-training", { credentials: "include" })
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d)) setBerlinTraining(d); })
-      .catch(() => {});
-    fetch("/api/admin/berlin-training-chat", { credentials: "include" })
-      .then(r => r.json())
-      .then(d => {
-        if (Array.isArray(d) && d.length > 0) {
-          setTrainingChat(d.map((m: TrainingChatMessage) => ({ role:m.role, content:m.content, saved:!!m.saved })));
-        }
-      })
-      .catch(() => {});
-    if (adminRole === "super_admin") {
+
+    // Blog is allowed for all CMS roles
+    if (can("blog.manage")) {
+      fetch("/api/blog", { credentials: "include" })
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) setBlogPosts(data);
+        })
+        .catch(() => {});
+    }
+
+    if (can("products.view")) {
+      fetch("/api/admin-products", { credentials: "include" })
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) setProducts(data);
+        })
+        .catch(() => {});
+    } else {
+      setProducts([]);
+    }
+
+    if (can("orders.view")) {
+      fetch("/api/admin-orders", { credentials: "include" })
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) {
+            setOrders(
+              data.map((o: any) => ({
+                id: o.order_id,
+                customer: o.customer_name,
+                email: o.customer_email,
+                phone: o.customer_phone,
+                items: o.items_list || o.payment_method || "—",
+                total: `£${parseFloat(o.total || 0).toFixed(2)}`,
+                status: o.status,
+                date: o.created_at
+                  ? new Date(o.created_at).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : "—",
+                receipt: !!o.receipt_path,
+                receipt_path: o.receipt_path || "",
+                address: [o.delivery_address, o.city, o.postcode].filter(Boolean).join(", "),
+                payment: o.payment_method || "",
+                payment_reference: o.payment_reference || "",
+              }))
+            );
+          } else {
+            setOrders([]);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setOrders([]);
+    }
+
+    if (can("customers.view")) {
+      fetch("/api/admin-orders?customers=1", { credentials: "include" })
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) {
+            setCustomers(
+              data.map((c: any) => ({
+                name: c.customer_name || "",
+                email: c.customer_email || "",
+                phone: c.customer_phone || "",
+                orders: Number(c.order_count) || 0,
+                spent: `£${parseFloat(c.total_spent || 0).toFixed(2)}`,
+                joined: c.first_order
+                  ? new Date(c.first_order).toLocaleDateString("en-GB", {
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : "—",
+              }))
+            );
+          } else {
+            setCustomers([]);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setCustomers([]);
+    }
+
+    if (can("coupons.manage")) {
+      fetch("/api/coupons", { credentials: "include" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (Array.isArray(d)) setCoupons(d);
+        })
+        .catch(() => {});
+    } else {
+      setCoupons([]);
+    }
+
+    if (can("content.manage") || can("settings.manage")) {
+      fetch("/api/site-content?page=all")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d && typeof d === "object") setSiteContent(d);
+        })
+        .catch(() => {});
+    }
+
+    if (can("page_builder.manage")) {
+      fetch("/api/sections?page=home&all=1", { credentials: "include" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (Array.isArray(d)) setSections(d);
+        })
+        .catch(() => {});
+    } else {
+      setSections([]);
+    }
+
+    if (can("faqs.manage")) {
+      fetch("/api/faqs?admin=true", { credentials: "include" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (Array.isArray(d)) setFaqs(d);
+        })
+        .catch(() => {});
+    } else {
+      setFaqs([]);
+    }
+
+    if (can("leads.view")) {
+      fetch("/api/admin/leads", { credentials: "include" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (Array.isArray(d)) {
+            setChatLeads(d);
+            setSelectedLeadIds([]);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setChatLeads([]);
+    }
+
+    if (can("training.manage")) {
+      fetch("/api/admin/berlin-training", { credentials: "include" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (Array.isArray(d)) setBerlinTraining(d);
+        })
+        .catch(() => {});
+      fetch("/api/admin/berlin-training-chat", { credentials: "include" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (Array.isArray(d) && d.length > 0) {
+            setTrainingChat(
+              d.map((m: TrainingChatMessage) => ({
+                role: m.role,
+                content: m.content,
+                saved: !!m.saved,
+              }))
+            );
+          }
+        })
+        .catch(() => {});
+    }
+
+    if (can("staff.manage")) {
       fetch("/api/admin-staff", { credentials: "include" })
-        .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setStaffUsers(d); }).catch(()=>{});
+        .then((r) => r.json())
+        .then((d) => {
+          if (Array.isArray(d)) setStaffUsers(d);
+        })
+        .catch(() => {});
+    } else {
+      setStaffUsers([]);
     }
   }, [loggedIn, adminRole]);
+
+  // Keep current tab within role permissions (no hidden-tab bypass via state)
+  useEffect(() => {
+    if (!loggedIn) return;
+    if (!canAccessSidhuTab(adminRole, tab as SidhuTab)) {
+      setTab("dashboard");
+    }
+  }, [loggedIn, adminRole, tab]);
 
   useEffect(() => {
     if (tab !== "training") return;
@@ -431,16 +583,18 @@ export default function AdminPage() {
     }
   }, [tab, trainingChat, trainingChatLoading]);
 
-  // Refresh all site_content (incl. OG + WhatsApp icon) when Site Settings opens
+  // Refresh all site_content when Site Settings or Content Editor opens
   useEffect(() => {
-    if (!loggedIn || tab !== "settings") return;
+    if (!loggedIn) return;
+    if (tab !== "settings" && tab !== "pages") return;
+    if (!can("content.manage") && !can("settings.manage")) return;
     fetch("/api/site-content?page=all")
       .then((r) => r.json())
       .then((d) => {
         if (d && typeof d === "object") setSiteContent(d);
       })
       .catch(() => {});
-  }, [loggedIn, tab]);
+  }, [loggedIn, tab, adminRole]);
 
   // Cookie session carries auth — headers are only for Content-Type / optional metadata
   const getRoleHeaders = () => ({});
@@ -450,8 +604,20 @@ export default function AdminPage() {
     const updates = keys.map(k => ({ key: k, value: overrides?.[k] ?? siteContent[k] ?? "" }));
     const res = await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
       body: JSON.stringify({ updates }),
-    }).then(r => r.json()).catch(() => ({}));
+    }).then(async (r) => {
+      const data = await r.json().catch(() => ({}));
+      return { status: r.status, ...data };
+    }).catch(() => ({ status: 0 }));
     setContentSaving(false);
+    if (res.status === 401) {
+      handleSessionExpired();
+      return;
+    }
+    if (res.status === 403) {
+      setContentMsg(`❌ ${res.message || res.error || "You do not have permission for this action."}`);
+      setTimeout(() => setContentMsg(""), 4000);
+      return;
+    }
     if (res.success && res.subscription_slug) {
       setSiteContent((s) => ({
         ...s,
@@ -830,8 +996,17 @@ export default function AdminPage() {
     setFeatImgUploading(true);
     try {
       const base64 = await new Promise<string>((resolve,reject) => { const r=new FileReader(); r.onload=()=>resolve(r.result as string); r.onerror=reject; r.readAsDataURL(file); });
-      const res = await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file:base64,name:file.name})}).then(r=>r.json());
+      const r = await fetch("/api/upload",{
+        method:"POST",
+        credentials:"include",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file:base64,name:file.name,folder:"firestick4uk/blog"}),
+      });
+      if (r.status === 401) { handleSessionExpired(); return; }
+      if (r.status === 403) { showPermError(); return; }
+      const res = await r.json();
       if (res.path) setEditBlog(p=>({...p,featured_image:res.path}));
+      else if (res.error) setBlogMsg(`❌ ${res.message || res.error}`);
     } catch {}
     setFeatImgUploading(false);
   };
@@ -1024,9 +1199,14 @@ export default function AdminPage() {
       });
       const res = await fetch("/api/upload", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file: base64, name: file.name }),
-      }).then(r => r.json());
+        body: JSON.stringify({ file: base64, name: file.name, folder: "firestick4uk/products" }),
+      }).then(async (r) => {
+        if (r.status === 401) { handleSessionExpired(); return {}; }
+        if (r.status === 403) { showPermError(); return {}; }
+        return r.json();
+      });
       if (res.path) setEditProduct(p => ({ ...p, image: res.path }));
     } catch {}
     setImageUploading(false);
@@ -1466,7 +1646,7 @@ export default function AdminPage() {
               { id:"pages",     icon:"✏️", label:"Content Editor", roles:["super_admin","manager"] },
               { id:"staff",     icon:"👤", label:"Staff Users",  roles:["super_admin"] },
               { id:"settings",  icon:"⚙️", label:"Site Settings",roles:["super_admin"] },
-            ] as const).filter(item => ([...item.roles] as string[]).includes(adminRole)).map(item => (
+            ] as const).filter(item => canAccessSidhuTab(adminRole, item.id as SidhuTab)).map(item => (
               <button key={item.id} className={`nav-item ${tab===item.id?"active":""}`} onClick={() => { setTab(item.id); setSidebarOpen(false); }}>
                 <span className="nav-icon">{item.icon}</span>
                 {item.label}
@@ -1532,15 +1712,27 @@ export default function AdminPage() {
           {/* DASHBOARD */}
           {tab==="dashboard" && (
             <>
+              {permMsg && (
+                <div style={{marginBottom:14,padding:"10px 14px",background:"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:"#ff6666"}}>
+                  ❌ {permMsg}
+                </div>
+              )}
               <div className="stats-grid">
-                {[
-                  { icon:"🛒", label:"Total Orders", value:orders.length, trend:"All time" },
-                  { icon:"⏳", label:"Pending Orders", value:pendingCount, trend:"Needs action" },
-                  { icon:"💰", label:"Total Revenue", value:`£${totalRevenue.toFixed(2)}`, trend:"Confirmed only" },
-                  { icon:"👥", label:"Customers", value:customers.length, trend:"Unique" },
-                  { icon:"📦", label:"Products", value:products.length, trend:"Active" },
-                  { icon:"✅", label:"Delivered", value:deliveredCount, trend:"All time" },
-                ].map((s,i) => (
+                {(can("orders.view")
+                  ? [
+                      { icon:"🛒", label:"Total Orders", value:orders.length, trend:"All time" },
+                      { icon:"⏳", label:"Pending Orders", value:pendingCount, trend:"Needs action" },
+                      { icon:"💰", label:"Total Revenue", value:`£${totalRevenue.toFixed(2)}`, trend:"Confirmed only" },
+                      { icon:"👥", label:"Customers", value:customers.length, trend:"Unique" },
+                      { icon:"📦", label:"Products", value:products.length, trend:"Active" },
+                      { icon:"✅", label:"Delivered", value:deliveredCount, trend:"All time" },
+                    ]
+                  : [
+                      { icon:"📝", label:"Blog Posts", value:blogPosts.length, trend:"All posts" },
+                      { icon:"✅", label:"Published", value:blogPosts.filter((p)=>p.status==="published").length, trend:"Live" },
+                      { icon:"📄", label:"Drafts", value:blogPosts.filter((p)=>p.status==="draft").length, trend:"In progress" },
+                    ]
+                ).map((s,i) => (
                   <div className="stat-card" key={i}>
                     <div className="stat-card-top">
                       <span className="stat-icon">{s.icon}</span>
@@ -1553,6 +1745,7 @@ export default function AdminPage() {
               </div>
 
               {/* RECENT ORDERS */}
+              {can("orders.view") && (
               <div className="section-card">
                 <div className="section-header">
                   <div className="section-title">Recent Orders</div>
@@ -1576,11 +1769,23 @@ export default function AdminPage() {
                   </table>
                 </div>
               </div>
+              )}
+              {!can("orders.view") && can("blog.manage") && (
+                <div className="section-card">
+                  <div className="section-header">
+                    <div className="section-title">Your Blog Posts</div>
+                    <button className="add-btn" onClick={() => setTab("blog")}>Manage Blog →</button>
+                  </div>
+                  <div style={{fontSize:13,color:"#666",padding:"8px 0"}}>
+                    You have access to Blog authoring. Use the Blog tab to create and edit posts.
+                  </div>
+                </div>
+              )}
             </>
           )}
 
           {/* ORDERS */}
-          {tab==="orders" && (() => {
+          {tab==="orders" && can("orders.view") && (() => {
             const totalOrderPages = Math.ceil(filteredOrders.length / ORDERS_PER_PAGE);
             const pagedOrders = filteredOrders.slice((ordersPage-1)*ORDERS_PER_PAGE, ordersPage*ORDERS_PER_PAGE);
             const from = filteredOrders.length === 0 ? 0 : (ordersPage-1)*ORDERS_PER_PAGE+1;
@@ -1654,7 +1859,7 @@ export default function AdminPage() {
           })()}
 
           {/* PRODUCTS */}
-          {tab==="products" && (
+          {tab==="products" && can("products.view") && (
             <div className="section-card">
               <div className="section-header">
                 <div className="section-title">Products ({products.length})</div>
@@ -1684,7 +1889,7 @@ export default function AdminPage() {
           )}
 
           {/* BLOG */}
-          {tab==="blog" && (
+          {tab==="blog" && can("blog.manage") && (
             <div>
               {blogMsg && <div style={{marginBottom:16,padding:"10px 16px",background:blogMsg.startsWith("✅")?"rgba(22,163,74,0.1)":"rgba(220,38,38,0.1)",border:`1px solid ${blogMsg.startsWith("✅")?"rgba(22,163,74,0.3)":"rgba(220,38,38,0.25)"}`,borderRadius:10,fontSize:13,color:blogMsg.startsWith("✅")?"#16A34A":"#DC2626"}}>{blogMsg}</div>}
             <div className="section-card">
@@ -1719,7 +1924,7 @@ export default function AdminPage() {
           )}
 
           {/* CUSTOMERS */}
-          {tab==="customers" && (
+          {tab==="customers" && can("customers.view") && (
             <div className="section-card">
               <div className="section-header">
                 <div className="section-title">Customers ({customers.length})</div>
@@ -1751,7 +1956,7 @@ export default function AdminPage() {
           )}
 
           {/* 💬 CHAT LEADS */}
-          {tab==="leads" && (
+          {tab==="leads" && can("leads.view") && (
             <div>
               <div className="stats-grid" style={{marginBottom:20}}>
                 <div className="stat-card">
@@ -1820,7 +2025,7 @@ export default function AdminPage() {
           )}
 
           {/* 🧠 BERLIN TRAINING */}
-          {tab==="training" && (
+          {tab==="training" && can("training.manage") && (
             <div>
               {trainingMsg && (
                 <div style={{marginBottom:14,padding:"10px 14px",background:trainingMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:trainingMsg.startsWith("✅")?"#00c864":"#ff6666"}}>
@@ -1965,7 +2170,7 @@ export default function AdminPage() {
           )}
 
           {/* 🎟️ COUPONS */}
-          {tab==="coupons" && (
+          {tab==="coupons" && can("coupons.manage") && (
             <div>
               {couponMsg && <div style={{marginBottom:16,padding:"10px 16px",background:couponMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${couponMsg.startsWith("✅")?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,borderRadius:10,fontSize:13,color:couponMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{couponMsg}</div>}
               {/* Add Coupon Form */}
@@ -2018,7 +2223,7 @@ export default function AdminPage() {
           )}
 
           {/* 🎨 PAGE BUILDER */}
-          {tab==="builder" && (
+          {tab==="builder" && can("page_builder.manage") && (
             <div>
               {sectionMsg && <div style={{marginBottom:14,padding:"10px 14px",background:sectionMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:sectionMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{sectionMsg}</div>}
               {/* Page selector */}
@@ -2110,7 +2315,11 @@ export default function AdminPage() {
                             setHeroImgUploading(true);
                             try {
                               const base64=await new Promise<string>((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result as string); r.onerror=rej; r.readAsDataURL(file); });
-                              const data=await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file:base64,name:file.name})}).then(r=>r.json());
+                              const data=await fetch("/api/upload",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({file:base64,name:file.name,folder:"firestick4uk/products"})}).then(async r=>{
+                                if(r.status===401){handleSessionExpired();return{};}
+                                if(r.status===403){showPermError();return{};}
+                                return r.json();
+                              });
                               if(data.path) setSectionEditing((p:any)=>({...p,hero_image:data.path}));
                             } catch {}
                             setHeroImgUploading(false);
@@ -2179,7 +2388,7 @@ export default function AdminPage() {
           )}
 
           {/* ❓ FAQ ADMIN */}
-          {tab==="faqadmin" && (
+          {tab==="faqadmin" && can("faqs.manage") && (
             <div>
               {faqMsg && <div style={{marginBottom:14,padding:"10px 14px",background:faqMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:faqMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{faqMsg}</div>}
               <div style={{marginBottom:16,display:"flex",justifyContent:"flex-end"}}>
@@ -2234,14 +2443,14 @@ export default function AdminPage() {
           )}
 
           {/* 👤 STAFF USERS */}
-          {tab==="staff" && adminRole==="super_admin" && (
+          {tab==="staff" && can("staff.manage") && (
             <div>
               {staffMsg && <div style={{marginBottom:14,padding:"10px 14px",background:staffMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:staffMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{staffMsg}</div>}
               <div style={{marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
                 <div style={{fontSize:12,color:"#666",lineHeight:1.65,maxWidth:640}}>
-                  <div><strong>Super Admin</strong> — Full CMS access including Staff Users, Coupons, Page Builder, and Settings</div>
-                  <div><strong>Manager</strong> — Orders, Products, Customers, Leads, Berlin Training, Blog, FAQs, Content Editor</div>
-                  <div><strong>Writer</strong> — Blog and dashboard access only</div>
+                  <div><strong>Super Admin</strong> — {ROLE_UI_DESCRIPTIONS.super_admin}</div>
+                  <div><strong>Manager</strong> — {ROLE_UI_DESCRIPTIONS.manager}</div>
+                  <div><strong>Writer</strong> — {ROLE_UI_DESCRIPTIONS.writer}</div>
                 </div>
                 <button className="add-btn" onClick={()=>{ setStaffForm({name:"",email:"",password:"",confirmPassword:"",role:"writer",active:1}); setShowStaffPassword(false); setStaffModal("new"); setStaffMsg(""); }}>+ Add User</button>
               </div>
@@ -2298,9 +2507,9 @@ export default function AdminPage() {
                     <div className="modal-field">
                       <label>Role *</label>
                       <select value={staffForm.role} onChange={e=>setStaffForm(f=>({...f,role:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:"1px solid #E5E5E5",borderRadius:8,fontSize:14,background:"#fff",color:"#111"}}>
-                        <option value="writer">Writer — Blog / content authoring</option>
-                        <option value="manager">Manager — Operational CMS access</option>
-                        <option value="super_admin">Super Admin — Full CMS access</option>
+                        <option value="writer">Writer — {ROLE_UI_DESCRIPTIONS.writer}</option>
+                        <option value="manager">Manager — {ROLE_UI_DESCRIPTIONS.manager}</option>
+                        <option value="super_admin">Super Admin — {ROLE_UI_DESCRIPTIONS.super_admin}</option>
                       </select>
                     </div>
                     <div className="modal-field">
@@ -2445,7 +2654,7 @@ export default function AdminPage() {
           )}
 
           {/* ⚙️ SITE SETTINGS */}
-          {tab==="settings" && (
+          {tab==="settings" && can("settings.manage") && (
             <div className="section-card" style={{padding:28}}>
               <div className="section-header" style={{marginBottom:24}}>
                 <div className="section-title">Site Settings</div>
@@ -2804,7 +3013,7 @@ export default function AdminPage() {
           )}
 
           {/* ✏️ CONTENT EDITOR */}
-          {tab==="pages" && (
+          {tab==="pages" && can("content.manage") && (
             <div>
               {contentMsg && <div style={{marginBottom:16,padding:"10px 16px",background:contentMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${contentMsg.startsWith("✅")?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,borderRadius:10,fontSize:13,color:contentMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{contentMsg}</div>}
 

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
+import { hasAdminPermission, type AdminPermission } from "@/lib/adminPermissions";
 
 export type AdminRole = "super_admin" | "manager" | "writer";
 export type PrincipalType = "master" | "staff";
@@ -469,7 +470,23 @@ export async function requireAdminRole(
   const identity = await requireAdmin(req, res, options);
   if (!identity) return null;
   if (!allowedRoles.includes(identity.role)) {
-    res.status(403).json({ error: "Forbidden" });
+    res.status(403).json({ error: "Forbidden", message: "You do not have permission for this action." });
+    return null;
+  }
+  return identity;
+}
+
+/** Session + centralized capability check (preferred over ad-hoc role arrays). */
+export async function requireAdminPermission(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  permission: AdminPermission,
+  options?: { mutate?: boolean }
+): Promise<AdminIdentity | null> {
+  const identity = await requireAdmin(req, res, options);
+  if (!identity) return null;
+  if (!hasAdminPermission(identity.role, permission)) {
+    res.status(403).json({ error: "Forbidden", message: "You do not have permission for this action." });
     return null;
   }
   return identity;

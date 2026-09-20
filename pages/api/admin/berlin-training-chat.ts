@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Anthropic from '@anthropic-ai/sdk';
 import pool from '@/lib/db';
-import { requireAdminRole } from '@/lib/adminAuth';
+import { requireAdminPermission } from '@/lib/adminAuth';
 
 type TrainingChatMessage = {
   role: 'user' | 'assistant';
@@ -129,7 +129,7 @@ function extractTrainingSave(reply: string) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const admin = await requireAdminRole(req, res, ['super_admin', 'manager']);
+  const admin = await requireAdminPermission(req, res, 'training.manage');
   if (!admin) return;
 
   try {

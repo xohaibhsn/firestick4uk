@@ -1,13 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
-import { requireAdminRole } from '../../lib/adminAuth';
+import { requireAdminPermission } from '../../lib/adminAuth';
 
 
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method !== 'GET') {
-      const admin = await requireAdminRole(req, res, ['super_admin', 'manager', 'writer']);
+      const admin = await requireAdminPermission(req, res, 'blog.manage');
       if (!admin) return;
     }
     await pool.query(`

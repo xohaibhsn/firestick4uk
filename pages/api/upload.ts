@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
-import { requireAdminRole } from '../../lib/adminAuth';
+import { requireAdmin } from '../../lib/adminAuth';
+import { canUploadPurpose, resolveUploadPurpose } from '../../lib/adminPermissions';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } },
@@ -9,30 +10,43 @@ export const config = {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const admin = await requireAdminRole(req, res, ['super_admin', 'manager', 'writer']);
+  const admin = await requireAdmin(req, res);
   if (!admin) return;
 
   try {
     const { file, name, folder } = req.body;
     if (!file || !name) return res.status(400).json({ error: 'No file provided' });
 
-    // Determine Cloudinary folder — caller can override, default to products
-    const cloudinaryFolder = (folder as string) || 'firestick4uk/products';
-    const isReceipt = cloudinaryFolder.includes('receipt');
-    const isLogo = cloudinaryFolder.includes('logo');
-    const isWhatsAppIcon = cloudinaryFolder.includes('whatsapp');
-    const isHeroSlide = cloudinaryFolder.includes('hero-slides');
-    const isOg = cloudinaryFolder.includes('firestick4uk/og') || cloudinaryFolder.endsWith('/og');
+    const resolved = resolveUploadPurpose(folder);
+    if (!resolved) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'You do not have permission for this action.',
+        detail: 'Unapproved upload folder',
+      });
+    }
+
+    if (!canUploadPurpose(admin.role, resolved.purpose)) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'You do not have permission for this action.',
+      });
+    }
+
+    const cloudinaryFolder = resolved.folder;
+    const isReceipt = resolved.purpose === 'receipts';
+    const isLogo = resolved.purpose === 'logo';
+    const isWhatsAppIcon = resolved.purpose === 'whatsapp';
+    const isHeroSlide = resolved.purpose === 'hero';
+    const isOg = resolved.purpose === 'og';
     const preserveImage = isReceipt || isLogo || isWhatsAppIcon || isHeroSlide || isOg;
 
-    // Use Cloudinary if credentials are configured
     if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
       const cloudinary = (await import('../../lib/cloudinary')).default;
 
       const uploadOptions: any = { folder: cloudinaryFolder };
 
       if (isLogo) {
-        // Logo: keep transparency, limit size without square crop / webp force
         uploadOptions.transformation = [
           { width: 800, height: 200, crop: 'limit' },
           { quality: 90 },
@@ -43,7 +57,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           { quality: 90 },
         ];
       } else if (isOg) {
-        // OG share image: keep 1200×630 aspect, no square crop
         uploadOptions.transformation = [
           { width: 1200, height: 630, crop: 'limit' },
           { quality: 90 },
@@ -54,10 +67,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           { quality: 85, fetch_format: 'webp' },
         ];
       } else if (isReceipt) {
-        // Receipts: preserve original, no aggressive compression
         uploadOptions.transformation = [{ quality: 90 }];
       } else {
-        // Product/blog images: resize + webp
         uploadOptions.transformation = [
           { width: 800, height: 800, crop: 'limit' },
           { quality: 85, fetch_format: 'webp' },
@@ -68,7 +79,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ path: result.secure_url });
     }
 
-    // Fallback: save locally (localhost dev without Cloudinary creds)
     const base64Data = file.replace(/^data:[^;]+;base64,/, '');
     const localSub = isReceipt ? 'receipts' : isLogo ? 'logo' : isWhatsAppIcon ? 'whatsapp' : '';
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads', localSub);
