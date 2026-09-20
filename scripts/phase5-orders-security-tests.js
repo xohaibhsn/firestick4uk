@@ -1,7 +1,11 @@
 /**
  * Phase 5 order ops security tests A–V.
- * Usage: BASE_URL=http://127.0.0.1:3010 node scripts/phase5-orders-security-tests.js
+ * MUTATING — requires ALLOW_DB_MUTATION_TESTS=YES_I_UNDERSTAND
+ * Usage: ALLOW_DB_MUTATION_TESTS=YES_I_UNDERSTAND BASE_URL=http://127.0.0.1:3010 node scripts/phase5-orders-security-tests.js
  */
+const { requireMutationOptIn } = require("./testMutationGuard");
+requireMutationOptIn("phase5-orders-security-tests");
+
 const fs = require("fs");
 const http = require("http");
 const https = require("https");
@@ -109,11 +113,18 @@ async function main() {
   };
 
   const hash = await bcrypt.hash("Phase5TestPass99!", 10);
+  const testEmails = [
+    "phase5.sa@test.local",
+    "phase5.mgr@test.local",
+    "phase5.wr@test.local",
+  ];
   const users = [
     ["phase5.sa@test.local", "super_admin", "Phase5 SA"],
     ["phase5.mgr@test.local", "manager", "Phase5 Manager"],
     ["phase5.wr@test.local", "writer", "Phase5 Writer"],
   ];
+
+  try {
   for (const [email, role, name] of users) {
     const [rows] = await q("SELECT id FROM admin_staff WHERE email=? LIMIT 1", [email]);
     if (rows.length) {
@@ -343,16 +354,31 @@ async function main() {
     body: { customer_name: "x" },
   });
   mark("V", v.status === 400 || v.status === 500 || v.status === 200, `status=${v.status} (public endpoint reachable)`);
-
-  // cleanup staff
-  await q("DELETE FROM admin_staff WHERE email IN (?,?,?)", [
-    "phase5.sa@test.local",
-    "phase5.mgr@test.local",
-    "phase5.wr@test.local",
-  ]);
+  } finally {
+    try {
+      const [ids] = await q("SELECT id FROM admin_staff WHERE email IN (?,?,?)", testEmails).catch(
+        () => [[]]
+      );
+      const staffIds = (ids || []).map((r) => r.id);
+      if (staffIds.length) {
+        const ph = staffIds.map(() => "?").join(",");
+        await q(`DELETE FROM admin_sessions WHERE staff_id IN (${ph})`, staffIds).catch(() => {});
+        await q(`DELETE FROM admin_staff WHERE id IN (${ph})`, staffIds).catch(() => {});
+      }
+      await q(
+        "DELETE FROM admin_audit_log WHERE actor_name LIKE 'Phase5%' OR summary LIKE '%phase5%'"
+      ).catch(() => {});
+    } catch (cleanupErr) {
+      console.error("cleanup error", cleanupErr?.message || cleanupErr);
+    }
+    try {
+      await db.end();
+    } catch {
+      /* ignore */
+    }
+  }
 
   console.log("\nSUMMARY", out);
-  await db.end();
   const failed = Object.values(out).some((v) => v === "FAIL");
   process.exit(failed ? 1 : 0);
 }

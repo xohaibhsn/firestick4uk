@@ -242,6 +242,7 @@ export default function AdminPage() {
   const [staffBusy, setStaffBusy] = useState(false);
   const [showStaffPassword, setShowStaffPassword] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
+  const [primaryAdminOnboarding, setPrimaryAdminOnboarding] = useState(false);
   const [auditItems, setAuditItems] = useState<any[]>([]);
   const [auditPage, setAuditPage] = useState(1);
   const [auditTotalPages, setAuditTotalPages] = useState(1);
@@ -1097,15 +1098,33 @@ export default function AdminPage() {
       if (staffForm.password !== staffForm.confirmPassword) { setStaffMsg("❌ Passwords do not match"); return; }
     }
     setStaffBusy(true);
+    const role = primaryAdminOnboarding && staffModal==="new" ? "super_admin" : staffForm.role;
     const method = staffModal==="new" ? "POST" : "PUT";
     const body = staffModal==="new"
-      ? { name: staffForm.name, email: staffForm.email, password: staffForm.password, role: staffForm.role, active: staffForm.active }
+      ? { name: staffForm.name, email: staffForm.email, password: staffForm.password, role, active: 1 }
       : { id: staffModal.id, name: staffForm.name, email: staffForm.email, role: staffForm.role, active: staffForm.active };
     const res = await fetch("/api/admin-staff",{method,credentials:"include",headers:{...getRoleHeaders(),"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json()).catch(()=>({}));
     setStaffBusy(false);
-    if (res.success) { setStaffMsg("✅ Saved!"); setStaffModal(null); loadStaff(); }
+    if (res.success) {
+      if (primaryAdminOnboarding && staffModal==="new") {
+        setStaffMsg("✅ Primary Admin created. Sign out of Recovery Admin and sign in with your Primary Admin account for everyday use.");
+      } else {
+        setStaffMsg("✅ Saved!");
+      }
+      setStaffModal(null);
+      setPrimaryAdminOnboarding(false);
+      loadStaff();
+    }
     else setStaffMsg(`❌ ${res.error||"Failed"}`);
-    setTimeout(()=>setStaffMsg(""),4000);
+    setTimeout(()=>setStaffMsg(""), primaryAdminOnboarding ? 8000 : 4000);
+  };
+
+  const openPrimaryAdminCreate = () => {
+    setPrimaryAdminOnboarding(true);
+    setStaffForm({ name:"", email:"", password:"", confirmPassword:"", role:"super_admin", active:1 });
+    setShowStaffPassword(false);
+    setStaffModal("new");
+    setStaffMsg("");
   };
 
   const confirmStaffAction = async () => {
@@ -2021,23 +2040,29 @@ export default function AdminPage() {
             </div>
             <div className="top-right">
               <button className="admin-user-btn" onClick={() => setAdminDropOpen(o => !o)}>
-                👤 {adminName} <span style={{fontSize:10,color:"#888888"}}>{adminDropOpen?"▲":"▼"}</span>
+                👤{" "}
+                {adminPrincipalType==="master"
+                  ? "Recovery Admin"
+                  : `${adminName} · ${roleLabel(adminRole)}`}{" "}
+                <span style={{fontSize:10,color:"#888888"}}>{adminDropOpen?"▲":"▼"}</span>
               </button>
               {adminDropOpen && (
                 <div className="admin-dropdown" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
                   <div className="admin-dropdown-header">
-                    <div className="admin-dropdown-name">{adminName}</div>
+                    <div className="admin-dropdown-name">{adminPrincipalType==="master" ? "Recovery Admin" : adminName}</div>
                     <div className="admin-dropdown-role">
-                      {adminPrincipalType==="master"?"Master Administrator · ":""}
+                      {adminPrincipalType==="master" ? "Environment-managed · " : ""}
                       {roleLabel(adminRole)}
                     </div>
                   </div>
                   <button className="admin-dropdown-item" onClick={() => { void openProfile(); }}>
                     👤 My Profile
                   </button>
-                  <button className="admin-dropdown-item" onClick={() => openChangePassword()}>
-                    🔑 Change Password
-                  </button>
+                  {adminPrincipalType!=="master" && (
+                    <button className="admin-dropdown-item" onClick={() => openChangePassword()}>
+                      🔑 Change Password
+                    </button>
+                  )}
                   <button className="admin-dropdown-item danger" onClick={() => { setAdminDropOpen(false); handleLogout(); }}>
                     🚪 Logout
                   </button>
@@ -2871,13 +2896,39 @@ export default function AdminPage() {
           {tab==="staff" && can("staff.manage") && (
             <div>
               {staffMsg && <div style={{marginBottom:14,padding:"10px 14px",background:staffMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:staffMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{staffMsg}</div>}
+
+              {adminPrincipalType==="master" && (
+                <div className="section-card" style={{marginBottom:16,padding:20,background:"#F8F5FF",border:"1px solid #E9E0FF"}}>
+                  <div style={{fontWeight:700,fontSize:15,marginBottom:8,color:"#111"}}>Recovery Administrator</div>
+                  <div style={{fontSize:13,color:"#444",lineHeight:1.7}}>
+                    <div><strong>Role:</strong> Super Admin</div>
+                    <div><strong>Status:</strong> Active</div>
+                    <div><strong>Account type:</strong> Environment-managed</div>
+                    <div><strong>Password:</strong> Managed in hosting environment</div>
+                  </div>
+                  <div style={{marginTop:12,fontSize:12,color:"#5B21B6"}}>
+                    Use a Primary Admin account for everyday CMS access. Recovery Admin is for emergency / break-glass only.
+                  </div>
+                </div>
+              )}
+
+              {adminPrincipalType==="master" && !staffUsers.some((s:any)=>s.role==="super_admin" && Number(s.active)===1) && (
+                <div style={{marginBottom:16,padding:"14px 16px",background:"rgba(180,83,9,0.08)",border:"1px solid rgba(180,83,9,0.25)",borderRadius:10}}>
+                  <div style={{fontWeight:700,marginBottom:6,color:"#92400E"}}>Create your Primary Admin account</div>
+                  <div style={{fontSize:13,color:"#666",marginBottom:10,lineHeight:1.5}}>
+                    No active database Super Admin exists yet. Create a Primary Admin for daily CMS work (editable profile and password).
+                  </div>
+                  <button className="add-btn" type="button" onClick={openPrimaryAdminCreate}>Create Primary Admin</button>
+                </div>
+              )}
+
               <div style={{marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
                 <div style={{fontSize:12,color:"#666",lineHeight:1.65,maxWidth:640}}>
                   <div><strong>Super Admin</strong> — {ROLE_UI_DESCRIPTIONS.super_admin}</div>
                   <div><strong>Manager</strong> — {ROLE_UI_DESCRIPTIONS.manager}</div>
                   <div><strong>Writer</strong> — {ROLE_UI_DESCRIPTIONS.writer}</div>
                 </div>
-                <button className="add-btn" onClick={()=>{ setStaffForm({name:"",email:"",password:"",confirmPassword:"",role:"writer",active:1}); setShowStaffPassword(false); setStaffModal("new"); setStaffMsg(""); }}>+ Add User</button>
+                <button className="add-btn" onClick={()=>{ setPrimaryAdminOnboarding(false); setStaffForm({name:"",email:"",password:"",confirmPassword:"",role:"writer",active:1}); setShowStaffPassword(false); setStaffModal("new"); setStaffMsg(""); }}>+ Add User</button>
               </div>
               <div className="section-card">
                 <div className="table-wrap">
@@ -2894,7 +2945,7 @@ export default function AdminPage() {
                           <td style={{fontSize:12,color:"#888"}}>{formatLastLogin(s.last_login_at)}</td>
                           <td style={{fontSize:12,color:"#888"}}>{s.created_at ? new Date(s.created_at).toLocaleDateString("en-GB") : "—"}</td>
                           <td style={{whiteSpace:"nowrap"}}>
-                            <button className="action-btn btn-edit" style={{marginRight:4}} onClick={()=>{ setStaffForm({name:s.name,email:s.email,password:"",confirmPassword:"",role:s.role,active:Number(s.active)===1?1:0}); setStaffModal(s); setStaffMsg(""); }}>Edit</button>
+                            <button className="action-btn btn-edit" style={{marginRight:4}} onClick={()=>{ setPrimaryAdminOnboarding(false); setStaffForm({name:s.name,email:s.email,password:"",confirmPassword:"",role:s.role,active:Number(s.active)===1?1:0}); setStaffModal(s); setStaffMsg(""); }}>Edit</button>
                             <button className="action-btn btn-edit" style={{marginRight:4}} onClick={()=>{ setStaffResetForm({new_password:"",confirm_password:""}); setShowResetPassword(false); setStaffResetModal(s); setStaffMsg(""); }}>Reset Password</button>
                             {Number(s.active)===1 ? (
                               <button className="action-btn btn-edit" style={{marginRight:4}} onClick={()=>setStaffConfirm({type:"disable",user:s})}>Disable</button>
@@ -2913,7 +2964,7 @@ export default function AdminPage() {
               {staffModal && (
                 <div className="modal-overlay">
                   <div className="modal" onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
-                    <div className="modal-title">{staffModal==="new"?"Add Staff User":"Edit Staff User"}</div>
+                    <div className="modal-title">{primaryAdminOnboarding && staffModal==="new" ? "Create Primary Admin" : staffModal==="new"?"Add Staff User":"Edit Staff User"}</div>
                     {staffMsg&&<div style={{marginBottom:10,color:staffMsg.startsWith("✅")?"#00c864":"#ff6666",fontSize:13}}>{staffMsg}</div>}
                     <div className="modal-field"><label>Full Name *</label><input value={staffForm.name} onChange={e=>setStaffForm(f=>({...f,name:e.target.value}))} placeholder="Jane Smith" /></div>
                     <div className="modal-field"><label>Email *</label><input type="email" value={staffForm.email} onChange={e=>setStaffForm(f=>({...f,email:e.target.value}))} placeholder="jane@example.com" /></div>
@@ -2931,12 +2982,17 @@ export default function AdminPage() {
                     )}
                     <div className="modal-field">
                       <label>Role *</label>
+                      {primaryAdminOnboarding && staffModal==="new" ? (
+                        <input readOnly value={`Super Admin — ${ROLE_UI_DESCRIPTIONS.super_admin}`} style={{width:"100%",padding:"10px 12px",border:"1px solid #E5E5E5",borderRadius:8,fontSize:14,background:"#F5F5F5",color:"#111"}} />
+                      ) : (
                       <select value={staffForm.role} onChange={e=>setStaffForm(f=>({...f,role:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:"1px solid #E5E5E5",borderRadius:8,fontSize:14,background:"#fff",color:"#111"}}>
                         <option value="writer">Writer — {ROLE_UI_DESCRIPTIONS.writer}</option>
                         <option value="manager">Manager — {ROLE_UI_DESCRIPTIONS.manager}</option>
                         <option value="super_admin">Super Admin — {ROLE_UI_DESCRIPTIONS.super_admin}</option>
                       </select>
+                      )}
                     </div>
+                    {!(primaryAdminOnboarding && staffModal==="new") && (
                     <div className="modal-field">
                       <label>Status</label>
                       <select value={String(staffForm.active)} onChange={e=>setStaffForm(f=>({...f,active:(e.target.value==="1"?1:0) as 0|1}))} style={{width:"100%",padding:"10px 12px",border:"1px solid #E5E5E5",borderRadius:8,fontSize:14,background:"#fff",color:"#111"}}>
@@ -2944,12 +3000,13 @@ export default function AdminPage() {
                         <option value="0">Disabled</option>
                       </select>
                     </div>
+                    )}
                     {staffModal!=="new" && (
                       <div style={{fontSize:12,color:"#888",padding:"4px 0 8px"}}>To change password, use <strong>Reset Password</strong> on the staff list.</div>
                     )}
                     <div className="modal-actions">
-                      <button className="modal-cancel" onClick={()=>setStaffModal(null)} disabled={staffBusy}>Cancel</button>
-                      <button className="modal-save" onClick={saveStaff} disabled={staffBusy}>{staffBusy?"Saving…":staffModal==="new"?"Add User":"Save Changes"}</button>
+                      <button className="modal-cancel" onClick={()=>{ setStaffModal(null); setPrimaryAdminOnboarding(false); }} disabled={staffBusy}>Cancel</button>
+                      <button className="modal-save" onClick={saveStaff} disabled={staffBusy}>{staffBusy?"Saving…":primaryAdminOnboarding && staffModal==="new"?"Create Primary Admin":staffModal==="new"?"Add User":"Save Changes"}</button>
                     </div>
                   </div>
                 </div>
@@ -3006,11 +3063,11 @@ export default function AdminPage() {
                 {profileMsg&&<div style={{marginBottom:10,color:"#ff6666",fontSize:13}}>{profileMsg}</div>}
                 {adminPrincipalType==="master" || profileData?.principalType==="master" ? (
                   <div style={{fontSize:14,lineHeight:1.7,color:"#333"}}>
-                    <div><strong>Name:</strong> {profileData?.name || adminName}</div>
-                    <div><strong>Account:</strong> Master Administrator</div>
+                    <div><strong>Name:</strong> Recovery Admin</div>
+                    <div><strong>Account:</strong> Environment-managed Recovery Administrator</div>
                     <div><strong>Role:</strong> {roleLabel(profileData?.role || adminRole)}</div>
                     <div style={{marginTop:12,padding:"10px 12px",background:"#F8F5FF",borderRadius:8,fontSize:13,color:"#5B21B6"}}>
-                      Password is managed via server environment and cannot be changed in the CMS.
+                      Recovery Admin credentials are managed in the hosting environment and cannot be changed in the CMS.
                     </div>
                   </div>
                 ) : (
@@ -3038,7 +3095,7 @@ export default function AdminPage() {
                 {adminPrincipalType==="master" ? (
                   <>
                     <div style={{fontSize:14,color:"#444",lineHeight:1.6,marginBottom:16}}>
-                      Master Administrator password is managed via server environment and cannot be changed here.
+                      Recovery Admin credentials are managed in the hosting environment and cannot be changed through the CMS.
                     </div>
                     <div className="modal-actions">
                       <button className="modal-cancel" onClick={()=>setProfileModal(null)}>Close</button>

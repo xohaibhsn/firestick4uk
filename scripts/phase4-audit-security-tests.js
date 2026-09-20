@@ -1,7 +1,11 @@
 /**
  * Phase 4 security tests A–M.
- * Usage: BASE_URL=http://127.0.0.1:3010 node scripts/phase4-audit-security-tests.js
+ * MUTATING — requires ALLOW_DB_MUTATION_TESTS=YES_I_UNDERSTAND
+ * Usage: ALLOW_DB_MUTATION_TESTS=YES_I_UNDERSTAND BASE_URL=http://127.0.0.1:3010 node scripts/phase4-audit-security-tests.js
  */
+const { requireMutationOptIn } = require("./testMutationGuard");
+requireMutationOptIn("phase4-audit-security-tests");
+
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
@@ -164,7 +168,13 @@ async function main() {
     return `firestick_admin_session=${token}`;
   }
 
-  const saCookie = await mintMasterCookie();
+  const mgrEmail = "phase4.manager@test.local";
+  const wrEmail = "phase4.writer@test.local";
+  let createdStaffId = null;
+  let saCookie = "";
+
+  try {
+  saCookie = await mintMasterCookie();
   mark("auth.login", !!saCookie, "minted-master-session");
 
   // A Super Admin audit API
@@ -172,8 +182,6 @@ async function main() {
   mark("A", a.status === 200 && Array.isArray(a.json?.items), `status=${a.status}`);
 
   // Ensure manager + writer test users
-  const mgrEmail = "phase4.manager@test.local";
-  const wrEmail = "phase4.writer@test.local";
   for (const [email, role] of [
     [mgrEmail, "manager"],
     [wrEmail, "writer"],
@@ -228,7 +236,7 @@ async function main() {
     createStaff.status === 200 && createStaff.json?.success && afterDc === beforeDc + 1,
     `status=${createStaff.status} delta=${afterDc - beforeDc}`
   );
-  const createdStaffId = createStaff.json?.id;
+  createdStaffId = createStaff.json?.id || null;
 
   // E password reset — no password in metadata
   const reset = await request("POST", "/api/admin-staff-password", {
@@ -281,90 +289,151 @@ async function main() {
     mark("F", false, "no orders in DB");
   }
 
-  // G product edit
-  const [prods] = await q("SELECT id, name, slug, price, category, stock, active FROM products LIMIT 1");
-  if (prods.length) {
-    const p = prods[0];
-    const beforeG = await q(
-      "SELECT COUNT(*) AS c FROM admin_audit_log WHERE action='product.updated' AND entity_id=?",
-      [String(p.id)]
-    );
-    const put = await request("PUT", "/api/admin-products", {
+  // G product edit — TEMP product only (never mutate real catalog)
+  let tempProductId = null;
+  try {
+    const create = await request("POST", "/api/admin-products", {
       cookie: saCookie,
       body: {
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-        price: p.price,
-        category: p.category,
-        stock: p.stock,
-        active: p.active,
-        description: "",
+        name: "Phase4 Temp Product",
+        slug: `phase4-temp-product-${Date.now()}`,
+        price: 1,
+        category: "Subscription",
+        stock: "Digital",
+        description: "phase4-temp",
+        short_description: "phase4-temp",
       },
     });
-    const afterG = await q(
-      "SELECT COUNT(*) AS c FROM admin_audit_log WHERE action='product.updated' AND entity_id=?",
-      [String(p.id)]
-    );
-    mark(
-      "G",
-      put.status === 200 && Number(afterG[0][0].c) === Number(beforeG[0][0].c) + 1,
-      `status=${put.status}`
-    );
-  } else {
-    mark("G", false, "no products");
+    tempProductId = create.json?.id || null;
+    if (!tempProductId) {
+      mark("G", false, `temp create failed status=${create.status}`);
+    } else {
+      const beforeG = await q(
+        "SELECT COUNT(*) AS c FROM admin_audit_log WHERE action='product.updated' AND entity_id=?",
+        [String(tempProductId)]
+      );
+      const put = await request("PUT", "/api/admin-products", {
+        cookie: saCookie,
+        body: {
+          id: tempProductId,
+          name: "Phase4 Temp Product",
+          slug: create.json?.slug || `phase4-temp-${tempProductId}`,
+          price: 1,
+          category: "Subscription",
+          stock: "Digital",
+          active: 1,
+          description: "phase4-temp-updated",
+          short_description: "phase4-temp",
+        },
+      });
+      const afterG = await q(
+        "SELECT COUNT(*) AS c FROM admin_audit_log WHERE action='product.updated' AND entity_id=?",
+        [String(tempProductId)]
+      );
+      mark(
+        "G",
+        put.status === 200 && Number(afterG[0][0].c) === Number(beforeG[0][0].c) + 1,
+        `status=${put.status}`
+      );
+    }
+  } finally {
+    if (tempProductId) {
+      await request("DELETE", `/api/admin-products?id=${tempProductId}`, { cookie: saCookie }).catch(
+        () => {}
+      );
+      await q("DELETE FROM products WHERE id=?", [tempProductId]).catch(() => {});
+    }
   }
 
-  // H content batch one row with keys
+  // H content batch — snapshot + restore
+  const contentKeys = ["home_tagline", "footer_tagline"];
+  const [prevContentRows] = await q(
+    `SELECT content_key, content_value FROM site_content WHERE content_key IN (?,?)`,
+    contentKeys
+  );
+  const prevContent = {};
+  for (const row of prevContentRows || []) prevContent[row.content_key] = row.content_value;
   const beforeH = await q(
     "SELECT COUNT(*) AS c FROM admin_audit_log WHERE action='content.updated'"
   );
-  const contentSave = await request("POST", "/api/site-content", {
-    cookie: saCookie,
-    body: {
-      updates: [
-        { key: "home_tagline", value: "Fast. Reliable. Affordable." },
-        { key: "footer_tagline", value: "Premium Firestick Services UK" },
-      ],
-    },
-  });
-  const [hRows] = await q(
-    `SELECT metadata_json FROM admin_audit_log WHERE action='content.updated' ORDER BY id DESC LIMIT 1`
-  );
-  let hMeta = {};
   try {
-    hMeta = JSON.parse(hRows[0]?.metadata_json || "{}");
-  } catch {
-    /* ignore */
+    const contentSave = await request("POST", "/api/site-content", {
+      cookie: saCookie,
+      body: {
+        updates: [
+          { key: "home_tagline", value: prevContent.home_tagline ?? "Fast. Reliable. Affordable." },
+          {
+            key: "footer_tagline",
+            value: prevContent.footer_tagline ?? "Premium Firestick Services UK",
+          },
+        ],
+      },
+    });
+    const [hRows] = await q(
+      `SELECT metadata_json FROM admin_audit_log WHERE action='content.updated' ORDER BY id DESC LIMIT 1`
+    );
+    let hMeta = {};
+    try {
+      hMeta = JSON.parse(hRows[0]?.metadata_json || "{}");
+    } catch {
+      /* ignore */
+    }
+    const afterH = await q(
+      "SELECT COUNT(*) AS c FROM admin_audit_log WHERE action='content.updated'"
+    );
+    mark(
+      "H",
+      contentSave.status === 200 &&
+        Number(afterH[0][0].c) === Number(beforeH[0][0].c) + 1 &&
+        Array.isArray(hMeta.keys) &&
+        hMeta.keys.includes("home_tagline"),
+      `keys=${JSON.stringify(hMeta.keys)}`
+    );
+  } finally {
+    const restores = contentKeys
+      .filter((k) => prevContent[k] !== undefined)
+      .map((k) => ({ key: k, value: prevContent[k] }));
+    if (restores.length) {
+      await request("POST", "/api/site-content", {
+        cookie: saCookie,
+        body: { updates: restores },
+      }).catch(() => {});
+    }
   }
-  const afterH = await q(
-    "SELECT COUNT(*) AS c FROM admin_audit_log WHERE action='content.updated'"
-  );
-  mark(
-    "H",
-    contentSave.status === 200 &&
-      Number(afterH[0][0].c) === Number(beforeH[0][0].c) + 1 &&
-      Array.isArray(hMeta.keys) &&
-      hMeta.keys.includes("home_tagline"),
-    `keys=${JSON.stringify(hMeta.keys)}`
-  );
 
-  // I settings.updated
+  // I settings.updated — snapshot + restore site_tagline
+  const [tagRows] = await q(
+    "SELECT content_value FROM site_content WHERE content_key='site_tagline' LIMIT 1"
+  );
+  const prevTag = tagRows[0]?.content_value;
   const beforeI = await q(
     "SELECT COUNT(*) AS c FROM admin_audit_log WHERE action='settings.updated'"
   );
-  const settingsSave = await request("POST", "/api/site-content", {
-    cookie: saCookie,
-    body: { updates: [{ key: "site_tagline", value: "Best Firestick Service in UK" }] },
-  });
-  const afterI = await q(
-    "SELECT COUNT(*) AS c FROM admin_audit_log WHERE action='settings.updated'"
-  );
-  mark(
-    "I",
-    settingsSave.status === 200 && Number(afterI[0][0].c) === Number(beforeI[0][0].c) + 1,
-    `status=${settingsSave.status}`
-  );
+  try {
+    const settingsSave = await request("POST", "/api/site-content", {
+      cookie: saCookie,
+      body: {
+        updates: [
+          { key: "site_tagline", value: prevTag ?? "Best Firestick Service in UK" },
+        ],
+      },
+    });
+    const afterI = await q(
+      "SELECT COUNT(*) AS c FROM admin_audit_log WHERE action='settings.updated'"
+    );
+    mark(
+      "I",
+      settingsSave.status === 200 && Number(afterI[0][0].c) === Number(beforeI[0][0].c) + 1,
+      `status=${settingsSave.status}`
+    );
+  } finally {
+    if (prevTag !== undefined) {
+      await request("POST", "/api/site-content", {
+        cookie: saCookie,
+        body: { updates: [{ key: "site_tagline", value: prevTag }] },
+      }).catch(() => {});
+    }
+  }
 
   // J public order create — no admin audit
   const beforeJ = await q("SELECT COUNT(*) AS c FROM admin_audit_log");
@@ -419,18 +488,42 @@ async function main() {
       blob
     );
   mark("PRIVACY", !privacyFail);
-
-  // Cleanup temp staff
-  if (createdStaffId) {
-    await q("DELETE FROM admin_staff WHERE id=?", [createdStaffId]);
+  } finally {
+    // Always clean test residue
+    try {
+      if (createdStaffId) {
+        await q("DELETE FROM admin_sessions WHERE staff_id=?", [createdStaffId]).catch(() => {});
+        await q("DELETE FROM admin_staff WHERE id=?", [createdStaffId]).catch(() => {});
+      }
+      await q(
+        "DELETE FROM admin_staff WHERE email LIKE 'phase4.staff.%@test.local'"
+      ).catch(() => {});
+      const [ids] = await q("SELECT id FROM admin_staff WHERE email IN (?,?,?)", [
+        saEmail,
+        mgrEmail,
+        wrEmail,
+      ]).catch(() => [[]]);
+      const staffIds = (ids || []).map((r) => r.id);
+      if (staffIds.length) {
+        const ph = staffIds.map(() => "?").join(",");
+        await q(`DELETE FROM admin_sessions WHERE staff_id IN (${ph})`, staffIds).catch(() => {});
+        await q(`DELETE FROM admin_staff WHERE id IN (${ph})`, staffIds).catch(() => {});
+      }
+      await q(
+        "DELETE FROM admin_audit_log WHERE actor_name LIKE 'Phase4%' OR summary LIKE '%phase4%' OR summary LIKE 'Verify sample'"
+      ).catch(() => {});
+      await q("DELETE FROM products WHERE name LIKE 'Phase4 Temp Product%'").catch(() => {});
+    } catch (cleanupErr) {
+      console.error("cleanup error", cleanupErr?.message || cleanupErr);
+    }
+    try {
+      await db.end();
+    } catch {
+      /* ignore */
+    }
   }
-  await q("DELETE FROM admin_staff WHERE email IN (?, ?, ?)", [saEmail, mgrEmail, wrEmail]);
-  await q(
-    "DELETE FROM admin_audit_log WHERE actor_name LIKE 'Phase4%' OR summary LIKE '%phase4%' OR summary LIKE 'Verify sample'"
-  );
 
   console.log("\nSUMMARY", out);
-  await db.end();
   const failed = Object.values(out).some((v) => v === "FAIL");
   process.exit(failed ? 1 : 0);
 }
