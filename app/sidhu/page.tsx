@@ -264,18 +264,37 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminDropOpen, setAdminDropOpen] = useState(false);
-  const [orders, setOrders] = useState(demoOrders);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [ordersTotal, setOrdersTotal] = useState(0);
+  const [ordersTotalPages, setOrdersTotalPages] = useState(1);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
+  const [ordersHasFilters, setOrdersHasFilters] = useState(false);
+  const [orderQ, setOrderQ] = useState("");
+  const [orderPaymentFilter, setOrderPaymentFilter] = useState<"all"|"bank"|"cod">("all");
+  const [orderDateFrom, setOrderDateFrom] = useState("");
+  const [orderDateTo, setOrderDateTo] = useState("");
   const [products, setProducts] = useState<any[]>(demoProducts);
   const [statusFilter, setStatusFilter] = useState("all");
   const [ordersPage, setOrdersPage] = useState(1);
-  const ORDERS_PER_PAGE = 20;
+  const ORDERS_PER_PAGE = 25;
   const [receiptModal, setReceiptModal] = useState<string|null>(null);
-  const [orderModal, setOrderModal] = useState<typeof demoOrders[0]|null>(null);
+  const [orderModal, setOrderModal] = useState<any|null>(null);
+  const [orderDetail, setOrderDetail] = useState<{ order: any; items: any[] }|null>(null);
+  const [dashSummary, setDashSummary] = useState<any>(null);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [productModal, setProductModal] = useState<any|null|"new">(null);
   const [editProduct, setEditProduct] = useState({ name:"", slug:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"" });
   const [imageUploading, setImageUploading] = useState(false);
   const [heroImgUploading, setHeroImgUploading] = useState(false);
-  const [customers, setCustomers] = useState(demoCustomers);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [customersPage, setCustomersPage] = useState(1);
+  const [customersTotal, setCustomersTotal] = useState(0);
+  const [customersTotalPages, setCustomersTotalPages] = useState(1);
+  const [customersQ, setCustomersQ] = useState("");
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [customersError, setCustomersError] = useState("");
+  const CUSTOMERS_PER_PAGE = 25;
   const [coupons, setCoupons] = useState<any[]>([]);
   const [couponForm, setCouponForm] = useState({ code:"", type:"percentage", value:"", minimum_order:"0", usage_limit:"", expires_at:"" });
   const [couponMsg, setCouponMsg] = useState("");
@@ -368,6 +387,232 @@ export default function AdminPage() {
     }
   };
 
+  const mapOrderRow = (o: any) => ({
+    id: o.order_id,
+    customer: o.customer_name,
+    email: o.customer_email,
+    phone: o.customer_phone,
+    items: o.items_list || o.payment_method || "—",
+    total: `£${parseFloat(o.total || 0).toFixed(2)}`,
+    status: o.status,
+    date: o.created_at
+      ? new Date(o.created_at).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "—",
+    receipt: !!o.receipt_path,
+    receipt_path: o.receipt_path || "",
+    address: [o.delivery_address, o.city, o.postcode].filter(Boolean).join(", "),
+    payment: o.payment_method || "",
+    payment_reference: o.payment_reference || "",
+    city: o.city || "",
+    postcode: o.postcode || "",
+    notes: o.notes || "",
+    coupon_code: o.coupon_code || "",
+    discount_amount: o.discount_amount,
+    vat_amount: o.vat_amount,
+    created_at: o.created_at,
+  });
+
+  type OrderFilterOverrides = {
+    q?: string;
+    status?: string;
+    payment?: "all"|"bank"|"cod";
+    dateFrom?: string;
+    dateTo?: string;
+  };
+
+  const refreshDashSummary = () => {
+    if (!can("orders.view")) return;
+    fetch("/api/admin-orders?summary=1", { credentials: "include" })
+      .then((r) => {
+        if (r.status === 401) { handleSessionExpired(); return null; }
+        if (r.status === 403) { showPermError(); return null; }
+        return r.json();
+      })
+      .then((data) => { if (data && !data.error) setDashSummary(data); })
+      .catch(() => {});
+  };
+
+  const loadOrders = async (page?: number, overrides?: OrderFilterOverrides) => {
+    if (!can("orders.view")) return;
+    const p = page ?? ordersPage;
+    const q = overrides?.q !== undefined ? overrides.q : orderQ;
+    const status = overrides?.status !== undefined ? overrides.status : statusFilter;
+    const payment = overrides?.payment !== undefined ? overrides.payment : orderPaymentFilter;
+    const dateFrom = overrides?.dateFrom !== undefined ? overrides.dateFrom : orderDateFrom;
+    const dateTo = overrides?.dateTo !== undefined ? overrides.dateTo : orderDateTo;
+    const hasFilters = !!(
+      String(q || "").trim() ||
+      (status && status !== "all") ||
+      (payment && payment !== "all") ||
+      dateFrom ||
+      dateTo
+    );
+    setOrdersHasFilters(hasFilters);
+    setOrdersLoading(true);
+    setOrdersError("");
+    const params = new URLSearchParams();
+    params.set("page", String(p));
+    params.set("limit", String(ORDERS_PER_PAGE));
+    if (String(q || "").trim()) params.set("q", String(q).trim());
+    if (status && status !== "all") params.set("status", status);
+    if (payment && payment !== "all") params.set("payment_method", payment);
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    try {
+      const r = await fetch(`/api/admin-orders?${params.toString()}`, { credentials: "include" });
+      if (r.status === 401) { handleSessionExpired(); return; }
+      if (r.status === 403) { showPermError(); setOrdersError("You do not have permission to view orders."); return; }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setOrdersError(data?.error || "Failed to load orders");
+        setOrders([]);
+        setOrdersTotal(0);
+        setOrdersTotalPages(1);
+        return;
+      }
+      const items = Array.isArray(data?.items) ? data.items.map((o: any) => mapOrderRow(o)) : [];
+      setOrders(items);
+      setOrdersTotal(Number(data?.pagination?.total || 0));
+      setOrdersTotalPages(Math.max(1, Number(data?.pagination?.totalPages || 1)));
+      setOrdersPage(Number(data?.pagination?.page || p));
+    } catch {
+      setOrdersError("Failed to load orders");
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const loadCustomers = async (page?: number, overrides?: { q?: string }) => {
+    if (!can("customers.view")) return;
+    const p = page ?? customersPage;
+    const q = overrides?.q !== undefined ? overrides.q : customersQ;
+    setCustomersLoading(true);
+    setCustomersError("");
+    const params = new URLSearchParams();
+    params.set("customers", "1");
+    params.set("page", String(p));
+    params.set("limit", String(CUSTOMERS_PER_PAGE));
+    if (String(q || "").trim()) params.set("q", String(q).trim());
+    try {
+      const r = await fetch(`/api/admin-orders?${params.toString()}`, { credentials: "include" });
+      if (r.status === 401) { handleSessionExpired(); return; }
+      if (r.status === 403) { showPermError(); setCustomersError("You do not have permission to view customers."); return; }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setCustomersError(data?.error || "Failed to load customers");
+        setCustomers([]);
+        setCustomersTotal(0);
+        setCustomersTotalPages(1);
+        return;
+      }
+      const items = Array.isArray(data?.items)
+        ? data.items.map((c: any) => ({
+            name: c.customer_name || "",
+            email: c.customer_email || "",
+            phone: c.customer_phone || "",
+            orders: Number(c.order_count) || 0,
+            spent: `£${parseFloat(c.total_spent || 0).toFixed(2)}`,
+            first_order: c.first_order
+              ? new Date(c.first_order).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : "—",
+            last_order: c.last_order
+              ? new Date(c.last_order).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : "—",
+          }))
+        : [];
+      setCustomers(items);
+      setCustomersTotal(Number(data?.pagination?.total || 0));
+      setCustomersTotalPages(Math.max(1, Number(data?.pagination?.totalPages || 1)));
+      setCustomersPage(Number(data?.pagination?.page || p));
+    } catch {
+      setCustomersError("Failed to load customers");
+      setCustomers([]);
+    } finally {
+      setCustomersLoading(false);
+    }
+  };
+
+  const clearOrderFilters = () => {
+    setOrderQ("");
+    setStatusFilter("all");
+    setOrderPaymentFilter("all");
+    setOrderDateFrom("");
+    setOrderDateTo("");
+    setOrdersPage(1);
+    loadOrders(1, { q: "", status: "all", payment: "all", dateFrom: "", dateTo: "" });
+  };
+
+  const applyOrderFilters = () => {
+    setOrdersPage(1);
+    loadOrders(1);
+  };
+
+  const exportOrdersCsv = async () => {
+    const params = new URLSearchParams();
+    if (orderQ.trim()) params.set("q", orderQ.trim());
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (orderPaymentFilter !== "all") params.set("payment_method", orderPaymentFilter);
+    if (orderDateFrom) params.set("date_from", orderDateFrom);
+    if (orderDateTo) params.set("date_to", orderDateTo);
+    try {
+      const r = await fetch(`/api/admin-orders-export?${params.toString()}`, { credentials: "include" });
+      if (r.status === 401) { handleSessionExpired(); return; }
+      if (r.status === 403) { showPermError(); return; }
+      if (r.status === 400) {
+        const data = await r.json().catch(() => ({}));
+        alert(data?.error || "Export failed");
+        return;
+      }
+      if (!r.ok) {
+        alert("Export failed");
+        return;
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "orders-export.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Export failed");
+    }
+  };
+
+  const openOrderView = async (orderId: string) => {
+    try {
+      const r = await fetch(`/api/admin-orders?order_id=${encodeURIComponent(orderId)}`, {
+        credentials: "include",
+      });
+      if (r.status === 401) { handleSessionExpired(); return; }
+      if (r.status === 403) { showPermError(); return; }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data?.order) {
+        alert(data?.error || "Order not found");
+        return;
+      }
+      setOrderDetail({ order: data.order, items: Array.isArray(data.items) ? data.items : [] });
+      setOrderModal(mapOrderRow(data.order));
+    } catch {
+      alert("Failed to load order");
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -419,68 +664,35 @@ export default function AdminPage() {
     }
 
     if (can("orders.view")) {
-      fetch("/api/admin-orders", { credentials: "include" })
-        .then((r) => r.json())
+      fetch("/api/admin-orders?summary=1", { credentials: "include" })
+        .then((r) => {
+          if (r.status === 401) { handleSessionExpired(); return null; }
+          if (r.status === 403) { showPermError(); return null; }
+          return r.json();
+        })
+        .then((data) => { if (data && !data.error) setDashSummary(data); })
+        .catch(() => {});
+      fetch("/api/admin-orders?page=1&limit=10", { credentials: "include" })
+        .then((r) => {
+          if (r.status === 401) { handleSessionExpired(); return null; }
+          if (r.status === 403) { showPermError(); return null; }
+          return r.json();
+        })
         .then((data) => {
-          if (Array.isArray(data) && data.length > 0) {
-            setOrders(
-              data.map((o: any) => ({
-                id: o.order_id,
-                customer: o.customer_name,
-                email: o.customer_email,
-                phone: o.customer_phone,
-                items: o.items_list || o.payment_method || "—",
-                total: `£${parseFloat(o.total || 0).toFixed(2)}`,
-                status: o.status,
-                date: o.created_at
-                  ? new Date(o.created_at).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  : "—",
-                receipt: !!o.receipt_path,
-                receipt_path: o.receipt_path || "",
-                address: [o.delivery_address, o.city, o.postcode].filter(Boolean).join(", "),
-                payment: o.payment_method || "",
-                payment_reference: o.payment_reference || "",
-              }))
-            );
+          if (Array.isArray(data?.items)) {
+            setRecentOrders(data.items.map((o: any) => mapOrderRow(o)));
           } else {
-            setOrders([]);
+            setRecentOrders([]);
           }
         })
         .catch(() => {});
     } else {
+      setDashSummary(null);
+      setRecentOrders([]);
       setOrders([]);
     }
 
-    if (can("customers.view")) {
-      fetch("/api/admin-orders?customers=1", { credentials: "include" })
-        .then((r) => r.json())
-        .then((data) => {
-          if (Array.isArray(data) && data.length > 0) {
-            setCustomers(
-              data.map((c: any) => ({
-                name: c.customer_name || "",
-                email: c.customer_email || "",
-                phone: c.customer_phone || "",
-                orders: Number(c.order_count) || 0,
-                spent: `£${parseFloat(c.total_spent || 0).toFixed(2)}`,
-                joined: c.first_order
-                  ? new Date(c.first_order).toLocaleDateString("en-GB", {
-                      month: "short",
-                      year: "numeric",
-                    })
-                  : "—",
-              }))
-            );
-          } else {
-            setCustomers([]);
-          }
-        })
-        .catch(() => {});
-    } else {
+    if (!can("customers.view")) {
       setCustomers([]);
     }
 
@@ -574,6 +786,18 @@ export default function AdminPage() {
       setStaffUsers([]);
     }
   }, [loggedIn, adminRole]);
+
+  // Load orders/customers only when their tab is active (no polling)
+  useEffect(() => {
+    if (!loggedIn) return;
+    if (tab === "orders" && can("orders.view")) {
+      loadOrders(ordersPage || 1);
+    }
+    if (tab === "customers" && can("customers.view")) {
+      loadCustomers(customersPage || 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn, tab, adminRole]);
 
   // Keep current tab within role permissions (no hidden-tab bypass via state)
   useEffect(() => {
@@ -1007,9 +1231,22 @@ export default function AdminPage() {
       method: "PATCH",
       credentials: "include", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ order_id: id, status }),
-    }).catch(() => {});
-    setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
+    })
+      .then(async (r) => {
+        if (r.status === 401) { handleSessionExpired(); return; }
+        if (r.status === 403) { showPermError(); return; }
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}));
+          alert(data?.error || "Status update failed");
+          return;
+        }
+        setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+        setRecentOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+        refreshDashSummary();
+      })
+      .catch(() => {});
     setOrderModal(null);
+    setOrderDetail(null);
   };
 
   const deleteOrder = async (orderId: string, total: string, status: string) => {
@@ -1023,8 +1260,17 @@ export default function AdminPage() {
       body: JSON.stringify({ order_id: orderId }),
     }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
-      setOrders(prev => prev.filter(o => o.id !== orderId));
       setOrderModal(null);
+      setOrderDetail(null);
+      const nextLen = orders.length - 1;
+      if (nextLen <= 0 && ordersPage > 1) {
+        const prevPage = ordersPage - 1;
+        setOrdersPage(prevPage);
+        await loadOrders(prevPage);
+      } else {
+        await loadOrders(ordersPage);
+      }
+      refreshDashSummary();
     } else {
       alert(`❌ Delete failed: ${res.error || "Unknown error"}`);
     }
@@ -1305,12 +1551,7 @@ export default function AdminPage() {
     setProductModal("new");
   };
 
-  const filteredOrders = statusFilter === "all" ? orders : orders.filter(o => o.status === statusFilter);
-  const pendingCount = orders.filter(o => o.status === "pending").length;
-  // Fix 1 — dynamic dashboard stats from real data
-  const revenueOrders = orders.filter(o => ["confirmed","dispatched","delivered"].includes(o.status));
-  const totalRevenue = revenueOrders.reduce((s, o) => s + parseFloat((o.total||"0").replace("£","").replace(",","")), 0);
-  const deliveredCount = orders.filter(o => o.status === "delivered").length;
+  const pendingCount = Number(dashSummary?.pending_orders || 0);
   const leadsLast24 = chatLeads.filter(lead => new Date(lead.created_at).getTime() >= leadWindowStart).length;
 
   const statusClass = (s: string) => `status-badge status-${s}`;
@@ -1356,7 +1597,7 @@ export default function AdminPage() {
         <div className="modal-overlay">
           <div className="modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="modal-title">Payment Receipt — {receiptModal}</div>
-            {(() => { const o = orders.find(x => x.id === receiptModal); const path = (o as any)?.receipt_path; return path ? (
+            {(() => { const o = orders.find(x => x.id === receiptModal) || recentOrders.find(x => x.id === receiptModal); const path = (o as any)?.receipt_path; return path ? (
               <img src={path} alt="Receipt" style={{width:"100%",borderRadius:12,marginBottom:16,border:"1px solid rgba(139,0,255,0.3)"}} />
             ) : (
               <div className="receipt-preview">🧾<br /><span style={{fontSize:"14px",color:"rgba(255,255,255,0.4)"}}>No receipt image uploaded</span></div>
@@ -1372,18 +1613,72 @@ export default function AdminPage() {
       {/* ORDER MODAL */}
       {orderModal && (
         <div className="modal-overlay">
-          <div className="modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
+          <div className="modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()} style={{maxWidth:640}}>
             <div className="modal-title">Order — {orderModal.id}</div>
-            <div className="modal-field"><label>Customer</label><input readOnly value={orderModal.customer} /></div>
-            <div className="modal-field"><label>Email</label><input readOnly value={orderModal.email} /></div>
-            <div className="modal-field"><label>Phone / WhatsApp</label><input readOnly value={orderModal.phone} /></div>
-            <div className="modal-field"><label>Items</label><input readOnly value={orderModal.items} /></div>
-            <div className="modal-field"><label>Delivery Address</label><input readOnly value={(orderModal as any).address || "—"} /></div>
-            <div className="modal-field"><label>Payment Method</label><input readOnly value={(orderModal as any).payment || "—"} /></div>
-            {(orderModal as any).payment_reference && (
-              <div className="modal-field"><label>Payment Reference</label><input readOnly value={(orderModal as any).payment_reference} style={{background:"#F5F3FF",borderColor:"#DDD6FE",fontWeight:600}} /></div>
+
+            <div style={{fontSize:11,letterSpacing:1.5,textTransform:"uppercase",color:"#666",fontWeight:700,marginBottom:10}}>Order</div>
+            <div className="modal-field"><label>Order ID</label><input readOnly value={orderModal.id} /></div>
+            <div className="modal-field"><label>Date</label><input readOnly value={orderModal.date || "—"} /></div>
+            <div className="modal-field"><label>Delivery Address</label><input readOnly value={orderModal.address || "—"} /></div>
+
+            <div style={{fontSize:11,letterSpacing:1.5,textTransform:"uppercase",color:"#666",fontWeight:700,margin:"18px 0 10px"}}>Customer</div>
+            <div className="modal-field"><label>Name</label><input readOnly value={orderModal.customer || "—"} /></div>
+            <div className="modal-field"><label>Email</label><input readOnly value={orderModal.email || "—"} /></div>
+            <div className="modal-field"><label>Phone / WhatsApp</label><input readOnly value={orderModal.phone || "—"} /></div>
+
+            <div style={{fontSize:11,letterSpacing:1.5,textTransform:"uppercase",color:"#666",fontWeight:700,margin:"18px 0 10px"}}>Items</div>
+            {orderDetail?.items?.length ? (
+              <div className="table-wrap" style={{marginBottom:16,border:"1px solid #E5E5E5",borderRadius:8}}>
+                <table>
+                  <thead><tr><th>Product</th><th>Qty</th><th>Price</th></tr></thead>
+                  <tbody>
+                    {orderDetail.items.map((it: any) => (
+                      <tr key={it.id || `${it.product_name}-${it.quantity}`}>
+                        <td>{it.product_name || "—"}</td>
+                        <td>{it.quantity ?? "—"}</td>
+                        <td>£{parseFloat(it.price || 0).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="modal-field"><label>Items</label><input readOnly value={orderModal.items || "—"} /></div>
             )}
+
+            <div style={{fontSize:11,letterSpacing:1.5,textTransform:"uppercase",color:"#666",fontWeight:700,margin:"18px 0 10px"}}>Payment</div>
+            <div className="modal-field"><label>Payment Method</label><input readOnly value={orderModal.payment || "—"} /></div>
+            {orderModal.payment_reference && (
+              <div className="modal-field"><label>Payment Reference</label><input readOnly value={orderModal.payment_reference} style={{background:"#F5F3FF",borderColor:"#DDD6FE",fontWeight:600}} /></div>
+            )}
+
+            <div style={{fontSize:11,letterSpacing:1.5,textTransform:"uppercase",color:"#666",fontWeight:700,margin:"18px 0 10px"}}>Totals</div>
+            <div className="modal-field"><label>VAT</label><input readOnly value={orderModal.vat_amount != null && orderModal.vat_amount !== "" ? `£${parseFloat(orderModal.vat_amount || 0).toFixed(2)}` : "—"} /></div>
+            <div className="modal-field"><label>Discount</label><input readOnly value={orderModal.discount_amount != null && orderModal.discount_amount !== "" ? `£${parseFloat(orderModal.discount_amount || 0).toFixed(2)}` : "—"} /></div>
+            <div className="modal-field"><label>Coupon</label><input readOnly value={orderModal.coupon_code || "—"} /></div>
             <div className="modal-field"><label>Total</label><input readOnly value={orderModal.total} /></div>
+
+            {(orderModal.notes || orderDetail?.order?.notes) && (
+              <>
+                <div style={{fontSize:11,letterSpacing:1.5,textTransform:"uppercase",color:"#666",fontWeight:700,margin:"18px 0 10px"}}>Notes</div>
+                <div className="modal-field"><textarea readOnly value={orderModal.notes || orderDetail?.order?.notes || ""} rows={3} /></div>
+              </>
+            )}
+
+            {(orderModal.receipt_path || orderDetail?.order?.receipt_path) && (
+              <div className="modal-field" style={{marginTop:8}}>
+                <label>Receipt</label>
+                <a
+                  href={orderModal.receipt_path || orderDetail?.order?.receipt_path}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{color:"#5B21B6",fontSize:14,fontWeight:600}}
+                >
+                  Open receipt ↗
+                </a>
+              </div>
+            )}
+
             <div className="modal-field">
               <label>Update Status</label>
               <select defaultValue={orderModal.status} onChange={e => updateStatus(orderModal.id, e.target.value as OrderStatus)}>
@@ -1402,8 +1697,8 @@ export default function AdminPage() {
                 🗑 Delete Order
               </button>
               <div style={{display:"flex",gap:8}}>
-                <button className="modal-cancel" onClick={() => setOrderModal(null)}>Close</button>
-                {orderModal.receipt && <button className="modal-save" onClick={() => { setOrderModal(null); setReceiptModal(orderModal.id); }}>View Receipt</button>}
+                <button className="modal-cancel" onClick={() => { setOrderModal(null); setOrderDetail(null); }}>Close</button>
+                {orderModal.receipt && <button className="modal-save" onClick={() => { setOrderModal(null); setOrderDetail(null); setReceiptModal(orderModal.id); }}>View Receipt</button>}
               </div>
             </div>
           </div>
@@ -1762,12 +2057,12 @@ export default function AdminPage() {
               <div className="stats-grid">
                 {(can("orders.view")
                   ? [
-                      { icon:"🛒", label:"Total Orders", value:orders.length, trend:"All time" },
-                      { icon:"⏳", label:"Pending Orders", value:pendingCount, trend:"Needs action" },
-                      { icon:"💰", label:"Total Revenue", value:`£${totalRevenue.toFixed(2)}`, trend:"Confirmed only" },
-                      { icon:"👥", label:"Customers", value:customers.length, trend:"Unique" },
-                      { icon:"📦", label:"Products", value:products.length, trend:"Active" },
-                      { icon:"✅", label:"Delivered", value:deliveredCount, trend:"All time" },
+                      { icon:"🛒", label:"Total Orders", value:Number(dashSummary?.total_orders || 0), trend:"All time" },
+                      { icon:"⏳", label:"Pending Orders", value:Number(dashSummary?.pending_orders || 0), trend:"Needs action" },
+                      { icon:"💰", label:"Total Revenue", value:`£${Number(dashSummary?.confirmed_revenue || 0).toFixed(2)}`, trend:"Confirmed only" },
+                      { icon:"👥", label:"Customers", value:Number(dashSummary?.customer_count || 0), trend:"Unique" },
+                      { icon:"📦", label:"Products", value:Number(dashSummary?.product_count ?? products.length), trend:"Active" },
+                      { icon:"✅", label:"Delivered", value:Number(dashSummary?.delivered_orders || 0), trend:"All time" },
                     ]
                   : [
                       { icon:"📝", label:"Blog Posts", value:blogPosts.length, trend:"All posts" },
@@ -1797,16 +2092,19 @@ export default function AdminPage() {
                   <table>
                     <thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Action</th></tr></thead>
                     <tbody>
-                      {orders.slice(0,10).map(o => (
+                      {recentOrders.map(o => (
                         <tr key={o.id}>
                           <td style={{fontFamily:"monospace",color:"#5B21B6"}}>{o.id}</td>
                           <td>{o.customer}</td>
                           <td style={{maxWidth:"180px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.items}</td>
                           <td style={{fontWeight:700}}>{o.total}</td>
                           <td><span className={statusClass(o.status)}>{o.status}</span></td>
-                          <td><button className="action-btn btn-view" onClick={() => setOrderModal(o)}>View</button></td>
+                          <td><button className="action-btn btn-view" onClick={() => openOrderView(o.id)}>View</button></td>
                         </tr>
                       ))}
+                      {recentOrders.length === 0 && (
+                        <tr><td colSpan={6} style={{textAlign:"center",color:"#999",padding:"20px"}}>No recent orders</td></tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1828,53 +2126,75 @@ export default function AdminPage() {
 
           {/* ORDERS */}
           {tab==="orders" && can("orders.view") && (() => {
-            const totalOrderPages = Math.ceil(filteredOrders.length / ORDERS_PER_PAGE);
-            const pagedOrders = filteredOrders.slice((ordersPage-1)*ORDERS_PER_PAGE, ordersPage*ORDERS_PER_PAGE);
-            const from = filteredOrders.length === 0 ? 0 : (ordersPage-1)*ORDERS_PER_PAGE+1;
-            const to = Math.min(ordersPage*ORDERS_PER_PAGE, filteredOrders.length);
+            const from = ordersTotal === 0 ? 0 : (ordersPage - 1) * ORDERS_PER_PAGE + 1;
+            const to = Math.min(ordersPage * ORDERS_PER_PAGE, ordersTotal);
             return (
             <div className="section-card">
               <div className="section-header">
-                <div className="section-title">All Orders ({filteredOrders.length})</div>
-                <div className="section-actions">
-                  <select className="filter-select" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setOrdersPage(1); }}>
+                <div className="section-title">All Orders ({ordersTotal})</div>
+                <div className="section-actions" style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+                  <input
+                    className="filter-select"
+                    style={{minWidth:160}}
+                    placeholder="Search orders…"
+                    value={orderQ}
+                    onChange={(e) => setOrderQ(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") applyOrderFilters(); }}
+                  />
+                  <select className="filter-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                     <option value="all">All Status</option>
                     <option value="pending">Pending</option>
                     <option value="confirmed">Confirmed</option>
                     <option value="dispatched">Dispatched</option>
                     <option value="delivered">Delivered</option>
                   </select>
+                  <select className="filter-select" value={orderPaymentFilter} onChange={e => setOrderPaymentFilter(e.target.value as "all"|"bank"|"cod")}>
+                    <option value="all">All Payment</option>
+                    <option value="bank">Bank</option>
+                    <option value="cod">COD</option>
+                  </select>
+                  <input className="filter-select" type="date" value={orderDateFrom} onChange={e => setOrderDateFrom(e.target.value)} title="Date from" />
+                  <input className="filter-select" type="date" value={orderDateTo} onChange={e => setOrderDateTo(e.target.value)} title="Date to" />
+                  <button className="add-btn" type="button" onClick={applyOrderFilters}>Apply</button>
+                  <button className="action-btn btn-view" type="button" onClick={clearOrderFilters}>Clear Filters</button>
+                  <button className="action-btn btn-verify" type="button" onClick={exportOrdersCsv}>Export CSV</button>
                 </div>
               </div>
-              {/* Pagination info */}
-              {filteredOrders.length > 0 && (
-                <div style={{padding:"8px 20px",fontSize:12,color:"#888888",borderBottom:"1px solid #F0F0F0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span>Showing {from}–{to} of {filteredOrders.length} orders</span>
+              {ordersLoading && (
+                <div style={{padding:"20px",textAlign:"center",color:"#888",fontSize:13}}>Loading orders…</div>
+              )}
+              {ordersError && !ordersLoading && (
+                <div style={{padding:"20px",textAlign:"center",color:"#DC2626",fontSize:13}}>{ordersError}</div>
+              )}
+              {!ordersLoading && !ordersError && ordersTotal === 0 && (
+                <div style={{padding:"24px",textAlign:"center",color:"#888",fontSize:13}}>
+                  {ordersHasFilters ? "No orders match these filters" : "No orders yet"}
+                </div>
+              )}
+              {!ordersLoading && !ordersError && ordersTotal > 0 && (
+                <div style={{padding:"8px 20px",fontSize:12,color:"#888888",borderBottom:"1px solid #F0F0F0",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                  <span>Showing {from}–{to} of {ordersTotal} orders</span>
                   <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                    <button className="action-btn btn-view" disabled={ordersPage===1} onClick={()=>setOrdersPage(p=>p-1)} style={{opacity:ordersPage===1?0.4:1}}>← Prev</button>
-                    {Array.from({length:totalOrderPages},(_,i)=>i+1).filter(p=>p===1||p===totalOrderPages||Math.abs(p-ordersPage)<=1).map((p,i,arr)=>(
-                      <span key={p}>
-                        {i>0 && arr[i-1]!==p-1 && <span style={{color:"#888",padding:"0 2px"}}>…</span>}
-                        <button className={`action-btn ${p===ordersPage?"btn-verify":"btn-view"}`} onClick={()=>setOrdersPage(p)} style={{minWidth:32}}>{p}</button>
-                      </span>
-                    ))}
-                    <button className="action-btn btn-view" disabled={ordersPage===totalOrderPages} onClick={()=>setOrdersPage(p=>p+1)} style={{opacity:ordersPage===totalOrderPages?0.4:1}}>Next →</button>
+                    <button className="action-btn btn-view" disabled={ordersPage===1} onClick={()=>{ const p = ordersPage-1; setOrdersPage(p); loadOrders(p); }} style={{opacity:ordersPage===1?0.4:1}}>← Prev</button>
+                    <span style={{fontSize:12,color:"#666"}}>Page {ordersPage} of {ordersTotalPages}</span>
+                    <button className="action-btn btn-view" disabled={ordersPage>=ordersTotalPages} onClick={()=>{ const p = ordersPage+1; setOrdersPage(p); loadOrders(p); }} style={{opacity:ordersPage>=ordersTotalPages?0.4:1}}>Next →</button>
                   </div>
                 </div>
               )}
+              {!ordersLoading && !ordersError && orders.length > 0 && (
               <div className="table-wrap">
                 <table>
                   <thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Date</th><th>Payment</th><th>Receipt</th><th>Status</th><th>Actions</th></tr></thead>
                   <tbody>
-                    {pagedOrders.map(o => (
+                    {orders.map(o => (
                       <tr key={o.id}>
                         <td style={{fontFamily:"monospace",color:"#5B21B6",whiteSpace:"nowrap"}}>{o.id}</td>
                         <td style={{whiteSpace:"nowrap"}}>{o.customer}</td>
                         <td style={{maxWidth:"140px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.items}</td>
                         <td style={{fontWeight:700,whiteSpace:"nowrap"}}>{o.total}</td>
-                        <td style={{whiteSpace:"nowrap",color:"rgba(255,255,255,0.4)",fontSize:"12px"}}>{o.date}</td>
+                        <td style={{whiteSpace:"nowrap",color:"#888888",fontSize:"12px"}}>{o.date}</td>
                         <td>
-                          {(o as any).payment === "cod"
+                          {o.payment === "cod"
                             ? <span style={{fontSize:"11px",padding:"3px 9px",borderRadius:"10px",background:"rgba(0,200,100,0.1)",border:"1px solid rgba(0,200,100,0.3)",color:"#00c864",fontWeight:700}}>💵 COD</span>
                             : <span style={{fontSize:"11px",padding:"3px 9px",borderRadius:"10px",background:"rgba(68,136,255,0.1)",border:"1px solid rgba(68,136,255,0.3)",color:"#6699ff",fontWeight:700}}>🏦 Bank</span>
                           }
@@ -1882,12 +2202,12 @@ export default function AdminPage() {
                         <td>
                           {o.receipt
                             ? <button className="action-btn btn-view" style={{fontSize:"11px",padding:"4px 10px"}} onClick={() => setReceiptModal(o.id)}>View Receipt</button>
-                            : <span style={{color:"rgba(255,255,255,0.25)",fontSize:"11px"}}>No Receipt</span>
+                            : <span style={{color:"#AAAAAA",fontSize:"11px"}}>No Receipt</span>
                           }
                         </td>
                         <td><span className={statusClass(o.status)}>{o.status}</span></td>
                         <td style={{whiteSpace:"nowrap"}}>
-                          <button className="action-btn btn-view" onClick={() => setOrderModal(o)}>View</button>
+                          <button className="action-btn btn-view" onClick={() => openOrderView(o.id)}>View</button>
                           {o.status==="pending" && o.receipt && <button className="action-btn btn-verify" onClick={() => setReceiptModal(o.id)}>Verify</button>}
                           <button className="action-btn btn-delete" onClick={() => deleteOrder(o.id, o.total, o.status)}>Delete</button>
                         </td>
@@ -1896,6 +2216,7 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
             );
           })()}
@@ -1966,36 +2287,98 @@ export default function AdminPage() {
           )}
 
           {/* CUSTOMERS */}
-          {tab==="customers" && can("customers.view") && (
+          {tab==="customers" && can("customers.view") && (() => {
+            const from = customersTotal === 0 ? 0 : (customersPage - 1) * CUSTOMERS_PER_PAGE + 1;
+            const to = Math.min(customersPage * CUSTOMERS_PER_PAGE, customersTotal);
+            return (
             <div className="section-card">
               <div className="section-header">
-                <div className="section-title">Customers ({customers.length})</div>
+                <div className="section-title">Customers ({customersTotal})</div>
+                <div className="section-actions" style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+                  <input
+                    className="filter-select"
+                    style={{minWidth:180}}
+                    placeholder="Search customers…"
+                    value={customersQ}
+                    onChange={(e) => setCustomersQ(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { setCustomersPage(1); loadCustomers(1); } }}
+                  />
+                  <button className="add-btn" type="button" onClick={() => { setCustomersPage(1); loadCustomers(1); }}>Apply</button>
+                </div>
               </div>
+              {customersLoading && (
+                <div style={{padding:"20px",textAlign:"center",color:"#888",fontSize:13}}>Loading customers…</div>
+              )}
+              {customersError && !customersLoading && (
+                <div style={{padding:"20px",textAlign:"center",color:"#DC2626",fontSize:13}}>{customersError}</div>
+              )}
+              {!customersLoading && !customersError && customersTotal === 0 && (
+                <div style={{padding:"24px",textAlign:"center",color:"#888",fontSize:13}}>
+                  {customersQ.trim() ? "No customers match this search" : "No customers yet"}
+                </div>
+              )}
+              {!customersLoading && !customersError && customersTotal > 0 && (
+                <div style={{padding:"8px 20px",fontSize:12,color:"#888888",borderBottom:"1px solid #F0F0F0",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                  <span>Showing {from}–{to} of {customersTotal} customers</span>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <button className="action-btn btn-view" disabled={customersPage===1} onClick={()=>{ const p = customersPage-1; setCustomersPage(p); loadCustomers(p); }} style={{opacity:customersPage===1?0.4:1}}>← Prev</button>
+                    <span style={{fontSize:12,color:"#666"}}>Page {customersPage} of {customersTotalPages}</span>
+                    <button className="action-btn btn-view" disabled={customersPage>=customersTotalPages} onClick={()=>{ const p = customersPage+1; setCustomersPage(p); loadCustomers(p); }} style={{opacity:customersPage>=customersTotalPages?0.4:1}}>Next →</button>
+                  </div>
+                </div>
+              )}
+              {!customersLoading && !customersError && customers.length > 0 && (
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th></th><th>Name</th><th>Email</th><th>Phone / WhatsApp</th><th>Orders</th><th>Total Spent</th><th>Joined</th><th>Actions</th></tr></thead>
+                  <thead><tr><th></th><th>Name</th><th>Email</th><th>Phone</th><th>Orders</th><th>Total Spent</th><th>First Order</th><th>Last Order</th><th>Actions</th></tr></thead>
                   <tbody>
                     {customers.map((c,i) => (
-                      <tr key={i}>
-                        <td><div className="customer-avatar">{c.name[0]}</div></td>
+                      <tr key={`${c.email}-${i}`}>
+                        <td><div className="customer-avatar">{(c.name||"?")[0]}</div></td>
                         <td style={{fontWeight:600}}>{c.name}</td>
-                        <td style={{color:"rgba(255,255,255,0.5)",fontSize:"13px"}}>{c.email}</td>
+                        <td style={{color:"#666666",fontSize:"13px"}}>{c.email}</td>
                         <td style={{fontSize:"13px"}}>{c.phone}</td>
                         <td><span style={{fontWeight:700,color:"#5B21B6"}}>{c.orders}</span></td>
                         <td style={{fontWeight:700}}>{c.spent}</td>
-                        <td style={{color:"rgba(255,255,255,0.4)",fontSize:"12px"}}>{c.joined}</td>
-                        <td>
-                          <a href={`https://wa.me/${c.phone.replace(/\s+/g,"").replace("+","")}`} target="_blank" rel="noopener noreferrer">
-                            <button className="action-btn btn-verify">WhatsApp</button>
-                          </a>
+                        <td style={{color:"#888888",fontSize:"12px"}}>{c.first_order}</td>
+                        <td style={{color:"#888888",fontSize:"12px"}}>{c.last_order}</td>
+                        <td style={{whiteSpace:"nowrap"}}>
+                          <button
+                            className="action-btn btn-view"
+                            onClick={() => {
+                              setOrderQ(c.email || "");
+                              setStatusFilter("all");
+                              setOrderPaymentFilter("all");
+                              setOrderDateFrom("");
+                              setOrderDateTo("");
+                              setOrdersPage(1);
+                              setTab("orders");
+                              loadOrders(1, {
+                                q: c.email || "",
+                                status: "all",
+                                payment: "all",
+                                dateFrom: "",
+                                dateTo: "",
+                              });
+                            }}
+                          >
+                            View Orders
+                          </button>
+                          {c.phone && (
+                            <a href={`https://wa.me/${String(c.phone).replace(/\s+/g,"").replace("+","")}`} target="_blank" rel="noopener noreferrer">
+                              <button className="action-btn btn-verify">WhatsApp</button>
+                            </a>
+                          )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
-          )}
+            );
+          })()}
 
           {/* 💬 CHAT LEADS */}
           {tab==="leads" && can("leads.view") && (
@@ -2720,7 +3103,7 @@ export default function AdminPage() {
                     {[
                       "auth.login","auth.logout","profile.password_changed",
                       "staff.created","staff.updated","staff.enabled","staff.disabled","staff.deleted","staff.password_reset",
-                      "order.status_changed","order.deleted",
+                      "order.status_changed","order.deleted","order.exported",
                       "product.created","product.updated","product.deleted",
                       "blog.created","blog.updated","blog.deleted",
                       "faq.created","faq.updated","faq.deleted",
