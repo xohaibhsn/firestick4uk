@@ -22,6 +22,7 @@ export type AdminPermission =
   | "page_builder.manage"
   | "settings.manage"
   | "staff.manage"
+  | "audit.view"
   | "media.upload"
   | "blog_media.upload";
 
@@ -38,7 +39,8 @@ export type SidhuTab =
   | "faqadmin"
   | "pages"
   | "staff"
-  | "settings";
+  | "settings"
+  | "audit";
 
 const ALL_PERMISSIONS: readonly AdminPermission[] = [
   "dashboard.view",
@@ -57,6 +59,7 @@ const ALL_PERMISSIONS: readonly AdminPermission[] = [
   "page_builder.manage",
   "settings.manage",
   "staff.manage",
+  "audit.view",
   "media.upload",
   "blog_media.upload",
 ] as const;
@@ -104,6 +107,7 @@ const TAB_PERMISSION: Record<SidhuTab, AdminPermission> = {
   pages: "content.manage",
   staff: "staff.manage",
   settings: "settings.manage",
+  audit: "audit.view",
 };
 
 /**

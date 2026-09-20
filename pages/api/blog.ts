@@ -1,13 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
-import { requireAdminPermission } from '../../lib/adminAuth';
+import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
+import { recordAdminAudit } from '../../lib/adminAudit';
 
 
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
+    let admin: Awaited<ReturnType<typeof requireAdminPermission>> | null = null;
     if (req.method !== 'GET') {
-      const admin = await requireAdminPermission(req, res, 'blog.manage');
+      admin = await requireAdminPermission(req, res, 'blog.manage');
       if (!admin) return;
     }
     await pool.query(`
@@ -112,6 +114,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'INSERT INTO blog_posts (title, slug, excerpt, content, category, emoji, badge, badgeText, featured_image, meta_title, meta_description, focus_keyword, status, featured, canonical_url, faqs, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
         [title, slug || '', excerpt || '', content || '', category || 'Guides', emoji || '📝', badge || 'guide', badgeText || 'Guide', featured_image || '', meta_title || '', meta_description || '', focus_keyword || '', status || 'published', featured ? 1 : 0, finalCanonical, faqs ? JSON.stringify(faqs) : null]
       );
+      if (admin) {
+        const { ip } = getRequestMeta(req);
+        await recordAdminAudit({
+          actor: admin,
+          action: 'blog.created',
+          entityType: 'blog',
+          entityId: result.insertId,
+          summary: `Created blog post ${title || result.insertId}`,
+          ip,
+        });
+      }
       return res.status(200).json({ success: true, id: result.insertId });
     }
 
@@ -122,12 +135,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'UPDATE blog_posts SET title=?, slug=?, excerpt=?, content=?, category=?, emoji=?, badge=?, badgeText=?, featured_image=?, meta_title=?, meta_description=?, focus_keyword=?, status=?, featured=?, canonical_url=?, faqs=? WHERE id=?',
         [title, slug || '', excerpt || '', content || '', category || 'Guides', emoji || '📝', badge || 'guide', badgeText || 'Guide', featured_image || '', meta_title || '', meta_description || '', focus_keyword || '', status || 'published', featured ? 1 : 0, finalCanonical, faqs ? JSON.stringify(faqs) : null, id]
       );
+      if (admin) {
+        const { ip } = getRequestMeta(req);
+        await recordAdminAudit({
+          actor: admin,
+          action: 'blog.updated',
+          entityType: 'blog',
+          entityId: id,
+          summary: `Updated blog post ${title || id}`,
+          ip,
+        });
+      }
       return res.status(200).json({ success: true });
     }
 
     if (req.method === 'DELETE') {
       const { id } = req.query;
+      const [prevRows]: any = await pool.query('SELECT id, title FROM blog_posts WHERE id = ? LIMIT 1', [id]);
+      const prev = Array.isArray(prevRows) && prevRows[0] ? prevRows[0] : null;
       await pool.query('DELETE FROM blog_posts WHERE id = ?', [id]);
+      if (admin) {
+        const { ip } = getRequestMeta(req);
+        await recordAdminAudit({
+          actor: admin,
+          action: 'blog.deleted',
+          entityType: 'blog',
+          entityId: id as string,
+          summary: `Deleted blog post ${prev?.title || id}`,
+          ip,
+        });
+      }
       return res.status(200).json({ success: true });
     }
 

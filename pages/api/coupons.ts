@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { RL_GENERAL, getClientIp } from '../../lib/rateLimit';
 import pool from '../../lib/db';
-import { requireAdminPermission } from '../../lib/adminAuth';
+import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
+import { recordAdminAudit } from '../../lib/adminAudit';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { allowed } = RL_GENERAL(getClientIp(req));
@@ -71,6 +72,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'INSERT INTO coupons (code,type,value,minimum_order,usage_limit,expires_at) VALUES (?,?,?,?,?,?)',
         [String(code).toUpperCase().trim(), type, value, minimum_order||0, usage_limit||null, expires_at||null]
       );
+      const { ip } = getRequestMeta(req);
+      await recordAdminAudit({
+        actor: admin,
+        action: 'coupon.created',
+        entityType: 'coupon',
+        entityId: r.insertId,
+        summary: `Created coupon ${String(code).toUpperCase().trim()}`,
+        metadata: { type },
+        ip,
+      });
       return res.status(200).json({ success:true, id:r.insertId });
     }
 
@@ -80,12 +91,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'UPDATE coupons SET code=?,type=?,value=?,minimum_order=?,usage_limit=?,expires_at=?,is_active=? WHERE id=?',
         [String(code).toUpperCase().trim(), type, value, minimum_order||0, usage_limit||null, expires_at||null, is_active?1:0, id]
       );
+      const { ip } = getRequestMeta(req);
+      await recordAdminAudit({
+        actor: admin,
+        action: 'coupon.updated',
+        entityType: 'coupon',
+        entityId: id,
+        summary: `Updated coupon ${String(code).toUpperCase().trim()}`,
+        ip,
+      });
       return res.status(200).json({ success:true });
     }
 
     if (req.method === 'DELETE') {
       const { id } = req.query;
+      const [prevRows]: any = await pool.query('SELECT id, code FROM coupons WHERE id=?', [id]);
+      const prev = Array.isArray(prevRows) && prevRows[0] ? prevRows[0] : null;
       await pool.query('DELETE FROM coupons WHERE id=?', [id]);
+      const { ip } = getRequestMeta(req);
+      await recordAdminAudit({
+        actor: admin,
+        action: 'coupon.deleted',
+        entityType: 'coupon',
+        entityId: id as string,
+        summary: `Deleted coupon ${prev?.code || id}`,
+        ip,
+      });
       return res.status(200).json({ success:true });
     }
 

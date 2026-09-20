@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "../../lib/db";
-import { requireAdminPermission } from "../../lib/adminAuth";
+import { getRequestMeta, requireAdminPermission } from "../../lib/adminAuth";
+import { recordAdminAudit } from "../../lib/adminAudit";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const admin = await requireAdminPermission(req, res, "orders.manage");
@@ -33,7 +34,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === "PATCH") {
       const { order_id, status } = req.body;
-      await pool.query("UPDATE orders SET status = ? WHERE order_id = ?", [status, order_id]);
+      if (!order_id) return res.status(400).json({ error: "order_id required" });
+
+      const [prevRows]: any = await pool.query(
+        "SELECT order_id, status FROM orders WHERE order_id = ? LIMIT 1",
+        [order_id]
+      );
+      const prev = Array.isArray(prevRows) && prevRows[0] ? prevRows[0] : null;
+      if (!prev) return res.status(404).json({ error: "Order not found" });
+
+      const oldStatus = String(prev.status || "");
+      const newStatus = String(status || "");
+      await pool.query("UPDATE orders SET status = ? WHERE order_id = ?", [newStatus, order_id]);
+
+      const { ip } = getRequestMeta(req);
+      await recordAdminAudit({
+        actor: admin,
+        action: "order.status_changed",
+        entityType: "order",
+        entityId: order_id,
+        summary: `Order status ${oldStatus} → ${newStatus}`,
+        metadata: { old_status: oldStatus, new_status: newStatus },
+        ip,
+      });
+
       return res.status(200).json({ success: true });
     }
 
@@ -41,12 +65,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { order_id } = req.body;
       if (!order_id) return res.status(400).json({ error: "order_id required" });
 
-      const [orderRows]: any = await pool.query("SELECT * FROM orders WHERE order_id=?", [order_id]);
+      const [orderRows]: any = await pool.query("SELECT order_id, status, total FROM orders WHERE order_id=?", [order_id]);
       if (!orderRows.length) return res.status(404).json({ error: "Order not found" });
       const order = orderRows[0];
 
       await pool.query("DELETE FROM order_items WHERE order_id=?", [order_id]);
       await pool.query("DELETE FROM orders WHERE order_id=?", [order_id]);
+
+      const { ip } = getRequestMeta(req);
+      await recordAdminAudit({
+        actor: admin,
+        action: "order.deleted",
+        entityType: "order",
+        entityId: order_id,
+        summary: `Deleted order ${order_id}`,
+        metadata: { was_status: order.status },
+        ip,
+      });
 
       return res.status(200).json({
         success: true,

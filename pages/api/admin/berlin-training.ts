@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
-import { requireAdminPermission } from '@/lib/adminAuth';
+import { getRequestMeta, requireAdminPermission } from '@/lib/adminAuth';
+import { recordAdminAudit } from '@/lib/adminAudit';
 
 async function ensureBerlinTrainingTable() {
   await pool.query(`
@@ -35,6 +36,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         [title, content, is_active === false ? 0 : 1]
       );
       const insertResult = result as { insertId?: number };
+      const { ip } = getRequestMeta(req);
+      await recordAdminAudit({
+        actor: admin,
+        action: 'training.created',
+        entityType: 'training',
+        entityId: insertResult.insertId,
+        summary: `Created training entry ${title}`,
+        ip,
+      });
       return res.status(200).json({ success: true, id: insertResult.insertId });
     }
 
@@ -45,13 +55,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'UPDATE berlin_training SET title=?, content=?, is_active=? WHERE id=?',
         [title || '', content || '', is_active ? 1 : 0, id]
       );
+      const { ip } = getRequestMeta(req);
+      await recordAdminAudit({
+        actor: admin,
+        action: 'training.updated',
+        entityType: 'training',
+        entityId: id,
+        summary: `Updated training entry ${title || id}`,
+        ip,
+      });
       return res.status(200).json({ success: true });
     }
 
     if (req.method === 'DELETE') {
       const id = Number(req.query.id || req.body?.id);
       if (!id) return res.status(400).json({ error: 'id required' });
+      const [prevRows]: any = await pool.query('SELECT id, title FROM berlin_training WHERE id=? LIMIT 1', [id]);
+      const prev = Array.isArray(prevRows) && prevRows[0] ? prevRows[0] : null;
       await pool.query('DELETE FROM berlin_training WHERE id=?', [id]);
+      const { ip } = getRequestMeta(req);
+      await recordAdminAudit({
+        actor: admin,
+        action: 'training.deleted',
+        entityType: 'training',
+        entityId: id,
+        summary: `Deleted training entry ${prev?.title || id}`,
+        ip,
+      });
       return res.status(200).json({ success: true });
     }
 

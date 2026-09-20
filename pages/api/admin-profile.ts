@@ -4,6 +4,7 @@ import {
   clearAdminSessionCookie,
   destroyAdminSessionsForStaff,
   ensureAdminStaffTable,
+  getRequestMeta,
   hashStaffPassword,
   readAdminSessionToken,
   requireAdmin,
@@ -11,6 +12,7 @@ import {
   verifyStaffPassword,
   destroyAdminSessionByToken,
 } from "../../lib/adminAuth";
+import { recordAdminAudit } from "../../lib/adminAudit";
 
 /** Own profile + password change for authenticated admin. */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -99,6 +101,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const token = readAdminSessionToken(req);
       if (token) await destroyAdminSessionByToken(token).catch(() => {});
       clearAdminSessionCookie(res, req);
+
+      const { ip } = getRequestMeta(req);
+      await recordAdminAudit({
+        actor: admin,
+        action: "profile.password_changed",
+        entityType: "staff",
+        entityId: admin.staffId,
+        summary: "Admin changed own password",
+        ip,
+      });
 
       return res.status(200).json({
         success: true,

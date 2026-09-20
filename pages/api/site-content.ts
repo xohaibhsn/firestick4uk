@@ -8,8 +8,9 @@ import {
   subscriptionPageUrl,
   validateSubscriptionSlug,
 } from '../../lib/subscriptionSlug';
-import { requireAdmin } from '../../lib/adminAuth';
+import { requireAdmin, getRequestMeta } from '../../lib/adminAuth';
 import { hasAdminPermission, isSuperAdminSettingsKey } from '../../lib/adminPermissions';
+import { recordAdminAudit } from '../../lib/adminAudit';
 
 const DEFAULTS = [
   ['site_title','Firestick4UK','text','settings','Website Title'],
@@ -279,6 +280,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await upsert(u.key, u.value);
       }
 
+      const allKeys = updateList.map((u) => u.key);
+      const hasSettings = settingsKeys.length > 0;
+      const hasContent = contentKeys.length > 0;
+      const { ip } = getRequestMeta(req);
+      if (hasSettings && !hasContent) {
+        await recordAdminAudit({
+          actor: admin,
+          action: 'settings.updated',
+          entityType: 'settings',
+          entityId: null,
+          summary: `Updated ${settingsKeys.length} site setting(s)`,
+          metadata: { keys: settingsKeys },
+          ip,
+        });
+      } else if (hasContent && !hasSettings) {
+        await recordAdminAudit({
+          actor: admin,
+          action: 'content.updated',
+          entityType: 'content',
+          entityId: null,
+          summary: `Updated ${contentKeys.length} content key(s)`,
+          metadata: { keys: contentKeys },
+          ip,
+        });
+      } else if (hasSettings || hasContent) {
+        // Mixed batch — one settings event if any settings keys, else content
+        await recordAdminAudit({
+          actor: admin,
+          action: hasSettings ? 'settings.updated' : 'content.updated',
+          entityType: hasSettings ? 'settings' : 'content',
+          entityId: null,
+          summary: `Updated ${allKeys.length} site content key(s)`,
+          metadata: { keys: allKeys, settings_keys: settingsKeys, content_keys: contentKeys },
+          ip,
+        });
+      }
+
       return res.status(200).json({
         success: true,
         ...(slugUpdate
@@ -317,6 +355,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'INSERT INTO site_content (content_key,content_value,content_type,page_name,label) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE content_value=?,label=?',
         [ck, content_value||'', content_type||'text', page_name||'', label||ck, content_value||'', label||ck]
       );
+      const { ip } = getRequestMeta(req);
+      const isSettings = isSuperAdminSettingsKey(ck);
+      await recordAdminAudit({
+        actor: admin,
+        action: isSettings ? 'settings.updated' : 'content.updated',
+        entityType: isSettings ? 'settings' : 'content',
+        entityId: ck,
+        summary: isSettings ? 'Updated site setting' : 'Updated site content',
+        metadata: { keys: [ck] },
+        ip,
+      });
       return res.status(200).json({ success: true });
     }
 
@@ -340,6 +389,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       await pool.query('DELETE FROM site_content WHERE content_key=?', [key]);
+      const { ip } = getRequestMeta(req);
+      const isSettings = isSuperAdminSettingsKey(key);
+      await recordAdminAudit({
+        actor: admin,
+        action: isSettings ? 'settings.updated' : 'content.updated',
+        entityType: isSettings ? 'settings' : 'content',
+        entityId: key,
+        summary: isSettings ? 'Deleted site setting key' : 'Deleted site content key',
+        metadata: { keys: [key], deleted: true },
+        ip,
+      });
       return res.status(200).json({ success: true });
     }
 

@@ -3,6 +3,7 @@ import pool from "../../lib/db";
 import {
   destroyAdminSessionsForStaff,
   ensureAdminStaffTable,
+  getRequestMeta,
   hashStaffPassword,
   isAdminRole,
   isValidStaffEmail,
@@ -11,6 +12,7 @@ import {
   validateStaffPassword,
   wouldLeaveZeroActiveSuperAdmins,
 } from "../../lib/adminAuth";
+import { recordAdminAudit } from "../../lib/adminAudit";
 
 function parseActive(value: unknown, fallback = 1): 0 | 1 {
   if (value === undefined || value === null || value === "") return fallback as 0 | 1;
@@ -72,6 +74,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
            VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
           [trimmedName, normalizedEmail, passwordHash, role, activeFlag]
         );
+        const { ip } = getRequestMeta(req);
+        await recordAdminAudit({
+          actor: admin,
+          action: "staff.created",
+          entityType: "staff",
+          entityId: result.insertId,
+          summary: `Created staff user ${trimmedName}`,
+          metadata: { target_email: normalizedEmail, target_role: role, active: activeFlag },
+          ip,
+        });
         return res.status(200).json({ success: true, id: result.insertId });
       } catch (err: any) {
         if (err?.code === "ER_DUP_ENTRY") {
@@ -140,6 +152,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await destroyAdminSessionsForStaff(staffId);
       }
 
+      const changedFields: string[] = [];
+      if (trimmedName !== existing.name) changedFields.push("name");
+      if (normalizedEmail !== existing.email) changedFields.push("email");
+      if (nextRole !== existing.role) changedFields.push("role");
+      if (nextActive !== Number(existing.active)) changedFields.push("active");
+
+      const { ip } = getRequestMeta(req);
+      let action = "staff.updated";
+      let summary = `Updated staff user ${trimmedName}`;
+      if (nextActive === 0 && Number(existing.active) === 1) {
+        action = "staff.disabled";
+        summary = `Disabled staff user ${trimmedName}`;
+      } else if (nextActive === 1 && Number(existing.active) === 0) {
+        action = "staff.enabled";
+        summary = `Enabled staff user ${trimmedName}`;
+      }
+
+      await recordAdminAudit({
+        actor: admin,
+        action,
+        entityType: "staff",
+        entityId: staffId,
+        summary,
+        metadata: {
+          target_email: normalizedEmail,
+          target_role: nextRole,
+          changed_fields: changedFields,
+        },
+        ip,
+      });
+
       return res.status(200).json({ success: true });
     }
 
@@ -150,7 +193,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const [existingRows]: any = await pool.query(
-        "SELECT id, role, active FROM admin_staff WHERE id = ? LIMIT 1",
+        "SELECT id, name, email, role, active FROM admin_staff WHERE id = ? LIMIT 1",
         [staffId]
       );
       const existing = Array.isArray(existingRows) && existingRows[0] ? existingRows[0] : null;
@@ -166,6 +209,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       await destroyAdminSessionsForStaff(staffId);
       await pool.query("DELETE FROM admin_staff WHERE id = ?", [staffId]);
+      const { ip } = getRequestMeta(req);
+      await recordAdminAudit({
+        actor: admin,
+        action: "staff.deleted",
+        entityType: "staff",
+        entityId: staffId,
+        summary: `Deleted staff user ${existing.name || staffId}`,
+        metadata: { target_email: existing.email, target_role: existing.role },
+        ip,
+      });
       return res.status(200).json({ success: true });
     }
 

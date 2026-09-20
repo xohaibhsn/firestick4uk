@@ -13,6 +13,7 @@ import {
   sha256Hex,
   verifyStaffPassword,
 } from "../../lib/adminAuth";
+import { recordAdminAudit } from "../../lib/adminAudit";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -80,6 +81,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         userAgent: meta.userAgent,
       });
       setAdminSessionCookie(res, token, req);
+      await recordAdminAudit({
+        actor: {
+          principalType: "staff",
+          staffId: Number(staff.id),
+          name: String(staff.name || "Staff"),
+          role: staff.role,
+        },
+        action: "auth.login",
+        entityType: "session",
+        entityId: staff.id,
+        summary: "Admin signed in",
+        metadata: { principal: "staff" },
+        ip: meta.ip,
+      });
       return res.status(200).json({
         success: true,
         role: staff.role,
@@ -140,6 +155,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       userAgent: meta.userAgent,
     });
     setAdminSessionCookie(res, token, req);
+    await recordAdminAudit({
+      actor: {
+        principalType: "master",
+        staffId: null,
+        name: "Admin",
+        role: "super_admin",
+      },
+      action: "auth.login",
+      entityType: "session",
+      entityId: null,
+      summary: "Admin signed in",
+      metadata: { principal: "master" },
+      ip: meta.ip,
+    });
     return res.status(200).json({
       success: true,
       role: "super_admin",

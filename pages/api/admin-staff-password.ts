@@ -3,10 +3,12 @@ import pool from "../../lib/db";
 import {
   destroyAdminSessionsForStaff,
   ensureAdminStaffTable,
+  getRequestMeta,
   hashStaffPassword,
   requireAdminPermission,
   validateStaffPassword,
 } from "../../lib/adminAuth";
+import { recordAdminAudit } from "../../lib/adminAudit";
 
 /** Super Admin: reset another staff user's password (no old password required). */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -47,6 +49,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [passwordHash, staffId]
     );
     await destroyAdminSessionsForStaff(staffId);
+
+    const { ip } = getRequestMeta(req);
+    await recordAdminAudit({
+      actor: admin,
+      action: "staff.password_reset",
+      entityType: "staff",
+      entityId: staffId,
+      summary: "Staff password reset by Super Admin",
+      metadata: { target_staff_id: staffId },
+      ip,
+    });
 
     return res.status(200).json({ success: true, sessionsRevoked: true });
   } catch (error: any) {

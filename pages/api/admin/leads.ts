@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
-import { requireAdminPermission } from '@/lib/adminAuth';
+import { getRequestMeta, requireAdminPermission } from '@/lib/adminAuth';
+import { recordAdminAudit } from '@/lib/adminAudit';
 
 async function ensureChatLeadsTable() {
   await pool.query(`
@@ -36,12 +37,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (ids.length > 0) {
         const placeholders = ids.map(() => '?').join(',');
         await pool.query(`DELETE FROM chat_leads WHERE id IN (${placeholders})`, ids);
+        const { ip } = getRequestMeta(req);
+        await recordAdminAudit({
+          actor: admin,
+          action: 'lead.bulk_deleted',
+          entityType: 'lead',
+          entityId: null,
+          summary: `Bulk deleted ${ids.length} lead(s)`,
+          metadata: { count: ids.length },
+          ip,
+        });
         return res.status(200).json({ success: true, deleted: ids.length });
       }
 
       const id = Number(req.query.id || req.body?.id);
       if (!id) return res.status(400).json({ error: 'id required' });
       await pool.query('DELETE FROM chat_leads WHERE id=?', [id]);
+      const { ip } = getRequestMeta(req);
+      await recordAdminAudit({
+        actor: admin,
+        action: 'lead.deleted',
+        entityType: 'lead',
+        entityId: id,
+        summary: `Deleted lead ${id}`,
+        ip,
+      });
       return res.status(200).json({ success: true });
     }
 

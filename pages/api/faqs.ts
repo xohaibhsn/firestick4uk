@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
-import { requireAdminPermission } from '../../lib/adminAuth';
+import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
+import { recordAdminAudit } from '../../lib/adminAudit';
 
 
 
@@ -41,8 +42,9 @@ async function ensureFaqExists(question: string, answer: string, category: strin
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
+    let admin: Awaited<ReturnType<typeof requireAdminPermission>> | null = null;
     if (req.method !== 'GET') {
-      const admin = await requireAdminPermission(req, res, 'faqs.manage');
+      admin = await requireAdminPermission(req, res, 'faqs.manage');
       if (!admin) return;
     }
 
@@ -90,6 +92,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'INSERT INTO faqs (question,answer,category,sort_order) VALUES (?,?,?,?)',
         [question, answer, category||'General', sort_order||0]
       );
+      if (admin) {
+        const { ip } = getRequestMeta(req);
+        await recordAdminAudit({
+          actor: admin,
+          action: 'faq.created',
+          entityType: 'faq',
+          entityId: r.insertId,
+          summary: 'Created FAQ',
+          metadata: { category: category || 'General' },
+          ip,
+        });
+      }
       return res.status(200).json({ success:true, id:r.insertId });
     }
 
@@ -100,12 +114,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'UPDATE faqs SET question=?,answer=?,category=?,sort_order=?,is_visible=? WHERE id=?',
         [question, answer, category||'General', sort_order||0, is_visible??1, id]
       );
+      if (admin) {
+        const { ip } = getRequestMeta(req);
+        await recordAdminAudit({
+          actor: admin,
+          action: 'faq.updated',
+          entityType: 'faq',
+          entityId: id,
+          summary: 'Updated FAQ',
+          ip,
+        });
+      }
       return res.status(200).json({ success:true });
     }
 
     if (req.method === 'DELETE') {
       const { id } = req.query;
       await pool.query('DELETE FROM faqs WHERE id=?', [id]);
+      if (admin) {
+        const { ip } = getRequestMeta(req);
+        await recordAdminAudit({
+          actor: admin,
+          action: 'faq.deleted',
+          entityType: 'faq',
+          entityId: id as string,
+          summary: 'Deleted FAQ',
+          ip,
+        });
+      }
       return res.status(200).json({ success:true });
     }
 

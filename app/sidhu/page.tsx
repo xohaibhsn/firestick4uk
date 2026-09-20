@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import dynamic from "next/dynamic";
 import { toEditorHtml } from "@/lib/contentHtml";
 import AdminContentPanel from "@/components/admin/AdminContentPanel";
@@ -218,7 +218,7 @@ const demoCustomers = [
   { name:"Emma Wilson", email:"emma@example.com", phone:"+44 7444 444444", orders:1, spent:"£9.99", joined:"May 2026" },
 ];
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"training"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"training"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit";
 type AdminRole = "super_admin"|"manager"|"writer";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
@@ -242,6 +242,15 @@ export default function AdminPage() {
   const [staffBusy, setStaffBusy] = useState(false);
   const [showStaffPassword, setShowStaffPassword] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
+  const [auditItems, setAuditItems] = useState<any[]>([]);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditTotalPages, setAuditTotalPages] = useState(1);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditQ, setAuditQ] = useState("");
+  const [auditAction, setAuditAction] = useState("");
+  const [auditEntity, setAuditEntity] = useState("");
+  const [auditExpanded, setAuditExpanded] = useState<number|null>(null);
   const [profileModal, setProfileModal] = useState<"profile"|"password"|null>(null);
   const [profileData, setProfileData] = useState<any>(null);
   const [profileMsg, setProfileMsg] = useState("");
@@ -573,6 +582,37 @@ export default function AdminPage() {
       setTab("dashboard");
     }
   }, [loggedIn, adminRole, tab]);
+
+  const loadAuditLog = (page = 1) => {
+    if (!can("audit.view")) return;
+    setAuditLoading(true);
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("limit", "50");
+    if (auditQ.trim()) params.set("q", auditQ.trim());
+    if (auditAction.trim()) params.set("action", auditAction.trim());
+    if (auditEntity.trim()) params.set("entity_type", auditEntity.trim());
+    fetch(`/api/admin-audit?${params.toString()}`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d?.items)) {
+          setAuditItems(d.items);
+          setAuditPage(Number(d.pagination?.page) || page);
+          setAuditTotalPages(Number(d.pagination?.totalPages) || 1);
+          setAuditTotal(Number(d.pagination?.total) || 0);
+        } else {
+          setAuditItems([]);
+        }
+      })
+      .catch(() => setAuditItems([]))
+      .finally(() => setAuditLoading(false));
+  };
+
+  useEffect(() => {
+    if (!loggedIn || tab !== "audit" || !can("audit.view")) return;
+    loadAuditLog(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn, tab, adminRole]);
 
   useEffect(() => {
     if (tab !== "training") return;
@@ -1645,6 +1685,7 @@ export default function AdminPage() {
               { id:"faqadmin",  icon:"❓", label:"FAQs",         roles:["super_admin","manager"] },
               { id:"pages",     icon:"✏️", label:"Content Editor", roles:["super_admin","manager"] },
               { id:"staff",     icon:"👤", label:"Staff Users",  roles:["super_admin"] },
+              { id:"audit",     icon:"📜", label:"Activity Log", roles:["super_admin"] },
               { id:"settings",  icon:"⚙️", label:"Site Settings",roles:["super_admin"] },
             ] as const).filter(item => canAccessSidhuTab(adminRole, item.id as SidhuTab)).map(item => (
               <button key={item.id} className={`nav-item ${tab===item.id?"active":""}`} onClick={() => { setTab(item.id); setSidebarOpen(false); }}>
@@ -1679,6 +1720,7 @@ export default function AdminPage() {
                 {tab==="faqadmin" && <>Manage <span>FAQs</span></>}
                 {tab==="pages" && <>Content <span>Editor</span></>}
                 {tab==="staff" && <>Staff <span>Users</span></>}
+                {tab==="audit" && <>Activity <span>Log</span></>}
                 {tab==="settings" && <>Site <span>Settings</span></>}
               </h1>
             </div>
@@ -2650,6 +2692,137 @@ export default function AdminPage() {
                   </>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* 📜 ACTIVITY LOG */}
+          {tab==="audit" && can("audit.view") && (
+            <div>
+              <div style={{marginBottom:16,display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-end"}}>
+                <div style={{flex:"1 1 180px"}}>
+                  <label style={{display:"block",fontSize:11,color:"#888",marginBottom:4}}>Search</label>
+                  <input
+                    value={auditQ}
+                    onChange={e=>setAuditQ(e.target.value)}
+                    placeholder="Actor, summary, entity id…"
+                    style={{width:"100%",padding:"9px 12px",border:"1px solid #E5E5E5",borderRadius:8,fontSize:13}}
+                    onKeyDown={e=>{ if(e.key==="Enter") loadAuditLog(1); }}
+                  />
+                </div>
+                <div style={{flex:"0 1 160px"}}>
+                  <label style={{display:"block",fontSize:11,color:"#888",marginBottom:4}}>Action</label>
+                  <select
+                    value={auditAction}
+                    onChange={e=>setAuditAction(e.target.value)}
+                    style={{width:"100%",padding:"9px 12px",border:"1px solid #E5E5E5",borderRadius:8,fontSize:13,background:"#fff"}}
+                  >
+                    <option value="">All actions</option>
+                    {[
+                      "auth.login","auth.logout","profile.password_changed",
+                      "staff.created","staff.updated","staff.enabled","staff.disabled","staff.deleted","staff.password_reset",
+                      "order.status_changed","order.deleted",
+                      "product.created","product.updated","product.deleted",
+                      "blog.created","blog.updated","blog.deleted",
+                      "faq.created","faq.updated","faq.deleted",
+                      "coupon.created","coupon.updated","coupon.deleted",
+                      "content.updated","settings.updated",
+                      "page_builder.updated",
+                      "lead.deleted","lead.bulk_deleted",
+                      "training.created","training.updated","training.deleted",
+                    ].map(a=><option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div style={{flex:"0 1 140px"}}>
+                  <label style={{display:"block",fontSize:11,color:"#888",marginBottom:4}}>Entity</label>
+                  <select
+                    value={auditEntity}
+                    onChange={e=>setAuditEntity(e.target.value)}
+                    style={{width:"100%",padding:"9px 12px",border:"1px solid #E5E5E5",borderRadius:8,fontSize:13,background:"#fff"}}
+                  >
+                    <option value="">All entities</option>
+                    {["session","staff","order","product","blog","faq","coupon","content","settings","page_builder","lead","training"].map(e=><option key={e} value={e}>{e}</option>)}
+                  </select>
+                </div>
+                <button className="add-btn" onClick={()=>loadAuditLog(1)} disabled={auditLoading}>
+                  {auditLoading?"Loading…":"Apply"}
+                </button>
+                <button className="action-btn btn-view" onClick={()=>loadAuditLog(auditPage)} disabled={auditLoading}>Refresh</button>
+              </div>
+              <div style={{fontSize:12,color:"#888",marginBottom:10}}>
+                {auditTotal} event{auditTotal===1?"":"s"} · page {auditPage} of {auditTotalPages}
+              </div>
+              <div className="section-card">
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Time</th>
+                        <th>Admin</th>
+                        <th>Role</th>
+                        <th>Action</th>
+                        <th>Entity</th>
+                        <th>Summary</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {!auditLoading && auditItems.length===0 && (
+                        <tr><td colSpan={7} style={{textAlign:"center",color:"#888",padding:24}}>No audit events yet.</td></tr>
+                      )}
+                      {auditItems.map((row:any)=>(
+                        <Fragment key={row.id}>
+                          <tr>
+                            <td style={{fontSize:12,whiteSpace:"nowrap",color:"#666"}}>
+                              {row.createdAt ? new Date(row.createdAt).toLocaleString("en-GB") : "—"}
+                            </td>
+                            <td style={{fontWeight:600,fontSize:13}}>{row.actorName}</td>
+                            <td><span className={`status-badge ${row.actorRole==="super_admin"?"status-confirmed":row.actorRole==="manager"?"status-dispatched":"status-pending"}`}>{roleLabel(row.actorRole)}</span></td>
+                            <td style={{fontSize:12,fontFamily:"monospace"}}>{row.action}</td>
+                            <td style={{fontSize:12}}>
+                              {row.entityType}{row.entityId!=null && row.entityId!=="" ? ` #${row.entityId}` : ""}
+                            </td>
+                            <td style={{fontSize:13,maxWidth:280}}>{row.summary || "—"}</td>
+                            <td>
+                              {(row.metadata || row.ipAddress) && (
+                                <button
+                                  className="action-btn btn-view"
+                                  onClick={()=>setAuditExpanded(auditExpanded===row.id?null:row.id)}
+                                >
+                                  {auditExpanded===row.id?"Hide":"Details"}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                          {auditExpanded===row.id && (
+                            <tr>
+                              <td colSpan={7} style={{background:"#fafafa",fontSize:12,color:"#555",padding:"12px 16px"}}>
+                                {row.ipAddress && <div style={{marginBottom:6}}><strong>IP:</strong> {row.ipAddress}</div>}
+                                {row.metadata && typeof row.metadata === "object" && (
+                                  <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                                    {Object.entries(row.metadata).map(([k,v])=>(
+                                      <span key={k} style={{background:"#eee",padding:"4px 8px",borderRadius:6}}>
+                                        <strong>{k}:</strong>{" "}
+                                        {Array.isArray(v) ? v.join(", ") : typeof v === "object" ? JSON.stringify(v) : String(v)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {auditTotalPages > 1 && (
+                <div style={{display:"flex",gap:8,justifyContent:"center",marginTop:16,alignItems:"center"}}>
+                  <button className="action-btn btn-view" disabled={auditPage<=1||auditLoading} onClick={()=>loadAuditLog(auditPage-1)} style={{opacity:auditPage<=1?0.4:1}}>← Prev</button>
+                  <span style={{fontSize:13,color:"#666"}}>Page {auditPage} / {auditTotalPages}</span>
+                  <button className="action-btn btn-view" disabled={auditPage>=auditTotalPages||auditLoading} onClick={()=>loadAuditLog(auditPage+1)} style={{opacity:auditPage>=auditTotalPages?0.4:1}}>Next →</button>
+                </div>
+              )}
             </div>
           )}
 
