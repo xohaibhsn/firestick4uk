@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
 
 export type AdminRole = "super_admin" | "manager" | "writer";
@@ -17,11 +18,59 @@ export type AdminIdentity = {
 
 export const ADMIN_SESSION_COOKIE = "firestick_admin_session";
 export const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+export const BCRYPT_COST = 12;
+export const MIN_STAFF_PASSWORD_LENGTH = 10;
 
 const VALID_ROLES: AdminRole[] = ["super_admin", "manager", "writer"];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function isAdminRole(value: unknown): value is AdminRole {
   return typeof value === "string" && (VALID_ROLES as string[]).includes(value);
+}
+
+export function normalizeStaffEmail(email: unknown): string {
+  return String(email || "")
+    .trim()
+    .toLowerCase();
+}
+
+export function isValidStaffEmail(email: string): boolean {
+  return EMAIL_RE.test(email) && email.length <= 255;
+}
+
+export function validateStaffPassword(password: unknown): string | null {
+  const pw = String(password || "");
+  if (pw.length < MIN_STAFF_PASSWORD_LENGTH) {
+    return `Password must be at least ${MIN_STAFF_PASSWORD_LENGTH} characters`;
+  }
+  return null;
+}
+
+export function isBcryptHash(hash: string): boolean {
+  return typeof hash === "string" && /^\$2[aby]?\$/.test(hash);
+}
+
+export function sha256Hex(value: string): string {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+export async function hashStaffPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_COST);
+}
+
+/** Verify staff password; needsUpgrade=true when legacy SHA-256 matched and should be rehashed. */
+export async function verifyStaffPassword(
+  password: string,
+  storedHash: string
+): Promise<{ ok: boolean; needsUpgrade: boolean }> {
+  if (!storedHash) return { ok: false, needsUpgrade: false };
+  if (isBcryptHash(storedHash)) {
+    const ok = await bcrypt.compare(password, storedHash);
+    return { ok, needsUpgrade: false };
+  }
+  // Legacy SHA-256 hex digest
+  const ok = sha256Hex(password) === storedHash;
+  return { ok, needsUpgrade: ok };
 }
 
 export async function ensureAdminSessionsTable(): Promise<void> {
@@ -54,9 +103,72 @@ export async function ensureAdminStaffTable(): Promise<void> {
       password_hash VARCHAR(255) NOT NULL,
       role ENUM('super_admin','manager','writer') DEFAULT 'writer',
       active TINYINT(1) DEFAULT 1,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_login_at DATETIME NULL,
+      password_changed_at DATETIME NULL,
+      updated_at DATETIME NULL
     )
   `);
+  // Idempotent additive columns for existing deployments
+  const alters = [
+    "ALTER TABLE admin_staff ADD COLUMN last_login_at DATETIME NULL",
+    "ALTER TABLE admin_staff ADD COLUMN password_changed_at DATETIME NULL",
+    "ALTER TABLE admin_staff ADD COLUMN updated_at DATETIME NULL",
+  ];
+  for (const sql of alters) {
+    try {
+      await pool.query(sql);
+    } catch {
+      /* column already exists */
+    }
+  }
+}
+
+/** Revoke all DB sessions for a staff user (disable / password change / delete). */
+export async function destroyAdminSessionsForStaff(staffId: number): Promise<void> {
+  if (!Number.isFinite(staffId) || staffId <= 0) return;
+  await ensureAdminSessionsTable();
+  await pool.query("DELETE FROM admin_sessions WHERE staff_id = ?", [staffId]);
+}
+
+export async function countActiveSuperAdmins(): Promise<number> {
+  await ensureAdminStaffTable();
+  const [rows]: any = await pool.query(
+    "SELECT COUNT(*) AS c FROM admin_staff WHERE role = 'super_admin' AND active = 1"
+  );
+  return Number(rows?.[0]?.c || 0);
+}
+
+/**
+ * True when applying nextRole/nextActive to staffId would leave zero active super_admin staff.
+ * Pass nextRole/nextActive for edit; omit both (or pass removing=true) for delete.
+ */
+export async function wouldLeaveZeroActiveSuperAdmins(
+  staffId: number,
+  next?: { role?: string; active?: number | boolean; deleting?: boolean }
+): Promise<boolean> {
+  await ensureAdminStaffTable();
+  const [rows]: any = await pool.query(
+    "SELECT id, role, active FROM admin_staff WHERE id = ? LIMIT 1",
+    [staffId]
+  );
+  const staff = Array.isArray(rows) && rows[0] ? rows[0] : null;
+  if (!staff) return false;
+
+  const currentlyActiveSa = staff.role === "super_admin" && Number(staff.active) === 1;
+  if (!currentlyActiveSa) return false;
+
+  if (next?.deleting) {
+    return (await countActiveSuperAdmins()) <= 1;
+  }
+
+  const nextRole = next?.role ?? staff.role;
+  const nextActiveRaw = next?.active ?? staff.active;
+  const nextActive = nextActiveRaw === true || Number(nextActiveRaw) === 1 ? 1 : 0;
+  const remainsActiveSa = nextRole === "super_admin" && nextActive === 1;
+  if (remainsActiveSa) return false;
+
+  return (await countActiveSuperAdmins()) <= 1;
 }
 
 export function hashSessionToken(token: string): string {

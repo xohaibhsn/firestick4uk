@@ -53,7 +53,7 @@ const styles = `
   .admin-badge { background:#F5F5F5; border:1px solid #E5E5E5; color:#666666; font-size:12px; padding:6px 14px; border-radius:20px; }
   .admin-user-btn { display:flex; align-items:center; gap:6px; background:#F5F5F5; border:1px solid #E5E5E5; color:#111111; font-size:13px; font-weight:500; padding:7px 14px; border-radius:20px; cursor:pointer; transition:all 0.15s; }
   .admin-user-btn:hover { background:#EEEEEE; border-color:#CCCCCC; }
-  .admin-dropdown { position:absolute; top:calc(100% + 8px); right:0; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:10px; min-width:160px; box-shadow:0 4px 20px rgba(0,0,0,0.12); z-index:200; overflow:hidden; }
+  .admin-dropdown { position:absolute; top:calc(100% + 8px); right:0; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:10px; min-width:200px; box-shadow:0 4px 20px rgba(0,0,0,0.12); z-index:200; overflow:hidden; }
   .admin-dropdown-header { padding:12px 16px 10px; border-bottom:1px solid #F0F0F0; }
   .admin-dropdown-name { font-size:14px; font-weight:600; color:#111111; }
   .admin-dropdown-role { font-size:11px; color:#888888; margin-top:1px; }
@@ -224,10 +224,25 @@ export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [adminRole, setAdminRole] = useState<AdminRole>("super_admin");
   const [adminName, setAdminName] = useState("Admin");
+  const [adminPrincipalType, setAdminPrincipalType] = useState<"master"|"staff">("master");
+  const [adminEmail, setAdminEmail] = useState<string|null>(null);
   const [staffUsers, setStaffUsers] = useState<any[]>([]);
-  const [staffForm, setStaffForm] = useState({ name:"", email:"", password:"", role:"writer" });
+  const [staffForm, setStaffForm] = useState({ name:"", email:"", password:"", confirmPassword:"", role:"writer", active:1 as 0|1 });
   const [staffModal, setStaffModal] = useState<any>(null);
+  const [staffResetModal, setStaffResetModal] = useState<any>(null);
+  const [staffResetForm, setStaffResetForm] = useState({ new_password:"", confirm_password:"" });
+  const [staffConfirm, setStaffConfirm] = useState<{ type:"delete"|"disable"; user:any }|null>(null);
   const [staffMsg, setStaffMsg] = useState("");
+  const [staffBusy, setStaffBusy] = useState(false);
+  const [showStaffPassword, setShowStaffPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [profileModal, setProfileModal] = useState<"profile"|"password"|null>(null);
+  const [profileData, setProfileData] = useState<any>(null);
+  const [profileMsg, setProfileMsg] = useState("");
+  const [passwordForm, setPasswordForm] = useState({ current_password:"", new_password:"", confirm_password:"" });
+  const [showPwCurrent, setShowPwCurrent] = useState(false);
+  const [showPwNew, setShowPwNew] = useState(false);
+  const [showPwConfirm, setShowPwConfirm] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -308,6 +323,8 @@ export default function AdminPage() {
           setLoggedIn(true);
           setAdminRole((res.role || "super_admin") as AdminRole);
           setAdminName(res.name || "Admin");
+          setAdminPrincipalType(res.principalType === "staff" ? "staff" : "master");
+          setAdminEmail(res.email || null);
         } else {
           setLoggedIn(false);
         }
@@ -587,14 +604,23 @@ export default function AdminPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
-      }).then(r => r.json());
+      }).then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        return { status: r.status, ...data };
+      });
       if (res.success) {
         setAdminRole((res.role || "super_admin") as AdminRole);
         setAdminName(res.name || "Admin");
+        setAdminPrincipalType(res.principalType === "staff" ? "staff" : "master");
+        setAdminEmail(null);
         setLoggedIn(true);
         setLoginError("");
+      } else if (res.status === 429) {
+        setLoginError("❌ Too many login attempts. Try again in 15 minutes.");
+      } else if (res.error === "Account disabled") {
+        setLoginError("❌ Account disabled");
       } else {
-        setLoginError("❌ Incorrect username or password");
+        setLoginError("❌ Invalid email or password");
       }
     } catch {
       setLoginError("❌ Login failed. Please try again.");
@@ -610,8 +636,23 @@ export default function AdminPage() {
     setLoggedIn(false);
     setAdminRole("super_admin");
     setAdminName("Admin");
+    setAdminPrincipalType("master");
+    setAdminEmail(null);
+    setProfileModal(null);
     setTab("dashboard");
   };
+
+  const formatLastLogin = (value: any) => {
+    if (!value) return "Never";
+    try {
+      return new Date(value).toLocaleString("en-GB", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+    } catch {
+      return "—";
+    }
+  };
+
+  const roleLabel = (role: string) =>
+    role === "super_admin" ? "Super Admin" : role === "manager" ? "Manager" : "Writer";
 
   const loadStaff = () => {
     fetch("/api/admin-staff", { credentials: "include", headers: getRoleHeaders() })
@@ -619,20 +660,140 @@ export default function AdminPage() {
   };
 
   const saveStaff = async () => {
-    if (!staffForm.name||!staffForm.email) { setStaffMsg("❌ Name and email required"); return; }
-    if (staffModal==="new" && !staffForm.password) { setStaffMsg("❌ Password required"); return; }
+    if (!staffForm.name.trim()||!staffForm.email.trim()) { setStaffMsg("❌ Name and email required"); return; }
+    if (staffModal==="new") {
+      if (!staffForm.password) { setStaffMsg("❌ Password required"); return; }
+      if (staffForm.password.length < 10) { setStaffMsg("❌ Password must be at least 10 characters"); return; }
+      if (staffForm.password !== staffForm.confirmPassword) { setStaffMsg("❌ Passwords do not match"); return; }
+    }
+    setStaffBusy(true);
     const method = staffModal==="new" ? "POST" : "PUT";
-    const body = staffModal==="new" ? staffForm : { ...staffForm, id: staffModal.id };
+    const body = staffModal==="new"
+      ? { name: staffForm.name, email: staffForm.email, password: staffForm.password, role: staffForm.role, active: staffForm.active }
+      : { id: staffModal.id, name: staffForm.name, email: staffForm.email, role: staffForm.role, active: staffForm.active };
     const res = await fetch("/api/admin-staff",{method,credentials:"include",headers:{...getRoleHeaders(),"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json()).catch(()=>({}));
+    setStaffBusy(false);
     if (res.success) { setStaffMsg("✅ Saved!"); setStaffModal(null); loadStaff(); }
     else setStaffMsg(`❌ ${res.error||"Failed"}`);
-    setTimeout(()=>setStaffMsg(""),3000);
+    setTimeout(()=>setStaffMsg(""),4000);
   };
 
-  const deleteStaff = async (id:number) => {
-    if (!confirm("Delete this staff user?")) return;
-    await fetch(`/api/admin-staff?id=${id}`, { method: "DELETE", credentials: "include", headers: getRoleHeaders()});
-    loadStaff();
+  const confirmStaffAction = async () => {
+    if (!staffConfirm) return;
+    setStaffBusy(true);
+    if (staffConfirm.type === "delete") {
+      const res = await fetch(`/api/admin-staff?id=${staffConfirm.user.id}`, { method: "DELETE", credentials: "include", headers: getRoleHeaders()}).then(r=>r.json()).catch(()=>({}));
+      setStaffBusy(false);
+      setStaffConfirm(null);
+      if (res.success) { setStaffMsg("✅ Staff user deleted"); loadStaff(); }
+      else setStaffMsg(`❌ ${res.error||"Delete failed"}`);
+    } else {
+      const res = await fetch("/api/admin-staff", {
+        method: "PUT",
+        credentials: "include",
+        headers: { ...getRoleHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: staffConfirm.user.id,
+          name: staffConfirm.user.name,
+          email: staffConfirm.user.email,
+          role: staffConfirm.user.role,
+          active: 0,
+        }),
+      }).then(r=>r.json()).catch(()=>({}));
+      setStaffBusy(false);
+      setStaffConfirm(null);
+      if (res.success) { setStaffMsg("✅ Account disabled"); loadStaff(); }
+      else setStaffMsg(`❌ ${res.error||"Disable failed"}`);
+    }
+    setTimeout(()=>setStaffMsg(""),4000);
+  };
+
+  const enableStaff = async (user: any) => {
+    setStaffBusy(true);
+    const res = await fetch("/api/admin-staff", {
+      method: "PUT",
+      credentials: "include",
+      headers: { ...getRoleHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ id: user.id, name: user.name, email: user.email, role: user.role, active: 1 }),
+    }).then(r=>r.json()).catch(()=>({}));
+    setStaffBusy(false);
+    if (res.success) { setStaffMsg("✅ Account enabled"); loadStaff(); }
+    else setStaffMsg(`❌ ${res.error||"Enable failed"}`);
+    setTimeout(()=>setStaffMsg(""),4000);
+  };
+
+  const resetStaffPassword = async () => {
+    if (!staffResetModal) return;
+    if (staffResetForm.new_password.length < 10) { setStaffMsg("❌ Password must be at least 10 characters"); return; }
+    if (staffResetForm.new_password !== staffResetForm.confirm_password) { setStaffMsg("❌ Passwords do not match"); return; }
+    setStaffBusy(true);
+    const res = await fetch("/api/admin-staff-password", {
+      method: "POST",
+      credentials: "include",
+      headers: { ...getRoleHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ id: staffResetModal.id, ...staffResetForm }),
+    }).then(r=>r.json()).catch(()=>({}));
+    setStaffBusy(false);
+    if (res.success) {
+      setStaffMsg("✅ Password reset. Their sessions were revoked.");
+      setStaffResetModal(null);
+      setStaffResetForm({ new_password:"", confirm_password:"" });
+    } else setStaffMsg(`❌ ${res.error||"Reset failed"}`);
+    setTimeout(()=>setStaffMsg(""),4000);
+  };
+
+  const openProfile = async () => {
+    setAdminDropOpen(false);
+    setProfileMsg("");
+    setProfileModal("profile");
+    try {
+      const res = await fetch("/api/admin-profile", { credentials: "include" }).then(r=>r.json());
+      setProfileData(res);
+      if (res?.name) setAdminName(res.name);
+      if (res?.email) setAdminEmail(res.email);
+      if (res?.principalType) setAdminPrincipalType(res.principalType);
+    } catch {
+      setProfileData(null);
+      setProfileMsg("❌ Could not load profile");
+    }
+  };
+
+  const openChangePassword = () => {
+    setAdminDropOpen(false);
+    setPasswordForm({ current_password:"", new_password:"", confirm_password:"" });
+    setProfileMsg("");
+    setShowPwCurrent(false); setShowPwNew(false); setShowPwConfirm(false);
+    setProfileModal("password");
+  };
+
+  const submitChangePassword = async () => {
+    if (adminPrincipalType === "master") {
+      setProfileMsg("❌ Master password is managed via server environment");
+      return;
+    }
+    if (passwordForm.new_password.length < 10) { setProfileMsg("❌ Password must be at least 10 characters"); return; }
+    if (passwordForm.new_password !== passwordForm.confirm_password) { setProfileMsg("❌ Passwords do not match"); return; }
+    setStaffBusy(true);
+    const res = await fetch("/api/admin-profile", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(passwordForm),
+    }).then(r=>r.json()).catch(()=>({}));
+    setStaffBusy(false);
+    if (res.success || res.reLoginRequired) {
+      setProfileModal(null);
+      setLoggedIn(false);
+      setAdminRole("super_admin");
+      setAdminName("Admin");
+      setAdminPrincipalType("master");
+      setLoginError("");
+      setUsername("");
+      setPassword("");
+      alert("Password changed. Please sign in again.");
+    } else {
+      setProfileMsg(`❌ ${res.error||"Password change failed"}`);
+    }
   };
 
   const updateStatus = (id: string, status: OrderStatus) => {
@@ -1337,6 +1498,7 @@ export default function AdminPage() {
                 {tab==="builder" && <>Page <span>Builder</span></>}
                 {tab==="faqadmin" && <>Manage <span>FAQs</span></>}
                 {tab==="pages" && <>Content <span>Editor</span></>}
+                {tab==="staff" && <>Staff <span>Users</span></>}
                 {tab==="settings" && <>Site <span>Settings</span></>}
               </h1>
             </div>
@@ -1348,8 +1510,17 @@ export default function AdminPage() {
                 <div className="admin-dropdown" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
                   <div className="admin-dropdown-header">
                     <div className="admin-dropdown-name">{adminName}</div>
-                    <div className="admin-dropdown-role">{adminRole==="super_admin"?"Super Admin":adminRole==="manager"?"Manager":"Writer"}</div>
+                    <div className="admin-dropdown-role">
+                      {adminPrincipalType==="master"?"Master Administrator · ":""}
+                      {roleLabel(adminRole)}
+                    </div>
                   </div>
+                  <button className="admin-dropdown-item" onClick={() => { void openProfile(); }}>
+                    👤 My Profile
+                  </button>
+                  <button className="admin-dropdown-item" onClick={() => openChangePassword()}>
+                    🔑 Change Password
+                  </button>
                   <button className="admin-dropdown-item danger" onClick={() => { setAdminDropOpen(false); handleLogout(); }}>
                     🚪 Logout
                   </button>
@@ -2066,29 +2237,37 @@ export default function AdminPage() {
           {tab==="staff" && adminRole==="super_admin" && (
             <div>
               {staffMsg && <div style={{marginBottom:14,padding:"10px 14px",background:staffMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:staffMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{staffMsg}</div>}
-              <div style={{marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div>
-                  <div style={{fontSize:12,color:"#888",marginBottom:4}}>Role permissions: <strong>super_admin</strong> = full access · <strong>manager</strong> = products + blogs · <strong>writer</strong> = blogs only</div>
+              <div style={{marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+                <div style={{fontSize:12,color:"#666",lineHeight:1.65,maxWidth:640}}>
+                  <div><strong>Super Admin</strong> — Full CMS access including Staff Users, Coupons, Page Builder, and Settings</div>
+                  <div><strong>Manager</strong> — Orders, Products, Customers, Leads, Berlin Training, Blog, FAQs, Content Editor</div>
+                  <div><strong>Writer</strong> — Blog and dashboard access only</div>
                 </div>
-                <button className="add-btn" onClick={()=>{ setStaffForm({name:"",email:"",password:"",role:"writer"}); setStaffModal("new"); setStaffMsg(""); }}>+ Add Staff</button>
+                <button className="add-btn" onClick={()=>{ setStaffForm({name:"",email:"",password:"",confirmPassword:"",role:"writer",active:1}); setShowStaffPassword(false); setStaffModal("new"); setStaffMsg(""); }}>+ Add User</button>
               </div>
               <div className="section-card">
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th>Created</th><th>Actions</th></tr></thead>
                     <tbody>
                       {staffUsers.length===0&&<tr><td colSpan={7} style={{textAlign:"center",color:"#888",padding:24}}>No staff users yet. Add staff to delegate access.</td></tr>}
                       {staffUsers.map((s:any)=>(
                         <tr key={s.id}>
-                          <td style={{color:"#888",fontSize:12}}>#{s.id}</td>
                           <td style={{fontWeight:600}}>{s.name}</td>
-                          <td style={{fontSize:12,color:"#888"}}>{s.email}</td>
-                          <td><span className={`status-badge ${s.role==="super_admin"?"status-confirmed":s.role==="manager"?"status-dispatched":"status-pending"}`}>{s.role}</span></td>
-                          <td><span className={`status-badge ${s.active?"status-delivered":"status-pending"}`}>{s.active?"Active":"Inactive"}</span></td>
+                          <td style={{fontSize:12,color:"#666"}}>{s.email}</td>
+                          <td><span className={`status-badge ${s.role==="super_admin"?"status-confirmed":s.role==="manager"?"status-dispatched":"status-pending"}`}>{roleLabel(s.role)}</span></td>
+                          <td><span className={`status-badge ${Number(s.active)===1?"status-delivered":"status-pending"}`}>{Number(s.active)===1?"Active":"Disabled"}</span></td>
+                          <td style={{fontSize:12,color:"#888"}}>{formatLastLogin(s.last_login_at)}</td>
                           <td style={{fontSize:12,color:"#888"}}>{s.created_at ? new Date(s.created_at).toLocaleDateString("en-GB") : "—"}</td>
                           <td style={{whiteSpace:"nowrap"}}>
-                            <button className="action-btn btn-edit" style={{marginRight:6}} onClick={()=>{ setStaffForm({name:s.name,email:s.email,password:"",role:s.role}); setStaffModal(s); setStaffMsg(""); }}>Edit</button>
-                            <button className="action-btn btn-delete" onClick={()=>deleteStaff(s.id)}>Delete</button>
+                            <button className="action-btn btn-edit" style={{marginRight:4}} onClick={()=>{ setStaffForm({name:s.name,email:s.email,password:"",confirmPassword:"",role:s.role,active:Number(s.active)===1?1:0}); setStaffModal(s); setStaffMsg(""); }}>Edit</button>
+                            <button className="action-btn btn-edit" style={{marginRight:4}} onClick={()=>{ setStaffResetForm({new_password:"",confirm_password:""}); setShowResetPassword(false); setStaffResetModal(s); setStaffMsg(""); }}>Reset Password</button>
+                            {Number(s.active)===1 ? (
+                              <button className="action-btn btn-edit" style={{marginRight:4}} onClick={()=>setStaffConfirm({type:"disable",user:s})}>Disable</button>
+                            ) : (
+                              <button className="action-btn btn-edit" style={{marginRight:4}} disabled={staffBusy} onClick={()=>enableStaff(s)}>Enable</button>
+                            )}
+                            <button className="action-btn btn-delete" onClick={()=>setStaffConfirm({type:"delete",user:s})}>Delete</button>
                           </td>
                         </tr>
                       ))}
@@ -2096,6 +2275,7 @@ export default function AdminPage() {
                   </table>
                 </div>
               </div>
+
               {staffModal && (
                 <div className="modal-overlay">
                   <div className="modal" onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
@@ -2103,27 +2283,164 @@ export default function AdminPage() {
                     {staffMsg&&<div style={{marginBottom:10,color:staffMsg.startsWith("✅")?"#00c864":"#ff6666",fontSize:13}}>{staffMsg}</div>}
                     <div className="modal-field"><label>Full Name *</label><input value={staffForm.name} onChange={e=>setStaffForm(f=>({...f,name:e.target.value}))} placeholder="Jane Smith" /></div>
                     <div className="modal-field"><label>Email *</label><input type="email" value={staffForm.email} onChange={e=>setStaffForm(f=>({...f,email:e.target.value}))} placeholder="jane@example.com" /></div>
-                    <div className="modal-field"><label>{staffModal==="new"?"Password *":"New Password (leave blank to keep)"}</label><input type="password" value={staffForm.password} onChange={e=>setStaffForm(f=>({...f,password:e.target.value}))} placeholder="Password" /></div>
+                    {staffModal==="new" && (
+                      <>
+                        <div className="modal-field">
+                          <label>Password * (min 10 characters)</label>
+                          <div style={{display:"flex",gap:8}}>
+                            <input style={{flex:1}} type={showStaffPassword?"text":"password"} value={staffForm.password} onChange={e=>setStaffForm(f=>({...f,password:e.target.value}))} placeholder="Password" autoComplete="new-password" />
+                            <button type="button" className="modal-cancel" style={{padding:"8px 12px"}} onClick={()=>setShowStaffPassword(v=>!v)}>{showStaffPassword?"Hide":"Show"}</button>
+                          </div>
+                        </div>
+                        <div className="modal-field"><label>Confirm Password *</label><input type={showStaffPassword?"text":"password"} value={staffForm.confirmPassword} onChange={e=>setStaffForm(f=>({...f,confirmPassword:e.target.value}))} placeholder="Confirm password" autoComplete="new-password" /></div>
+                      </>
+                    )}
                     <div className="modal-field">
                       <label>Role *</label>
                       <select value={staffForm.role} onChange={e=>setStaffForm(f=>({...f,role:e.target.value}))} style={{width:"100%",padding:"10px 12px",border:"1px solid #E5E5E5",borderRadius:8,fontSize:14,background:"#fff",color:"#111"}}>
-                        <option value="writer">Writer — Blog access only</option>
-                        <option value="manager">Manager — Products + Blogs</option>
-                        <option value="super_admin">Super Admin — Full access</option>
+                        <option value="writer">Writer — Blog / content authoring</option>
+                        <option value="manager">Manager — Operational CMS access</option>
+                        <option value="super_admin">Super Admin — Full CMS access</option>
                       </select>
                     </div>
-                    <div style={{fontSize:12,color:"#888",padding:"8px 0",lineHeight:1.6}}>
-                      🔒 <strong>writer</strong>: view/add/edit blogs only<br/>
-                      📦 <strong>manager</strong>: products, blogs, orders, customers<br/>
-                      ⚙️ <strong>super_admin</strong>: everything including staff and settings
+                    <div className="modal-field">
+                      <label>Status</label>
+                      <select value={String(staffForm.active)} onChange={e=>setStaffForm(f=>({...f,active:(e.target.value==="1"?1:0) as 0|1}))} style={{width:"100%",padding:"10px 12px",border:"1px solid #E5E5E5",borderRadius:8,fontSize:14,background:"#fff",color:"#111"}}>
+                        <option value="1">Active</option>
+                        <option value="0">Disabled</option>
+                      </select>
                     </div>
+                    {staffModal!=="new" && (
+                      <div style={{fontSize:12,color:"#888",padding:"4px 0 8px"}}>To change password, use <strong>Reset Password</strong> on the staff list.</div>
+                    )}
                     <div className="modal-actions">
-                      <button className="modal-cancel" onClick={()=>setStaffModal(null)}>Cancel</button>
-                      <button className="modal-save" onClick={saveStaff}>{staffModal==="new"?"Add Staff":"Save Changes"}</button>
+                      <button className="modal-cancel" onClick={()=>setStaffModal(null)} disabled={staffBusy}>Cancel</button>
+                      <button className="modal-save" onClick={saveStaff} disabled={staffBusy}>{staffBusy?"Saving…":staffModal==="new"?"Add User":"Save Changes"}</button>
                     </div>
                   </div>
                 </div>
               )}
+
+              {staffResetModal && (
+                <div className="modal-overlay">
+                  <div className="modal" onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+                    <div className="modal-title">Reset Password</div>
+                    <div style={{fontSize:13,color:"#666",marginBottom:12}}>Set a new password for <strong>{staffResetModal.name}</strong> ({staffResetModal.email}). Their existing sessions will be revoked.</div>
+                    {staffMsg&&!staffMsg.startsWith("✅")&&<div style={{marginBottom:10,color:"#ff6666",fontSize:13}}>{staffMsg}</div>}
+                    <div className="modal-field">
+                      <label>New Password * (min 10 characters)</label>
+                      <div style={{display:"flex",gap:8}}>
+                        <input style={{flex:1}} type={showResetPassword?"text":"password"} value={staffResetForm.new_password} onChange={e=>setStaffResetForm(f=>({...f,new_password:e.target.value}))} autoComplete="new-password" />
+                        <button type="button" className="modal-cancel" style={{padding:"8px 12px"}} onClick={()=>setShowResetPassword(v=>!v)}>{showResetPassword?"Hide":"Show"}</button>
+                      </div>
+                    </div>
+                    <div className="modal-field"><label>Confirm Password *</label><input type={showResetPassword?"text":"password"} value={staffResetForm.confirm_password} onChange={e=>setStaffResetForm(f=>({...f,confirm_password:e.target.value}))} autoComplete="new-password" /></div>
+                    <div className="modal-actions">
+                      <button className="modal-cancel" onClick={()=>setStaffResetModal(null)} disabled={staffBusy}>Cancel</button>
+                      <button className="modal-save" onClick={resetStaffPassword} disabled={staffBusy}>{staffBusy?"Saving…":"Reset Password"}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {staffConfirm && (
+                <div className="modal-overlay">
+                  <div className="modal" onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+                    <div className="modal-title">{staffConfirm.type==="delete"?"Delete Staff User":"Disable Account"}</div>
+                    <div style={{fontSize:14,color:"#444",lineHeight:1.55,marginBottom:18}}>
+                      {staffConfirm.type==="delete"
+                        ? <>Permanently delete <strong>{staffConfirm.user.name}</strong>? Their sessions will be revoked. This cannot be undone.</>
+                        : <>Disable <strong>{staffConfirm.user.name}</strong>? They will be signed out immediately and cannot log in until re-enabled.</>}
+                    </div>
+                    <div className="modal-actions">
+                      <button className="modal-cancel" onClick={()=>setStaffConfirm(null)} disabled={staffBusy}>Cancel</button>
+                      <button className="modal-save" style={{background:staffConfirm.type==="delete"?"#DC2626":"#B45309"}} onClick={confirmStaffAction} disabled={staffBusy}>
+                        {staffBusy?"Working…":staffConfirm.type==="delete"?"Delete":"Disable"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Profile / Change Password modals */}
+          {profileModal==="profile" && (
+            <div className="modal-overlay">
+              <div className="modal" onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+                <div className="modal-title">My Profile</div>
+                {profileMsg&&<div style={{marginBottom:10,color:"#ff6666",fontSize:13}}>{profileMsg}</div>}
+                {adminPrincipalType==="master" || profileData?.principalType==="master" ? (
+                  <div style={{fontSize:14,lineHeight:1.7,color:"#333"}}>
+                    <div><strong>Name:</strong> {profileData?.name || adminName}</div>
+                    <div><strong>Account:</strong> Master Administrator</div>
+                    <div><strong>Role:</strong> {roleLabel(profileData?.role || adminRole)}</div>
+                    <div style={{marginTop:12,padding:"10px 12px",background:"#F8F5FF",borderRadius:8,fontSize:13,color:"#5B21B6"}}>
+                      Password is managed via server environment and cannot be changed in the CMS.
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{fontSize:14,lineHeight:1.7,color:"#333"}}>
+                    <div><strong>Name:</strong> {profileData?.name || adminName}</div>
+                    <div><strong>Email:</strong> {profileData?.email || adminEmail || "—"}</div>
+                    <div><strong>Role:</strong> {roleLabel(profileData?.role || adminRole)}</div>
+                    <div><strong>Last Login:</strong> {formatLastLogin(profileData?.last_login_at)}</div>
+                  </div>
+                )}
+                <div className="modal-actions">
+                  <button className="modal-cancel" onClick={()=>setProfileModal(null)}>Close</button>
+                  {adminPrincipalType!=="master" && (
+                    <button className="modal-save" onClick={()=>{ setProfileModal(null); openChangePassword(); }}>Change Password</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {profileModal==="password" && (
+            <div className="modal-overlay">
+              <div className="modal" onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+                <div className="modal-title">Change Password</div>
+                {adminPrincipalType==="master" ? (
+                  <>
+                    <div style={{fontSize:14,color:"#444",lineHeight:1.6,marginBottom:16}}>
+                      Master Administrator password is managed via server environment and cannot be changed here.
+                    </div>
+                    <div className="modal-actions">
+                      <button className="modal-cancel" onClick={()=>setProfileModal(null)}>Close</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {profileMsg&&<div style={{marginBottom:10,color:profileMsg.startsWith("✅")?"#00c864":"#ff6666",fontSize:13}}>{profileMsg}</div>}
+                    <div className="modal-field">
+                      <label>Current Password *</label>
+                      <div style={{display:"flex",gap:8}}>
+                        <input style={{flex:1}} type={showPwCurrent?"text":"password"} value={passwordForm.current_password} onChange={e=>setPasswordForm(f=>({...f,current_password:e.target.value}))} autoComplete="current-password" />
+                        <button type="button" className="modal-cancel" style={{padding:"8px 12px"}} onClick={()=>setShowPwCurrent(v=>!v)}>{showPwCurrent?"Hide":"Show"}</button>
+                      </div>
+                    </div>
+                    <div className="modal-field">
+                      <label>New Password * (min 10 characters)</label>
+                      <div style={{display:"flex",gap:8}}>
+                        <input style={{flex:1}} type={showPwNew?"text":"password"} value={passwordForm.new_password} onChange={e=>setPasswordForm(f=>({...f,new_password:e.target.value}))} autoComplete="new-password" />
+                        <button type="button" className="modal-cancel" style={{padding:"8px 12px"}} onClick={()=>setShowPwNew(v=>!v)}>{showPwNew?"Hide":"Show"}</button>
+                      </div>
+                    </div>
+                    <div className="modal-field">
+                      <label>Confirm New Password *</label>
+                      <div style={{display:"flex",gap:8}}>
+                        <input style={{flex:1}} type={showPwConfirm?"text":"password"} value={passwordForm.confirm_password} onChange={e=>setPasswordForm(f=>({...f,confirm_password:e.target.value}))} autoComplete="new-password" />
+                        <button type="button" className="modal-cancel" style={{padding:"8px 12px"}} onClick={()=>setShowPwConfirm(v=>!v)}>{showPwConfirm?"Hide":"Show"}</button>
+                      </div>
+                    </div>
+                    <div className="modal-actions">
+                      <button className="modal-cancel" onClick={()=>setProfileModal(null)} disabled={staffBusy}>Cancel</button>
+                      <button className="modal-save" onClick={submitChangePassword} disabled={staffBusy}>{staffBusy?"Saving…":"Update Password"}</button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
 

@@ -1,76 +1,176 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "../../lib/db";
-import { createHash } from "crypto";
-import { requireAdminRole } from "../../lib/adminAuth";
+import {
+  destroyAdminSessionsForStaff,
+  ensureAdminStaffTable,
+  hashStaffPassword,
+  isAdminRole,
+  isValidStaffEmail,
+  normalizeStaffEmail,
+  requireAdminRole,
+  validateStaffPassword,
+  wouldLeaveZeroActiveSuperAdmins,
+} from "../../lib/adminAuth";
+
+function parseActive(value: unknown, fallback = 1): 0 | 1 {
+  if (value === undefined || value === null || value === "") return fallback as 0 | 1;
+  if (value === true || value === 1 || value === "1") return 1;
+  return 0;
+}
+
+function safeStaffRow(row: any) {
+  return {
+    id: Number(row.id),
+    name: String(row.name || ""),
+    email: String(row.email || ""),
+    role: row.role,
+    active: Number(row.active) === 1 ? 1 : 0,
+    last_login_at: row.last_login_at || null,
+    password_changed_at: row.password_changed_at || null,
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null,
+  };
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const admin = await requireAdminRole(req, res, ["super_admin"]);
   if (!admin) return;
 
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS admin_staff (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
-        role ENUM('super_admin','manager','writer') DEFAULT 'writer',
-        active TINYINT(1) DEFAULT 1,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    await ensureAdminStaffTable();
 
     if (req.method === "GET") {
-      const [rows] = await pool.query(
-        "SELECT id,name,email,role,active,created_at FROM admin_staff ORDER BY created_at DESC"
+      const [rows]: any = await pool.query(
+        `SELECT id, name, email, role, active, last_login_at, password_changed_at, created_at, updated_at
+         FROM admin_staff
+         ORDER BY created_at DESC`
       );
-      return res.status(200).json(Array.isArray(rows) ? rows : []);
+      const list = Array.isArray(rows) ? rows.map(safeStaffRow) : [];
+      return res.status(200).json(list);
     }
 
     if (req.method === "POST") {
-      const { name, email, password, role } = req.body || {};
-      if (!name || !email || !password) return res.status(400).json({ error: "Name, email and password required" });
-      const validRoles = ["super_admin", "manager", "writer"];
-      const finalRole = validRoles.includes(role) ? role : "writer";
-      const hash = createHash("sha256").update(password).digest("hex");
-      const [result]: any = await pool.query(
-        "INSERT INTO admin_staff (name,email,password_hash,role) VALUES (?,?,?,?)",
-        [name, email, hash, finalRole]
-      );
-      return res.status(200).json({ success: true, id: result.insertId });
+      const { name, email, password, role, active } = req.body || {};
+      const trimmedName = String(name || "").trim();
+      const normalizedEmail = normalizeStaffEmail(email);
+
+      if (!trimmedName) return res.status(400).json({ error: "Name is required" });
+      if (!isValidStaffEmail(normalizedEmail)) return res.status(400).json({ error: "Valid email is required" });
+
+      const pwError = validateStaffPassword(password);
+      if (pwError) return res.status(400).json({ error: pwError });
+
+      if (!isAdminRole(role)) return res.status(400).json({ error: "Invalid role" });
+
+      const activeFlag = parseActive(active, 1);
+      const passwordHash = await hashStaffPassword(String(password));
+
+      try {
+        const [result]: any = await pool.query(
+          `INSERT INTO admin_staff
+            (name, email, password_hash, role, active, password_changed_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+          [trimmedName, normalizedEmail, passwordHash, role, activeFlag]
+        );
+        return res.status(200).json({ success: true, id: result.insertId });
+      } catch (err: any) {
+        if (err?.code === "ER_DUP_ENTRY") {
+          return res.status(409).json({ error: "A staff user with this email already exists" });
+        }
+        throw err;
+      }
     }
 
     if (req.method === "PUT") {
-      const { id, name, email, role, password, active } = req.body || {};
-      if (!id) return res.status(400).json({ error: "ID required" });
-      const validRoles = ["super_admin", "manager", "writer"];
-      const finalRole = validRoles.includes(role) ? role : "writer";
-      if (password) {
-        const hash = createHash("sha256").update(password).digest("hex");
-        await pool.query(
-          "UPDATE admin_staff SET name=?,email=?,role=?,password_hash=?,active=? WHERE id=?",
-          [name, email, finalRole, hash, active ?? 1, id]
-        );
-      } else {
-        await pool.query("UPDATE admin_staff SET name=?,email=?,role=?,active=? WHERE id=?", [
-          name,
-          email,
-          finalRole,
-          active ?? 1,
-          id,
-        ]);
+      const { id, name, email, role, active } = req.body || {};
+      const staffId = Number(id);
+      if (!Number.isFinite(staffId) || staffId <= 0) {
+        return res.status(400).json({ error: "ID required" });
       }
+
+      const [existingRows]: any = await pool.query(
+        "SELECT id, name, email, role, active FROM admin_staff WHERE id = ? LIMIT 1",
+        [staffId]
+      );
+      const existing = Array.isArray(existingRows) && existingRows[0] ? existingRows[0] : null;
+      if (!existing) return res.status(404).json({ error: "Staff user not found" });
+
+      const trimmedName = String(name ?? existing.name).trim();
+      const normalizedEmail = normalizeStaffEmail(email ?? existing.email);
+      const nextRole = isAdminRole(role) ? role : existing.role;
+      const nextActive = parseActive(active, Number(existing.active));
+
+      if (!trimmedName) return res.status(400).json({ error: "Name is required" });
+      if (!isValidStaffEmail(normalizedEmail)) return res.status(400).json({ error: "Valid email is required" });
+      if (!isAdminRole(nextRole)) return res.status(400).json({ error: "Invalid role" });
+
+      // Self-disable guard
+      if (admin.principalType === "staff" && admin.staffId === staffId && nextActive === 0) {
+        return res.status(400).json({ error: "You cannot disable your own account" });
+      }
+
+      // Last active super_admin / self-demote lockout
+      if (
+        await wouldLeaveZeroActiveSuperAdmins(staffId, {
+          role: nextRole,
+          active: nextActive,
+        })
+      ) {
+        return res.status(400).json({
+          error: "Cannot demote or disable the last active Super Admin",
+        });
+      }
+
+      try {
+        await pool.query(
+          `UPDATE admin_staff
+           SET name = ?, email = ?, role = ?, active = ?, updated_at = NOW()
+           WHERE id = ?`,
+          [trimmedName, normalizedEmail, nextRole, nextActive, staffId]
+        );
+      } catch (err: any) {
+        if (err?.code === "ER_DUP_ENTRY") {
+          return res.status(409).json({ error: "A staff user with this email already exists" });
+        }
+        throw err;
+      }
+
+      // Revoke sessions when disabling
+      if (nextActive === 0) {
+        await destroyAdminSessionsForStaff(staffId);
+      }
+
       return res.status(200).json({ success: true });
     }
 
     if (req.method === "DELETE") {
-      const { id } = req.query;
-      await pool.query("DELETE FROM admin_staff WHERE id=?", [id]);
+      const staffId = Number(req.query.id);
+      if (!Number.isFinite(staffId) || staffId <= 0) {
+        return res.status(400).json({ error: "ID required" });
+      }
+
+      const [existingRows]: any = await pool.query(
+        "SELECT id, role, active FROM admin_staff WHERE id = ? LIMIT 1",
+        [staffId]
+      );
+      const existing = Array.isArray(existingRows) && existingRows[0] ? existingRows[0] : null;
+      if (!existing) return res.status(404).json({ error: "Staff user not found" });
+
+      if (admin.principalType === "staff" && admin.staffId === staffId) {
+        return res.status(400).json({ error: "You cannot delete your own account" });
+      }
+
+      if (await wouldLeaveZeroActiveSuperAdmins(staffId, { deleting: true })) {
+        return res.status(400).json({ error: "Cannot delete the last active Super Admin" });
+      }
+
+      await destroyAdminSessionsForStaff(staffId);
+      await pool.query("DELETE FROM admin_staff WHERE id = ?", [staffId]);
       return res.status(200).json({ success: true });
     }
 
     return res.status(405).json({ error: "Method not allowed" });
   } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error?.message || "Staff request failed" });
   }
 }
