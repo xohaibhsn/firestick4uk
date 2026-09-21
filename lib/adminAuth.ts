@@ -55,6 +55,17 @@ export function sha256Hex(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
+/** Constant-time string compare for equal-length digests / plaintext. */
+export function timingSafeEqualString(a: string, b: string): boolean {
+  const left = Buffer.from(String(a), "utf8");
+  const right = Buffer.from(String(b), "utf8");
+  if (left.length !== right.length) {
+    crypto.timingSafeEqual(left, left);
+    return false;
+  }
+  return crypto.timingSafeEqual(left, right);
+}
+
 export async function hashStaffPassword(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_COST);
 }
@@ -70,7 +81,7 @@ export async function verifyStaffPassword(
     return { ok, needsUpgrade: false };
   }
   // Legacy SHA-256 hex digest
-  const ok = sha256Hex(password) === storedHash;
+  const ok = timingSafeEqualString(sha256Hex(password), storedHash);
   return { ok, needsUpgrade: ok };
 }
 

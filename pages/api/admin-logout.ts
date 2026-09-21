@@ -32,8 +32,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     return res.status(200).json({ success: true });
-  } catch (error: any) {
+  } catch {
+    console.error("[admin-logout] cleanup failed");
     clearAdminSessionCookie(res, req);
-    return res.status(200).json({ success: true, warning: error?.message || "logout_partial" });
+    return res.status(200).json({ success: true });
   }
 }

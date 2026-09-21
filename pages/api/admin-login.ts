@@ -1,5 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import bcrypt from "bcryptjs";
 import { RL_AUTH, getClientIp } from "../../lib/rateLimit";
 import pool from "../../lib/db";
 import {
@@ -9,22 +8,33 @@ import {
   isAdminRole,
   normalizeStaffEmail,
   setAdminSessionCookie,
-  sha256Hex,
   verifyStaffPassword,
 } from "../../lib/adminAuth";
 import { recordAdminAudit } from "../../lib/adminAudit";
+import {
+  readRecoveryAuthConfigFromEnv,
+  verifyRecoveryAdminPassword,
+} from "../../lib/recoveryAdminAuth";
+
+const PUBLIC_INVALID = "Invalid email or password";
+const PUBLIC_AUTH_UNAVAILABLE = "Authentication unavailable";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { allowed } = RL_AUTH(getClientIp(req));
-  if (!allowed) {
-    return res.status(429).json({ success: false, error: "Too many login attempts. Try again in 15 minutes." });
+  const limitResult = RL_AUTH(getClientIp(req));
+  if (!limitResult.allowed) {
+    const retryAfter = Math.max(1, Number(limitResult.retryAfterSec) || 900);
+    res.setHeader("Retry-After", String(retryAfter));
+    return res.status(429).json({
+      success: false,
+      error: "Too many login attempts. Try again in 15 minutes.",
+    });
   }
 
   const { username, password } = req.body || {};
   if (!username || !password) {
-    return res.status(400).json({ success: false, error: "Invalid email or password" });
+    return res.status(400).json({ success: false, error: PUBLIC_INVALID });
   }
 
   const meta = getRequestMeta(req);
@@ -40,17 +50,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (Array.isArray(rows) && rows.length) {
       const staff = rows[0];
 
-      if (Number(staff.active) !== 1) {
-        return res.status(401).json({ success: false, error: "Account disabled" });
-      }
-
-      if (!isAdminRole(staff.role)) {
-        return res.status(401).json({ success: false, error: "Invalid email or password" });
+      // Uniform public message — do not reveal inactive / invalid role before auth
+      if (Number(staff.active) !== 1 || !isAdminRole(staff.role)) {
+        return res.status(401).json({ success: false, error: PUBLIC_INVALID });
       }
 
       const verified = await verifyStaffPassword(String(password), String(staff.password_hash || ""));
       if (!verified.ok) {
-        return res.status(401).json({ success: false, error: "Invalid email or password" });
+        return res.status(401).json({ success: false, error: PUBLIC_INVALID });
       }
 
       if (verified.needsUpgrade) {
@@ -103,40 +110,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     /* DB not ready — fall through to master admin check */
   }
 
-  // ── Master admin login (username must be 'admin') ─────────────────────────
+  // ── Recovery Admin (username must be 'admin') ─────────────────────────────
   if (loginId.toLowerCase() !== "admin") {
-    return res.status(401).json({ success: false, error: "Invalid email or password" });
+    return res.status(401).json({ success: false, error: PUBLIC_INVALID });
   }
 
-  const hashEnv = process.env.ADMIN_PASSWORD_HASH;
-  const sha256Env = process.env.ADMIN_PASSWORD_SHA256;
-  const plainEnv = process.env.ADMIN_PASSWORD;
+  const recovery = await verifyRecoveryAdminPassword(
+    String(password),
+    readRecoveryAuthConfigFromEnv()
+  );
 
-  let masterOk = false;
-
-  if (sha256Env) {
-    if (sha256Hex(String(password)) === sha256Env) masterOk = true;
+  if (recovery.configError) {
+    console.error("[admin-login] recovery auth configuration invalid");
+    return res.status(500).json({ success: false, error: PUBLIC_AUTH_UNAVAILABLE });
   }
 
-  if (!masterOk && hashEnv && hashEnv.startsWith("$2")) {
-    try {
-      const match = await bcrypt.compare(String(password), hashEnv);
-      if (match) masterOk = true;
-    } catch {
-      /* ignore */
-    }
+  if (recovery.ignoredMalformedHash) {
+    console.error("[admin-login] recovery auth configuration invalid");
   }
 
-  if (!masterOk && plainEnv && String(password) === plainEnv) {
-    masterOk = true;
+  if (!recovery.ok) {
+    return res.status(401).json({ success: false, error: PUBLIC_INVALID });
   }
 
-  if (!hashEnv && !sha256Env && !plainEnv) {
-    return res.status(500).json({ success: false, error: "Server not configured" });
-  }
-
-  if (!masterOk) {
-    return res.status(401).json({ success: false, error: "Invalid email or password" });
+  if (recovery.legacy) {
+    console.warn("[admin-login] legacy recovery admin credential mode in use");
   }
 
   try {
@@ -169,7 +167,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       name: "Admin",
       principalType: "master",
     });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error?.message || "Session create failed" });
+  } catch {
+    console.error("[admin-login] session create failed");
+    return res.status(500).json({ success: false, error: PUBLIC_AUTH_UNAVAILABLE });
   }
 }

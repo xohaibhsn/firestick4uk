@@ -9,22 +9,28 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-export function rateLimit(ip: string, limit: number, windowMs: number): { allowed: boolean; remaining: number } {
+export function rateLimit(
+  ip: string,
+  limit: number,
+  windowMs: number
+): { allowed: boolean; remaining: number; retryAfterSec: number } {
   const now = Date.now();
   const key = ip;
   const record = store.get(key);
 
   if (!record || now > record.resetAt) {
     store.set(key, { count: 1, resetAt: now + windowMs });
-    return { allowed: true, remaining: limit - 1 };
+    return { allowed: true, remaining: limit - 1, retryAfterSec: Math.ceil(windowMs / 1000) };
   }
 
+  const retryAfterSec = Math.max(1, Math.ceil((record.resetAt - now) / 1000));
+
   if (record.count >= limit) {
-    return { allowed: false, remaining: 0 };
+    return { allowed: false, remaining: 0, retryAfterSec };
   }
 
   record.count++;
-  return { allowed: true, remaining: limit - record.count };
+  return { allowed: true, remaining: limit - record.count, retryAfterSec };
 }
 
 // Presets

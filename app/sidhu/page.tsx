@@ -1069,8 +1069,6 @@ export default function AdminPage() {
         setLoginError("");
       } else if (res.status === 429) {
         setLoginError("❌ Too many login attempts. Try again in 15 minutes.");
-      } else if (res.error === "Account disabled") {
-        setLoginError("❌ Account disabled");
       } else {
         setLoginError("❌ Invalid email or password");
       }

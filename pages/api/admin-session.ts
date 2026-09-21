@@ -11,7 +11,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ authenticated: false });
     }
     return res.status(200).json(publicAdminIdentity(identity));
-  } catch (error: any) {
-    return res.status(500).json({ authenticated: false, error: error?.message || "Session check failed" });
+  } catch {
+    console.error("[admin-session] session check failed");
+    return res.status(500).json({ authenticated: false, error: "Session check failed" });
   }
 }

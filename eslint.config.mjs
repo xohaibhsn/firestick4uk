@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import reactHooks from "eslint-plugin-react-hooks";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -8,6 +9,9 @@ const eslintConfig = defineConfig([
 
   // Project-wide baseline: keep type/framework debt visible without blocking lint.
   {
+    plugins: {
+      "react-hooks": reactHooks,
+    },
     rules: {
       // Legacy CMS/API still use explicit any extensively; warn until Phase 12.1+ typing work.
       "@typescript-eslint/no-explicit-any": "warn",
@@ -33,6 +37,9 @@ const eslintConfig = defineConfig([
   // ERP is frozen this phase — demote residual React surface rules to warnings only.
   {
     files: ["app/erp/**/*.{js,jsx,ts,tsx}", "pages/api/erp/**/*.{js,jsx,ts,tsx}"],
+    plugins: {
+      "react-hooks": reactHooks,
+    },
     rules: {
       "react/no-unescaped-entities": "warn",
       "react-hooks/immutability": "warn",
@@ -43,6 +50,9 @@ const eslintConfig = defineConfig([
   // building episode URLs; converting to state would change render/update behavior.
   {
     files: ["app/player/page.tsx"],
+    plugins: {
+      "react-hooks": reactHooks,
+    },
     rules: {
       "react-hooks/refs": "warn",
     },
