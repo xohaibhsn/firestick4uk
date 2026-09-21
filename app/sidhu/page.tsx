@@ -194,34 +194,6 @@ const styles = `
   }
 `;
 
-// DEMO DATA
-const demoOrders = [
-  { id:"FK44-62305", customer:"John Smith", email:"john@example.com", phone:"+447518787653", items:"B1G 6 Month Plan + Firestick 4K", total:"£89.98", status:"confirmed", date:"30 May 2026", receipt:true },
-  { id:"FK44-22222", customer:"Ali Hassan", email:"ali@example.com", phone:"+44 7222 222222", items:"B1G 1 Year Plan", total:"£79.99", status:"pending", date:"30 May 2026", receipt:true },
-  { id:"FK44-11111", customer:"Sarah Jones", email:"sarah@example.com", phone:"+44 7111 111111", items:"Android Box Ultra", total:"£73.98", status:"dispatched", date:"28 May 2026", receipt:true },
-  { id:"FK44-33333", customer:"David Brown", email:"david@example.com", phone:"+44 7333 333333", items:"Firestick 4K Max", total:"£54.99", status:"delivered", date:"25 May 2026", receipt:false },
-  { id:"FK44-44444", customer:"Emma Wilson", email:"emma@example.com", phone:"+44 7444 444444", items:"B1G 1 Month Plan", total:"£9.99", status:"pending", date:"31 May 2026", receipt:true },
-];
-
-const demoProducts = [
-  { id:1, name:"B1G 1 Month Plan", category:"Subscription", price:"£9.99", stock:"Digital", emoji:"📦" },
-  { id:2, name:"B1G 6 Month Plan", category:"Subscription", price:"£49.99", stock:"Digital", emoji:"📦" },
-  { id:3, name:"B1G 1 Year Plan", category:"Subscription", price:"£79.99", stock:"Digital", emoji:"📦" },
-  { id:4, name:"Firestick 4K", category:"Device", price:"£39.99", stock:"12", emoji:"🔥" },
-  { id:5, name:"Firestick 4K Max", category:"Device", price:"£54.99", stock:"8", emoji:"🔥" },
-  { id:6, name:"Android Box Pro", category:"Device", price:"£49.99", stock:"5", emoji:"📺" },
-  { id:7, name:"Android Box Ultra", category:"Device", price:"£69.99", stock:"3", emoji:"📺" },
-  { id:8, name:"Starter Bundle", category:"Bundle", price:"£44.99", stock:"10", emoji:"⭐" },
-];
-
-const demoCustomers = [
-  { name:"John Smith", email:"john@example.com", phone:"+447518787653", orders:3, spent:"£219.96", joined:"Jan 2026" },
-  { name:"Sarah Jones", email:"sarah@example.com", phone:"+44 7111 111111", orders:2, spent:"£123.97", joined:"Feb 2026" },
-  { name:"Ali Hassan", email:"ali@example.com", phone:"+44 7222 222222", orders:1, spent:"£79.99", joined:"May 2026" },
-  { name:"David Brown", email:"david@example.com", phone:"+44 7333 333333", orders:4, spent:"£189.95", joined:"Dec 2025" },
-  { name:"Emma Wilson", email:"emma@example.com", phone:"+44 7444 444444", orders:1, spent:"£9.99", joined:"May 2026" },
-];
-
 type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"training"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history";
 type AdminRole = "super_admin"|"manager"|"writer";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
@@ -279,7 +251,12 @@ export default function AdminPage() {
   const [orderPaymentFilter, setOrderPaymentFilter] = useState<"all"|"bank"|"cod">("all");
   const [orderDateFrom, setOrderDateFrom] = useState("");
   const [orderDateTo, setOrderDateTo] = useState("");
-  const [products, setProducts] = useState<any[]>(demoProducts);
+  const [products, setProducts] = useState<any[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState("");
+  const [productMsg, setProductMsg] = useState("");
+  const [productSaving, setProductSaving] = useState(false);
+  const [productDeletingId, setProductDeletingId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [ordersPage, setOrdersPage] = useState(1);
   const ORDERS_PER_PAGE = 25;
@@ -556,6 +533,44 @@ export default function AdminPage() {
     }
   };
 
+  const loadProducts = async () => {
+    if (!can("products.view")) {
+      setProducts([]);
+      setProductsError("");
+      setProductsLoading(false);
+      return;
+    }
+    setProductsLoading(true);
+    setProductsError("");
+    try {
+      const r = await fetch("/api/admin-products", { credentials: "include" });
+      if (r.status === 401) {
+        handleSessionExpired();
+        setProducts([]);
+        return;
+      }
+      if (r.status === 403) {
+        showPermError();
+        setProductsError("You do not have permission to view products.");
+        setProducts([]);
+        return;
+      }
+      const data = await r.json().catch(() => null);
+      if (!r.ok) {
+        setProductsError("Failed to load products");
+        setProducts([]);
+        return;
+      }
+      // Empty array is valid — never keep stale/demo rows
+      setProducts(Array.isArray(data) ? data : []);
+    } catch {
+      setProductsError("Failed to load products");
+      setProducts([]);
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
   const clearOrderFilters = () => {
     setOrderQ("");
     setStatusFilter("all");
@@ -664,14 +679,10 @@ export default function AdminPage() {
     }
 
     if (can("products.view")) {
-      fetch("/api/admin-products", { credentials: "include" })
-        .then((r) => r.json())
-        .then((data) => {
-          if (Array.isArray(data) && data.length > 0) setProducts(data);
-        })
-        .catch(() => {});
+      loadProducts();
     } else {
       setProducts([]);
+      setProductsError("");
     }
 
     if (can("orders.view")) {
@@ -1398,9 +1409,44 @@ export default function AdminPage() {
     setTimeout(()=>setBlogMsg(""),3000);
   };
 
-  const deleteProduct = (id: number) => {
-    fetch(`/api/admin-products?id=${id}`, { method: "DELETE", credentials: "include" }).catch(() => {});
-    setProducts(products.filter(p => p.id !== id));
+  const deleteProduct = async (id: number) => {
+    if (
+      !confirm(
+        "Delete this product? A history snapshot will be kept, but deleted products cannot be restored automatically."
+      )
+    ) {
+      return;
+    }
+    if (productDeletingId != null) return;
+    setProductDeletingId(id);
+    setProductMsg("");
+    try {
+      const r = await fetch(`/api/admin-products?id=${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      if (r.status === 403) {
+        showPermError();
+        setProductMsg("❌ Failed to delete product");
+        return;
+      }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || data?.error) {
+        setProductMsg(`❌ ${data?.error || "Failed to delete product"}`);
+        return;
+      }
+      setProductMsg("✅ Product deleted");
+      await loadProducts();
+    } catch {
+      setProductMsg("❌ Failed to delete product");
+    } finally {
+      setProductDeletingId(null);
+      setTimeout(() => setProductMsg(""), 3000);
+    }
   };
 
   const deleteLead = async (id: number) => {
@@ -1561,6 +1607,7 @@ export default function AdminPage() {
     const slug = (editProduct.slug || toSlug(editProduct.name)).trim();
     if (!editProduct.name.trim()) return;
     if (!slug) return;
+    if (productSaving) return;
     const payload = {
       name: editProduct.name,
       slug,
@@ -1577,25 +1624,41 @@ export default function AdminPage() {
       meta_description: editProduct.meta_description || "",
       focus_keyword: editProduct.focus_keyword || "",
     };
-    if (productModal === "new") {
-      const res = await fetch("/api/admin-products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", },
-        body: JSON.stringify(payload),
-      }).then(r => r.json()).catch(() => ({}));
-      if (res.error) { alert(res.error); return; }
-      const newId = res.id || Date.now();
-      setProducts([...products, { ...editProduct, slug, id: newId, emoji: "" }]);
-    } else if (productModal) {
-      const res = await fetch("/api/admin-products", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", },
-        body: JSON.stringify({ ...payload, id: productModal.id, active: 1 }),
-      }).then(r => r.json()).catch(() => ({}));
-      if (res.error) { alert(res.error); return; }
-      setProducts(products.map(p => p.id === productModal.id ? { ...p, ...editProduct, slug } : p));
+    setProductSaving(true);
+    setProductMsg("");
+    try {
+      const isNew = productModal === "new";
+      const r = await fetch("/api/admin-products", {
+        method: isNew ? "POST" : "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          isNew ? payload : { ...payload, id: (productModal as { id: number }).id, active: 1 }
+        ),
+      });
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      if (r.status === 403) {
+        showPermError();
+        setProductMsg("❌ Failed to save product");
+        return;
+      }
+      const res = await r.json().catch(() => ({}));
+      if (!r.ok || res.error) {
+        setProductMsg(`❌ ${res.error || "Failed to save product"}`);
+        return;
+      }
+      setProductModal(null);
+      setProductMsg("✅ Product saved");
+      await loadProducts();
+    } catch {
+      setProductMsg("❌ Failed to save product");
+    } finally {
+      setProductSaving(false);
+      setTimeout(() => setProductMsg(""), 3000);
     }
-    setProductModal(null);
   };
 
   const openEditProduct = (p: any) => {
@@ -1808,6 +1871,9 @@ export default function AdminPage() {
         <div className="modal-overlay">
           <div className="modal modal-product" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
             <div className="modal-title">{productModal === "new" ? "Add New Product" : "Edit Product"}</div>
+            {productMsg && productMsg.startsWith("❌") && (
+              <div style={{marginBottom:12,padding:"10px 12px",background:"rgba(220,38,38,0.1)",border:"1px solid rgba(220,38,38,0.25)",borderRadius:8,fontSize:13,color:"#DC2626"}}>{productMsg}</div>
+            )}
             {productModal !== "new" && (() => {
               const health = productHealth({
                 ...productModal,
@@ -1953,7 +2019,9 @@ export default function AdminPage() {
                   🕘 History
                 </button>
               )}
-              <button className="modal-save" onClick={saveProduct} disabled={imageUploading}>Save Product</button>
+              <button className="modal-save" onClick={saveProduct} disabled={imageUploading || productSaving}>
+                {productSaving ? "Saving…" : "Save Product"}
+              </button>
             </div>
           </div>
         </div>
@@ -2382,16 +2450,34 @@ export default function AdminPage() {
 
           {/* PRODUCTS */}
           {tab==="products" && can("products.view") && (
+            <div>
+              {productMsg && (
+                <div style={{marginBottom:16,padding:"10px 16px",background:productMsg.startsWith("✅")?"rgba(22,163,74,0.1)":"rgba(220,38,38,0.1)",border:`1px solid ${productMsg.startsWith("✅")?"rgba(22,163,74,0.3)":"rgba(220,38,38,0.25)"}`,borderRadius:10,fontSize:13,color:productMsg.startsWith("✅")?"#16A34A":"#DC2626"}}>{productMsg}</div>
+              )}
             <div className="section-card">
               <div className="section-header">
-                <div className="section-title">Products ({products.length})</div>
-                <button className="add-btn" onClick={openNewProduct}>+ Add Product</button>
+                <div className="section-title">Products ({productsLoading ? "…" : products.length})</div>
+                {can("products.manage") && (
+                  <button className="add-btn" onClick={openNewProduct} disabled={productSaving}>+ Add Product</button>
+                )}
               </div>
+              {productsError && (
+                <div style={{padding:"14px 16px",marginBottom:12,background:"rgba(220,38,38,0.1)",border:"1px solid rgba(220,38,38,0.25)",borderRadius:10,color:"#DC2626",fontSize:13}}>
+                  {productsError}
+                  <button type="button" className="action-btn btn-edit" style={{marginLeft:12}} onClick={() => loadProducts()}>Retry</button>
+                </div>
+              )}
               <div className="table-wrap">
                 <table>
                   <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Content</th><th>Actions</th></tr></thead>
                   <tbody>
-                    {products.map(p => {
+                    {productsLoading && (
+                      <tr><td colSpan={7} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>Loading products…</td></tr>
+                    )}
+                    {!productsLoading && !productsError && products.length === 0 && (
+                      <tr><td colSpan={7} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No products found{can("products.manage") ? ". Add a product above." : "."}</td></tr>
+                    )}
+                    {!productsLoading && products.map(p => {
                       const health = productHealth(p);
                       const badgeColor =
                         health.label === "Complete" ? { bg:"#ECFDF5", bd:"#A7F3D0", fg:"#047857" } :
@@ -2409,8 +2495,14 @@ export default function AdminPage() {
                           <span title={health.missing.length ? `Missing: ${health.missing.join(", ")}` : "All key fields present"} style={{background:badgeColor.bg,border:`1px solid ${badgeColor.bd}`,color:badgeColor.fg,padding:"3px 8px",borderRadius:8,fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{health.label}</span>
                         </td>
                         <td>
-                          <button className="action-btn btn-edit" onClick={() => openEditProduct(p)}>Edit</button>
-                          <button className="action-btn btn-delete" onClick={() => deleteProduct(p.id)}>Delete</button>
+                          {can("products.manage") && (
+                            <>
+                              <button className="action-btn btn-edit" onClick={() => openEditProduct(p)} disabled={productSaving || productDeletingId != null}>Edit</button>
+                              <button className="action-btn btn-delete" onClick={() => deleteProduct(p.id)} disabled={productDeletingId != null || productSaving}>
+                                {productDeletingId === p.id ? "Deleting…" : "Delete"}
+                              </button>
+                            </>
+                          )}
                         </td>
                       </tr>
                       );
@@ -2418,6 +2510,7 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
             </div>
           )}
 
