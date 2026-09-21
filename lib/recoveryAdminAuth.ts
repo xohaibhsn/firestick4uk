@@ -16,8 +16,23 @@ export type RecoveryAuthResult = {
   ignoredMalformedHash?: boolean;
 };
 
+/**
+ * Full structural bcrypt check (not prefix-only).
+ * Accepts $2a$ / $2b$ / $2y$ with cost 04–31 and a 53-char bcrypt-alphabet body (60 chars total).
+ */
 export function isBcryptHash(hash: string): boolean {
-  return typeof hash === "string" && /^\$2[aby]?\$/.test(hash);
+  if (typeof hash !== "string") return false;
+  const h = hash;
+  // $2a$12$ + 22-char salt + 31-char checksum = 60 chars; alphabet is ./A-Za-z0-9
+  const m = /^\$2([aby])\$([0-3]\d)\$([./A-Za-z0-9]{53})$/.exec(h);
+  if (!m) return false;
+  const cost = Number(m[2]);
+  if (!Number.isInteger(cost) || cost < 4 || cost > 31) return false;
+  try {
+    return bcrypt.getRounds(h) === cost;
+  } catch {
+    return false;
+  }
 }
 
 export function sha256Hex(value: string): string {

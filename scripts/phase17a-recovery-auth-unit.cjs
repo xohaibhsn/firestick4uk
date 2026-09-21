@@ -6,7 +6,17 @@ const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 
 function isBcryptHash(hash) {
-  return typeof hash === "string" && /^\$2[aby]?\$/.test(String(hash));
+  if (typeof hash !== "string") return false;
+  const h = hash;
+  const m = /^\$2([aby])\$([0-3]\d)\$([./A-Za-z0-9]{53})$/.exec(h);
+  if (!m) return false;
+  const cost = Number(m[2]);
+  if (!Number.isInteger(cost) || cost < 4 || cost > 31) return false;
+  try {
+    return bcrypt.getRounds(h) === cost;
+  } catch {
+    return false;
+  }
 }
 
 function sha256Hex(value) {
