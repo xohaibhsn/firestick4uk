@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import bcrypt from "bcryptjs";
 import { RL_AUTH, getClientIp } from "../../lib/rateLimit";
 import pool from "../../lib/db";
 import {
@@ -119,7 +120,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!masterOk && hashEnv && hashEnv.startsWith("$2")) {
     try {
-      const bcrypt = require("bcryptjs");
       const match = await bcrypt.compare(String(password), hashEnv);
       if (match) masterOk = true;
     } catch {

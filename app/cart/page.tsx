@@ -171,7 +171,6 @@ export default function CartPage() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [paymentReference, setPaymentReference] = useState("");
   const [placing, setPlacing] = useState(false);
-  const [orderId, setOrderId] = useState("");
   const [orderError, setOrderError] = useState("");
 
   const [form, setForm] = useState({
@@ -252,7 +251,6 @@ export default function CartPage() {
       const data = await res.json();
       if (data.order_id) {
         const oid = data.order_id;
-        setOrderId(oid);
 
         const itemsList = cart.map(i => `• ${i.name} x${i.qty} — £${(i.price * i.qty).toFixed(2)}`).join('\n');
         const fullAddress = [form.address, form.city, form.postcode].filter(Boolean).join(', ');

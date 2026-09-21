@@ -75,7 +75,6 @@ export default function HomeClient({
 }: HomeClientProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [added, setAdded] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [hoveringId, setHoveringId] = useState<number | null>(null);
   const [slides, setSlides] = useState<string[]>([]);
@@ -198,8 +197,6 @@ export default function HomeClient({
 
   const handleAddToCart = (p: Product) => {
     addToCart({ id: p.id, name: p.name, price: Number(p.price), qty: 1 });
-    setAdded(p.id);
-    setTimeout(() => setAdded(null), 1500);
   };
 
   return (
@@ -637,7 +634,12 @@ export default function HomeClient({
                         style={{background: inCart ? (hovering ? "#DC2626" : "#16A34A") : "#5B21B6", cursor: inCart && !hovering ? "default" : "pointer"}}
                         onMouseEnter={() => inCart && setHoveringId(p.id)}
                         onMouseLeave={() => setHoveringId(null)}
-                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); inCart ? removeFromCart(p.id) : handleAddToCart(p); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          if (inCart) removeFromCart(p.id);
+                          else handleAddToCart(p);
+                        }}
                       >
                         {inCart ? (hovering ? t("home_remove", "Remove") : t("home_added", "Added!")) : t("home_add_cart", "Add to Cart →")}
                       </button>
@@ -734,7 +736,7 @@ export default function HomeClient({
                 {sec.home_testimonials.items.map((item:any,i:number)=>(
                   <div className="feature-item" key={i}>
                     <div style={{fontSize:20,marginBottom:8}}>{"⭐".repeat(item.rating||5)}</div>
-                    <div className="feature-desc" style={{marginBottom:10}}>"{item.text}"</div>
+                    <div className="feature-desc" style={{marginBottom:10}}>&ldquo;{item.text}&rdquo;</div>
                     <div className="feature-title" style={{fontSize:14}}>— {item.name}</div>
                   </div>
                 ))}

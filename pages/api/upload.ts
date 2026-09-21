@@ -135,7 +135,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (!preserveImage) {
         try {
-          const sharp = require("sharp");
+          const sharp = (await import("sharp")).default;
           const webpName = stamped.replace(/\.[^.]+$/, ".webp");
           await sharp(parsed.data.buffer)
             .resize(800, 800, { fit: "inside", withoutEnlargement: true })

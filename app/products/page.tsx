@@ -309,7 +309,12 @@ export default function ProductsPage() {
                         style={{background:inCart?(hovering?"#DC2626":"#16A34A"):"#5B21B6",cursor:inCart&&!hovering?"default":"pointer"}}
                         onMouseEnter={()=>inCart&&setHoveringId(p.id)}
                         onMouseLeave={()=>setHoveringId(null)}
-                        onClick={e=>{e.stopPropagation();e.preventDefault();inCart?removeFromCart(p.id):handleAddToCart(p);}}
+                        onClick={e=>{
+                          e.stopPropagation();
+                          e.preventDefault();
+                          if (inCart) removeFromCart(p.id);
+                          else handleAddToCart(p);
+                        }}
                       >
                         {inCart?(hovering?`✕ ${t("products_remove", "Remove")}`:`✅ ${t("products_added", "Added!")}`):t("products_add_cart", "Add to Cart →")}
                       </button>
