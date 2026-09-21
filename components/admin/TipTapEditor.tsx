@@ -9,13 +9,18 @@ import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isInternalHref, linkMarkAttrs } from "@/lib/seoLinks";
 
 interface TipTapEditorProps {
   content: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  /**
+   * Optional Media Library request. Parent opens the picker and later calls
+   * insertImage(url) with the selected asset URL.
+   */
+  onRequestMedia?: (insertImage: (url: string) => void) => void;
 }
 
 const SmartLink = Link.extend({
@@ -102,11 +107,17 @@ const Sep = () => (
   <div style={{ width: 1, background: "#E5E5E5", margin: "2px 4px", alignSelf: "stretch" }} />
 );
 
-export default function TipTapEditor({ content, onChange, placeholder = "Write your blog post..." }: TipTapEditorProps) {
+export default function TipTapEditor({
+  content,
+  onChange,
+  placeholder = "Write your blog post...",
+  onRequestMedia,
+}: TipTapEditorProps) {
   const [linkUrl, setLinkUrl] = useState("");
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [imgUrl, setImgUrl] = useState("");
   const [showImgInput, setShowImgInput] = useState(false);
+  const pendingSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -152,6 +163,42 @@ export default function TipTapEditor({ content, onChange, placeholder = "Write y
     editor.chain().focus().setImage({ src: imgUrl }).run();
     setImgUrl(""); setShowImgInput(false);
   }, [editor, imgUrl]);
+
+  const insertLibraryImage = useCallback(
+    (url: string) => {
+      if (!editor) return;
+      const src = String(url || "").trim();
+      if (!src) return;
+
+      const docSize = editor.state.doc.content.size;
+      const pending = pendingSelectionRef.current;
+      pendingSelectionRef.current = null;
+
+      let from = pending?.from ?? editor.state.selection.from;
+      let to = pending?.to ?? editor.state.selection.to;
+      from = Math.max(0, Math.min(from, docSize));
+      to = Math.max(0, Math.min(to, docSize));
+      if (from > to) {
+        const swap = from;
+        from = to;
+        to = swap;
+      }
+
+      editor.chain().focus().setTextSelection({ from, to }).setImage({ src }).run();
+      setImgUrl("");
+      setShowImgInput(false);
+    },
+    [editor]
+  );
+
+  const openMediaLibrary = useCallback(() => {
+    if (!editor || !onRequestMedia) return;
+    pendingSelectionRef.current = {
+      from: editor.state.selection.from,
+      to: editor.state.selection.to,
+    };
+    onRequestMedia(insertLibraryImage);
+  }, [editor, onRequestMedia, insertLibraryImage]);
 
   if (!editor) return null;
 
@@ -224,9 +271,9 @@ export default function TipTapEditor({ content, onChange, placeholder = "Write y
         </div>
       )}
 
-      {/* Image input */}
+      {/* Image input — manual URL + optional Media Library */}
       {showImgInput && (
-        <div style={{ padding: "8px 12px", borderBottom: "1px solid #E5E5E5", background: "#F5F3FF", display: "flex", gap: 8 }}>
+        <div style={{ padding: "8px 12px", borderBottom: "1px solid #E5E5E5", background: "#F5F3FF", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <input
             type="url"
             value={imgUrl}
@@ -234,9 +281,18 @@ export default function TipTapEditor({ content, onChange, placeholder = "Write y
             onKeyDown={e => e.key === "Enter" && addImage()}
             placeholder="https://res.cloudinary.com/... or any image URL"
             autoFocus
-            style={{ flex: 1, border: "1px solid #DDD6FE", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none", color: "#111111" }}
+            style={{ flex: "1 1 200px", border: "1px solid #DDD6FE", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none", color: "#111111" }}
           />
           <button type="button" onClick={addImage} style={{ background: "#5B21B6", color: "#FFF", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>Insert</button>
+          {onRequestMedia && (
+            <button
+              type="button"
+              onClick={openMediaLibrary}
+              style={{ background: "#FFFFFF", color: "#5B21B6", border: "1px solid #5B21B6", borderRadius: 6, padding: "6px 14px", fontSize: 13, cursor: "pointer", fontWeight: 600 }}
+            >
+              Choose from Library
+            </button>
+          )}
           <button type="button" onClick={() => setShowImgInput(false)} style={{ background: "#E5E5E5", color: "#333", border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 13, cursor: "pointer" }}>✕</button>
         </div>
       )}

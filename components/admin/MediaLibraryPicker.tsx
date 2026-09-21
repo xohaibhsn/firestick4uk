@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   formatBytes,
   formatDimensions,
@@ -92,7 +92,14 @@ export default function MediaLibraryPicker({
   onClose,
   title = "Choose from Library",
 }: Props) {
-  const uploadPurposes = mediaLibraryUploadPurposes(role);
+  // Contextual pickers: only allow uploads into the intersection of role + allowedPurposes
+  const uploadPurposes = useMemo(() => {
+    const roleOnes = mediaLibraryUploadPurposes(role);
+    if (allowedPurposes?.length) {
+      return roleOnes.filter((p) => allowedPurposes.includes(p));
+    }
+    return roleOnes;
+  }, [role, allowedPurposes]);
 
   const [q, setQ] = useState("");
   const [purpose, setPurpose] = useState("");
@@ -103,8 +110,15 @@ export default function MediaLibraryPicker({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [uploadPurpose, setUploadPurpose] = useState(uploadPurposes[0] || "blog");
+  const [uploadPurpose, setUploadPurpose] = useState<MediaLibraryPurpose>("blog");
   const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    if (uploadPurposes.length === 0) return;
+    if (!uploadPurposes.includes(uploadPurpose)) {
+      setUploadPurpose(uploadPurposes[0]);
+    }
+  }, [uploadPurposes, uploadPurpose]);
 
   const load = useCallback(
     async (pageNum = 1) => {

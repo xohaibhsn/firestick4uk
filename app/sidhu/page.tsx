@@ -1967,6 +1967,13 @@ export default function AdminPage() {
                 content={editProduct.short_description || ""}
                 onChange={(html) => setEditProduct({ ...editProduct, short_description: html })}
                 placeholder="Brief product summary shown on the product page..."
+                onRequestMedia={(insertImage) =>
+                  setMediaPicker({
+                    purposes: ["products"],
+                    title: "Choose Product Content Image",
+                    onSelect: (asset) => insertImage(asset.url),
+                  })
+                }
               />
             </div>
             <div className="modal-field">
@@ -1975,6 +1982,13 @@ export default function AdminPage() {
                 content={editProduct.full_description || ""}
                 onChange={(html) => setEditProduct({ ...editProduct, full_description: html })}
                 placeholder="Detailed product description for the product page..."
+                onRequestMedia={(insertImage) =>
+                  setMediaPicker({
+                    purposes: ["products"],
+                    title: "Choose Product Content Image",
+                    onSelect: (asset) => insertImage(asset.url),
+                  })
+                }
               />
             </div>
             <div className="modal-field">
@@ -2066,6 +2080,13 @@ export default function AdminPage() {
                 content={editBlog.content}
                 onChange={(html) => setEditBlog(p => ({ ...p, content: html }))}
                 placeholder="Write your blog post here... Paste from Word/Google Docs supported!"
+                onRequestMedia={(insertImage) =>
+                  setMediaPicker({
+                    purposes: ["blog"],
+                    title: "Choose Blog Image",
+                    onSelect: (asset) => insertImage(asset.url),
+                  })
+                }
               />
             </div>
 
@@ -3016,7 +3037,7 @@ export default function AdminPage() {
                             setHeroImgUploading(true);
                             try {
                               const base64=await new Promise<string>((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result as string); r.onerror=rej; r.readAsDataURL(file); });
-                              const data=await fetch("/api/upload",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({file:base64,name:file.name,folder:"firestick4uk/products"})}).then(async r=>{
+                              const data=await fetch("/api/upload",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({file:base64,name:file.name,folder:"firestick4uk/hero-slides"})}).then(async r=>{
                                 if(r.status===401){handleSessionExpired();return{};}
                                 if(r.status===403){showPermError();return{};}
                                 return r.json();
@@ -3026,6 +3047,20 @@ export default function AdminPage() {
                             setHeroImgUploading(false);
                           }} />
                         </label>
+                        <button
+                          type="button"
+                          style={{cursor:"pointer",background:"#FFFFFF",border:"1px solid #5B21B6",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}
+                          onClick={() =>
+                            setMediaPicker({
+                              purposes: ["hero"],
+                              title: "Choose Hero Image",
+                              onSelect: (asset) =>
+                                setSectionEditing((p: any) => ({ ...p, hero_image: asset.url })),
+                            })
+                          }
+                        >
+                          Choose from Library
+                        </button>
                         {sectionEditing.hero_image && <button type="button" style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:12}} onClick={()=>setSectionEditing((p:any)=>({...p,hero_image:""}))}>✕ Remove</button>}
                       </div>
                     </div>
