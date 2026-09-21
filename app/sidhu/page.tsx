@@ -3510,10 +3510,10 @@ export default function AdminPage() {
                       <div style={{width:48,height:48,borderRadius:8,border:"1px dashed #CCC",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#AAA"}}>None</div>
                     )}
                     <label style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}>
-                      {faviconUploading ? "Uploading..." : "Upload Favicon (.ico/.png/.svg)"}
+                      {faviconUploading ? "Uploading..." : "Upload Favicon (.ico/.png/.jpg)"}
                       <input
                         type="file"
-                        accept=".ico,.png,.jpg,.svg,image/png,image/jpeg,image/svg+xml"
+                        accept="image/png,image/jpeg,image/x-icon,image/vnd.microsoft.icon,.ico,.png,.jpg,.jpeg"
                         style={{display:"none"}}
                         onChange={(e) => {
                           const f = e.target.files?.[0];
