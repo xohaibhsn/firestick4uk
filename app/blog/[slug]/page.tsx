@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import BlogPostClient from "./BlogPostClient";
 import pool from "../../../lib/db";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
@@ -24,66 +25,82 @@ async function getPost(slug: string): Promise<Post | null> {
   }
 }
 
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const post = await getPost(slug);
   if (!post) return { title: "Post Not Found | Firestick4UK Blog" };
 
   const title = `${post.meta_title || post.title} | Firestick4UK Blog`;
-  const description = post.meta_description || post.excerpt || "";
-  const canonical = post.canonical_url || `https://firestick4uk.com/blog/${slug}`;
+  const description = stripHtml(post.meta_description || post.excerpt || "");
+  const canonical = post.canonical_url || `https://firestick4uk.com/blog/${post.slug || slug}`;
+  const image = String(post.featured_image || "").trim();
 
   return {
     title,
-    description,
+    ...(description ? { description } : {}),
     keywords: "",
     alternates: { canonical },
     openGraph: {
-      title, description,
+      title,
+      ...(description ? { description } : {}),
       url: canonical,
       siteName: "Firestick4UK",
       type: "article",
       publishedTime: post.created_at,
-      images: post.featured_image ? [{ url: post.featured_image, width: 1200, height: 630 }] : [],
+      ...(image ? { images: [{ url: image, width: 1200, height: 630 }] } : {}),
     },
-    twitter: { card: "summary_large_image", title, description, images: post.featured_image ? [post.featured_image] : [] },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      ...(description ? { description } : {}),
+      ...(image ? { images: [image] } : {}),
+    },
   };
 }
 
 export default async function BlogSlugPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = await getPost(slug);
+  if (!post) notFound();
 
-  const canonical = post?.canonical_url || `https://firestick4uk.com/blog/${slug}`;
-  const faqsArr = post?.faqs
+  const canonical = post.canonical_url || `https://firestick4uk.com/blog/${post.slug || slug}`;
+  const faqsArr = post.faqs
     ? (typeof post.faqs === "string" ? JSON.parse(post.faqs) : post.faqs) as Array<{question:string;answer:string}>
     : [];
+  const image = String(post.featured_image || "").trim();
+  const description = stripHtml(post.excerpt || post.meta_description || "");
 
-  const articleLd = post
-    ? {
-        "@context": "https://schema.org",
-        "@type": "Article",
-        headline: post.title,
-        description: post.excerpt || post.meta_description || "",
-        image: post.featured_image || "",
-        datePublished: post.created_at,
-        dateModified: post.updated_at || post.created_at,
-        author: {
-          "@type": "Organization",
-          name: "Firestick4UK",
-          url: "https://firestick4uk.com",
-        },
-        publisher: {
-          "@type": "Organization",
-          name: "Firestick4UK",
-          logo: {
-            "@type": "ImageObject",
-            url: "https://firestick4uk.com/logo.png",
-          },
-        },
-        mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
-      }
-    : null;
+  const articleLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    datePublished: post.created_at,
+    dateModified: post.updated_at || post.created_at,
+    author: {
+      "@type": "Organization",
+      name: "Firestick4UK",
+      url: "https://firestick4uk.com",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Firestick4UK",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://firestick4uk.com/logo.png",
+      },
+    },
+    mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
+  };
+  if (description) articleLd.description = description;
+  if (image) articleLd.image = image;
 
   const faqLd =
     faqsArr.length > 0
@@ -104,7 +121,7 @@ export default async function BlogSlugPage({ params }: { params: Promise<{ slug:
         items={[
           { name: "Home", url: "https://firestick4uk.com" },
           { name: "Blog", url: "https://firestick4uk.com/blog" },
-          { name: post?.title || slug, url: canonical },
+          { name: post.title || slug, url: canonical },
         ]}
       />
       <JsonLd data={articleLd} />

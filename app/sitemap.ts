@@ -2,6 +2,10 @@ import type { MetadataRoute } from "next";
 import pool from "@/lib/db";
 import { getSubscriptionSlugConfig } from "@/lib/subscriptionSlugServer";
 
+/** Always resolve from DB at request time — avoid build-time empty product/blog URLs. */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://firestick4uk.com";
   const now = new Date();
@@ -38,20 +42,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let blogPages: MetadataRoute.Sitemap = [];
 
   try {
-    // Prefer stored slug column; fall back to name-derived slug for older rows
+    // Only emit authoritative stored slugs (no name-derived aliases)
     const [products]: any = await pool.query(
-      `SELECT
-         COALESCE(
-           NULLIF(slug, ''),
-           LOWER(REPLACE(REPLACE(name, ' ', '-'), '/', ''))
-         ) AS slug,
-         created_at
+      `SELECT slug, created_at
        FROM products
-       WHERE active = 1 AND name IS NOT NULL AND name != ''`
+       WHERE active = 1
+         AND slug IS NOT NULL AND TRIM(slug) <> ''`
     );
 
     productPages = (Array.isArray(products) ? products : [])
-      .filter((p: { slug?: string }) => !!p.slug)
+      .map((p: { slug: string; created_at?: string | Date }) => ({
+        slug: String(p.slug || "")
+          .trim()
+          .toLowerCase()
+          .replace(/^\/+|\/+$/g, ""),
+        created_at: p.created_at,
+      }))
+      .filter((p: { slug: string }) => !!p.slug)
       .map((p: { slug: string; created_at?: string | Date }) => ({
         url: `${baseUrl}/products/${p.slug}`,
         lastModified: p.created_at ? new Date(p.created_at) : now,
