@@ -22,6 +22,37 @@ type MediaAsset = {
   created_at?: string;
 };
 
+type UsageReference = {
+  entityType: string;
+  entityId: string;
+  entityLabel: string;
+  field: string;
+  fieldLabel: string;
+  location?: string | null;
+  active?: boolean | null;
+  status?: string | null;
+  path?: string | null;
+  pageName?: string | null;
+  contentType?: string | null;
+};
+
+type UsageResponse = {
+  asset: {
+    id: number;
+    url: string;
+    purpose: string;
+    original_name?: string | null;
+  };
+  usage: UsageReference[];
+  summary: {
+    total: number;
+    products: number;
+    blogs: number;
+    siteContent: number;
+    sections: number;
+  };
+};
+
 const PURPOSE_LABELS: Record<string, string> = {
   blog: "Blog",
   products: "Products",
@@ -88,6 +119,47 @@ export default function MediaLibraryPanel({ role }: { role: AdminRoleName }) {
   const [uploadPurpose, setUploadPurpose] = useState(uploadPurposes[0] || "blog");
   const [msg, setMsg] = useState("");
   const [copyFlash, setCopyFlash] = useState<number | null>(null);
+  const [usageAsset, setUsageAsset] = useState<MediaAsset | null>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [usageError, setUsageError] = useState("");
+  const [usageData, setUsageData] = useState<UsageResponse | null>(null);
+
+  const loadUsage = useCallback(async (asset: MediaAsset) => {
+    setUsageAsset(asset);
+    setUsageLoading(true);
+    setUsageError("");
+    setUsageData(null);
+    try {
+      const r = await fetch(`/api/admin-media-usage?id=${encodeURIComponent(String(asset.id))}`, {
+        credentials: "include",
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.status === 401) {
+        setUsageError("Session expired. Please sign in again.");
+        return;
+      }
+      if (r.status === 403) {
+        setUsageError("Permission denied.");
+        return;
+      }
+      if (!r.ok) {
+        setUsageError(data.message || data.error || "Usage lookup failed");
+        return;
+      }
+      setUsageData(data as UsageResponse);
+    } catch {
+      setUsageError("Usage lookup failed");
+    } finally {
+      setUsageLoading(false);
+    }
+  }, []);
+
+  const closeUsage = () => {
+    setUsageAsset(null);
+    setUsageData(null);
+    setUsageError("");
+    setUsageLoading(false);
+  };
 
   const load = useCallback(
     async (pageNum = 1) => {
@@ -370,6 +442,14 @@ export default function MediaLibraryPanel({ role }: { role: AdminRoleName }) {
                 >
                   Open
                 </a>
+                <button
+                  type="button"
+                  className="action-btn btn-view"
+                  style={{ padding: "6px 10px", fontSize: 12 }}
+                  onClick={() => loadUsage(asset)}
+                >
+                  Usage
+                </button>
               </div>
             </div>
           </div>
@@ -399,6 +479,162 @@ export default function MediaLibraryPanel({ role }: { role: AdminRoleName }) {
           >
             Next →
           </button>
+        </div>
+      )}
+
+      {usageAsset && (
+        <div className="modal-overlay" style={{ zIndex: 1200 }} onClick={closeUsage}>
+          <div
+            className="modal"
+            style={{ maxWidth: 640, width: "95%", maxHeight: "90vh", overflow: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div className="modal-title" style={{ margin: 0 }}>Where used</div>
+              <button type="button" className="modal-cancel" onClick={closeUsage}>Close</button>
+            </div>
+
+            <div style={{ display: "flex", gap: 14, marginBottom: 16, alignItems: "flex-start" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={usageAsset.url}
+                alt={usageAsset.original_name || "media"}
+                style={{ width: 96, height: 72, objectFit: "cover", borderRadius: 8, border: "1px solid #E5E5E5", background: "#F5F5F5" }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+                  {usageAsset.original_name || "Untitled image"}
+                </div>
+                <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>
+                  {PURPOSE_LABELS[usageAsset.purpose] || usageAsset.purpose}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "#888",
+                    wordBreak: "break-all",
+                    lineHeight: 1.4,
+                  }}
+                  title={usageAsset.url}
+                >
+                  {usageAsset.url.length > 90 ? `${usageAsset.url.slice(0, 90)}…` : usageAsset.url}
+                </div>
+                <button
+                  type="button"
+                  className="action-btn btn-view"
+                  style={{ padding: "4px 8px", fontSize: 11, marginTop: 8 }}
+                  onClick={() => {
+                    navigator.clipboard?.writeText(usageAsset.url).catch(() => {});
+                  }}
+                >
+                  Copy URL
+                </button>
+              </div>
+            </div>
+
+            {usageLoading && (
+              <div style={{ padding: "24px 0", textAlign: "center", color: "#666", fontSize: 13 }}>Loading usage…</div>
+            )}
+
+            {!usageLoading && usageError && (
+              <div style={{ padding: 14, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, marginBottom: 12 }}>
+                <div style={{ color: "#B91C1C", fontSize: 13, marginBottom: 8 }}>{usageError}</div>
+                <button type="button" className="action-btn btn-view" onClick={() => loadUsage(usageAsset)}>
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {!usageLoading && !usageError && usageData && (
+              <>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>
+                  Used in {usageData.summary.total} {usageData.summary.total === 1 ? "place" : "places"}
+                </div>
+
+                {usageData.summary.total === 0 && (
+                  <div style={{ padding: 16, background: "#F8F5FF", borderRadius: 10, border: "1px solid #EDE7FF" }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Not currently used</div>
+                    <div style={{ fontSize: 12, color: "#666", lineHeight: 1.5 }}>
+                      No current CMS references were found for this URL.
+                      <br />
+                      Media deletion is not enabled.
+                    </div>
+                  </div>
+                )}
+
+                {([
+                  { key: "product", title: "Products" },
+                  { key: "blog", title: "Blog" },
+                  { key: "site_content", title: "Site Content / Settings" },
+                  { key: "section", title: "Page Builder" },
+                ] as const).map((group) => {
+                  const itemsInGroup = usageData.usage.filter((u) => u.entityType === group.key);
+                  if (!itemsInGroup.length) return null;
+                  return (
+                    <div key={group.key} style={{ marginBottom: 16 }}>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: "0.06em",
+                          textTransform: "uppercase",
+                          color: "#666",
+                          marginBottom: 8,
+                        }}
+                      >
+                        {group.title}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {itemsInGroup.map((ref) => (
+                          <div
+                            key={`${ref.entityType}-${ref.entityId}-${ref.field}-${ref.path || ""}`}
+                            style={{
+                              padding: 12,
+                              border: "1px solid #E5E5E5",
+                              borderRadius: 8,
+                              background: "#FAFAFA",
+                            }}
+                          >
+                            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
+                              {ref.entityLabel}
+                            </div>
+                            <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>
+                              {ref.fieldLabel}
+                              {ref.path && ref.path !== ref.field ? ` · ${ref.path}` : ""}
+                            </div>
+                            <div style={{ fontSize: 11, color: "#888", display: "flex", flexWrap: "wrap", gap: 8 }}>
+                              {ref.status != null && <span>Status: {ref.status}</span>}
+                              {ref.active != null && (
+                                <span>{ref.active ? "Active" : "Inactive"}</span>
+                              )}
+                              {ref.pageName && <span>Page: {ref.pageName}</span>}
+                              {ref.location && (
+                                <a
+                                  href={ref.location}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: "#5B21B6", fontWeight: 600 }}
+                                >
+                                  Open public page
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {usageData.summary.total > 0 && (
+                  <div style={{ fontSize: 11, color: "#888", marginTop: 8 }}>
+                    Media deletion is not enabled.
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
