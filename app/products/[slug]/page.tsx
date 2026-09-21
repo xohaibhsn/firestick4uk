@@ -226,6 +226,14 @@ export default async function ProductDetailPage({
 
   const product = resolved.product;
   const canonicalSlug = authoritativeProductSlug(product, slug);
+  // Preserve raw request segment; redirect mixed-case / punctuated variants to DB slug.
+  const rawTrimmed = String(slug || "")
+    .trim()
+    .replace(/^\/+|\/+$/g, "");
+  if (rawTrimmed !== canonicalSlug) {
+    permanentRedirect(`/products/${canonicalSlug}`);
+  }
+
   const productUrl = `https://firestick4uk.com/products/${canonicalSlug}`;
   const productLd = buildProductJsonLd(product, productUrl);
 
