@@ -42,22 +42,49 @@ function normalizeNullableImage(value: unknown): string | null {
   return s ? s : null;
 }
 
+const PRICE_ERROR = 'Price must be a finite non-negative number';
+
+/** Whole pounds or up to 2 decimal places; optional thousands commas. No silent junk stripping. */
+const STRICT_PRICE_NUMERIC = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?$/;
+
 function validatePrice(value: unknown): { ok: true; price: number } | { ok: false; error: string } {
   if (value === null || value === undefined || value === '') {
-    return { ok: false, error: 'Price must be a finite non-negative number' };
+    return { ok: false, error: PRICE_ERROR };
   }
-  const raw = String(value).trim();
-  const cleaned = raw.replace(/[^0-9.\-]/g, '');
-  if (!cleaned || cleaned === '-' || cleaned === '.' || cleaned === '-.') {
-    return { ok: false, error: 'Price must be a finite non-negative number' };
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value < 0) {
+      return { ok: false, error: PRICE_ERROR };
+    }
+    // At most 2 decimal places (reject float junk / excess precision)
+    if (Math.abs(value * 100 - Math.round(value * 100)) > 1e-6) {
+      return { ok: false, error: PRICE_ERROR };
+    }
+    return { ok: true, price: value };
   }
-  // Reject if letters/currency junk left only digits after strip but original had no numeric token
-  if (!/[0-9]/.test(raw)) {
-    return { ok: false, error: 'Price must be a finite non-negative number' };
+
+  if (typeof value !== 'string') {
+    return { ok: false, error: PRICE_ERROR };
   }
-  const n = Number(cleaned);
+
+  let raw = value.trim();
+  if (!raw || /^(nan|infinity|\+infinity|-infinity)$/i.test(raw)) {
+    return { ok: false, error: PRICE_ERROR };
+  }
+
+  // Normalize only explicitly supported formatting: optional £ + surrounding whitespace
+  if (raw.startsWith('£')) {
+    raw = raw.slice(1).trim();
+  }
+
+  // Entire remaining string must match; do not strip letters or arbitrary characters
+  if (!STRICT_PRICE_NUMERIC.test(raw)) {
+    return { ok: false, error: PRICE_ERROR };
+  }
+
+  const n = Number(raw.replace(/,/g, ''));
   if (!Number.isFinite(n) || n < 0) {
-    return { ok: false, error: 'Price must be a finite non-negative number' };
+    return { ok: false, error: PRICE_ERROR };
   }
   return { ok: true, price: n };
 }
