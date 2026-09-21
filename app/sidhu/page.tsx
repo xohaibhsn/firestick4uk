@@ -6,6 +6,7 @@ import AdminContentPanel from "@/components/admin/AdminContentPanel";
 import SubscriptionContentEditor from "@/components/admin/SubscriptionContentEditor";
 import MediaLibraryPanel from "@/components/admin/MediaLibraryPanel";
 import MediaLibraryPicker, { type MediaAsset } from "@/components/admin/MediaLibraryPicker";
+import ContentHistoryPanel from "@/components/admin/ContentHistoryPanel";
 import { keysForPage } from "@/lib/adminContentFields";
 import {
   canAccessSidhuTab,
@@ -221,7 +222,7 @@ const demoCustomers = [
   { name:"Emma Wilson", email:"emma@example.com", phone:"+44 7444 444444", orders:1, spent:"£9.99", joined:"May 2026" },
 ];
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"training"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"training"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history";
 type AdminRole = "super_admin"|"manager"|"writer";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
@@ -295,6 +296,7 @@ export default function AdminPage() {
     onSelect: (asset: MediaAsset) => void;
     title?: string;
   } | null>(null);
+  const [historyFilter, setHistoryFilter] = useState<{ entityType?: string; entityId?: string } | null>(null);
   const [heroImgUploading, setHeroImgUploading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [customersPage, setCustomersPage] = useState(1);
@@ -1938,6 +1940,19 @@ export default function AdminPage() {
 
             <div className="modal-actions">
               <button className="modal-cancel" onClick={() => setProductModal(null)}>Cancel</button>
+              {productModal !== "new" && productModal?.id && can("revisions.view") && (
+                <button
+                  type="button"
+                  className="modal-cancel"
+                  onClick={() => {
+                    setHistoryFilter({ entityType: "product", entityId: String(productModal.id) });
+                    setProductModal(null);
+                    setTab("history");
+                  }}
+                >
+                  🕘 History
+                </button>
+              )}
               <button className="modal-save" onClick={saveProduct} disabled={imageUploading}>Save Product</button>
             </div>
           </div>
@@ -2053,6 +2068,19 @@ export default function AdminPage() {
 
             <div className="modal-actions" style={{marginTop:"20px"}}>
               <button className="modal-cancel" onClick={()=>setBlogModal(null)}>Cancel</button>
+              {blogModal !== "new" && typeof blogModal === "object" && blogModal?.id && can("revisions.view") && (
+                <button
+                  type="button"
+                  className="modal-cancel"
+                  onClick={() => {
+                    setHistoryFilter({ entityType: "blog", entityId: String(blogModal.id) });
+                    setBlogModal(null);
+                    setTab("history");
+                  }}
+                >
+                  🕘 History
+                </button>
+              )}
               <button className="modal-save" onClick={saveBlog} disabled={!editBlog.title}>
                 {editBlog.status==="published"?"Publish Post":"Save Draft"}
               </button>
@@ -2093,6 +2121,7 @@ export default function AdminPage() {
               { id:"training",  icon:"🧠", label:"Berlin Training", roles:["super_admin","manager"] },
               { id:"blog",      icon:"📝", label:"Blog",         roles:["super_admin","manager","writer"] },
               { id:"media",     icon:"🖼️", label:"Media Library", roles:["super_admin","manager","writer"] },
+              { id:"history",   icon:"🕘", label:"History", roles:["super_admin","manager","writer"] },
               { id:"coupons",   icon:"🎟️", label:"Coupons",      roles:["super_admin"] },
               { id:"builder",   icon:"🎨", label:"Page Builder", roles:["super_admin"] },
               { id:"faqadmin",  icon:"❓", label:"FAQs",         roles:["super_admin","manager"] },
@@ -2101,7 +2130,11 @@ export default function AdminPage() {
               { id:"audit",     icon:"📜", label:"Activity Log", roles:["super_admin"] },
               { id:"settings",  icon:"⚙️", label:"Site Settings",roles:["super_admin"] },
             ] as const).filter(item => canAccessSidhuTab(adminRole, item.id as SidhuTab)).map(item => (
-              <button key={item.id} className={`nav-item ${tab===item.id?"active":""}`} onClick={() => { setTab(item.id); setSidebarOpen(false); }}>
+              <button key={item.id} className={`nav-item ${tab===item.id?"active":""}`} onClick={() => {
+                if (item.id === "history") setHistoryFilter(null);
+                setTab(item.id);
+                setSidebarOpen(false);
+              }}>
                 <span className="nav-icon">{item.icon}</span>
                 {item.label}
                 {"badge" in item && item.badge && <span className={`nav-badge ${item.badgeColor||""}`}>{item.badge}</span>}
@@ -2129,6 +2162,7 @@ export default function AdminPage() {
                 {tab==="training" && <>Berlin <span>Training</span></>}
                 {tab==="blog" && <>Manage <span>Blog</span></>}
                 {tab==="media" && <>Media <span>Library</span></>}
+                {tab==="history" && <>Content <span>History</span></>}
                 {tab==="coupons" && <>Manage <span>Coupons</span></>}
                 {tab==="builder" && <>Page <span>Builder</span></>}
                 {tab==="faqadmin" && <>Manage <span>FAQs</span></>}
@@ -2425,6 +2459,16 @@ export default function AdminPage() {
           {/* MEDIA LIBRARY */}
           {tab==="media" && can("media.view") && (
             <MediaLibraryPanel role={adminRole} />
+          )}
+
+          {/* CONTENT HISTORY */}
+          {tab==="history" && can("revisions.view") && (
+            <ContentHistoryPanel
+              key={`${historyFilter?.entityType || "all"}:${historyFilter?.entityId || ""}`}
+              role={adminRole}
+              initialEntityType={historyFilter?.entityType || ""}
+              initialEntityId={historyFilter?.entityId || ""}
+            />
           )}
 
           {/* CUSTOMERS */}

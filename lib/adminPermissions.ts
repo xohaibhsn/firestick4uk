@@ -25,7 +25,8 @@ export type AdminPermission =
   | "audit.view"
   | "media.view"
   | "media.upload"
-  | "blog_media.upload";
+  | "blog_media.upload"
+  | "revisions.view";
 
 export type SidhuTab =
   | "dashboard"
@@ -42,7 +43,8 @@ export type SidhuTab =
   | "staff"
   | "settings"
   | "audit"
-  | "media";
+  | "media"
+  | "history";
 
 const ALL_PERMISSIONS: readonly AdminPermission[] = [
   "dashboard.view",
@@ -65,6 +67,7 @@ const ALL_PERMISSIONS: readonly AdminPermission[] = [
   "media.view",
   "media.upload",
   "blog_media.upload",
+  "revisions.view",
 ] as const;
 
 const MANAGER_PERMISSIONS: readonly AdminPermission[] = [
@@ -83,6 +86,7 @@ const MANAGER_PERMISSIONS: readonly AdminPermission[] = [
   "media.view",
   "media.upload",
   "blog_media.upload",
+  "revisions.view",
 ] as const;
 
 const WRITER_PERMISSIONS: readonly AdminPermission[] = [
@@ -90,6 +94,7 @@ const WRITER_PERMISSIONS: readonly AdminPermission[] = [
   "blog.manage",
   "media.view",
   "blog_media.upload",
+  "revisions.view",
 ] as const;
 
 export const ROLE_PERMISSIONS: Record<AdminRoleName, readonly AdminPermission[]> = {
@@ -114,6 +119,7 @@ const TAB_PERMISSION: Record<SidhuTab, AdminPermission> = {
   settings: "settings.manage",
   audit: "audit.view",
   media: "media.view",
+  history: "revisions.view",
 };
 
 /**

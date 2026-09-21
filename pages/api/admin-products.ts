@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
 import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
+import { recordContentRevision, snapshotProduct } from '../../lib/contentRevisions';
 
 const PRODUCT_CATEGORIES = ['Subscription', 'Device', 'Bundle'] as const;
 
@@ -73,6 +74,13 @@ function valuesEqual(a: unknown, b: unknown): boolean {
   const na = a === null || a === undefined ? '' : String(a);
   const nb = b === null || b === undefined ? '' : String(b);
   return na === nb;
+}
+
+function pricesEqual(a: unknown, b: unknown): boolean {
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return na === nb;
+  return valuesEqual(a, b);
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -232,7 +240,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
       track('name', merged.name, current.name);
       track('slug', merged.slug, current.slug);
-      track('price', merged.price, current.price);
+      if (!pricesEqual(merged.price, current.price)) changedFields.push('price');
       track('category', merged.category, current.category);
       track('active', merged.active, current.active);
       for (const field of OPTIONAL_STRING_FIELDS) {
@@ -240,43 +248,71 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       try {
-        await pool.query(
-          `UPDATE products SET name=?, slug=?, description=?, price=?, category=?, badge=?, image=?, stock=?, active=?,
-            short_description=?, full_description=?, seo_title=?, meta_description=?, focus_keyword=?, features=?, og_image=?
-           WHERE id=?`,
-          [
-            merged.name,
-            merged.slug,
-            merged.description,
-            merged.price,
-            merged.category,
-            merged.badge,
-            merged.image,
-            merged.stock,
-            merged.active,
-            merged.short_description,
-            merged.full_description,
-            merged.seo_title,
-            merged.meta_description,
-            merged.focus_keyword,
-            merged.features,
-            merged.og_image,
-            id,
-          ]
-        );
-
-        if (changedFields.length > 0) {
-          const { ip } = getRequestMeta(req);
-          await recordAdminAudit({
-            actor: admin,
-            action: 'product.updated',
-            entityType: 'product',
-            entityId: id,
-            summary: `Updated product ${merged.name}`,
-            metadata: { changed_fields: changedFields },
-            ip,
+        if (changedFields.length === 0) {
+          return res.status(200).json({
+            success: true,
+            slug: merged.slug,
+            changed_fields: changedFields,
           });
         }
+
+        const conn = await pool.getConnection();
+        try {
+          await conn.beginTransaction();
+          await recordContentRevision(
+            {
+              entityType: "product",
+              entityId: id,
+              entityLabel: String(current.name || ""),
+              revisionAction: "update",
+              snapshot: snapshotProduct(current),
+              changedFields,
+              actor: admin,
+            },
+            conn
+          );
+          await conn.query(
+            `UPDATE products SET name=?, slug=?, description=?, price=?, category=?, badge=?, image=?, stock=?, active=?,
+              short_description=?, full_description=?, seo_title=?, meta_description=?, focus_keyword=?, features=?, og_image=?
+             WHERE id=?`,
+            [
+              merged.name,
+              merged.slug,
+              merged.description,
+              merged.price,
+              merged.category,
+              merged.badge,
+              merged.image,
+              merged.stock,
+              merged.active,
+              merged.short_description,
+              merged.full_description,
+              merged.seo_title,
+              merged.meta_description,
+              merged.focus_keyword,
+              merged.features,
+              merged.og_image,
+              id,
+            ]
+          );
+          await conn.commit();
+        } catch (txErr) {
+          try { await conn.rollback(); } catch { /* ignore */ }
+          throw txErr;
+        } finally {
+          conn.release();
+        }
+
+        const { ip } = getRequestMeta(req);
+        await recordAdminAudit({
+          actor: admin,
+          action: 'product.updated',
+          entityType: 'product',
+          entityId: id,
+          summary: `Updated product ${merged.name}`,
+          metadata: { changed_fields: changedFields },
+          ip,
+        });
 
         return res.status(200).json({
           success: true,
@@ -284,6 +320,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           changed_fields: changedFields,
         });
       } catch (err: any) {
+        if (err?.code === 'REVISION_TOO_LARGE') {
+          return res.status(400).json({ error: err.message });
+        }
         if (err?.code === 'ER_DUP_ENTRY') {
           return res.status(409).json({ error: 'Slug already exists. Choose a different URL slug.' });
         }
@@ -293,9 +332,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'DELETE') {
       const { id } = req.query;
-      const [prevRows]: any = await pool.query('SELECT id, name FROM products WHERE id = ? LIMIT 1', [id]);
+      const [prevRows]: any = await pool.query('SELECT * FROM products WHERE id = ? LIMIT 1', [id]);
       const prev = Array.isArray(prevRows) && prevRows[0] ? prevRows[0] : null;
-      await pool.query('DELETE FROM products WHERE id = ?', [id]);
+      if (prev) {
+        const conn = await pool.getConnection();
+        try {
+          await conn.beginTransaction();
+          await recordContentRevision(
+            {
+              entityType: "product",
+              entityId: String(id),
+              entityLabel: String(prev.name || ""),
+              revisionAction: "delete",
+              snapshot: snapshotProduct(prev),
+              changedFields: ["delete"],
+              actor: admin,
+            },
+            conn
+          );
+          await conn.query('DELETE FROM products WHERE id = ?', [id]);
+          await conn.commit();
+        } catch (txErr) {
+          try { await conn.rollback(); } catch { /* ignore */ }
+          throw txErr;
+        } finally {
+          conn.release();
+        }
+      } else {
+        await pool.query('DELETE FROM products WHERE id = ?', [id]);
+      }
       const { ip } = getRequestMeta(req);
       await recordAdminAudit({
         actor: admin,
