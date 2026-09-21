@@ -11,7 +11,7 @@ export type ContactConfig = {
 
 const FALLBACK: ContactConfig = {
   whatsapp: "447518787653",
-  email: "firestick4uk@gmail.com",
+  email: "info@firestick4uk.com",
   telegram: "@firestick44",
   phone: "+447518787653",
   whatsappUrl: "https://wa.me/447518787653",

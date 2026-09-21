@@ -78,22 +78,7 @@ export default function HomeClient({
   const [searchTerm, setSearchTerm] = useState("");
   const [hoveringId, setHoveringId] = useState<number | null>(null);
   const [slides, setSlides] = useState<string[]>([]);
-  const [featureList, setFeatureList] = useState<string[]>([
-    "HD & 4K Streaming Quality",
-    "Live Sports & Entertainment",
-    "Movies & TV Series On Demand",
-    "Catch-up TV Available",
-    "Compatible with All Devices",
-    "Fast Setup & Activation",
-    "24/7 Customer Support",
-    "UK Based Service",
-    "Easy Remote Setup Help",
-    "No Hidden Fees",
-    "Same-Day Order Processing",
-    "Secure Payment Options",
-    "Multi-Device Compatibility",
-    "Regular Channel Updates",
-  ]);
+  const [featureList, setFeatureList] = useState<string[]>([]);
   const [cmsData, setCmsData] = useState<Record<string, string>>({});
   const [featuresHtml, setFeaturesHtml] = useState("");
   const [heroBtns, setHeroBtns] = useState({
@@ -104,11 +89,7 @@ export default function HomeClient({
     secondaryLink: "/about",
     secondaryShow: true,
   });
-  const [heroStats, setHeroStats] = useState([
-    { num: "500+", label: "Happy Customers" },
-    { num: "4.9★", label: "Average Rating" },
-    { num: "24/7", label: "Support" },
-  ]);
+  const [heroStats, setHeroStats] = useState<{ num: string; label: string }[]>([]);
   const { addToCart, removeFromCart, cart } = useCart();
 
   const t = (key: string, fallback = "") => cms(cmsData, key, fallback);
@@ -117,11 +98,11 @@ export default function HomeClient({
     if (q) window.location.href = `/products?q=${encodeURIComponent(q)}`;
   };
 
-  // Section data from DB
+  // Section data from DB — no invented metrics, reviews, or service claims in fallbacks
   const [sec, setSec] = useState<Record<string,any>>({
     home_hero: { title:"Premium UK Streaming Service", subtitle:"Firestick4UK provides premium UK streaming services for Firestick and Android Box users.", button_text:"Shop Now", button_link:"/products", secondary_button_text:"Learn More", secondary_button_link:"/about" },
-    home_features: { title:"Why Choose Us", items:[{icon:"⚡",title:"Fast Setup",description:"Ready in minutes"},{icon:"🔒",title:"Secure",description:"Safe & reliable"},{icon:"💬",title:"24/7 Support",description:"Always here for you"},{icon:"🚀",title:"Fast Delivery",description:"Quick & efficient"}] },
-    home_testimonials: { title:"What Our Customers Say", items:[{name:"John Smith",rating:5,text:"Amazing service!"},{name:"Sarah Jones",rating:5,text:"Best firestick service in UK!"}] },
+    home_features: { title:"Why Choose Us", items:[] },
+    home_testimonials: { title:"What Our Customers Say", items:[] },
     home_newsletter: { title:"Stay in the Loop", subtitle:"Get the latest guides, tips and offers", button_text:"Subscribe" },
   });
 
@@ -176,20 +157,17 @@ export default function HomeClient({
           secondaryLink: (data.home_hero_btn2_link || "").trim() || "/about",
           secondaryShow: data.home_hero_btn2_show !== "0",
         });
-        setHeroStats([
-          {
-            num: (data.home_stat1_num || "").trim() || "500+",
-            label: (data.home_stat1_label || "").trim() || "Happy Customers",
-          },
-          {
-            num: (data.home_stat2_num || "").trim() || "4.9★",
-            label: (data.home_stat2_label || "").trim() || "Average Rating",
-          },
-          {
-            num: (data.home_stat3_num || "").trim() || "24/7",
-            label: (data.home_stat3_label || "").trim() || "Support",
-          },
-        ]);
+        const nextStats: { num: string; label: string }[] = [];
+        const s1n = (data.home_stat1_num || "").trim();
+        const s1l = (data.home_stat1_label || "").trim();
+        if (s1n && s1l) nextStats.push({ num: s1n, label: s1l });
+        const s2n = (data.home_stat2_num || "").trim();
+        const s2l = (data.home_stat2_label || "").trim();
+        if (s2n && s2l) nextStats.push({ num: s2n, label: s2l });
+        const s3n = (data.home_stat3_num || "").trim();
+        const s3l = (data.home_stat3_label || "").trim();
+        if (s3n && s3l) nextStats.push({ num: s3n, label: s3l });
+        setHeroStats(nextStats);
       })
       .catch(() => {});
     return () => {};
@@ -663,7 +641,9 @@ export default function HomeClient({
             <div className="hero-combined">
               <div className="hero-combined-scroll">
                 <div className="hero-content">
-                  <span className="hero-tag">✦ {t("home_hero_tag", "UK's #1 Firestick Service")}</span>
+                  {t("home_hero_tag", "") ? (
+                    <span className="hero-tag">✦ {t("home_hero_tag", "")}</span>
+                  ) : null}
                   <h2 className="hero-title">
                     {formatHeroTitle(heroTitle)}
                   </h2>
@@ -700,6 +680,7 @@ export default function HomeClient({
                 </div>
               </div>
             </div>
+            {heroStats.length > 0 ? (
             <div className="hero-stats">
               {heroStats.map((s, i) => (
                 <div className="stat-item" key={`${s.num}-${i}`}>
@@ -708,6 +689,7 @@ export default function HomeClient({
                 </div>
               ))}
             </div>
+            ) : null}
             {t("home_tagline", "") ? (
               <p style={{textAlign:"center",marginTop:16,color:"#64748b",fontWeight:600,letterSpacing:"0.04em"}}>{t("home_tagline")}</p>
             ) : null}
@@ -716,6 +698,7 @@ export default function HomeClient({
 
         {/* Features + Testimonials — LIGHT section */}
         <div className="features-outer">
+          {(sec.home_features?.items || []).length > 0 ? (
           <div className="features-section">
             <div className="section-tag">✦ {t("home_why_tag", "Why Choose Us")}</div>
             <h2 className="section-title">{sec.home_features?.title || "Why Choose Us"}</h2>
@@ -729,6 +712,7 @@ export default function HomeClient({
               ))}
             </div>
           </div>
+          ) : null}
           {sec.home_testimonials?.items?.length > 0 && (
             <div className="features-section" style={{paddingTop:0}}>
               <h2 className="section-title" style={{marginBottom:32}}>{sec.home_testimonials.title || "What Our Customers Say"}</h2>

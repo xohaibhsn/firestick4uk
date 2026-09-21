@@ -168,34 +168,10 @@ export default function AboutPage() {
   }, []);
 
   const t = (key: string, fallback = "") => cms(sc, key, fallback);
-  const stats = cmsJson(sc, "about_stats_json", [
-    { num: "500+", label: "Happy Customers" },
-    { num: "99%", label: "Satisfaction Rate" },
-    { num: "24/7", label: "Support Available" },
-    { num: "2+", label: "Years in Business" },
-    { num: "1000+", label: "Orders Fulfilled" },
-  ]);
-  const points = cmsJson(sc, "about_points_json", [
-    { icon: "UK", title: "UK Based", desc: "We operate fully within the United Kingdom, serving customers nationwide." },
-    { icon: "PS", title: "Personal Service", desc: "Every customer gets direct WhatsApp and Telegram support from our team." },
-    { icon: "FR", title: "Fast & Reliable", desc: "Orders processed and dispatched within 24 hours of confirmation." },
-    { icon: "FP", title: "Fair Pricing", desc: "No hidden fees. What you see is what you pay." },
-  ]);
-  const values = cmsJson(sc, "about_values_json", [
-    { icon: "TR", title: "Transparency", desc: "No hidden charges, no confusing terms. We tell you exactly what you are getting before you buy." },
-    { icon: "SP", title: "Speed", desc: "Fast order processing, quick delivery, and instant support responses — we value your time." },
-    { icon: "RS", title: "Real Support", desc: "Our WhatsApp and Telegram team is staffed by real humans who know our products inside out." },
-    { icon: "QL", title: "Quality", desc: "We only sell devices and plans we trust and have tested ourselves." },
-    { icon: "RL", title: "Reliability", desc: "We follow through on every promise — from delivery times to after-sales support." },
-    { icon: "VL", title: "Value", desc: "Premium products at fair prices. We believe quality should not cost a fortune." },
-  ]);
-  const timeline = cmsJson(sc, "about_timeline_json", [
-    { year: "2022", icon: "01", title: "Founded", desc: "Firestick4UK launched with a small range of Firestick devices and a big ambition to serve UK customers better." },
-    { year: "2023", icon: "02", title: "Expanded Products", desc: "Added Android boxes and flexible subscription plans to our catalogue based on customer demand." },
-    { year: "2024", icon: "03", title: "WhatsApp Support Launched", desc: "Introduced dedicated WhatsApp and Telegram support, making us one of the most responsive tech stores in the UK." },
-    { year: "2025", icon: "04", title: "500+ Happy Customers", desc: "Reached a major milestone of 500 satisfied customers with a 99% satisfaction rate." },
-    { year: "2026", icon: "05", title: "New Website Launch", desc: "Launched our brand new custom-built website with full order tracking and easy payment options." },
-  ]);
+  const stats = cmsJson(sc, "about_stats_json", []);
+  const points = cmsJson(sc, "about_points_json", []);
+  const values = cmsJson(sc, "about_values_json", []);
+  const timeline = cmsJson(sc, "about_timeline_json", []);
 
   return (
     <>
@@ -208,17 +184,18 @@ export default function AboutPage() {
         {/* HERO */}
         <div className="about-hero">
           <div className="section-tag">✦ {t("about_hero_tag", "Our Story")}</div>
-          <h1 className="page-title">{t("about_title", "The UK's Most Trusted")}<br /><span>{t("about_title_accent", "Tech Store")}</span></h1>
+          <h1 className="page-title">{t("about_title", "About Firestick4UK")}{t("about_title_accent", "") ? (<><br /><span>{t("about_title_accent", "")}</span></>) : null}</h1>
           <div
             className="hero-text"
             dangerouslySetInnerHTML={renderRichOrPlain(
               sc.about_description || "",
-              "We started Firestick4UK with one goal — to make premium streaming devices and subscription plans accessible, affordable, and hassle-free for everyone in the UK."
+              "Firestick4UK supplies streaming devices and subscription plans for customers across the UK."
             )}
           />
         </div>
 
         {/* STATS */}
+        {stats.length > 0 ? (
         <div className="stats-bar">
           {stats.map((s: any, i: number) => (
             <div className="stat-card" key={i}>
@@ -227,6 +204,7 @@ export default function AboutPage() {
             </div>
           ))}
         </div>
+        ) : null}
 
         {/* STORY */}
         <div className="story-section">
@@ -237,17 +215,20 @@ export default function AboutPage() {
               className="story-para"
               dangerouslySetInnerHTML={renderRichOrPlain(
                 sc.about_mission || "",
-                "Firestick4UK was founded by a team of tech enthusiasts who were frustrated with overpriced, complicated streaming setups. We wanted something simple — great devices, fair prices, and real human support."
+                "We focus on clear product options, straightforward ordering, and practical support for UK customers."
               )}
             />
+            {t("about_story_html", "") ? (
             <div
               className="story-para"
               dangerouslySetInnerHTML={renderRichOrPlain(
                 t("about_story_html", ""),
-                "Today, we serve hundreds of customers across the United Kingdom, offering carefully selected Firestick devices, powerful Android boxes, and flexible subscription plans — all backed by our dedicated WhatsApp and Telegram support team."
+                ""
               )}
             />
+            ) : null}
           </div>
+          {points.length > 0 ? (
           <div className="story-visual">
             {points.map((p: any, i: number) => (
               <div className="story-point" key={i}>
@@ -259,9 +240,11 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
+          ) : null}
         </div>
 
         {/* VALUES */}
+        {values.length > 0 ? (
         <div className="values-section">
           <div className="values-inner">
           <div className="section-header">
@@ -279,8 +262,10 @@ export default function AboutPage() {
           </div>
           </div>
         </div>
+        ) : null}
 
         {/* TIMELINE */}
+        {timeline.length > 0 ? (
         <div className="timeline-section">
           <div className="section-tag">✦ {t("about_journey_tag", "Our Journey")}</div>
           <h2 className="section-title">{t("about_journey_title", "How We")} <span>{t("about_journey_accent", "Grew")}</span></h2>
@@ -300,12 +285,13 @@ export default function AboutPage() {
             ))}
           </div>
         </div>
+        ) : null}
 
         {/* CTA */}
         <div className="cta-section">
           <div className="cta-box">
             <h2 className="cta-title">{t("about_cta_title", "Ready to Shop With Us?")}</h2>
-            <p className="cta-sub">{t("about_cta_subtitle", "Join hundreds of happy UK customers. Fast delivery. Real support.")}</p>
+            <p className="cta-sub">{t("about_cta_subtitle", "Browse our products or get in touch if you need help choosing.")}</p>
             <div className="cta-btns">
               <a href={t("about_cta_btn1_link", "/products")} className="btn-primary">{t("about_cta_btn1", "Browse Products")}</a>
               <a href={t("about_cta_btn2_link", "/contact")} className="btn-secondary">{t("about_cta_btn2", "Get In Touch")}</a>
