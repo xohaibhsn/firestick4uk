@@ -43,7 +43,7 @@ Before the `useEffect` fetch completes, the admin dashboard shows fake hardcoded
 `app/products/[slug]/page.tsx` line 16 still uses the old direct `createConnection` pattern instead of the shared pool:
 ```ts
 const conn = await Promise.race([
-  mysql.createConnection({ host: ..., user: ..., password: 'Firestick@2026', ... }),
+  mysql.createConnection({ host: ..., user: ..., password: '[REDACTED]', ... }),
   new Promise(reject timeout)
 ])
 ```
@@ -94,22 +94,22 @@ The DB schema SQL file is tracked in git. While not a secret, it exposes the ful
 `app/products/[slug]/page.tsx` lines 16–20:
 ```ts
 mysql.createConnection({
-  host: process.env.DB_HOST || "srv497.hstgr.io",
-  user: process.env.DB_USER || "u992747032_firestick4uk",
-  password: process.env.DB_PASSWORD || "Firestick@2026",  // ← hardcoded fallback
-  database: process.env.DB_NAME || "u992747032_firestick4uk",
+  host: process.env.DB_HOST || "[REDACTED_HOST]",
+  user: process.env.DB_USER || "[REDACTED_USER]",
+  password: process.env.DB_PASSWORD || "[REDACTED]",  // ← hardcoded fallback (historical)
+  database: process.env.DB_NAME || "[REDACTED_DB]",
 })
 ```
-`lib/db.ts` also has the same pattern. While env vars take priority, the hardcoded fallback means if `.env.local` is missing or variables are unset, **the real DB password appears in source code**. Source code is in a GitHub repository.  
-**Fix:** Remove all hardcoded credential fallbacks — if env vars are missing, throw an error.
+Historical note: `lib/db.ts` is now env-only (throws if vars missing). Hardcoded DB fallbacks must never return to source.  
+**Fix:** Remove all hardcoded credential fallbacks — if env vars are missing, throw an error. Rotate any previously exposed password.
 
 **SEC-2: ERP DEFAULT ADMIN PASSWORD IN PLAINTEXT (Critical)**  
 `pages/api/erp/login.ts` line 22:
 ```ts
 INSERT INTO erp_users (name,email,password,role) 
-VALUES ('Admin','admin@firestick4uk.com','erp123','admin')
+VALUES ('Admin','admin@firestick4uk.com','[REDACTED_DEFAULT]','admin')
 ```
-The default ERP admin password `erp123` is:
+The default ERP admin password `[REDACTED_DEFAULT]` is:
 1. Stored as **plain text** in the DB (no hashing)
 2. Hardcoded visibly in source code
 3. Never changes unless manually updated  
@@ -341,7 +341,7 @@ The shipping fee (`£3.99` for non-subscription, `Free` for plans) is calculated
 ### 🔴 Critical (Fix Immediately)
 
 1. **Remove DB credential fallbacks** from `app/products/[slug]/page.tsx` and `lib/db.ts` — use env vars only, throw if missing
-2. **Hash ERP default password** in `pages/api/erp/login.ts` — never store `erp123` plaintext
+2. **Hash ERP default password** in `pages/api/erp/login.ts` — never store a plaintext default password
 3. **Add `checkAdminAuth()` to `blog.ts`, `faqs.ts`, `sections.ts`, `site-content.ts`, `upload.ts`, `upload-favicon.ts`** — all currently unprotected
 4. **Sanitize blog content with `xss` package** — `xss` is already installed, just use it
 
