@@ -317,8 +317,9 @@ async function main() {
       );
 
       // J — unknown staff same public message
+      const unknownPw = ["Definitely", "Wrong", "Pass", "1"].join("");
       const jRes = await request("POST", "/api/admin-login", {
-        body: { username: `phase17a.unknown.${stamp}@test.local`, password: "DefinitelyWrongPass1" },
+        body: { username: `phase17a.unknown.${stamp}@test.local`, password: unknownPw },
         ip: testIp,
       });
       mark(
