@@ -4,6 +4,10 @@ import BlogPostClient from "./BlogPostClient";
 import pool from "../../../lib/db";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import JsonLd from "@/components/JsonLd";
+import {
+  defaultSocialImages,
+  resolveDefaultOgImage,
+} from "@/lib/socialMetadata";
 
 interface Post {
   id: number; title: string; slug: string; content: string; excerpt: string;
@@ -41,7 +45,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const title = `${post.meta_title || post.title} | Firestick4UK Blog`;
   const description = stripHtml(post.meta_description || post.excerpt || "");
   const canonical = post.canonical_url || `https://firestick4uk.com/blog/${post.slug || slug}`;
-  const image = String(post.featured_image || "").trim();
+  const featured = String(post.featured_image || "").trim();
+  const social = defaultSocialImages(
+    featured || resolveDefaultOgImage(null),
+    post.title || "Firestick4UK"
+  );
 
   return {
     title,
@@ -55,13 +63,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       siteName: "Firestick4UK",
       type: "article",
       publishedTime: post.created_at,
-      ...(image ? { images: [{ url: image, width: 1200, height: 630 }] } : {}),
+      images: social.images,
     },
     twitter: {
       card: "summary_large_image",
       title,
       ...(description ? { description } : {}),
-      ...(image ? { images: [image] } : {}),
+      images: social.twitterImages,
     },
   };
 }

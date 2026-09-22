@@ -5,6 +5,10 @@ import ProductDetail from "./ProductDetail";
 import pool from "../../../lib/db";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import JsonLd from "@/components/JsonLd";
+import {
+  defaultSocialImages,
+  resolveDefaultOgImage,
+} from "@/lib/socialMetadata";
 
 interface Product {
   id: number;
@@ -184,6 +188,10 @@ export async function generateMetadata({
   const description = productMetaDescription(product);
   const image = String(product.og_image || product.image || "").trim();
   const canonical = `https://firestick4uk.com/products/${canonicalSlug}`;
+  const social = defaultSocialImages(
+    image || resolveDefaultOgImage(null),
+    product.name
+  );
 
   return {
     title,
@@ -196,15 +204,13 @@ export async function generateMetadata({
       url: canonical,
       siteName: "Firestick4UK",
       type: "website",
-      ...(image
-        ? { images: [{ url: image, width: 1200, height: 630, alt: product.name }] }
-        : {}),
+      images: social.images,
     },
     twitter: {
       card: "summary_large_image",
       title,
       ...(description ? { description } : {}),
-      ...(image ? { images: [image] } : {}),
+      images: social.twitterImages,
     },
   };
 }

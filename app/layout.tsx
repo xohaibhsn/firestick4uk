@@ -5,6 +5,10 @@ import { CartProvider } from "./lib/cartContext";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import JsonLd from "@/components/JsonLd";
 import { getContactConfig } from "@/lib/contact-config";
+import {
+  defaultSocialImages,
+  resolveDefaultOgImage,
+} from "@/lib/socialMetadata";
 
 async function getSiteSettings(): Promise<Record<string, string>> {
   try {
@@ -28,6 +32,7 @@ async function getSiteSettings(): Promise<Record<string, string>> {
   }
 }
 
+/** Favicon-only: intentional cache bust. Do not use for OG/twitter images. */
 function withCacheBust(url: string): string {
   const raw = (url || "").trim();
   if (!raw) return raw;
@@ -70,9 +75,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const icon32 = faviconUrl ? faviconSizeUrl(faviconUrl, 32) : "/api/favicon";
   const icon48 = faviconUrl ? faviconSizeUrl(faviconUrl, 48) : "/api/favicon";
   const icon180 = faviconUrl ? faviconSizeUrl(faviconUrl, 180) : "/api/favicon";
-  const ogFinal = ogImageUrl
-    ? withCacheBust(ogImageUrl)
-    : "https://firestick4uk.com/og-default.jpg";
+  // Social images must be stable — never Date.now() cache-bust
+  const ogFinal = resolveDefaultOgImage(ogImageUrl);
+  const social = defaultSocialImages(ogFinal, title);
 
   const description =
     (settings.site_meta_description || "").trim() ||
@@ -110,13 +115,13 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://firestick4uk.com",
       siteName: title,
       type: "website",
-      images: [{ url: ogFinal, width: 1200, height: 630, alt: title }],
+      images: social.images,
     },
     twitter: {
       card: "summary_large_image",
       title: `${title} — ${tagline}`,
       description,
-      images: [ogFinal],
+      images: social.twitterImages,
     },
     metadataBase: new URL("https://firestick4uk.com"),
   };

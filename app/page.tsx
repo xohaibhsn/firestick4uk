@@ -3,6 +3,10 @@ import { connection } from "next/server";
 import pool from "@/lib/db";
 import HomeClient from "./HomeClient";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
+import {
+  defaultSocialImages,
+  resolveDefaultOgImage,
+} from "@/lib/socialMetadata";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -21,7 +25,8 @@ async function getHomeContent(): Promise<Record<string, string>> {
             'home_top_hero_subtitle',
             'home_hero_title',
             'home_hero_subtitle',
-            'home_tagline'
+            'home_tagline',
+            'og_default_image'
           )`
     );
     const result: Record<string, string> = {};
@@ -40,6 +45,11 @@ export async function generateMetadata(): Promise<Metadata> {
   const metaDesc =
     content.home_meta_description?.trim() ||
     "Premium Firestick subscriptions and streaming services in the UK. HD & 4K channels, live sports, movies and more.";
+  // Child openGraph/twitter replace parent — must include stable images
+  const social = defaultSocialImages(
+    resolveDefaultOgImage(content.og_default_image),
+    "Firestick4UK"
+  );
 
   return {
     title: { absolute: metaTitle },
@@ -53,11 +63,13 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://firestick4uk.com",
       siteName: "Firestick4UK",
       type: "website",
+      images: social.images,
     },
     twitter: {
       card: "summary_large_image",
       title: metaTitle,
       description: metaDesc,
+      images: social.twitterImages,
     },
   };
 }

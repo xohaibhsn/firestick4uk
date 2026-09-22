@@ -11,6 +11,10 @@ import {
   subscriptionPageUrl,
 } from "@/lib/subscriptionSlug";
 import { getSubscriptionSlugConfig } from "@/lib/subscriptionSlugServer";
+import {
+  defaultSocialImages,
+  resolveDefaultOgImage,
+} from "@/lib/socialMetadata";
 
 type SiteMap = Record<string, string>;
 
@@ -119,10 +123,10 @@ export async function generateSubscriptionMetadata(): Promise<Metadata> {
     content.subscription_canonical,
     route.previousSlug
   );
-  const ogImage =
-    content.subscription_og_image?.trim() ||
-    content.og_default_image?.trim() ||
-    undefined;
+  const ogImage = resolveDefaultOgImage(
+    content.subscription_og_image?.trim() || content.og_default_image?.trim()
+  );
+  const social = defaultSocialImages(ogImage, "Firestick4UK");
 
   return {
     title: { absolute: title },
@@ -135,13 +139,13 @@ export async function generateSubscriptionMetadata(): Promise<Metadata> {
       url: canonical,
       siteName: "Firestick4UK",
       type: "website",
-      ...(ogImage ? { images: [{ url: ogImage }] } : {}),
+      images: social.images,
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      ...(ogImage ? { images: [ogImage] } : {}),
+      images: social.twitterImages,
     },
   };
 }
