@@ -1,33 +1,10 @@
 import type { Metadata } from "next";
-import { Inter, Plus_Jakarta_Sans, Cinzel } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "./lib/cartContext";
 // import ChatWidget from "@/components/ChatWidget"; // BERLIN TEMPORARILY HIDDEN
 import WhatsAppButton from "@/components/WhatsAppButton";
 import JsonLd from "@/components/JsonLd";
 import { getContactConfig } from "@/lib/contact-config";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-  weight: ["300", "400", "500", "600", "700", "800"],
-});
-
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  variable: "--font-jakarta",
-  display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
-});
-
-/** Logo text fallback only — do not use elsewhere */
-const cinzel = Cinzel({
-  subsets: ["latin"],
-  variable: "--font-cinzel",
-  display: "swap",
-  weight: ["400", "700", "900"],
-});
 
 async function getSiteSettings(): Promise<Record<string, string>> {
   try {
@@ -168,11 +145,18 @@ export default async function RootLayout({
   };
 
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${jakarta.variable} ${cinzel.variable} h-full antialiased`}
-    >
+    <html lang="en" className="h-full antialiased">
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        />
         <meta
           name="google-site-verification"
           content="bE3BpMEsptGDckTW4IX1nVwGibbaaiphTCCbQp9y-FY"

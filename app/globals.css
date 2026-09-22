@@ -9,9 +9,13 @@ html {
 }
 
 :root {
-  --font-display: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-body: var(--font-inter), 'Inter', system-ui, sans-serif;
-  --font-logo: var(--font-cinzel), 'Cinzel', Georgia, serif;
+  /* Runtime Google Fonts stylesheet + system fallbacks (no next/font build fetch) */
+  --font-inter: "Inter";
+  --font-jakarta: "Plus Jakarta Sans";
+  --font-cinzel: "Cinzel";
+  --font-display: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: var(--font-inter), "Inter", system-ui, sans-serif;
+  --font-logo: var(--font-cinzel), "Cinzel", Georgia, serif;
 
   /* Brand colors */
   --color-bg: #FFFFFF;
