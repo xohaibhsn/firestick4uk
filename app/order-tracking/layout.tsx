@@ -9,6 +9,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "Track Your Order — Firestick4UK",
     description:
       "Enter your Order ID to track your Firestick4UK order in real time. Check payment, dispatch and delivery status.",
+    alternates: { canonical: "https://firestick4uk.com/order-tracking" },
     openGraph: {
       title: "Track Your Order — Firestick4UK",
       description: "Real-time order tracking for Firestick4UK customers.",

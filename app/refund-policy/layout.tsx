@@ -9,6 +9,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "Refund Policy — Firestick4UK",
     description:
       "Firestick4UK Refund & Return Policy. 7-day returns on physical devices. Full details on how to request a refund.",
+    alternates: { canonical: "https://firestick4uk.com/refund-policy" },
     openGraph: {
       title: "Refund Policy — Firestick4UK",
       url: "https://firestick4uk.com/refund-policy",

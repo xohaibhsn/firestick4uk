@@ -9,6 +9,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "Privacy Policy — Firestick4UK",
     description:
       "Firestick4UK Privacy Policy. Learn how we collect, use, and protect your personal data in line with UK GDPR.",
+    alternates: { canonical: "https://firestick4uk.com/privacy-policy" },
     openGraph: {
       title: "Privacy Policy — Firestick4UK",
       url: "https://firestick4uk.com/privacy-policy",
