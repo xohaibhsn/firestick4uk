@@ -135,7 +135,7 @@ export default function TermsPage() {
               <h2>4. Payment</h2>
               <p>We accept UK bank transfer and cash on delivery as payment methods.</p>
               <ul>
-                <li><strong>Bank Transfer:</strong> Payment must be made to the account details shown at checkout. Include your Order ID as the payment reference. Upload your receipt to complete the order.</li>
+                <li><strong>Bank Transfer:</strong> Payment must be made to the account details shown at checkout. Use your first name as the payment reference. Upload your receipt to complete the order.</li>
                 <li><strong>Cash on Delivery:</strong> Payment is due upon delivery of physical goods. Available for UK mainland addresses only.</li>
                 <li>We verify all bank transfer receipts manually. Subscription services are active within 1 hour of payment confirmation.</li>
                 <li>Orders will not be fulfilled until payment is verified.</li>

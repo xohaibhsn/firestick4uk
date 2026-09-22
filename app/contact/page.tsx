@@ -155,10 +155,7 @@ export default function ContactPage() {
   const contact = useContactConfig();
   const { t, j } = useSiteContent();
   const hoursFallback = [
-    { day: "Monday – Friday", hours: "9AM – 10PM" },
-    { day: "Saturday", hours: "10AM – 8PM" },
-    { day: "Sunday", hours: "11AM – 6PM" },
-    { day: "Bank Holidays", hours: "Limited hours" },
+    { day: "Support", hours: "24/7" },
   ];
   const hoursParsed = j<{ day: string; hours: string }[]>("contact_hours_grid_json", hoursFallback);
   const hoursGrid = Array.isArray(hoursParsed) ? hoursParsed : hoursFallback;
@@ -228,7 +225,7 @@ export default function ContactPage() {
           <div className="contact-card">
             <span className="contact-card-icon">🕐</span>
             <div className="contact-card-title">{t("contact_hours_title", "Support Hours")}</div>
-            <div className="contact-card-value">{t("contact_hours", "9AM – 10PM")}</div>
+            <div className="contact-card-value">{t("contact_hours", "24/7 Support")}</div>
             <div className="contact-card-sub">{t("contact_hours_sub", "7 days a week")}</div>
           </div>
           <div className="contact-card">
