@@ -10,6 +10,11 @@ import {
   resolveSocialImagePrecedence,
 } from "@/lib/socialMetadata";
 import { getDefaultOgImageFromSettings } from "@/lib/socialMetadataServer";
+import {
+  normalizeProductSlug,
+  resolveProductLegacyRedirect,
+  PRODUCT8_LEGACY_SLUG_REDIRECTS,
+} from "@/lib/productLegacyRedirects";
 
 interface Product {
   id: number;
@@ -40,10 +45,7 @@ function stripHtml(html: string): string {
 }
 
 function normalizeRequestSlug(slug: string): string {
-  return String(slug || "")
-    .trim()
-    .toLowerCase()
-    .replace(/^\/+|\/+$/g, "");
+  return normalizeProductSlug(slug);
 }
 
 /** Prefer DB slug; fall back to request slug only when product has no stored slug. */
@@ -94,9 +96,19 @@ type ResolveResult =
   | { status: "redirect"; toSlug: string }
   | { status: "missing" };
 
+async function activeProductExistsBySlug(slug: string): Promise<boolean> {
+  const s = normalizeRequestSlug(slug);
+  if (!s) return false;
+  const [rows]: any = await pool.query(
+    `SELECT id FROM products WHERE active = 1 AND slug = ? LIMIT 1`,
+    [s]
+  );
+  return !!rows?.[0];
+}
+
 /**
- * Exact DB slug first; name-derived alias only for redirect compatibility.
- * Deduped per-request via React cache.
+ * Exact DB slug first; then conditional Product 8 legacy map (only if target
+ * exists); then name-derived alias. Deduped per-request via React cache.
  */
 const resolveProduct = cache(async (rawSlug: string): Promise<ResolveResult> => {
   const s = normalizeRequestSlug(rawSlug);
@@ -108,6 +120,18 @@ const resolveProduct = cache(async (rawSlug: string): Promise<ResolveResult> => 
       [s]
     );
     if (exactRows?.[0]) return { status: "ok", product: exactRows[0] };
+
+    // Phase 20D: legacy sources → canonical only when target slug is live in DB.
+    // Before migration (target absent), fall through so season-pass stays exact-hit
+    // above and world-cup keeps current 404 / name-alias behavior.
+    if (PRODUCT8_LEGACY_SLUG_REDIRECTS[s]) {
+      const mapped = PRODUCT8_LEGACY_SLUG_REDIRECTS[s];
+      const targetLive = await activeProductExistsBySlug(mapped);
+      const legacyTarget = resolveProductLegacyRedirect(s, targetLive);
+      if (legacyTarget) {
+        return { status: "redirect", toSlug: legacyTarget };
+      }
+    }
 
     const [legacyRows]: any = await pool.query(
       `SELECT * FROM products
