@@ -13,7 +13,7 @@ import {
 import { getSubscriptionSlugConfig } from "@/lib/subscriptionSlugServer";
 import {
   defaultSocialImages,
-  resolveDefaultOgImage,
+  resolveSocialImagePrecedence,
 } from "@/lib/socialMetadata";
 
 type SiteMap = Record<string, string>;
@@ -123,8 +123,9 @@ export async function generateSubscriptionMetadata(): Promise<Metadata> {
     content.subscription_canonical,
     route.previousSlug
   );
-  const ogImage = resolveDefaultOgImage(
-    content.subscription_og_image?.trim() || content.og_default_image?.trim()
+  const ogImage = resolveSocialImagePrecedence(
+    content.subscription_og_image?.trim(),
+    content.og_default_image?.trim()
   );
   const social = defaultSocialImages(ogImage, "Firestick4UK");
 

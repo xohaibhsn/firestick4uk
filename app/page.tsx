@@ -3,10 +3,8 @@ import { connection } from "next/server";
 import pool from "@/lib/db";
 import HomeClient from "./HomeClient";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
-import {
-  defaultSocialImages,
-  resolveDefaultOgImage,
-} from "@/lib/socialMetadata";
+import { defaultSocialImages } from "@/lib/socialMetadata";
+import { getDefaultOgImageFromSettings } from "@/lib/socialMetadataServer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -25,8 +23,7 @@ async function getHomeContent(): Promise<Record<string, string>> {
             'home_top_hero_subtitle',
             'home_hero_title',
             'home_hero_subtitle',
-            'home_tagline',
-            'og_default_image'
+            'home_tagline'
           )`
     );
     const result: Record<string, string> = {};
@@ -45,9 +42,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const metaDesc =
     content.home_meta_description?.trim() ||
     "Premium Firestick subscriptions and streaming services in the UK. HD & 4K channels, live sports, movies and more.";
-  // Child openGraph/twitter replace parent — must include stable images
+  // Child openGraph/twitter replace parent — must include CMS-aware stable images
   const social = defaultSocialImages(
-    resolveDefaultOgImage(content.og_default_image),
+    await getDefaultOgImageFromSettings(),
     "Firestick4UK"
   );
 

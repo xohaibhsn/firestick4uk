@@ -7,8 +7,9 @@ import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import JsonLd from "@/components/JsonLd";
 import {
   defaultSocialImages,
-  resolveDefaultOgImage,
+  resolveSocialImagePrecedence,
 } from "@/lib/socialMetadata";
+import { getDefaultOgImageFromSettings } from "@/lib/socialMetadataServer";
 
 interface Product {
   id: number;
@@ -188,8 +189,9 @@ export async function generateMetadata({
   const description = productMetaDescription(product);
   const image = String(product.og_image || product.image || "").trim();
   const canonical = `https://firestick4uk.com/products/${canonicalSlug}`;
+  const cmsDefault = await getDefaultOgImageFromSettings();
   const social = defaultSocialImages(
-    image || resolveDefaultOgImage(null),
+    resolveSocialImagePrecedence(image, cmsDefault),
     product.name
   );
 

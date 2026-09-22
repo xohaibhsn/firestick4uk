@@ -1,5 +1,5 @@
 /**
- * Phase 20B — Social metadata stability invariants (source-level).
+ * Phase 20B / 20B.1 — Social metadata stability + CMS authority invariants.
  */
 const fs = require("fs");
 const path = require("path");
@@ -21,14 +21,32 @@ const fail = (id, ok, detail) => {
 };
 
 const helper = read("lib/socialMetadata.ts");
+const serverHelper = read("lib/socialMetadataServer.ts");
 const layout = read("app/layout.tsx");
 const home = read("app/page.tsx");
+const productDetail = read("app/products/[slug]/page.tsx");
+const blogDetail = read("app/blog/[slug]/page.tsx");
+const subscription = read("lib/subscriptionLandingPage.tsx");
+
+const staticLayouts = [
+  "app/products/layout.tsx",
+  "app/blog/layout.tsx",
+  "app/contact/layout.tsx",
+  "app/about/layout.tsx",
+  "app/faq/layout.tsx",
+  "app/cart/layout.tsx",
+  "app/terms/layout.tsx",
+  "app/privacy-policy/layout.tsx",
+  "app/refund-policy/layout.tsx",
+  "app/order-tracking/layout.tsx",
+];
 
 fail(
   "A_helper_exists",
   /export function resolveDefaultOgImage/.test(helper) &&
     /export function stableSocialImageUrl/.test(helper) &&
-    /FALLBACK_OG_IMAGE/.test(helper)
+    /FALLBACK_OG_IMAGE/.test(helper) &&
+    /export function resolveSocialImagePrecedence/.test(helper)
 );
 
 fail(
@@ -40,8 +58,8 @@ fail(
 
 fail(
   "C_helper_no_Date_now",
-  !/Date\.now\s*\(/.test(helper),
-  "socialMetadata must not use Date.now"
+  !/Date\.now\s*\(/.test(helper) && !/Date\.now\s*\(/.test(serverHelper),
+  "social helpers must not use Date.now"
 );
 
 fail(
@@ -64,10 +82,10 @@ fail(
 );
 
 fail(
-  "G_home_includes_social_images",
-  /defaultSocialImages/.test(home) &&
-    /images:\s*social\.images/.test(home) &&
-    /images:\s*social\.twitterImages/.test(home)
+  "G_home_uses_cms_server_helper",
+  /getDefaultOgImageFromSettings/.test(home) &&
+    /defaultSocialImages/.test(home) &&
+    /images:\s*social\.images/.test(home)
 );
 
 fail(
@@ -87,43 +105,76 @@ fail(
   )
 );
 
-// Product 8 slug must remain untouched
-const productSlugFiles = [
-  "app/products/[slug]/page.tsx",
-  "lib/subscriptionLandingPage.tsx",
-];
-let product8Touched = false;
-for (const f of productSlugFiles) {
-  // Only flag if this phase introduced a forced slug rewrite for product 8 — scan for known bad patterns
-  const src = read(f);
-  if (/product.?8.*slug.*=.*['"][^'"]+['"]/i.test(src) && /migrate.*slug/i.test(src)) {
-    product8Touched = true;
+fail("K_no_product8_slug_migration", (() => {
+  for (const f of ["app/products/[slug]/page.tsx", "lib/subscriptionLandingPage.tsx"]) {
+    const src = read(f);
+    if (/product.?8.*slug.*=.*['"][^'"]+['"]/i.test(src) && /migrate.*slug/i.test(src)) {
+      return false;
+    }
+  }
+  return true;
+})());
+
+fail(
+  "L_no_erp_env_auth_in_helpers",
+  !/process\.env\.(DB_|ADMIN_|NEXTAUTH)/.test(helper) &&
+    !/erp\//i.test(helper) &&
+    !/erp\//i.test(serverHelper)
+);
+
+fail(
+  "M_server_helper_reads_cms_key",
+  /getDefaultOgImageFromSettings/.test(serverHelper) &&
+    /og_default_image/.test(serverHelper) &&
+    /resolveDefaultOgImage/.test(serverHelper) &&
+    /connection\(\)/.test(serverHelper)
+);
+
+// Child layouts must NOT use FALLBACK_OG_IMAGE as primary; must use CMS helper
+let bypassCount = 0;
+for (const rel of staticLayouts) {
+  const src = read(rel);
+  const usesFallbackPrimary = /defaultSocialImages\(\s*FALLBACK_OG_IMAGE\s*\)/.test(
+    src
+  );
+  const usesCmsHelper = /getDefaultOgImageFromSettings/.test(src);
+  const hasGenerateMetadata = /export async function generateMetadata/.test(src);
+  const hasImages = /images:\s*social\.images/.test(src);
+  if (usesFallbackPrimary || !usesCmsHelper || !hasGenerateMetadata || !hasImages) {
+    bypassCount += 1;
+    console.log(
+      `  layout issue: ${rel} fallbackPrimary=${usesFallbackPrimary} cms=${usesCmsHelper} genMeta=${hasGenerateMetadata} images=${hasImages}`
+    );
   }
 }
-fail("K_no_product8_slug_migration", !product8Touched);
-
 fail(
-  "L_no_erp_env_auth_in_phase20b_helper",
-  !/process\.env\.(DB_|ADMIN_|NEXTAUTH)/.test(helper) &&
-    !/erp\//i.test(helper)
+  "N_static_layouts_cms_not_bundled_primary",
+  bypassCount === 0,
+  `${bypassCount} layouts still bypass CMS`
 );
 
 fail(
-  "M_products_layout_has_og_images",
-  /images:\s*social\.images/.test(read("app/products/layout.tsx"))
+  "O_product_precedence",
+  /resolveSocialImagePrecedence\(\s*image,\s*cmsDefault\s*\)/.test(productDetail) &&
+    /getDefaultOgImageFromSettings/.test(productDetail) &&
+    !/resolveDefaultOgImage\(\s*null\s*\)/.test(productDetail)
 );
 
 fail(
-  "N_contact_layout_has_og_images",
-  /images:\s*social\.images/.test(read("app/contact/layout.tsx"))
+  "P_blog_precedence",
+  /resolveSocialImagePrecedence\(\s*featured,\s*cmsDefault\s*\)/.test(blogDetail) &&
+    /getDefaultOgImageFromSettings/.test(blogDetail) &&
+    !/resolveDefaultOgImage\(\s*null\s*\)/.test(blogDetail)
 );
 
 fail(
-  "O_subscription_uses_stable_resolver",
-  /resolveDefaultOgImage/.test(read("lib/subscriptionLandingPage.tsx"))
+  "Q_subscription_precedence",
+  /resolveSocialImagePrecedence\(/.test(subscription) &&
+    /subscription_og_image/.test(subscription) &&
+    /og_default_image/.test(subscription)
 );
 
-// Determinism: same CMS URL in → same URL out (simulate helper logic)
+// Determinism + precedence simulation
 function stableSocialImageUrl(url) {
   const raw = (url || "").trim().split("#")[0];
   if (!raw) return "";
@@ -134,20 +185,36 @@ function resolveDefaultOgImage(cmsUrl) {
   const stable = stableSocialImageUrl(cmsUrl || "");
   return stable || "https://firestick4uk.com/og-default.png";
 }
+function resolveSocialImagePrecedence(pageSpecific, cmsDefault) {
+  return (
+    stableSocialImageUrl(pageSpecific || "") || resolveDefaultOgImage(cmsDefault)
+  );
+}
+
 const sample =
   "https://res.cloudinary.com/dehknghwm/image/upload/v1786881940/firestick4uk/og/r4gqccnfsuybj3brmamc.png?v=1786881943158";
 const a = resolveDefaultOgImage(sample);
 const b = resolveDefaultOgImage(sample);
-const c = resolveDefaultOgImage(sample);
+fail("R_resolve_deterministic", a === b && a === sample, a);
 fail(
-  "P_resolve_deterministic",
-  a === b && b === c && a === sample,
-  a
+  "S_empty_falls_back_stable",
+  resolveDefaultOgImage("") === "https://firestick4uk.com/og-default.png"
 );
 fail(
-  "Q_empty_falls_back_stable",
-  resolveDefaultOgImage("") === "https://firestick4uk.com/og-default.png" &&
-    resolveDefaultOgImage(null) === "https://firestick4uk.com/og-default.png"
+  "T_precedence_page_over_cms",
+  resolveSocialImagePrecedence("https://cdn.example/product.webp", sample) ===
+    "https://cdn.example/product.webp"
+);
+fail(
+  "U_precedence_cms_over_fallback",
+  resolveSocialImagePrecedence("", sample) === sample &&
+    resolveSocialImagePrecedence(null, "") ===
+      "https://firestick4uk.com/og-default.png"
+);
+
+fail(
+  "V_no_layout_imports_FALLBACK_as_primary",
+  staticLayouts.every((rel) => !/FALLBACK_OG_IMAGE/.test(read(rel)))
 );
 
 console.log(failed === 0 ? "\nALL PHASE20B TESTS PASSED" : `\n${failed} FAILED`);

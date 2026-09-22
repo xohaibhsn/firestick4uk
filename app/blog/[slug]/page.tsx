@@ -6,8 +6,9 @@ import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import JsonLd from "@/components/JsonLd";
 import {
   defaultSocialImages,
-  resolveDefaultOgImage,
+  resolveSocialImagePrecedence,
 } from "@/lib/socialMetadata";
+import { getDefaultOgImageFromSettings } from "@/lib/socialMetadataServer";
 
 interface Post {
   id: number; title: string; slug: string; content: string; excerpt: string;
@@ -46,8 +47,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const description = stripHtml(post.meta_description || post.excerpt || "");
   const canonical = post.canonical_url || `https://firestick4uk.com/blog/${post.slug || slug}`;
   const featured = String(post.featured_image || "").trim();
+  const cmsDefault = await getDefaultOgImageFromSettings();
   const social = defaultSocialImages(
-    featured || resolveDefaultOgImage(null),
+    resolveSocialImagePrecedence(featured, cmsDefault),
     post.title || "Firestick4UK"
   );
 

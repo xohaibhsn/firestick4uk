@@ -20,6 +20,20 @@ export function resolveDefaultOgImage(cmsUrl?: string | null): string {
   return stable || FALLBACK_OG_IMAGE;
 }
 
+/**
+ * Precedence: page-specific → CMS default → bundled fallback.
+ * Pass already-resolved CMS URL from getDefaultOgImageFromSettings when available.
+ */
+export function resolveSocialImagePrecedence(
+  pageSpecific?: string | null,
+  cmsDefault?: string | null
+): string {
+  return (
+    stableSocialImageUrl(pageSpecific || "") ||
+    resolveDefaultOgImage(cmsDefault)
+  );
+}
+
 type OgImage = NonNullable<NonNullable<Metadata["openGraph"]>["images"]>;
 
 /** Image descriptors for openGraph / twitter — dimensions omitted unless known accurate. */
