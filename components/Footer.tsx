@@ -1,6 +1,7 @@
 "use client";
 
 import { useSiteContent } from "@/hooks/useSiteContent";
+import { openTrackingPreferences } from "@/lib/trackingConsent";
 
 export default function Footer() {
   const { t } = useSiteContent();
@@ -32,8 +33,16 @@ export default function Footer() {
         }
         .site-footer .footer-tagline { font-size:12px; color:rgba(255,255,255,0.45); margin-top:4px; }
         .site-footer .footer-links { display:flex; gap:24px; list-style:none; flex-wrap:wrap; margin:0; padding:0; }
-        .site-footer .footer-links a { color:rgba(255,255,255,0.6); text-decoration:none; font-size:13px; transition:color 0.2s; }
-        .site-footer .footer-links a:hover { color:#FFFFFF; }
+        .site-footer .footer-links a,
+        .site-footer .footer-links button.footer-privacy-choices {
+          color:rgba(255,255,255,0.6); text-decoration:none; font-size:13px; transition:color 0.2s;
+          background:none; border:none; padding:0; cursor:pointer; font-family:inherit;
+        }
+        .site-footer .footer-links a:hover,
+        .site-footer .footer-links button.footer-privacy-choices:hover { color:#FFFFFF; }
+        .site-footer .footer-links button.footer-privacy-choices:focus-visible {
+          outline:2px solid #FFFFFF; outline-offset:3px;
+        }
         .site-footer .footer-copy { font-size:12px; color:rgba(255,255,255,0.4); }
         .site-footer .footer-social { display:flex; gap:12px; }
         .site-footer .footer-social a { color:rgba(255,255,255,0.7); font-size:13px; text-decoration:none; }
@@ -53,6 +62,15 @@ export default function Footer() {
           {links.map((l) => (
             <li key={l.href}><a href={l.href}>{l.label}</a></li>
           ))}
+          <li>
+            <button
+              type="button"
+              className="footer-privacy-choices"
+              onClick={() => openTrackingPreferences()}
+            >
+              Privacy choices
+            </button>
+          </li>
         </ul>
         {(fb || ig || yt || tk) && (
           <div className="footer-social">

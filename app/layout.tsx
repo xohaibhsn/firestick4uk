@@ -3,6 +3,7 @@ import "./globals.css";
 import { CartProvider } from "./lib/cartContext";
 // import ChatWidget from "@/components/ChatWidget"; // BERLIN TEMPORARILY HIDDEN
 import WhatsAppButton from "@/components/WhatsAppButton";
+import TrackingConsent from "@/components/TrackingConsent";
 import JsonLd from "@/components/JsonLd";
 import { getContactConfig } from "@/lib/contact-config";
 import {
@@ -166,25 +167,11 @@ export default async function RootLayout({
           name="google-site-verification"
           content="bE3BpMEsptGDckTW4IX1nVwGibbaaiphTCCbQp9y-FY"
         />
-        <script
-          async
-          src="https://www.googletagmanager.com/gtag/js?id=G-055GHH06KD"
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', 'G-055GHH06KD');
-              gtag('config', 'AW-18404353244');
-            `,
-          }}
-        />
       </head>
       <body className="min-h-full flex flex-col">
         <JsonLd data={organizationLd} />
         <CartProvider>{children}</CartProvider>
+        <TrackingConsent />
         {/* BERLIN TEMPORARILY HIDDEN
         <ChatWidget />
         */}
