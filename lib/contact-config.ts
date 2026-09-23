@@ -1,22 +1,12 @@
 import pool from "@/lib/db";
+import {
+  CONTACT_CONFIG_FALLBACK,
+  normalizeContactFromMap,
+  type ContactConfig,
+} from "@/lib/contactConfigNormalize";
 
-export type ContactConfig = {
-  whatsapp: string;
-  email: string;
-  telegram: string;
-  phone: string;
-  whatsappUrl: string;
-  telegramUrl: string;
-};
-
-const FALLBACK: ContactConfig = {
-  whatsapp: "447518787653",
-  email: "info@firestick4uk.com",
-  telegram: "@firestick44",
-  phone: "+447518787653",
-  whatsappUrl: "https://wa.me/447518787653",
-  telegramUrl: "https://t.me/firestick44",
-};
+export type { ContactConfig };
+export { CONTACT_CONFIG_FALLBACK, normalizeContactFromMap };
 
 export async function getContactConfig(): Promise<ContactConfig> {
   try {
@@ -37,20 +27,8 @@ export async function getContactConfig(): Promise<ContactConfig> {
       config[row.content_key] = row.content_value || "";
     }
 
-    const whatsapp =
-      config.contact_whatsapp || config.whatsapp_number || FALLBACK.whatsapp;
-    const telegram = config.contact_telegram || FALLBACK.telegram;
-    const telegramHandle = telegram.replace(/^@/, "");
-
-    return {
-      whatsapp,
-      email: config.contact_email || FALLBACK.email,
-      telegram: telegram.startsWith("@") ? telegram : `@${telegramHandle}`,
-      phone: config.contact_phone || FALLBACK.phone,
-      whatsappUrl: `https://wa.me/${whatsapp}`,
-      telegramUrl: `https://t.me/${telegramHandle}`,
-    };
+    return normalizeContactFromMap(config);
   } catch {
-    return { ...FALLBACK };
+    return { ...CONTACT_CONFIG_FALLBACK };
   }
 }

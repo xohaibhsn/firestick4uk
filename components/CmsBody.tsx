@@ -6,9 +6,9 @@ import { fixContentLinkRels } from "@/lib/seoLinks";
 const bodyXss = {
   whiteList: {
     h1: [],
-    h2: [],
-    h3: [],
-    h4: [],
+    h2: ["id"],
+    h3: ["id"],
+    h4: ["id"],
     p: ["style", "class"],
     strong: [],
     em: [],
@@ -21,7 +21,7 @@ const bodyXss = {
     br: [],
     hr: [],
     span: ["style", "class"],
-    div: ["style", "class"],
+    div: ["style", "class", "id"],
   } as Record<string, string[]>,
   stripIgnoreTag: true,
 };
