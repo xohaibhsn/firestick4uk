@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar";
 import HeroSlider from "@/components/HeroSlider";
 import Footer from "@/components/Footer";
 import { cms } from "@/lib/cms";
+import type { PublicProduct } from "@/lib/publicProductsServer";
 
 const cardDescXss = {
   whiteList: {
@@ -39,7 +40,7 @@ interface Product {
   description: string;
   short_description?: string | null;
   slug?: string | null;
-  price: number;
+  price: number | string;
   badge: string | null;
   image: string | null;
 }
@@ -49,6 +50,12 @@ interface HomeClientProps {
   topHeroSubtitle?: string;
   heroTitle?: string;
   heroSubtitle?: string;
+  initialProducts?: PublicProduct[];
+}
+
+function productDetailHref(p: Product): string {
+  if (p.slug) return `/products/${p.slug}`;
+  return `/products/${p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 }
 
 function formatHeroTitle(title: string) {
@@ -72,9 +79,10 @@ export default function HomeClient({
   topHeroSubtitle = "Premium Streaming Solutions for the UK",
   heroTitle = "Premium UK Streaming Service",
   heroSubtitle = "Firestick4UK provides premium UK streaming services for Firestick and Android Box users.",
+  initialProducts = [],
 }: HomeClientProps) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [loading, setLoading] = useState(initialProducts.length === 0);
   const [searchTerm, setSearchTerm] = useState("");
   const [hoveringId, setHoveringId] = useState<number | null>(null);
   const [slides, setSlides] = useState<string[]>([]);
@@ -107,10 +115,12 @@ export default function HomeClient({
   });
 
   useEffect(() => {
-    fetch('/api/products')
-      .then(res => res.json())
-      .then(data => { setProducts(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
+    if (initialProducts.length === 0) {
+      fetch('/api/products')
+        .then(res => res.json())
+        .then(data => { setProducts(Array.isArray(data) ? data : []); setLoading(false); })
+        .catch(() => setLoading(false));
+    }
     fetch('/api/sections?page=home')
       .then(r => r.json())
       .then(data => {
@@ -419,6 +429,8 @@ export default function HomeClient({
         .badge.bundle { background:#EA580C; color:#FFFFFF; }
         .product-info { padding:16px 18px; }
         .product-name { font-family:var(--font-display); font-size:15px; font-weight:700; letter-spacing:-0.01em; color:#111111; margin-bottom:6px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; word-break:break-word; }
+        a.product-name, a.product-image-link { text-decoration:none; color:inherit; display:block; }
+        a.product-image-link { position:relative; }
         .product-desc,.product-short-desc { font-family:var(--font-body); font-size:14px; font-weight:400; color:#374151; line-height:1.7; margin-bottom:14px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
         .product-short-desc p { margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:14px; color:#374151; font-family:var(--font-body); }
         .product-short-desc strong,.product-desc strong { font-weight:700; color:#333333; }
@@ -568,28 +580,32 @@ export default function HomeClient({
           ) : products.length === 0 ? (
             <div className="loading">{t("home_empty", "No products found.")}</div>
           ) : (
-            products.slice(0, 8).map((p) => (
-              <div className="product-card" key={p.id} style={{cursor:"pointer"}} onClick={()=>window.location.href=`/products/${p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`}>
-                <div className="product-image">
-                  {p.badge && (
-                    <span className={`badge ${p.badge==="BEST VALUE"?"gold":p.badge==="NEW"?"new":p.badge==="BUNDLE"?"bundle":""}`}>
-                      {p.badge}
-                    </span>
-                  )}
-                  {p.image ? (
-                    <img src={p.image} alt={p.name} />
-                  ) : (
-                    <div className="image-placeholder">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-                        <polyline points="21 15 16 10 5 21"/>
-                      </svg>
-                      <span>Product Image</span>
-                    </div>
-                  )}
-                </div>
+            products.slice(0, 8).map((p) => {
+              const href = productDetailHref(p);
+              return (
+              <div className="product-card" key={p.id}>
+                <a href={href} className="product-image-link">
+                  <div className="product-image">
+                    {p.badge && (
+                      <span className={`badge ${p.badge==="BEST VALUE"?"gold":p.badge==="NEW"?"new":p.badge==="BUNDLE"?"bundle":""}`}>
+                        {p.badge}
+                      </span>
+                    )}
+                    {p.image ? (
+                      <img src={p.image} alt={p.name} />
+                    ) : (
+                      <div className="image-placeholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
+                          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                          <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                        <span>Product Image</span>
+                      </div>
+                    )}
+                  </div>
+                </a>
                 <div className="product-info">
-                  <div className="product-name">{p.name}</div>
+                  <a href={href} className="product-name">{p.name}</a>
                   <div
                     className="product-short-desc"
                     dangerouslySetInnerHTML={{
@@ -626,7 +642,8 @@ export default function HomeClient({
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
 

@@ -5,6 +5,7 @@ import HomeClient from "./HomeClient";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import { defaultSocialImages } from "@/lib/socialMetadata";
 import { getDefaultOgImageFromSettings } from "@/lib/socialMetadataServer";
+import { getPublicActiveProducts } from "@/lib/publicProductsServer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -72,7 +73,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const content = await getHomeContent();
+  const [content, initialProducts] = await Promise.all([
+    getHomeContent(),
+    getPublicActiveProducts(),
+  ]);
 
   return (
     <>
@@ -94,6 +98,7 @@ export default async function HomePage() {
           content.home_hero_subtitle?.trim() ||
           "Firestick4UK provides premium UK streaming services for Firestick and Android Box users."
         }
+        initialProducts={initialProducts}
       />
     </>
   );
