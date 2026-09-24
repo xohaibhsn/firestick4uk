@@ -111,10 +111,10 @@ export default function RefundPolicyClient({
 
         <div className="summary-cards">
           {[
-            { icon: "📦", title: "Physical Products", text: "14-day return window from delivery date" },
-            { icon: "💻", title: "Subscription Plans", text: "7-day money back on 1 Year plans and above only" },
-            { icon: "⚠️", title: "Faulty Items", text: "Full refund or replacement at no cost" },
-            { icon: "🚚", title: "Return Postage", text: "Customer's responsibility unless item is faulty" },
+            { icon: "📦", title: "Physical Products", text: "Tell us within 14 days if you want to cancel; then return within 14 days" },
+            { icon: "💻", title: "Subscription Plans", text: "7-day money-back guarantee on 1 Year+ plans; statutory rights are unaffected" },
+            { icon: "⚠️", title: "Faulty Items", text: "Statutory remedies apply if goods are faulty or not as described" },
+            { icon: "🚚", title: "Return Postage", text: "Change-of-mind return postage is normally the customer's responsibility" },
           ].map((c, i) => (
             <div className="summary-card" key={i}>
               <span className="summary-card-icon">{c.icon}</span>
