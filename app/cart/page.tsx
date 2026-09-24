@@ -1,11 +1,29 @@
 "use client";
 export const dynamic = 'force-dynamic';
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useCart } from "../lib/cartContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useContactConfig } from "@/hooks/useContactConfig";
 import { useSiteContent } from "@/hooks/useSiteContent";
+import {
+  DIGITAL_SUPPLY_ACK_TEXT,
+  PHYSICAL_SHIPPING_GBP,
+  cartShippingPounds,
+  isDigitalProduct,
+} from "@/lib/productFulfilment";
+
+type ProductFacts = {
+  id: number;
+  name: string;
+  category?: string | null;
+  stock?: string | null;
+  active?: number | boolean;
+};
+
+const UNRESOLVED_CART_MSG =
+  "One or more items in your cart are no longer available. Please remove them and try again.";
 
 const navStyles = `
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -118,6 +136,13 @@ const navStyles = `
   .place-order-btn { width:100%; background:#5B21B6; color:#FFFFFF; border:none; padding:16px; border-radius:9px; font-size:15px; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; margin-top:10px; }
   .place-order-btn:hover { background:#4C1D95; transform:translateY(-1px); box-shadow:0 4px 14px rgba(91,33,182,0.35); }
   .place-order-btn:disabled { opacity:0.45; cursor:not-allowed; transform:none; }
+  .digital-ack { background:#FAFAFA; border:1px solid #E5E5E5; border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+  .digital-ack-row { display:flex; gap:12px; align-items:flex-start; }
+  .digital-ack input[type="checkbox"] { width:18px; height:18px; margin-top:2px; flex-shrink:0; accent-color:#5B21B6; }
+  .digital-ack label { font-size:13px; line-height:1.55; color:#333333; cursor:pointer; }
+  .digital-ack-links { margin-top:10px; font-size:12px; line-height:1.6; color:#666666; }
+  .digital-ack-links a { color:#5B21B6; text-decoration:underline; text-underline-offset:2px; }
+  .digital-ack-error { margin-top:8px; font-size:12px; color:#DC2626; }
 
   /* SUCCESS */
   .success-screen { max-width:600px; margin:60px auto; padding:0 24px 80px; text-align:center; }
@@ -166,6 +191,7 @@ export default function CartPage() {
   const { cart, removeFromCart, updateQty, clearCart, total } = useCart();
   const contact = useContactConfig();
   const { t } = useSiteContent();
+  const router = useRouter();
   const [step, setStep] = useState<Step>("cart");
   const [paymentMethod, setPaymentMethod] = useState<"bank" | "cod">("bank");
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -183,11 +209,120 @@ export default function CartPage() {
   const [couponError, setCouponError] = useState("");
   const [couponChecking, setCouponChecking] = useState(false);
 
-  const shipping = cart.some(i => i.name.toLowerCase().includes("plan")) ? 0 : cart.length > 0 ? 3.99 : 0;
+  const [productMap, setProductMap] = useState<Map<number, ProductFacts> | null>(null);
+  const [classificationLoading, setClassificationLoading] = useState(true);
+  const [classificationFetchError, setClassificationFetchError] = useState(false);
+  const [digitalSupplyAcknowledged, setDigitalSupplyAcknowledged] = useState(false);
+  const [ackError, setAckError] = useState("");
+  const digitalAckRef = useRef<HTMLInputElement | null>(null);
+  const digitalAckId = useId();
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/products")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : [];
+        const map = new Map<number, ProductFacts>();
+        for (const p of list) {
+          const id = Number(p?.id);
+          if (!Number.isInteger(id) || id <= 0) continue;
+          map.set(id, {
+            id,
+            name: String(p.name || ""),
+            category: p.category ?? null,
+            stock: p.stock ?? null,
+            active: p.active,
+          });
+        }
+        setProductMap(map);
+        setClassificationFetchError(false);
+        setClassificationLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setProductMap(null);
+        setClassificationFetchError(true);
+        setClassificationLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  let classification: {
+    ready: boolean;
+    error: string | null;
+    hasDigitalItems: boolean;
+    hasPhysicalItems: boolean;
+  };
+  if (classificationLoading) {
+    classification = {
+      ready: false,
+      error: null,
+      hasDigitalItems: false,
+      hasPhysicalItems: false,
+    };
+  } else if (classificationFetchError || !productMap) {
+    classification = {
+      ready: false,
+      error: UNRESOLVED_CART_MSG,
+      hasDigitalItems: false,
+      hasPhysicalItems: false,
+    };
+  } else if (cart.length === 0) {
+    classification = {
+      ready: true,
+      error: null,
+      hasDigitalItems: false,
+      hasPhysicalItems: false,
+    };
+  } else {
+    let hasDigitalItems = false;
+    let hasPhysicalItems = false;
+    let unresolved = false;
+    for (const item of cart) {
+      const facts = productMap.get(Number(item.id));
+      if (!facts) {
+        unresolved = true;
+        break;
+      }
+      if (isDigitalProduct(facts)) hasDigitalItems = true;
+      else hasPhysicalItems = true;
+    }
+    classification = unresolved
+      ? {
+          ready: false,
+          error: UNRESOLVED_CART_MSG,
+          hasDigitalItems: false,
+          hasPhysicalItems: false,
+        }
+      : {
+          ready: true,
+          error: null,
+          hasDigitalItems,
+          hasPhysicalItems,
+        };
+  }
+
+  const effectiveDigitalAck =
+    classification.hasDigitalItems && digitalSupplyAcknowledged;
+
+  const shipping =
+    cart.length === 0
+      ? 0
+      : classification.ready
+        ? cartShippingPounds({
+            cartLength: cart.length,
+            hasPhysicalItems: classification.hasPhysicalItems,
+          })
+        : PHYSICAL_SHIPPING_GBP;
   const subtotal = total;
   const vatAmount = Math.round(subtotal * 0.20 * 100) / 100;
   const discountAmount = couponApplied ? couponApplied.discount_amount : 0;
   const grandTotal = Math.round((subtotal + shipping + vatAmount - discountAmount) * 100) / 100;
+  const classificationBlocked = !classification.ready || !!classification.error;
 
   const applyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -200,8 +335,21 @@ export default function CartPage() {
 
   const handleOrder = async () => {
     if (cart.length === 0) return;
-    setPlacing(true);
     setOrderError("");
+    setAckError("");
+
+    if (classificationBlocked) {
+      setOrderError(classification.error || UNRESOLVED_CART_MSG);
+      return;
+    }
+
+    if (classification.hasDigitalItems && !effectiveDigitalAck) {
+      setAckError("Please confirm the digital supply acknowledgement before placing your order.");
+      digitalAckRef.current?.focus();
+      return;
+    }
+
+    setPlacing(true);
 
     try {
       let receiptPath = "";
@@ -245,6 +393,9 @@ export default function CartPage() {
           coupon_code: couponApplied?.code || null,
           discount_amount: discountAmount,
           vat_amount: vatAmount,
+          ...(classification.hasDigitalItems
+            ? { digital_supply_acknowledgement: true }
+            : {}),
         })
       });
 
@@ -284,13 +435,14 @@ export default function CartPage() {
         sessionStorage.setItem('orderSuccess', JSON.stringify({
           orderId: oid, items: cart, subtotal, shipping, vatAmount,
           discountAmount, grandTotal, couponApplied, form, paymentMethod, waMessage,
+          digitalSupplyAcknowledged: classification.hasDigitalItems,
         }));
         clearCart();
-        window.location.href = '/cart/success';
+        router.push("/cart/success");
       } else {
         setOrderError(data.error?.includes("connect") || data.error?.includes("timeout")
           ? t("cart_err_unavailable", "Our system is temporarily unavailable. Please try again in a moment.")
-          : t("cart_err_failed", "Order could not be placed. Please try again or contact us on WhatsApp or Telegram."));
+          : (data.error || t("cart_err_failed", "Order could not be placed. Please try again or contact us on WhatsApp or Telegram.")));
       }
     } catch {
       setOrderError(t("cart_err_network", "Network error. Please check your connection and try again."));
@@ -359,9 +511,16 @@ export default function CartPage() {
                 {couponApplied && <div style={{fontSize:12,color:"#00c864"}}>✅ {couponApplied.message} — Save £{discountAmount.toFixed(2)}</div>}
                 {couponError && <div style={{fontSize:12,color:"#ff6666"}}>❌ {couponError}</div>}
               </div>
-              <button className="checkout-btn" disabled={cart.length === 0} onClick={() => setStep("checkout")}>
-                {t("cart_checkout_btn", "Proceed to Checkout →")}
+              <button className="checkout-btn" disabled={cart.length === 0 || classificationBlocked} onClick={() => setStep("checkout")}>
+                {classificationLoading
+                  ? "Preparing checkout..."
+                  : t("cart_checkout_btn", "Proceed to Checkout →")}
               </button>
+              {classification.error && cart.length > 0 && (
+                <div style={{padding:"0 20px 16px",fontSize:12,color:"#DC2626",lineHeight:1.5}}>
+                  {classification.error}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -474,8 +633,40 @@ export default function CartPage() {
                     {t("cart_activation", "Subscription services are active within 1 hour of payment confirmation.")}
                   </div>
 
+                  {classification.hasDigitalItems && (
+                    <div className="digital-ack">
+                      <div className="digital-ack-row">
+                        <input
+                          ref={digitalAckRef}
+                          id={digitalAckId}
+                          type="checkbox"
+                          checked={digitalSupplyAcknowledged}
+                          onChange={(e) => {
+                            setDigitalSupplyAcknowledged(e.target.checked);
+                            if (e.target.checked) setAckError("");
+                          }}
+                        />
+                        <label htmlFor={digitalAckId}>{DIGITAL_SUPPLY_ACK_TEXT}</label>
+                      </div>
+                      <div className="digital-ack-links">
+                        <a href="/terms" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a>
+                        {" · "}
+                        <a href="/refund-policy" target="_blank" rel="noopener noreferrer">Refund Policy</a>
+                        {" · "}
+                        <a href="/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                      </div>
+                      {ackError ? <div className="digital-ack-error">{ackError}</div> : null}
+                    </div>
+                  )}
+
+                  {classification.error && (
+                    <div style={{marginBottom:"12px",fontSize:"13px",color:"#DC2626",lineHeight:1.5}}>
+                      {classification.error}
+                    </div>
+                  )}
+
                   <button className="place-order-btn"
-                    disabled={placing || cart.length === 0}
+                    disabled={placing || cart.length === 0 || classificationBlocked}
                     onClick={handleOrder}>
                     {placing ? t("cart_placing", "Placing Order...") : t("cart_place_order", "Place Order →")}
                   </button>
