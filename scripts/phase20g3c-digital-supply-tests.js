@@ -200,13 +200,17 @@ ok(
 );
 ok(
   "customer_email_fire_and_forget",
-  /Customer digital confirmation email failed/.test(orders) &&
+  (/Customer order confirmation email failed/.test(orders) ||
+    /Customer digital confirmation email failed/.test(orders)) &&
     /\.catch\(/.test(orders)
 );
 ok(
   "email_failure_after_insert",
   orders.indexOf("INSERT INTO orders") <
-    orders.indexOf("Customer digital confirmation")
+    Math.max(
+      orders.indexOf("Customer order confirmation"),
+      orders.indexOf("Customer digital confirmation")
+    )
 );
 ok("escape_html_used", /escapeHtml/.test(orders));
 ok(

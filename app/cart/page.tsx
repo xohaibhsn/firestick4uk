@@ -140,9 +140,9 @@ const navStyles = `
   .digital-ack-row { display:flex; gap:12px; align-items:flex-start; }
   .digital-ack input[type="checkbox"] { width:18px; height:18px; margin-top:2px; flex-shrink:0; accent-color:#5B21B6; }
   .digital-ack label { font-size:13px; line-height:1.55; color:#333333; cursor:pointer; }
-  .digital-ack-links { margin-top:10px; font-size:12px; line-height:1.6; color:#666666; }
-  .digital-ack-links a { color:#5B21B6; text-decoration:underline; text-underline-offset:2px; }
   .digital-ack-error { margin-top:8px; font-size:12px; color:#DC2626; }
+  .checkout-policy-links { font-size:12px; line-height:1.6; color:#666666; margin:0 0 14px; }
+  .checkout-policy-links a { color:#5B21B6; text-decoration:underline; text-underline-offset:2px; }
 
   /* SUCCESS */
   .success-screen { max-width:600px; margin:60px auto; padding:0 24px 80px; text-align:center; }
@@ -648,13 +648,6 @@ export default function CartPage() {
                         />
                         <label htmlFor={digitalAckId}>{DIGITAL_SUPPLY_ACK_TEXT}</label>
                       </div>
-                      <div className="digital-ack-links">
-                        <a href="/terms" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a>
-                        {" · "}
-                        <a href="/refund-policy" target="_blank" rel="noopener noreferrer">Refund Policy</a>
-                        {" · "}
-                        <a href="/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
-                      </div>
                       {ackError ? <div className="digital-ack-error">{ackError}</div> : null}
                     </div>
                   )}
@@ -664,6 +657,15 @@ export default function CartPage() {
                       {classification.error}
                     </div>
                   )}
+
+                  <p className="checkout-policy-links">
+                    Please review our{" "}
+                    <a href="/terms" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a>,{" "}
+                    <a href="/refund-policy" target="_blank" rel="noopener noreferrer">Refund Policy</a>
+                    {" "}and{" "}
+                    <a href="/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                    {" "}before placing your order.
+                  </p>
 
                   <button className="place-order-btn"
                     disabled={placing || cart.length === 0 || classificationBlocked}

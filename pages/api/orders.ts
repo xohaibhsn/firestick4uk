@@ -162,8 +162,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         html,
       }).catch((err: any) => console.error('[orders] Email notification failed:', err));
 
-      // Customer digital confirmation — fire-and-forget; must not fail the order
-      if (hasDigital && customer_email) {
+      // Customer order confirmation — fire-and-forget; must not fail the order
+      if (customer_email) {
         const safeName = escapeHtml(String(customer_name || ''));
         const safeOrderId = escapeHtml(String(order_id));
         const safePayment =
@@ -183,6 +183,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             </tr>`;
           })
           .join('');
+
+        const digitalSection = hasDigital
+          ? `<p style="color:#333;font-size:14px;line-height:1.6;margin:0 0 14px">Subscription services are active within 1 hour of payment confirmation.</p>
+    <p style="color:#333;font-size:14px;line-height:1.65;margin:0 0 14px">You requested your digital subscription to begin as soon as possible after payment confirmation, before the 14-day cancellation period ends, and acknowledged that once digital supply begins you will lose the 14-day cancellation right for that digital content.</p>
+    <p style="color:#333;font-size:14px;line-height:1.65;margin:0 0 18px">This does not affect your statutory rights if the digital content is faulty, not as described, or otherwise does not conform to the contract.</p>`
+          : '';
 
         const customerHtml = `<!DOCTYPE html><html><body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f5f5f5">
 <div style="max-width:620px;margin:30px auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e5e5">
@@ -208,9 +214,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       </tr></thead>
       <tbody>${customerItemRows}</tbody>
     </table>
-    <p style="color:#333;font-size:14px;line-height:1.6;margin:0 0 14px">Subscription services are active within 1 hour of payment confirmation.</p>
-    <p style="color:#333;font-size:14px;line-height:1.65;margin:0 0 14px">You requested your digital subscription to begin as soon as possible after payment confirmation, before the 14-day cancellation period ends, and acknowledged that once digital supply begins you will lose the 14-day cancellation right for that digital content.</p>
-    <p style="color:#333;font-size:14px;line-height:1.65;margin:0 0 18px">This does not affect your statutory rights if the digital content is faulty, not as described, or otherwise does not conform to the contract.</p>
+    ${digitalSection}
     <p style="color:#555;font-size:13px;line-height:1.7;margin:0">
       <a href="https://firestick4uk.com/terms" style="color:#5B21B6">Terms &amp; Conditions</a> ·
       <a href="https://firestick4uk.com/refund-policy" style="color:#5B21B6">Refund Policy</a> ·
@@ -230,7 +234,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             html: customerHtml,
           })
           .catch((err: any) =>
-            console.error('[orders] Customer digital confirmation email failed:', err)
+            console.error('[orders] Customer order confirmation email failed:', err)
           );
       }
     }
