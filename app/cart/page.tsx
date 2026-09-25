@@ -403,7 +403,46 @@ export default function CartPage() {
       if (data.order_id) {
         const oid = data.order_id;
 
-        const itemsList = cart.map(i => `• ${i.name} x${i.qty} — £${(i.price * i.qty).toFixed(2)}`).join('\n');
+        // After success, server pricing/items are authoritative (ignore client/tampered figures).
+        const serverItems: { id: number; name: string; price: number; qty: number }[] =
+          Array.isArray(data.items) && data.items.length
+            ? data.items.map((i: any) => ({
+                id: Number(i.id),
+                name: String(i.name),
+                price: Number(i.price),
+                qty: Number(i.qty),
+              }))
+            : cart.map((i) => ({
+                id: i.id,
+                name: i.name,
+                price: i.price,
+                qty: i.qty,
+              }));
+        const p = data.pricing || {};
+        const authSubtotal = Number.isFinite(Number(p.subtotal)) ? Number(p.subtotal) : subtotal;
+        const authShipping = Number.isFinite(Number(p.shipping)) ? Number(p.shipping) : shipping;
+        const authVat = Number.isFinite(Number(p.vat_amount)) ? Number(p.vat_amount) : vatAmount;
+        const authDiscount = Number.isFinite(Number(p.discount_amount))
+          ? Number(p.discount_amount)
+          : discountAmount;
+        const authTotal = Number.isFinite(Number(p.total)) ? Number(p.total) : grandTotal;
+        const authCouponCode =
+          typeof p.coupon_code === "string" && p.coupon_code
+            ? p.coupon_code
+            : couponApplied?.code || null;
+        const authCouponApplied = authCouponCode
+          ? {
+              code: authCouponCode,
+              type: couponApplied?.type || "",
+              value: couponApplied?.value ?? 0,
+              discount_amount: authDiscount,
+              message: couponApplied?.message || "",
+            }
+          : null;
+
+        const itemsList = serverItems
+          .map((i) => `• ${i.name} x${i.qty} — £${(i.price * i.qty).toFixed(2)}`)
+          .join("\n");
         const fullAddress = [form.address, form.city, form.postcode].filter(Boolean).join(', ');
         const waMessage = [
           '🛍️ *NEW ORDER — firestick4uk.com*',
@@ -418,11 +457,11 @@ export default function CartPage() {
           '🛒 *Items:*',
           itemsList,
           '',
-          `💰 *Subtotal:* £${subtotal.toFixed(2)}`,
-          `🚚 *Shipping:* ${shipping === 0 ? 'Free' : '£' + shipping.toFixed(2)}`,
-          `🧾 *VAT (20%):* £${vatAmount.toFixed(2)}`,
-          couponApplied ? `🎟️ *Discount (${couponApplied.code}):* -£${discountAmount.toFixed(2)}` : null,
-          `💵 *Total: £${grandTotal.toFixed(2)}*`,
+          `💰 *Subtotal:* £${authSubtotal.toFixed(2)}`,
+          `🚚 *Shipping:* ${authShipping === 0 ? 'Free' : '£' + authShipping.toFixed(2)}`,
+          `🧾 *VAT (20%):* £${authVat.toFixed(2)}`,
+          authCouponApplied ? `🎟️ *Discount (${authCouponApplied.code}):* -£${authDiscount.toFixed(2)}` : null,
+          `💵 *Total: £${authTotal.toFixed(2)}*`,
           '',
           `💳 *Payment:* ${paymentMethod === 'bank' ? 'Bank Transfer' : 'Cash on Delivery'}`,
           paymentMethod === 'bank' && receiptPath ? '✅ Payment receipt uploaded' : '',
@@ -433,8 +472,8 @@ export default function CartPage() {
         ].filter(Boolean).join('\n');
 
         sessionStorage.setItem('orderSuccess', JSON.stringify({
-          orderId: oid, items: cart, subtotal, shipping, vatAmount,
-          discountAmount, grandTotal, couponApplied, form, paymentMethod, waMessage,
+          orderId: oid, items: serverItems, subtotal: authSubtotal, shipping: authShipping, vatAmount: authVat,
+          discountAmount: authDiscount, grandTotal: authTotal, couponApplied: authCouponApplied, form, paymentMethod, waMessage,
           digitalSupplyAcknowledged: classification.hasDigitalItems,
         }));
         clearCart();

@@ -3,6 +3,10 @@ import { RL_GENERAL, getClientIp } from '../../lib/rateLimit';
 import pool from '../../lib/db';
 import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
+import {
+  calculateCouponDiscount,
+  normalizeCouponCode,
+} from '../../lib/orderPricing';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { allowed } = RL_GENERAL(getClientIp(req));
@@ -16,9 +20,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { code, cart_total } = req.body;
       if (!code) return res.status(400).json({ valid:false, message:"Please enter a coupon code" });
 
+      const normalized = normalizeCouponCode(code);
       const [rows]: any = await pool.query(
         'SELECT * FROM coupons WHERE code=? AND is_active=1',
-        [String(code).toUpperCase().trim()]
+        [normalized]
       );
 
       if (!rows.length) return res.status(200).json({ valid:false, message:"Invalid coupon code" });
@@ -28,13 +33,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (c.usage_limit !== null && c.used_count >= c.usage_limit) return res.status(200).json({ valid:false, message:"Coupon usage limit reached" });
       if (cart_total < Number(c.minimum_order)) return res.status(200).json({ valid:false, message:`Minimum order £${Number(c.minimum_order).toFixed(2)} required` });
 
-      const discount = c.type === 'percentage'
-        ? Math.min(Number(cart_total) * Number(c.value) / 100, Number(cart_total))
-        : Math.min(Number(c.value), Number(cart_total));
+      const discount_amount = calculateCouponDiscount({
+        type: c.type,
+        value: Number(c.value),
+        cartTotal: Number(cart_total),
+      });
 
       return res.status(200).json({
         valid: true, code: c.code, type: c.type, value: Number(c.value),
-        discount_amount: Math.round(discount * 100) / 100,
+        discount_amount,
         message: `✅ ${c.code} applied!`,
       });
     }
