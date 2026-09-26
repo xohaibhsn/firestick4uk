@@ -7,7 +7,7 @@ import { useCart } from "./lib/cartContext";
 import Navbar from "@/components/Navbar";
 import HeroSlider from "@/components/HeroSlider";
 import Footer from "@/components/Footer";
-import { cms } from "@/lib/cms";
+import { useSiteContent } from "@/hooks/useSiteContent";
 import type { PublicProduct } from "@/lib/publicProductsServer";
 
 const cardDescXss = {
@@ -87,7 +87,7 @@ export default function HomeClient({
   const [hoveringId, setHoveringId] = useState<number | null>(null);
   const [slides, setSlides] = useState<string[]>([]);
   const [featureList, setFeatureList] = useState<string[]>([]);
-  const [cmsData, setCmsData] = useState<Record<string, string>>({});
+  const { sc: cmsData, t } = useSiteContent();
   const [featuresHtml, setFeaturesHtml] = useState("");
   const [heroBtns, setHeroBtns] = useState({
     primaryText: "Shop Now",
@@ -100,7 +100,6 @@ export default function HomeClient({
   const [heroStats, setHeroStats] = useState<{ num: string; label: string }[]>([]);
   const { addToCart, removeFromCart, cart } = useCart();
 
-  const t = (key: string, fallback = "") => cms(cmsData, key, fallback);
   const handleSearch = () => {
     const q = searchTerm.trim();
     if (q) window.location.href = `/products?q=${encodeURIComponent(q)}`;
@@ -131,57 +130,54 @@ export default function HomeClient({
         }
       })
       .catch(() => {});
-    fetch('/api/site-content?page=all')
-      .then(r => r.json())
-      .then(data => {
-        if (!data || typeof data !== 'object') return;
-        setCmsData(data);
-        const slideUrls = [
-          data.hero_slide_1,
-          data.hero_slide_2,
-          data.hero_slide_3,
-          data.hero_slide_4,
-        ].filter((u): u is string => typeof u === 'string' && !!u.trim());
-        setSlides(slideUrls);
-        if (typeof data.home_features_list === 'string' && data.home_features_list.trim()) {
-          const raw = data.home_features_list.trim();
-          if (looksLikeHtml(raw)) {
-            setFeaturesHtml(raw);
-            setFeatureList([]);
-          } else {
-            const items = raw
-              .split(/\r?\n/)
-              .map((s: string) => s.trim())
-              .filter(Boolean);
-            if (items.length) {
-              setFeatureList(items);
-              setFeaturesHtml(plainLinesToListHtml(raw));
-            }
-          }
+  }, [initialProducts.length]);
+
+  useEffect(() => {
+    if (!cmsData || typeof cmsData !== "object") return;
+    const data = cmsData;
+    const slideUrls = [
+      data.hero_slide_1,
+      data.hero_slide_2,
+      data.hero_slide_3,
+      data.hero_slide_4,
+    ].filter((u): u is string => typeof u === "string" && !!u.trim());
+    setSlides(slideUrls);
+    if (typeof data.home_features_list === "string" && data.home_features_list.trim()) {
+      const raw = data.home_features_list.trim();
+      if (looksLikeHtml(raw)) {
+        setFeaturesHtml(raw);
+        setFeatureList([]);
+      } else {
+        const items = raw
+          .split(/\r?\n/)
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+        if (items.length) {
+          setFeatureList(items);
+          setFeaturesHtml(plainLinesToListHtml(raw));
         }
-        setHeroBtns({
-          primaryText: (data.home_hero_btn_text || "").trim() || "Shop Now",
-          primaryLink: (data.home_hero_btn_link || "").trim() || "/products",
-          primaryShow: data.home_hero_btn_show !== "0",
-          secondaryText: (data.home_hero_btn2_text || "").trim() || "Learn More",
-          secondaryLink: (data.home_hero_btn2_link || "").trim() || "/about",
-          secondaryShow: data.home_hero_btn2_show !== "0",
-        });
-        const nextStats: { num: string; label: string }[] = [];
-        const s1n = (data.home_stat1_num || "").trim();
-        const s1l = (data.home_stat1_label || "").trim();
-        if (s1n && s1l) nextStats.push({ num: s1n, label: s1l });
-        const s2n = (data.home_stat2_num || "").trim();
-        const s2l = (data.home_stat2_label || "").trim();
-        if (s2n && s2l) nextStats.push({ num: s2n, label: s2l });
-        const s3n = (data.home_stat3_num || "").trim();
-        const s3l = (data.home_stat3_label || "").trim();
-        if (s3n && s3l) nextStats.push({ num: s3n, label: s3l });
-        setHeroStats(nextStats);
-      })
-      .catch(() => {});
-    return () => {};
-  }, []);
+      }
+    }
+    setHeroBtns({
+      primaryText: (data.home_hero_btn_text || "").trim() || "Shop Now",
+      primaryLink: (data.home_hero_btn_link || "").trim() || "/products",
+      primaryShow: data.home_hero_btn_show !== "0",
+      secondaryText: (data.home_hero_btn2_text || "").trim() || "Learn More",
+      secondaryLink: (data.home_hero_btn2_link || "").trim() || "/about",
+      secondaryShow: data.home_hero_btn2_show !== "0",
+    });
+    const nextStats: { num: string; label: string }[] = [];
+    const s1n = (data.home_stat1_num || "").trim();
+    const s1l = (data.home_stat1_label || "").trim();
+    if (s1n && s1l) nextStats.push({ num: s1n, label: s1l });
+    const s2n = (data.home_stat2_num || "").trim();
+    const s2l = (data.home_stat2_label || "").trim();
+    if (s2n && s2l) nextStats.push({ num: s2n, label: s2l });
+    const s3n = (data.home_stat3_num || "").trim();
+    const s3l = (data.home_stat3_label || "").trim();
+    if (s3n && s3l) nextStats.push({ num: s3n, label: s3l });
+    setHeroStats(nextStats);
+  }, [cmsData]);
 
   const handleAddToCart = (p: Product) => {
     addToCart({ id: p.id, name: p.name, price: Number(p.price), qty: 1 });

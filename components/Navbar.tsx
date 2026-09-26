@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 export interface NavbarProps {
   logoUrl?: string;
@@ -12,6 +13,19 @@ export interface NavbarProps {
   children?: ReactNode;
 }
 
+function normalizeSubscriptionSlug(raw: string): string {
+  return (
+    String(raw || "iptv-subscriptions-uk")
+      .trim()
+      .toLowerCase()
+      .replace(/^\/+|\/+$/g, "")
+      .replace(/[\s_]+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "") || "iptv-subscriptions-uk"
+  );
+}
+
 export default function Navbar({
   logoUrl,
   cartCount = 0,
@@ -19,48 +33,37 @@ export default function Navbar({
   shopHref = "/products",
   children,
 }: NavbarProps) {
+  const { sc } = useSiteContent();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logo, setLogo] = useState(logoUrl || "");
-  const [labels, setLabels] = useState({
-    alt: "Firestick4UK",
-    text: "FIRESTICK4UK",
-    cart: "Cart",
-    shop: "Shop Now",
-    subscription: "IPTV Subscription",
-    subscriptionHref: "/iptv-subscriptions-uk",
-  });
+
+  const labels = useMemo(() => {
+    const slug = normalizeSubscriptionSlug(
+      String(sc.subscription_slug || "iptv-subscriptions-uk")
+    );
+    return {
+      alt:
+        (sc.nav_logo_alt || sc.site_title || "Firestick4UK").trim() ||
+        "Firestick4UK",
+      text:
+        (sc.nav_logo_text || sc.site_title || "FIRESTICK4UK").trim() ||
+        "FIRESTICK4UK",
+      cart: (sc.nav_cart_label || "Cart").trim() || "Cart",
+      shop: (sc.nav_shop_label || "Shop Now").trim() || "Shop Now",
+      subscription:
+        (sc.nav_subscription_label || "IPTV Subscription").trim() ||
+        "IPTV Subscription",
+      subscriptionHref: `/${slug}`,
+    };
+  }, [sc]);
 
   useEffect(() => {
-    fetch("/api/site-content?page=all")
-      .then((r) => r.json())
-      .then((d) => {
-        if (!d || typeof d !== "object") return;
-        if (logoUrl === undefined && d.site_logo_url) setLogo(String(d.site_logo_url));
-        const slug =
-          String(d.subscription_slug || "iptv-subscriptions-uk")
-            .trim()
-            .toLowerCase()
-            .replace(/^\/+|\/+$/g, "")
-            .replace(/[\s_]+/g, "-")
-            .replace(/[^a-z0-9-]/g, "")
-            .replace(/-+/g, "-")
-            .replace(/^-+|-+$/g, "") || "iptv-subscriptions-uk";
-        setLabels({
-          alt: (d.nav_logo_alt || d.site_title || "Firestick4UK").trim() || "Firestick4UK",
-          text: (d.nav_logo_text || d.site_title || "FIRESTICK4UK").trim() || "FIRESTICK4UK",
-          cart: (d.nav_cart_label || "Cart").trim() || "Cart",
-          shop: (d.nav_shop_label || "Shop Now").trim() || "Shop Now",
-          subscription:
-            (d.nav_subscription_label || "IPTV Subscription").trim() || "IPTV Subscription",
-          subscriptionHref: `/${slug}`,
-        });
-      })
-      .catch(() => {});
-  }, [logoUrl]);
-
-  useEffect(() => {
-    if (logoUrl !== undefined) setLogo(logoUrl || "");
-  }, [logoUrl]);
+    if (logoUrl !== undefined) {
+      setLogo(logoUrl || "");
+      return;
+    }
+    if (sc.site_logo_url) setLogo(String(sc.site_logo_url));
+  }, [logoUrl, sc.site_logo_url]);
 
   const close = () => setMenuOpen(false);
 

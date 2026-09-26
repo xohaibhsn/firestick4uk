@@ -5,6 +5,7 @@ import { CartProvider } from "./lib/cartContext";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import TrackingConsent from "@/components/TrackingConsent";
 import JsonLd from "@/components/JsonLd";
+import { SiteContentProvider } from "@/components/SiteContentProvider";
 import { getContactConfig } from "@/lib/contact-config";
 import {
   defaultSocialImages,
@@ -170,12 +171,14 @@ export default async function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <JsonLd data={organizationLd} />
-        <CartProvider>{children}</CartProvider>
-        <TrackingConsent />
-        {/* BERLIN TEMPORARILY HIDDEN
-        <ChatWidget />
-        */}
-        <WhatsAppButton />
+        <SiteContentProvider>
+          <CartProvider>{children}</CartProvider>
+          <TrackingConsent />
+          {/* BERLIN TEMPORARILY HIDDEN
+          <ChatWidget />
+          */}
+          <WhatsAppButton />
+        </SiteContentProvider>
       </body>
     </html>
   );

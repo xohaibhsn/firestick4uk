@@ -1,11 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
 import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
 import { looksLikeHtml } from "@/lib/contentHtml";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { cms, cmsJson } from "@/lib/cms";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 const richXss = {
   whiteList: {
@@ -161,17 +160,12 @@ const styles = `
 `;
 
 export default function AboutPage() {
-  const [sc, setSc] = useState<Record<string,string>>({});
+  const { sc, t, j } = useSiteContent();
 
-  useEffect(() => {
-    fetch("/api/site-content?page=all").then(r=>r.json()).then(d=>{ if(d&&typeof d==="object") setSc(d); }).catch(()=>{});
-  }, []);
-
-  const t = (key: string, fallback = "") => cms(sc, key, fallback);
-  const stats = cmsJson(sc, "about_stats_json", []);
-  const points = cmsJson(sc, "about_points_json", []);
-  const values = cmsJson(sc, "about_values_json", []);
-  const timeline = cmsJson(sc, "about_timeline_json", []);
+  const stats = j<any[]>("about_stats_json", []);
+  const points = j<any[]>("about_points_json", []);
+  const values = j<any[]>("about_values_json", []);
+  const timeline = j<any[]>("about_timeline_json", []);
 
   return (
     <>

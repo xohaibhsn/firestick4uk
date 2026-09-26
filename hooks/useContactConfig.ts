@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useSiteContentContext } from "@/components/SiteContentProvider";
 import {
   CONTACT_CONFIG_FALLBACK,
   normalizeContactFromMap,
@@ -9,22 +10,18 @@ import {
 
 export type ContactConfigClient = ContactConfig;
 
+/**
+ * Contact config from shared public CMS map (no independent page=all fetch).
+ */
 export function useContactConfig(
   initial?: ContactConfig | null
 ): ContactConfigClient {
-  const [config, setConfig] = useState<ContactConfigClient>(
-    initial || CONTACT_CONFIG_FALLBACK
-  );
+  const { sc, loaded } = useSiteContentContext();
 
-  useEffect(() => {
-    fetch("/api/site-content?page=all")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data || typeof data !== "object") return;
-        setConfig(normalizeContactFromMap(data as Record<string, string>));
-      })
-      .catch(() => {});
-  }, []);
-
-  return config;
+  return useMemo(() => {
+    if (!loaded) {
+      return initial || CONTACT_CONFIG_FALLBACK;
+    }
+    return normalizeContactFromMap(sc);
+  }, [sc, loaded, initial]);
 }

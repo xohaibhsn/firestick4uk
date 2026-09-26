@@ -1,26 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 export default function WhatsAppButton() {
-  const [config, setConfig] = useState({
-    number: "447518787653",
-    iconUrl: "",
-    title: "Chat on WhatsApp",
-  });
+  const { sc } = useSiteContent();
 
-  useEffect(() => {
-    fetch("/api/site-content?page=all")
-      .then((r) => r.json())
-      .then((data) => {
-        setConfig({
-          number: data.contact_whatsapp || data.whatsapp_number || "447518787653",
-          iconUrl: data.whatsapp_icon_url || "",
-          title: (data.wa_chat_title || "Chat on WhatsApp").trim() || "Chat on WhatsApp",
-        });
-      })
-      .catch(() => {});
-  }, []);
+  const config = useMemo(
+    () => ({
+      number:
+        sc.contact_whatsapp || sc.whatsapp_number || "447518787653",
+      iconUrl: sc.whatsapp_icon_url || "",
+      title:
+        (sc.wa_chat_title || "Chat on WhatsApp").trim() || "Chat on WhatsApp",
+    }),
+    [sc]
+  );
 
   const whatsappUrl = `https://wa.me/${config.number}`;
 
