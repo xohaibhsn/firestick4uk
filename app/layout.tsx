@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import "./globals.css";
 import { CartProvider } from "./lib/cartContext";
 // import ChatWidget from "@/components/ChatWidget"; // BERLIN TEMPORARILY HIDDEN
@@ -12,7 +13,8 @@ import {
   resolveDefaultOgImage,
 } from "@/lib/socialMetadata";
 
-async function getSiteSettings(): Promise<Record<string, string>> {
+/** Request-scoped: metadata + RootLayout share one settings SELECT. */
+const getSiteSettings = cache(async (): Promise<Record<string, string>> => {
   try {
     const pool = (await import("../lib/db")).default;
     // Fetch settings page + asset keys explicitly (never mix keys)
@@ -32,7 +34,7 @@ async function getSiteSettings(): Promise<Record<string, string>> {
   } catch {
     return {};
   }
-}
+});
 
 /** Favicon-only: intentional cache bust. Do not use for OG/twitter images. */
 function withCacheBust(url: string): string {

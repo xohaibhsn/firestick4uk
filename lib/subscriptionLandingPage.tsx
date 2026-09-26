@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { connection } from "next/server";
 import pool from "@/lib/db";
 import { getContactConfig } from "@/lib/contact-config";
@@ -39,7 +40,8 @@ type FaqRow = {
   is_visible?: number;
 };
 
-async function getSubscriptionContent(): Promise<SiteMap> {
+/** Request-scoped: metadata + render share one subscription content SELECT. */
+const getSubscriptionContent = cache(async (): Promise<SiteMap> => {
   await connection();
   try {
     const [rows]: any = await pool.query(
@@ -55,7 +57,7 @@ async function getSubscriptionContent(): Promise<SiteMap> {
   } catch {
     return {};
   }
-}
+});
 
 function parseIdList(raw: string): number[] {
   try {

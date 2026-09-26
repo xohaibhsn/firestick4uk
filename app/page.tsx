@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { connection } from "next/server";
 import pool from "@/lib/db";
 import HomeClient from "./HomeClient";
@@ -10,7 +11,8 @@ import { getPublicActiveProducts } from "@/lib/publicProductsServer";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-async function getHomeContent(): Promise<Record<string, string>> {
+/** Request-scoped: generateMetadata + HomePage share one home content SELECT. */
+const getHomeContent = cache(async (): Promise<Record<string, string>> => {
   await connection();
   try {
     const [rows]: any = await pool.query(
@@ -33,7 +35,7 @@ async function getHomeContent(): Promise<Record<string, string>> {
   } catch {
     return {};
   }
-}
+});
 
 export async function generateMetadata(): Promise<Metadata> {
   const content = await getHomeContent();

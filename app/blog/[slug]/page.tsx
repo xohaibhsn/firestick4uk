@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import BlogPostClient from "./BlogPostClient";
 import pool from "../../../lib/db";
@@ -18,7 +19,8 @@ interface Post {
   faqs: Array<{question:string;answer:string}> | string | null;
 }
 
-async function getPost(slug: string): Promise<Post | null> {
+/** Request-scoped: generateMetadata + page share one post SELECT. */
+const getPost = cache(async (slug: string): Promise<Post | null> => {
   try {
     const [rows]: any = await pool.query(
       'SELECT * FROM blog_posts WHERE slug = ? AND status = "published" AND active = 1 LIMIT 1',
@@ -28,7 +30,7 @@ async function getPost(slug: string): Promise<Post | null> {
   } catch {
     return null;
   }
-}
+});
 
 function stripHtml(html: string): string {
   return html

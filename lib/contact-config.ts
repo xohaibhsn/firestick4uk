@@ -1,3 +1,4 @@
+import { cache } from "react";
 import pool from "@/lib/db";
 import {
   CONTACT_CONFIG_FALLBACK,
@@ -8,7 +9,8 @@ import {
 export type { ContactConfig };
 export { CONTACT_CONFIG_FALLBACK, normalizeContactFromMap };
 
-export async function getContactConfig(): Promise<ContactConfig> {
+/** Request-scoped: RootLayout + page helpers share one contact SELECT. */
+export const getContactConfig = cache(async (): Promise<ContactConfig> => {
   try {
     const [rows]: any = await pool.query(
       `SELECT content_key, content_value
@@ -31,4 +33,4 @@ export async function getContactConfig(): Promise<ContactConfig> {
   } catch {
     return { ...CONTACT_CONFIG_FALLBACK };
   }
-}
+});
