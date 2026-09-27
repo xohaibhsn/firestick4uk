@@ -247,15 +247,23 @@ ok(
 ok("normalize_coupon_upper", normalizeCouponCode("  save10 ") === "SAVE10");
 ok(
   "orders_validates_coupon_server_side",
-  /SELECT \* FROM coupons WHERE code=\? AND is_active=1/.test(orders) &&
-    /Coupon has expired/.test(orders) &&
-    /Coupon usage limit reached/.test(orders) &&
-    /Minimum order/.test(orders) &&
+  /SELECT \* FROM coupons WHERE code=\? AND is_active=1 LIMIT 1 FOR UPDATE/.test(orders) &&
+    /evaluateLockedCoupon/.test(orders) &&
     /Invalid coupon code/.test(orders)
 );
 ok(
   "orders_400_on_invalid_coupon_before_insert",
   orders.indexOf("Invalid coupon code") < orders.indexOf("INSERT INTO orders")
+);
+ok(
+  "coupon_lock_after_begin_transaction",
+  orders.indexOf("beginTransaction") < orders.indexOf("FOR UPDATE") &&
+    orders.indexOf("FOR UPDATE") < orders.indexOf("INSERT INTO orders")
+);
+ok(
+  "coupon_increment_uses_conn_not_pool",
+  /conn\.query\(\s*['"]UPDATE coupons SET used_count/.test(orders) &&
+    !/pool\.query\(\s*['"]UPDATE coupons SET used_count/.test(orders)
 );
 ok(
   "coupons_api_uses_shared_math",

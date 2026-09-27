@@ -105,3 +105,50 @@ export function calculateGrandTotal(opts: {
   );
   return total < 0 ? 0 : total;
 }
+
+export type LockedCouponRow = {
+  code: string;
+  type: CouponType;
+  value: number | string;
+  minimum_order: number | string;
+  usage_limit: number | string | null;
+  used_count: number | string;
+  expires_at?: string | Date | null;
+};
+
+/**
+ * Validate a coupon row already locked with SELECT ... FOR UPDATE.
+ * Pure: no DB. Preserves existing orders.ts business error messages.
+ */
+export function evaluateLockedCoupon(opts: {
+  coupon: LockedCouponRow;
+  cartTotalForCoupon: number;
+  now?: Date;
+}):
+  | { ok: true; code: string; discountAmount: number }
+  | { ok: false; error: string } {
+  const c = opts.coupon;
+  const now = opts.now ?? new Date();
+  if (c.expires_at && new Date(c.expires_at) < now) {
+    return { ok: false, error: "Coupon has expired." };
+  }
+  if (c.usage_limit !== null && Number(c.used_count) >= Number(c.usage_limit)) {
+    return { ok: false, error: "Coupon usage limit reached." };
+  }
+  const cartTotalForCoupon = roundMoney(Number(opts.cartTotalForCoupon));
+  if (cartTotalForCoupon < Number(c.minimum_order)) {
+    return {
+      ok: false,
+      error: `Minimum order £${Number(c.minimum_order).toFixed(2)} required.`,
+    };
+  }
+  const discountAmount = calculateCouponDiscount({
+    type: c.type,
+    value: Number(c.value),
+    cartTotal: cartTotalForCoupon,
+  });
+  if (!Number.isFinite(discountAmount) || discountAmount < 0) {
+    return { ok: false, error: "Unable to apply coupon." };
+  }
+  return { ok: true, code: String(c.code), discountAmount };
+}

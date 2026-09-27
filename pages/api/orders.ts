@@ -10,8 +10,8 @@ import {
 } from '../../lib/productFulfilment';
 import {
   calculateAuthoritativePricing,
-  calculateCouponDiscount,
   calculateGrandTotal,
+  evaluateLockedCoupon,
   isFiniteNonNegativeMoney,
   normalizeCouponCode,
   parseOrderQuantity,
@@ -29,6 +29,16 @@ type DbProduct = {
 };
 
 const ALLOWED_PAYMENT_METHODS = new Set(['bank', 'cod']);
+
+/** Coupon/order validation failures that must roll back an open transaction. */
+class OrderValidationError extends Error {
+  status: number;
+  constructor(message: string, status = 400) {
+    super(message);
+    this.name = 'OrderValidationError';
+    this.status = status;
+  }
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -127,47 +137,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { subtotal, shipping, vatAmount } = calculateAuthoritativePricing(authoritativeItems);
 
-    let validatedCouponCode: string | null = null;
-    let discountAmount = 0;
     const rawCoupon = normalizeCouponCode(coupon_code);
-    if (rawCoupon) {
-      const [couponRows]: any = await pool.query(
-        'SELECT * FROM coupons WHERE code=? AND is_active=1',
-        [rawCoupon]
-      );
-      if (!Array.isArray(couponRows) || !couponRows.length) {
-        return res.status(400).json({ error: 'Invalid coupon code.' });
-      }
-      const c = couponRows[0];
-      if (c.expires_at && new Date(c.expires_at) < new Date()) {
-        return res.status(400).json({ error: 'Coupon has expired.' });
-      }
-      if (c.usage_limit !== null && Number(c.used_count) >= Number(c.usage_limit)) {
-        return res.status(400).json({ error: 'Coupon usage limit reached.' });
-      }
-      const cartTotalForCoupon = roundMoney(subtotal + shipping);
-      if (cartTotalForCoupon < Number(c.minimum_order)) {
-        return res.status(400).json({
-          error: `Minimum order £${Number(c.minimum_order).toFixed(2)} required.`,
-        });
-      }
-      discountAmount = calculateCouponDiscount({
-        type: c.type,
-        value: Number(c.value),
-        cartTotal: cartTotalForCoupon,
-      });
-      if (!Number.isFinite(discountAmount) || discountAmount < 0) {
-        return res.status(400).json({ error: 'Unable to apply coupon.' });
-      }
-      validatedCouponCode = String(c.code);
-    }
-
-    const grandTotal = calculateGrandTotal({
-      subtotal,
-      shipping,
-      vatAmount,
-      discountAmount,
-    });
 
     const customerNotes = typeof notes === 'string' ? notes : '';
     const recordedAt = new Date().toISOString();
@@ -180,11 +150,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : customerNotes || '';
 
     const order_id = 'ORD-' + Date.now();
+    // Contact/SMTP stay outside the short DB transaction.
     const contact = await getContactConfig();
+
+    let validatedCouponCode: string | null = null;
+    let discountAmount = 0;
+    let grandTotal = 0;
 
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+
+      if (rawCoupon) {
+        const [couponRows]: any = await conn.query(
+          'SELECT * FROM coupons WHERE code=? AND is_active=1 LIMIT 1 FOR UPDATE',
+          [rawCoupon]
+        );
+        if (!Array.isArray(couponRows) || !couponRows.length) {
+          throw new OrderValidationError('Invalid coupon code.');
+        }
+        const evaluated = evaluateLockedCoupon({
+          coupon: couponRows[0],
+          cartTotalForCoupon: roundMoney(subtotal + shipping),
+        });
+        if (!evaluated.ok) {
+          throw new OrderValidationError(evaluated.error);
+        }
+        discountAmount = evaluated.discountAmount;
+        validatedCouponCode = evaluated.code;
+      }
+
+      grandTotal = calculateGrandTotal({
+        subtotal,
+        shipping,
+        vatAmount,
+        discountAmount,
+      });
 
       await conn.query(
         'INSERT INTO orders (order_id,customer_name,customer_email,customer_phone,delivery_address,city,postcode,notes,payment_method,receipt_path,total,coupon_code,discount_amount,vat_amount,payment_reference,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
@@ -223,7 +224,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       await conn.commit();
     } catch (txErr) {
-      await conn.rollback();
+      try {
+        await conn.rollback();
+      } catch {
+        /* ignore */
+      }
       throw txErr;
     } finally {
       conn.release();
@@ -406,6 +411,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       items: responseItems,
     });
   } catch (error: any) {
+    if (error instanceof OrderValidationError || error?.name === 'OrderValidationError') {
+      return res.status(error.status || 400).json({ error: error.message });
+    }
     return res.status(500).json({ error: error.message });
   }
 }
