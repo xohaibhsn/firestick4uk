@@ -140,7 +140,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const [rows]: any = await pool.query(
         `SELECT id, name, slug, active, seo_title, meta_description, focus_keyword,
-                image, og_image, short_description, description
+                image, og_image, short_description, description, full_description
          FROM products
          ORDER BY id ASC`
       );
@@ -157,6 +157,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           meta_description: p.meta_description,
           short_description: p.short_description,
           description: p.description,
+          full_description: p.full_description,
           image: p.image,
           og_image: p.og_image,
         });

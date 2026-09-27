@@ -40,28 +40,39 @@ export function blogPublicUrl(slug: string): string {
   return `${SEO_SITE_ORIGIN}/blog/${s}`;
 }
 
+/**
+ * Mirrors app/products/[slug]/page.tsx productPageTitle().
+ * Keep in sync — Overview is read-only parity, not a second algorithm.
+ */
 export function productEffectiveTitle(
   seoTitle: string | null | undefined,
   name: string | null | undefined
 ): string {
-  const seo = String(seoTitle || "").trim();
-  if (seo) {
-    if (/\|\s*Firestick4UK\s*$/i.test(seo)) return seo;
-    return `${seo} | Firestick4UK`;
+  const base = String(seoTitle || name || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!base) return "Firestick4UK";
+  if (/\|\s*Firestick4UK\s*$/i.test(base)) return base;
+  if (/Firestick4UK\s*$/i.test(base) && !/\|\s*Firestick4UK\s*$/i.test(base)) {
+    return base;
   }
-  const n = String(name || "").trim();
-  return n ? `${n} | Firestick4UK` : "";
+  return `${base} | Firestick4UK`;
 }
 
+/**
+ * Mirrors app/products/[slug]/page.tsx productMetaDescription() fallback chain.
+ */
 export function productEffectiveDescription(opts: {
   meta_description?: string | null;
   short_description?: string | null;
   description?: string | null;
+  full_description?: string | null;
 }): string {
   const raw =
     opts.meta_description ||
     opts.short_description ||
     opts.description ||
+    opts.full_description ||
     "";
   return stripHtml(String(raw)).slice(0, 320);
 }
@@ -85,6 +96,7 @@ export function deriveProductHealth(opts: {
   meta_description?: string | null;
   short_description?: string | null;
   description?: string | null;
+  full_description?: string | null;
   image?: string | null;
   og_image?: string | null;
 }): { flags: SeoHealth[]; inSitemap: boolean; title: string; description: string; canonical: string; ogSource: ProductOgSource } {
@@ -94,7 +106,12 @@ export function deriveProductHealth(opts: {
     .replace(/^\/+|\/+$/g, "");
   const active = !!opts.active;
   const title = productEffectiveTitle(opts.seo_title, opts.name);
-  const description = productEffectiveDescription(opts);
+  const description = productEffectiveDescription({
+    meta_description: opts.meta_description,
+    short_description: opts.short_description,
+    description: opts.description,
+    full_description: opts.full_description,
+  });
   const canonical = slug ? productPublicUrl(slug) : "";
   const ogSource = productOgSource(opts.og_image, opts.image);
   const inSitemap = active && !!slug;

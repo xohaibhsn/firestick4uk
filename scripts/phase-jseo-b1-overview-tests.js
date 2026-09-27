@@ -114,6 +114,23 @@ ok(
     !/for\s*\([^)]*of[^)]*\)\s*\{[\s\S]*?pool\.query/.test(api)
 );
 ok(
+  "api_select_includes_full_description",
+  /short_description,\s*description,\s*full_description/.test(api) ||
+    /description,\s*full_description/.test(api)
+);
+ok(
+  "api_passes_full_description_to_derive",
+  /full_description:\s*p\.full_description/.test(api)
+);
+ok(
+  "api_does_not_expose_raw_full_description",
+  /description,\s*full_description/.test(api) &&
+    /full_description:\s*p\.full_description/.test(api) &&
+    !/\breturn\s*\{[\s\S]*?\bfull_description\s*:/.test(
+      api.slice(api.indexOf("products = "))
+    )
+);
+ok(
   "api_no_http_crawler",
   !/fetch\s*\(/.test(api) &&
     !/https\.get/.test(api) &&
@@ -131,6 +148,34 @@ ok(
   !/FROM orders/i.test(api) &&
     !/customer_email/i.test(api) &&
     !/FROM customers/i.test(api)
+);
+
+// --- PUBLIC PARITY GUARD (app/products/[slug]/page.tsx) ---
+const productPage = read("app/products/[slug]/page.tsx");
+ok(
+  "public_product_title_brand_suffix",
+  /function productPageTitle/.test(productPage) &&
+    /\\\|\\s\*Firestick4UK\\s\*\$/.test(productPage) &&
+    /Firestick4UK\\s\*\$/.test(productPage) &&
+    /return `\$\{base\} \| Firestick4UK`/.test(productPage)
+);
+ok(
+  "public_product_description_fallback_chain",
+  /function productMetaDescription/.test(productPage) &&
+    /product\.meta_description\s*\|\|/.test(productPage) &&
+    /product\.short_description\s*\|\|/.test(productPage) &&
+    /product\.description\s*\|\|/.test(productPage) &&
+    /product\.full_description\s*\|\|/.test(productPage)
+);
+ok(
+  "overview_mirrors_public_title_comment",
+  /Mirrors app\/products\/\[slug\]\/page\.tsx productPageTitle/.test(seoHelper)
+);
+ok(
+  "overview_mirrors_public_description_comment",
+  /Mirrors app\/products\/\[slug\]\/page\.tsx productMetaDescription/.test(
+    seoHelper
+  )
 );
 
 // --- PRODUCT ---
@@ -168,6 +213,97 @@ const inactive = so.deriveProductHealth({
   image: "i",
 });
 ok("inactive_not_in_sitemap", inactive.inSitemap === false);
+
+// --- TITLE PARITY (mirrors productPageTitle) ---
+ok(
+  "title_case_a_plain_appends_brand",
+  so.productEffectiveTitle("3 Years Subscription UK", "ignored") ===
+    "3 Years Subscription UK | Firestick4UK"
+);
+ok(
+  "title_case_b_pipe_brand_unchanged",
+  so.productEffectiveTitle(
+    "3 Years Subscription UK | Firestick4UK",
+    "ignored"
+  ) === "3 Years Subscription UK | Firestick4UK"
+);
+ok(
+  "title_case_c_brand_without_pipe_unchanged",
+  so.productEffectiveTitle("My Product Firestick4UK", "ignored") ===
+    "My Product Firestick4UK"
+);
+ok(
+  "title_case_d_whitespace_normalized",
+  so.productEffectiveTitle("   My   Product   ", "ignored") ===
+    "My Product | Firestick4UK"
+);
+ok(
+  "title_case_e_blank_title_and_name",
+  so.productEffectiveTitle("", "") === "Firestick4UK" &&
+    so.productEffectiveTitle(null, null) === "Firestick4UK"
+);
+
+// --- DESCRIPTION PARITY (mirrors productMetaDescription) ---
+ok(
+  "desc_case_a_meta_preferred",
+  so.productEffectiveDescription({
+    meta_description: "Meta wins",
+    short_description: "Short",
+    description: "Desc",
+    full_description: "Full",
+  }) === "Meta wins"
+);
+ok(
+  "desc_case_b_short_when_meta_empty",
+  so.productEffectiveDescription({
+    meta_description: "",
+    short_description: "Short only",
+    description: "Desc",
+    full_description: "Full",
+  }) === "Short only"
+);
+ok(
+  "desc_case_c_description_when_meta_short_empty",
+  so.productEffectiveDescription({
+    meta_description: "",
+    short_description: "",
+    description: "Body description",
+    full_description: "Full",
+  }) === "Body description"
+);
+ok(
+  "desc_case_d_full_description_html_fallback",
+  so.productEffectiveDescription({
+    meta_description: "",
+    short_description: "",
+    description: "",
+    full_description: "<p>Detailed product description only</p>",
+  }) === "Detailed product description only"
+);
+const longHtml =
+  "<div>" + "x".repeat(400) + "<b>tail</b></div>";
+const descE = so.productEffectiveDescription({
+  meta_description: "",
+  short_description: "",
+  description: "",
+  full_description: longHtml,
+});
+ok(
+  "desc_case_e_html_stripped_and_capped_320",
+  !/</.test(descE) &&
+    descE.length <= 320 &&
+    descE.length === 320 &&
+    descE.startsWith("x")
+);
+ok(
+  "derive_uses_full_description_when_others_empty",
+  so.deriveProductHealth({
+    name: "N",
+    slug: "n",
+    active: true,
+    full_description: "<p>Only full desc</p>",
+  }).description === "Only full desc"
+);
 
 // --- BLOG CANONICAL ---
 ok(
