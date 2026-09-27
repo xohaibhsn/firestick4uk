@@ -7,6 +7,9 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
   { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:;" },
+];
+
+const noStoreHeaders = [
   { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
 ];
 
@@ -30,6 +33,34 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: securityHeaders,
+      },
+      {
+        source: "/api/:path*",
+        headers: noStoreHeaders,
+      },
+      {
+        source: "/sidhu",
+        headers: noStoreHeaders,
+      },
+      {
+        source: "/sidhu/:path*",
+        headers: noStoreHeaders,
+      },
+      {
+        source: "/erp",
+        headers: noStoreHeaders,
+      },
+      {
+        source: "/erp/:path*",
+        headers: noStoreHeaders,
+      },
+      {
+        source: "/cart",
+        headers: noStoreHeaders,
+      },
+      {
+        source: "/cart/:path*",
+        headers: noStoreHeaders,
       },
       {
         source: "/downloads/:path*",
