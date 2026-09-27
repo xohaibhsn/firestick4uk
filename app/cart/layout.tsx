@@ -9,6 +9,17 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "Cart & Checkout — Firestick4UK",
     description:
       "Complete your order for Firestick devices, Streaming Plans and Android boxes. Secure checkout with bank transfer or cash on delivery.",
+    robots: {
+      index: false,
+      follow: false,
+      googleBot: {
+        index: false,
+        follow: false,
+      },
+    },
+    alternates: {
+      canonical: "https://firestick4uk.com/cart",
+    },
     openGraph: {
       title: "Cart & Checkout — Firestick4UK",
       description:
