@@ -38,6 +38,13 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         headers: noStoreHeaders,
       },
+      // Favicon is public CMS media — override API no-store so browser/CDN can cache redirect.
+      {
+        source: "/api/favicon",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=3600" },
+        ],
+      },
       {
         source: "/sidhu",
         headers: noStoreHeaders,

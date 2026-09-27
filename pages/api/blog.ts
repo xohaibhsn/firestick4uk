@@ -3,6 +3,7 @@ import pool from '../../lib/db';
 import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
 import { recordContentRevision, snapshotBlog } from '../../lib/contentRevisions';
+import { invalidateSitemapCache } from '../../lib/hostingerResourceInvalidation';
 
 function valuesEqual(a: unknown, b: unknown): boolean {
   const na = a === null || a === undefined ? '' : String(a);
@@ -63,6 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ip,
         });
       }
+      invalidateSitemapCache();
       return res.status(200).json({ success: true, id: result.insertId });
     }
 
@@ -183,6 +185,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         metadata: { changed_fields: changedFields },
         ip,
       });
+      invalidateSitemapCache();
       return res.status(200).json({ success: true, changed_fields: changedFields });
     }
 
@@ -230,6 +233,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         summary: `Deleted blog post ${prev?.title || id}`,
         ip,
       });
+      invalidateSitemapCache();
       return res.status(200).json({ success: true });
     }
 

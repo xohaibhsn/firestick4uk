@@ -11,6 +11,7 @@ import {
   parseDataUrlImage,
   sanitizeUploadFilename,
 } from "../../lib/imageUploadValidation";
+import { invalidateFaviconCache } from "../../lib/hostingerResourceInvalidation";
 
 export const config = { api: { bodyParser: { sizeLimit: "2mb" } } };
 
@@ -115,6 +116,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error("[upload-favicon] site_content update failed", (err as Error)?.message || err);
       return res.status(500).json({ error: "Favicon upload failed" });
     }
+
+    invalidateFaviconCache();
 
     const mediaId = await recordMediaAsset({
       url: publicUrl,

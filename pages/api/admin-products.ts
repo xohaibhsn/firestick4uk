@@ -3,6 +3,7 @@ import pool from '../../lib/db';
 import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
 import { recordContentRevision, snapshotProduct } from '../../lib/contentRevisions';
+import { invalidateSitemapCache } from '../../lib/hostingerResourceInvalidation';
 
 const PRODUCT_CATEGORIES = ['Subscription', 'Device', 'Bundle'] as const;
 
@@ -172,6 +173,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           metadata: { slug: finalSlug },
           ip,
         });
+        invalidateSitemapCache();
         return res.status(200).json({ success: true, id: result.insertId, slug: finalSlug });
       } catch (err: any) {
         if (err?.code === 'ER_DUP_ENTRY') {
@@ -341,6 +343,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ip,
         });
 
+        invalidateSitemapCache();
         return res.status(200).json({
           success: true,
           slug: merged.slug,
@@ -397,6 +400,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         summary: `Deleted product ${prev?.name || id}`,
         ip,
       });
+      invalidateSitemapCache();
       return res.status(200).json({ success: true });
     }
 

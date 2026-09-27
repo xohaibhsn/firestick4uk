@@ -36,28 +36,21 @@ const getSiteSettings = cache(async (): Promise<Record<string, string>> => {
   }
 });
 
-/** Favicon-only: intentional cache bust. Do not use for OG/twitter images. */
-function withCacheBust(url: string): string {
-  const raw = (url || "").trim();
-  if (!raw) return raw;
-  if (!raw.startsWith("http") && !raw.startsWith("/")) return raw;
-  const base = raw.split("#")[0];
-  if (/[?&]v=/.test(base)) {
-    return base.replace(/([?&])v=[^&]*/, `$1v=${Date.now()}`);
-  }
-  return `${base}${base.includes("?") ? "&" : "?"}v=${Date.now()}`;
-}
-
-/** Cloudinary on-the-fly resize — browsers need small PNGs, not 200KB originals */
+/**
+ * Cloudinary on-the-fly resize — browsers need small PNGs, not 200KB originals.
+ * Stable URL (no per-request cache-bust query): caching works until CMS favicon_url changes.
+ * Do not use for OG/twitter images.
+ */
 function faviconSizeUrl(url: string, size: number): string {
   const clean = (url || "").trim().split("?")[0];
   if (!clean) return "/api/favicon";
   if (clean.includes("res.cloudinary.com") && clean.includes("/upload/")) {
-    return withCacheBust(
-      clean.replace("/upload/", `/upload/c_fit,w_${size},h_${size},f_png,q_auto/`)
+    return clean.replace(
+      "/upload/",
+      `/upload/c_fit,w_${size},h_${size},f_png,q_auto/`
     );
   }
-  return withCacheBust(clean);
+  return clean;
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -79,7 +72,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const icon32 = faviconUrl ? faviconSizeUrl(faviconUrl, 32) : "/api/favicon";
   const icon48 = faviconUrl ? faviconSizeUrl(faviconUrl, 48) : "/api/favicon";
   const icon180 = faviconUrl ? faviconSizeUrl(faviconUrl, 180) : "/api/favicon";
-  // Social images must be stable — never Date.now() cache-bust
+  // Social images must be stable — never append request-time cache-bust query params
   const ogFinal = resolveDefaultOgImage(ogImageUrl);
   const social = defaultSocialImages(ogFinal, title);
 

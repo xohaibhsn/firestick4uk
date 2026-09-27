@@ -1,93 +1,52 @@
 import type { MetadataRoute } from "next";
-import pool from "@/lib/db";
-import { getSubscriptionSlugConfig } from "@/lib/subscriptionSlugServer";
+import { getCachedSitemapDynamicData } from "@/lib/sitemapDataServer";
 
-/** Always resolve from DB at request time — avoid build-time empty product/blog URLs. */
+/**
+ * Keep force-dynamic so Hostinger build never permanently caches an empty
+ * product/blog sitemap when DB is unavailable at build time.
+ * Expensive DB work is memoized via unstable_cache (see sitemapDataServer).
+ */
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://firestick4uk.com";
-  const now = new Date();
+  const data = await getCachedSitemapDynamicData();
 
-  let subscriptionUrl = `${baseUrl}/iptv-subscriptions-uk`;
-  try {
-    const route = await getSubscriptionSlugConfig();
-    subscriptionUrl = route.pageUrl;
-  } catch {
-    // keep default
-  }
-
+  // Static/marketing URLs: omit lastModified — no reliable change timestamp;
+  // never use request-time new Date() (false "always changed" signal).
   const staticPages: MetadataRoute.Sitemap = [
-    { url: baseUrl, lastModified: now, changeFrequency: "daily", priority: 1.0 },
-    { url: `${baseUrl}/products`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    { url: baseUrl, changeFrequency: "daily", priority: 1.0 },
+    { url: `${baseUrl}/products`, changeFrequency: "daily", priority: 0.9 },
     {
-      url: subscriptionUrl,
-      lastModified: now,
+      url: data.subscriptionUrl,
       changeFrequency: "weekly",
       priority: 0.9,
     },
-    { url: `${baseUrl}/blog`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
-    { url: `${baseUrl}/cart`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
-    { url: `${baseUrl}/contact`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${baseUrl}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${baseUrl}/faq`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${baseUrl}/order-tracking`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${baseUrl}/terms`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
-    { url: `${baseUrl}/privacy-policy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
-    { url: `${baseUrl}/refund-policy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${baseUrl}/blog`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${baseUrl}/cart`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${baseUrl}/contact`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${baseUrl}/about`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${baseUrl}/faq`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${baseUrl}/order-tracking`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${baseUrl}/terms`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${baseUrl}/privacy-policy`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${baseUrl}/refund-policy`, changeFrequency: "yearly", priority: 0.3 },
   ];
 
-  let productPages: MetadataRoute.Sitemap = [];
-  let blogPages: MetadataRoute.Sitemap = [];
+  const productPages: MetadataRoute.Sitemap = data.products.map((p) => ({
+    url: `${baseUrl}/products/${p.slug}`,
+    ...(p.lastModified ? { lastModified: new Date(p.lastModified) } : {}),
+    changeFrequency: "weekly" as const,
+    priority: 0.8,
+  }));
 
-  try {
-    // Only emit authoritative stored slugs (no name-derived aliases)
-    const [products]: any = await pool.query(
-      `SELECT slug, created_at
-       FROM products
-       WHERE active = 1
-         AND slug IS NOT NULL AND TRIM(slug) <> ''`
-    );
-
-    productPages = (Array.isArray(products) ? products : [])
-      .map((p: { slug: string; created_at?: string | Date }) => ({
-        slug: String(p.slug || "")
-          .trim()
-          .toLowerCase()
-          .replace(/^\/+|\/+$/g, ""),
-        created_at: p.created_at,
-      }))
-      .filter((p: { slug: string }) => !!p.slug)
-      .map((p: { slug: string; created_at?: string | Date }) => ({
-        url: `${baseUrl}/products/${p.slug}`,
-        lastModified: p.created_at ? new Date(p.created_at) : now,
-        changeFrequency: "weekly" as const,
-        priority: 0.8,
-      }));
-  } catch {
-    // Keep static pages if DB is unavailable
-  }
-
-  try {
-    const [posts]: any = await pool.query(
-      `SELECT slug, created_at
-       FROM blog_posts
-       WHERE status = 'published' AND active = 1
-         AND slug IS NOT NULL AND slug != ''`
-    );
-
-    blogPages = (Array.isArray(posts) ? posts : []).map(
-      (p: { slug: string; created_at?: string | Date }) => ({
-        url: `${baseUrl}/blog/${p.slug}`,
-        lastModified: p.created_at ? new Date(p.created_at) : now,
-        changeFrequency: "weekly" as const,
-        priority: 0.7,
-      })
-    );
-  } catch {
-    // Keep static pages if DB is unavailable
-  }
+  const blogPages: MetadataRoute.Sitemap = data.posts.map((p) => ({
+    url: `${baseUrl}/blog/${p.slug}`,
+    ...(p.lastModified ? { lastModified: new Date(p.lastModified) } : {}),
+    changeFrequency: "weekly" as const,
+    priority: 0.7,
+  }));
 
   return [...staticPages, ...productPages, ...blogPages];
 }

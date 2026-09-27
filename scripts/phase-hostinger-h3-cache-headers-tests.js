@@ -169,7 +169,9 @@ ok(
 );
 ok(
   "no_public_max_age_on_html_forced",
-  !/public,\s*max-age=\d+/.test(nextConfig)
+  // Favicon may set public max-age; HTML routes must not get a blanket public max-age.
+  !/source:\s*["']\/\(\.\*\)["'][\s\S]{0,200}public,\s*max-age=/.test(nextConfig) &&
+    !/source:\s*["']\/["'][\s\S]{0,120}public,\s*max-age=/.test(nextConfig)
 );
 
 ok(

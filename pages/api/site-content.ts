@@ -15,6 +15,12 @@ import {
   classifySiteContentEntityType,
   recordContentRevision,
 } from '../../lib/contentRevisions';
+import {
+  invalidateFaviconCache,
+  invalidateSitemapCache,
+  siteContentKeysAffectFavicon,
+  siteContentKeysAffectSitemap,
+} from '../../lib/hostingerResourceInvalidation';
 
 /** Lookup metadata for upserts only — does not seed the database at request time. */
 const DEFAULTS = SITE_CONTENT_DEFAULTS;
@@ -287,6 +293,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
+      if (siteContentKeysAffectSitemap(allKeys) || !!slugUpdate) {
+        invalidateSitemapCache();
+      }
+      if (siteContentKeysAffectFavicon(allKeys)) {
+        invalidateFaviconCache();
+      }
+
       return res.status(200).json({
         success: true,
         ...(slugUpdate
@@ -372,6 +385,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           metadata: { keys: [ck] },
           ip,
         });
+        if (siteContentKeysAffectSitemap([ck])) {
+          invalidateSitemapCache();
+        }
+        if (siteContentKeysAffectFavicon([ck])) {
+          invalidateFaviconCache();
+        }
       }
       return res.status(200).json({ success: true });
     }
@@ -458,6 +477,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         metadata: { keys: [key], deleted: true },
         ip,
       });
+      if (siteContentKeysAffectSitemap([key])) {
+        invalidateSitemapCache();
+      }
+      if (siteContentKeysAffectFavicon([key])) {
+        invalidateFaviconCache();
+      }
       return res.status(200).json({ success: true });
     }
 

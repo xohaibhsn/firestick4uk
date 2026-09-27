@@ -195,8 +195,9 @@ ok(
   /force-dynamic/.test(sitemap) && /revalidate = 0/.test(sitemap)
 );
 ok(
-  "favicon_untouched",
-  /favicon_url/.test(favicon) && /public, max-age=3600/.test(favicon)
+  "favicon_cms_authority_and_max_age",
+  (/favicon_url/.test(favicon) || /favicon_url/.test(read("lib/faviconUrlServer.ts"))) &&
+    /public, max-age=3600/.test(favicon)
 );
 ok(
   "site_content_api_no_unstable_cache",
