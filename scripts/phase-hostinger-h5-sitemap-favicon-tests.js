@@ -141,7 +141,12 @@ ok(
 );
 ok(
   "favicon_fallback_safe",
-  /FAVICON_FALLBACK_URL|og-default\.jpg/.test(faviconLib)
+  /FAVICON_FALLBACK_URL\s*=\s*["']https:\/\/firestick4uk\.com\/og-default\.png["']/.test(
+    faviconLib
+  ) &&
+    !/og-default\.jpg/.test(faviconLib) &&
+    exists("public/og-default.png") &&
+    !exists("public/og-default.jpg")
 );
 ok(
   "favicon_api_sets_public_max_age",

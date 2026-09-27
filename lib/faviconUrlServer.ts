@@ -3,7 +3,7 @@ import pool from "@/lib/db";
 
 export const FAVICON_CACHE_TAG = "favicon-url";
 export const FAVICON_CACHE_TTL_SECONDS = 3600;
-export const FAVICON_FALLBACK_URL = "https://firestick4uk.com/og-default.jpg";
+export const FAVICON_FALLBACK_URL = "https://firestick4uk.com/og-default.png";
 
 function applyCloudinaryFaviconTransform(url: string): string {
   if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
