@@ -7,6 +7,7 @@ import SubscriptionContentEditor from "@/components/admin/SubscriptionContentEdi
 import MediaLibraryPanel from "@/components/admin/MediaLibraryPanel";
 import MediaLibraryPicker, { type MediaAsset } from "@/components/admin/MediaLibraryPicker";
 import ContentHistoryPanel from "@/components/admin/ContentHistoryPanel";
+import SeoOverviewPanel from "@/components/admin/SeoOverviewPanel";
 import { keysForPage } from "@/lib/adminContentFields";
 import {
   canAccessSidhuTab,
@@ -194,7 +195,7 @@ const styles = `
   }
 `;
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"training"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"training"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history"|"seo";
 type AdminRole = "super_admin"|"manager"|"writer";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
@@ -2207,6 +2208,7 @@ export default function AdminPage() {
               { id:"leads",     icon:"💬", label:"Leads",        badge: leadsLast24 > 0 ? String(leadsLast24) : null, badgeColor:"orange", roles:["super_admin","manager"] },
               { id:"training",  icon:"🧠", label:"Berlin Training", roles:["super_admin","manager"] },
               { id:"blog",      icon:"📝", label:"Blog",         roles:["super_admin","manager","writer"] },
+              { id:"seo",       icon:"🔎", label:"SEO",          roles:["super_admin","manager","writer"] },
               { id:"media",     icon:"🖼️", label:"Media Library", roles:["super_admin","manager","writer"] },
               { id:"history",   icon:"🕘", label:"History", roles:["super_admin","manager","writer"] },
               { id:"coupons",   icon:"🎟️", label:"Coupons",      roles:["super_admin"] },
@@ -2248,6 +2250,7 @@ export default function AdminPage() {
                 {tab==="leads" && <>Berlin <span>Leads</span></>}
                 {tab==="training" && <>Berlin <span>Training</span></>}
                 {tab==="blog" && <>Manage <span>Blog</span></>}
+                {tab==="seo" && <>SEO <span>Overview</span></>}
                 {tab==="media" && <>Media <span>Library</span></>}
                 {tab==="history" && <>Content <span>History</span></>}
                 {tab==="coupons" && <>Manage <span>Coupons</span></>}
@@ -2534,6 +2537,16 @@ export default function AdminPage() {
           )}
 
           {/* BLOG */}
+          {tab==="seo" && canAccessSidhuTab(adminRole, "seo") && (
+            <SeoOverviewPanel
+              role={adminRole}
+              getRoleHeaders={getRoleHeaders}
+              onNavigate={(next) => {
+                setTab(next as Tab);
+                setSidebarOpen(false);
+              }}
+            />
+          )}
           {tab==="blog" && can("blog.manage") && (
             <div>
               {blogMsg && <div style={{marginBottom:16,padding:"10px 16px",background:blogMsg.startsWith("✅")?"rgba(22,163,74,0.1)":"rgba(220,38,38,0.1)",border:`1px solid ${blogMsg.startsWith("✅")?"rgba(22,163,74,0.3)":"rgba(220,38,38,0.25)"}`,borderRadius:10,fontSize:13,color:blogMsg.startsWith("✅")?"#16A34A":"#DC2626"}}>{blogMsg}</div>}

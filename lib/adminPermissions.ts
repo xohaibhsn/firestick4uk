@@ -44,7 +44,8 @@ export type SidhuTab =
   | "settings"
   | "audit"
   | "media"
-  | "history";
+  | "history"
+  | "seo";
 
 const ALL_PERMISSIONS: readonly AdminPermission[] = [
   "dashboard.view",
@@ -103,7 +104,7 @@ export const ROLE_PERMISSIONS: Record<AdminRoleName, readonly AdminPermission[]>
   writer: WRITER_PERMISSIONS,
 };
 
-const TAB_PERMISSION: Record<SidhuTab, AdminPermission> = {
+const TAB_PERMISSION: Record<Exclude<SidhuTab, "seo">, AdminPermission> = {
   dashboard: "dashboard.view",
   orders: "orders.view",
   products: "products.view",
@@ -161,7 +162,21 @@ export function allowedRolesFor(permission: AdminPermission): AdminRoleName[] {
   );
 }
 
+/**
+ * SEO Overview (read-only) — no dedicated seo.* permission.
+ * Visible when the role can see any existing SEO-capable surface.
+ */
+export function canAccessSeoOverview(role: AdminRoleName): boolean {
+  return (
+    hasAdminPermission(role, "products.view") ||
+    hasAdminPermission(role, "blog.manage") ||
+    hasAdminPermission(role, "content.manage") ||
+    hasAdminPermission(role, "settings.manage")
+  );
+}
+
 export function canAccessSidhuTab(role: AdminRoleName, tab: SidhuTab): boolean {
+  if (tab === "seo") return canAccessSeoOverview(role);
   const perm = TAB_PERMISSION[tab];
   return perm ? hasAdminPermission(role, perm) : false;
 }
