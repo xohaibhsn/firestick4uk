@@ -11,6 +11,21 @@ export function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/** Strip CR/LF from dynamic email header fragments (subject/from display). */
+export function sanitizeEmailHeaderText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/[\r\n]+/g, " ")
+    .trim();
+}
+
+/**
+ * Escape HTML first, then turn newlines into <br /> for email/plain-note display.
+ * Never reverse this order.
+ */
+export function escapeHtmlWithLineBreaks(value: unknown): string {
+  return escapeHtml(String(value ?? "")).replace(/\r\n|\r|\n/g, "<br />");
+}
+
 /** Convert legacy "one line per feature" plain text into a TipTap-friendly list. */
 export function plainLinesToListHtml(raw: string): string {
   const lines = (raw || "")
