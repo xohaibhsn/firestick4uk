@@ -15,9 +15,9 @@ interface LoginXtream{ server:string; username:string; password:string; name:str
 const b64       = (s:string) => { try { return atob(s); } catch { return s; } };
 const fmtTime   = (ts:number) => new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 const epgPct    = (p:EpgProg) => Math.min(100,Math.max(0,((Date.now()/1000-p.start_ts)/(p.stop_ts-p.start_ts))*100));
-const proxied   = (url:string) => `/api/erp/iptv/proxy?url=${encodeURIComponent(url)}`;
+const proxied   = (url:string) => `/api/player/proxy?url=${encodeURIComponent(url)}`;
 const xtreamQ   = (sv:LoginXtream, action:string, extra='') =>
-  `/api/erp/iptv/xtream?server=${encodeURIComponent(sv.server)}&username=${encodeURIComponent(sv.username)}&password=${encodeURIComponent(sv.password)}&action=${action}${extra}`;
+  `/api/player/xtream?server=${encodeURIComponent(sv.server)}&username=${encodeURIComponent(sv.username)}&password=${encodeURIComponent(sv.password)}&action=${action}${extra}`;
 
 function groupByF<T extends {group:string}>(items:T[]):Record<string,T[]>{
   return items.reduce((a,i)=>{ (a[i.group]=a[i.group]||[]).push(i); return a; },{} as Record<string,T[]>);
