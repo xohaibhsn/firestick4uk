@@ -4,11 +4,21 @@ import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
 import { recordContentRevision, snapshotBlog } from '../../lib/contentRevisions';
 import { invalidateSitemapCache } from '../../lib/hostingerResourceInvalidation';
+import {
+  BLOG_PUBLISHED_SLUG_PROTECTED_MESSAGE,
+  normalizeBlogCanonicalInput,
+  normalizeBlogSlug,
+  resolveBlogCanonicalForPut,
+} from '../../lib/blogSeoSafety';
 
 function valuesEqual(a: unknown, b: unknown): boolean {
   const na = a === null || a === undefined ? '' : String(a);
   const nb = b === null || b === undefined ? '' : String(b);
   return na === nb;
+}
+
+function hasOwn(body: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(body, key);
 }
 
 function normalizeFaqs(value: unknown): string | null {
@@ -19,6 +29,14 @@ function normalizeFaqs(value: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+function toBlogSlug(value: unknown): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -47,11 +65,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
-      const { title, slug, excerpt, content, category, emoji, badge, badgeText, featured_image, meta_title, meta_description, focus_keyword, status, featured, canonical_url, faqs } = req.body;
-      const finalCanonical = (canonical_url || '').trim() || `https://firestick4uk.com/blog/${slug || ''}`;
+      const body = req.body || {};
+      const {
+        title,
+        slug,
+        excerpt,
+        content,
+        category,
+        emoji,
+        badge,
+        badgeText,
+        featured_image,
+        meta_title,
+        meta_description,
+        focus_keyword,
+        status,
+        featured,
+        canonical_url,
+        faqs,
+      } = body;
+      const finalSlug = toBlogSlug(slug) || toBlogSlug(title);
+      if (!String(title || '').trim() || !finalSlug) {
+        return res.status(400).json({ error: 'Title and slug are required' });
+      }
+      const canon = normalizeBlogCanonicalInput(canonical_url, finalSlug);
+      if (!canon.ok) {
+        return res.status(400).json({ error: canon.error });
+      }
       const [result]: any = await pool.query(
         'INSERT INTO blog_posts (title, slug, excerpt, content, category, emoji, badge, badgeText, featured_image, meta_title, meta_description, focus_keyword, status, featured, canonical_url, faqs, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
-        [title, slug || '', excerpt || '', content || '', category || 'Guides', emoji || '📝', badge || 'guide', badgeText || 'Guide', featured_image || '', meta_title || '', meta_description || '', focus_keyword || '', status || 'published', featured ? 1 : 0, finalCanonical, faqs ? JSON.stringify(faqs) : null]
+        [title, finalSlug, excerpt || '', content || '', category || 'Guides', emoji || '📝', badge || 'guide', badgeText || 'Guide', featured_image || '', meta_title || '', meta_description || '', focus_keyword || '', status || 'published', featured ? 1 : 0, canon.canonical, faqs ? JSON.stringify(faqs) : null]
       );
       if (admin) {
         const { ip } = getRequestMeta(req);
@@ -70,7 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'PUT') {
       if (!admin) return;
-      const body = req.body || {};
+      const body = (req.body || {}) as Record<string, unknown>;
       const id = Number(body.id);
       if (!Number.isFinite(id) || id <= 0) {
         return res.status(400).json({ error: 'Valid blog id is required' });
@@ -80,9 +123,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const current = Array.isArray(existingRows) && existingRows[0] ? existingRows[0] : null;
       if (!current) return res.status(404).json({ error: 'Blog post not found' });
 
+      const oldSlug = normalizeBlogSlug(current.slug);
+      const requestedSlugRaw = hasOwn(body, 'slug') ? body.slug : current.slug;
+      const finalSlug = toBlogSlug(requestedSlugRaw) || oldSlug;
+      if (!finalSlug) {
+        return res.status(400).json({ error: 'Slug cannot be empty' });
+      }
+
+      const currentWasPublishedPublic =
+        String(current.status || '') === 'published' && Number(current.active) === 1;
+      if (currentWasPublishedPublic && finalSlug !== oldSlug) {
+        return res.status(409).json({ error: BLOG_PUBLISHED_SLUG_PROTECTED_MESSAGE });
+      }
+
+      const bodyHasCanonical = hasOwn(body, 'canonical_url');
+      const slugChanged = finalSlug !== oldSlug;
+      const canon = resolveBlogCanonicalForPut({
+        bodyHasCanonical,
+        suppliedCanonical: bodyHasCanonical ? String(body.canonical_url ?? '') : undefined,
+        currentCanonical: current.canonical_url,
+        oldSlug,
+        finalSlug,
+        slugChanged,
+      });
+      if (!canon.ok) {
+        return res.status(400).json({ error: canon.error });
+      }
+
       const next = {
         title: body.title ?? current.title,
-        slug: body.slug ?? current.slug ?? '',
+        slug: finalSlug,
         excerpt: body.excerpt ?? current.excerpt ?? '',
         content: body.content ?? current.content ?? '',
         category: body.category ?? current.category ?? 'Guides',
@@ -95,10 +165,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         focus_keyword: body.focus_keyword ?? current.focus_keyword ?? '',
         status: body.status ?? current.status ?? 'published',
         featured: body.featured != null ? (body.featured ? 1 : 0) : (current.featured ? 1 : 0),
-        canonical_url:
-          (body.canonical_url || '').trim() ||
-          current.canonical_url ||
-          `https://firestick4uk.com/blog/${body.slug || current.slug || ''}`,
+        canonical_url: canon.canonical,
         faqs: normalizeFaqs(body.faqs !== undefined ? body.faqs : current.faqs),
       };
 
@@ -147,16 +214,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           [
             next.title,
             next.slug || '',
-            next.excerpt || '',
-            next.content || '',
+            next.excerpt,
+            next.content,
             next.category,
             next.emoji,
             next.badge,
             next.badgeText,
-            next.featured_image || '',
-            next.meta_title || '',
-            next.meta_description || '',
-            next.focus_keyword || '',
+            next.featured_image,
+            next.meta_title,
+            next.meta_description,
+            next.focus_keyword,
             next.status,
             next.featured,
             next.canonical_url,
@@ -166,7 +233,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
         await conn.commit();
       } catch (txErr: any) {
-        try { await conn.rollback(); } catch { /* ignore */ }
+        try {
+          await conn.rollback();
+        } catch {
+          /* ignore */
+        }
         if (txErr?.code === 'REVISION_TOO_LARGE') {
           return res.status(400).json({ error: txErr.message });
         }

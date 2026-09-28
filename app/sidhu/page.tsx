@@ -16,6 +16,9 @@ import {
   type SidhuTab,
 } from "@/lib/adminPermissions";
 import type { MediaLibraryPurpose } from "@/lib/mediaLibrary";
+import {
+  isAutoCanonicalForSlug,
+} from "@/lib/blogSeoSafety";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
 const styles = `
@@ -294,6 +297,8 @@ export default function AdminPage() {
   const editorRef = useRef<HTMLDivElement>(null);
   const defaultBlog = { title:"", slug:"", excerpt:"", content:"", category:"Guides", emoji:"📝", badge:"guide", badgeText:"Guide", featured_image:"", meta_title:"", meta_description:"", focus_keyword:"", status:"published" as "published"|"draft", featured:false, canonical_url:"", faqs:[] as Array<{question:string;answer:string}> };
   const [editBlog, setEditBlog] = useState<typeof defaultBlog>(defaultBlog);
+  /** When true, this edit session opened a published post — slug stays protected even if status toggled to draft. */
+  const [blogSlugLocked, setBlogSlugLocked] = useState(false);
 
   // Site Content
   const [siteContent, setSiteContent] = useState<Record<string,string>>({});
@@ -1900,7 +1905,7 @@ export default function AdminPage() {
                   onChange={e => {
                     const name = e.target.value;
                     setEditProduct(p => {
-                      const shouldAuto = productModal === "new" || !p.slug || p.slug === toSlug(p.name);
+                      const shouldAuto = productModal === "new";
                       return { ...p, name, slug: shouldAuto ? toSlug(name) : p.slug };
                     });
                   }}
@@ -1918,18 +1923,29 @@ export default function AdminPage() {
               <input
                 type="text"
                 value={editProduct.slug || ""}
-                onChange={e => setEditProduct({
-                  ...editProduct,
-                  slug: e.target.value
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]+/g, "-")
-                    .replace(/(^-|-$)/g, ""),
-                })}
+                readOnly={productModal !== "new"}
+                disabled={productModal !== "new"}
+                onChange={e => {
+                  if (productModal !== "new") return;
+                  setEditProduct({
+                    ...editProduct,
+                    slug: e.target.value
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]+/g, "-")
+                      .replace(/(^-|-$)/g, ""),
+                  });
+                }}
                 placeholder="e.g. b1g-1-month-plan"
+                style={productModal !== "new" ? { opacity: 0.75, cursor: "not-allowed" } : undefined}
               />
               <small style={{display:"block",marginTop:4,fontSize:11,color:"rgba(255,255,255,0.35)"}}>
                 URL: firestick4uk.com/products/{editProduct.slug || "product-slug"}
               </small>
+              {productModal !== "new" && (
+                <small style={{display:"block",marginTop:6,fontSize:11,color:"#EA580C",lineHeight:1.45}}>
+                  Public URL is protected. Slug changes require a controlled SEO migration with a redirect.
+                </small>
+              )}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div className="modal-field"><label>Price</label><input placeholder="e.g. £9.99" value={editProduct.price} onChange={e => setEditProduct({...editProduct,price:e.target.value})} /></div>
@@ -2081,8 +2097,42 @@ export default function AdminPage() {
             <div className="modal-title">{blogModal==="new"?"New Blog Post":"Edit Blog Post"}</div>
 
             {/* Title + Slug */}
-            <div className="modal-field"><label>Title *</label><input placeholder="Post title" value={editBlog.title} onChange={e => { const t=e.target.value; setEditBlog(p=>({...p,title:t,slug:p.slug===toSlug(p.title)||p.slug===""?toSlug(t):p.slug})); }} /></div>
-            <div className="modal-field"><label>Slug</label><input placeholder="auto-generated-from-title" value={editBlog.slug} onChange={e => setEditBlog(p=>({...p,slug:e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-")}))} /></div>
+            <div className="modal-field"><label>Title *</label><input placeholder="Post title" value={editBlog.title} onChange={e => { const t=e.target.value; setEditBlog(p=>{
+              const canAutoSlug = !blogSlugLocked && (blogModal === "new" || p.slug===toSlug(p.title) || p.slug==="");
+              const nextSlug = canAutoSlug ? toSlug(t) : p.slug;
+              let nextCanonical = p.canonical_url;
+              if (canAutoSlug && nextSlug !== p.slug && (isAutoCanonicalForSlug(p.canonical_url, p.slug) || !String(p.canonical_url||"").trim())) {
+                nextCanonical = "";
+              }
+              return {...p, title:t, slug:nextSlug, canonical_url:nextCanonical};
+            }); }} /></div>
+            <div className="modal-field">
+              <label>Slug</label>
+              <input
+                placeholder="auto-generated-from-title"
+                value={editBlog.slug}
+                readOnly={blogSlugLocked}
+                disabled={blogSlugLocked}
+                style={blogSlugLocked ? { opacity: 0.75, cursor: "not-allowed" } : undefined}
+                onChange={e => {
+                  if (blogSlugLocked) return;
+                  const nextSlug = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-");
+                  setEditBlog(p => {
+                    const oldSlug = p.slug;
+                    let nextCanonical = p.canonical_url;
+                    if (nextSlug !== oldSlug && (isAutoCanonicalForSlug(p.canonical_url, oldSlug) || !String(p.canonical_url||"").trim())) {
+                      nextCanonical = "";
+                    }
+                    return {...p, slug: nextSlug, canonical_url: nextCanonical};
+                  });
+                }}
+              />
+              {blogSlugLocked && (
+                <div style={{fontSize:11,color:"#EA580C",marginTop:6,lineHeight:1.45}}>
+                  Published URL is protected. A slug change requires a controlled redirect migration.
+                </div>
+              )}
+            </div>
 
             {/* Featured Image */}
             <div className="modal-field">
@@ -2152,7 +2202,9 @@ export default function AdminPage() {
               <div className="modal-field" style={{marginBottom:0}}>
                 <label>Canonical URL</label>
                 <input placeholder={`https://firestick4uk.com/blog/${editBlog.slug||"post-slug"}`} value={editBlog.canonical_url} onChange={e=>setEditBlog(p=>({...p,canonical_url:e.target.value}))} />
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",marginTop:3}}>Leave empty to auto-generate from slug</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",marginTop:3}}>
+                  Leave empty to auto-generate from slug. Canonical must use the current Firestick4UK blog URL.
+                </div>
               </div>
             </div>
 
@@ -2587,7 +2639,7 @@ export default function AdminPage() {
             <div className="section-card">
               <div className="section-header">
                 <div className="section-title">Blog Posts ({blogPosts.length})</div>
-                <button className="add-btn" onClick={() => { setEditBlog(defaultBlog); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML="";},50); setBlogModal("new"); }}>+ Add Post</button>
+                <button className="add-btn" onClick={() => { setEditBlog(defaultBlog); setBlogSlugLocked(false); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML="";},50); setBlogModal("new"); }}>+ Add Post</button>
               </div>
               <div className="table-wrap">
                 <table>
@@ -2603,7 +2655,7 @@ export default function AdminPage() {
                         <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{p.category}</span></td>
                         <td><span style={{fontSize:"11px",padding:"3px 10px",borderRadius:"10px",fontWeight:700,background:p.status==="published"?"rgba(0,200,100,0.12)":"rgba(255,180,0,0.12)",border:p.status==="published"?"1px solid rgba(0,200,100,0.3)":"1px solid rgba(255,180,0,0.3)",color:p.status==="published"?"#00c864":"#ffb400"}}>{p.status==="published"?"Published":"Draft"}</span></td>
                         <td style={{whiteSpace:"nowrap"}}>
-                          <button className="action-btn btn-edit" onClick={() => { const faqsParsed = p.faqs ? (typeof p.faqs==="string" ? JSON.parse(p.faqs) : p.faqs) : []; setEditBlog({title:p.title,slug:p.slug||"",excerpt:p.excerpt||"",content:p.content||"",category:p.category||"Guides",emoji:p.emoji||"📝",badge:p.badge||"guide",badgeText:p.badgeText||"Guide",featured_image:p.featured_image||"",meta_title:p.meta_title||"",meta_description:p.meta_description||"",focus_keyword:p.focus_keyword||"",status:p.status||"published",featured:!!p.featured,canonical_url:p.canonical_url||"",faqs:faqsParsed}); setBlogModal(p); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML=p.content||"";},80); }}>Edit</button>
+                          <button className="action-btn btn-edit" onClick={() => { const faqsParsed = p.faqs ? (typeof p.faqs==="string" ? JSON.parse(p.faqs) : p.faqs) : []; setEditBlog({title:p.title,slug:p.slug||"",excerpt:p.excerpt||"",content:p.content||"",category:p.category||"Guides",emoji:p.emoji||"📝",badge:p.badge||"guide",badgeText:p.badgeText||"Guide",featured_image:p.featured_image||"",meta_title:p.meta_title||"",meta_description:p.meta_description||"",focus_keyword:p.focus_keyword||"",status:p.status||"published",featured:!!p.featured,canonical_url:p.canonical_url||"",faqs:faqsParsed}); setBlogSlugLocked(p.status === "published"); setBlogModal(p); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML=p.content||"";},80); }}>Edit</button>
                           <button className="action-btn btn-delete" onClick={() => deleteBlog(p.id)}>Delete</button>
                         </td>
                       </tr>

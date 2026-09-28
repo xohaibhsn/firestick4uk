@@ -204,10 +204,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       let slug = String(current.slug || '');
-      if (hasOwn(body, 'slug') || hasOwn(body, 'name')) {
-        const slugSource = hasOwn(body, 'slug') ? String(body.slug || '') : name;
-        const nextSlug = toSlug(slugSource || name);
+      if (hasOwn(body, 'slug')) {
+        const nextSlug = toSlug(String(body.slug || ''));
         if (!nextSlug) return res.status(400).json({ error: 'Slug cannot be empty' });
+        const currentNorm = toSlug(String(current.slug || '')) || String(current.slug || '').trim();
+        if (nextSlug !== currentNorm) {
+          return res.status(409).json({
+            error:
+              'Existing product URL slug is protected. Use a controlled SEO migration with a permanent redirect before changing this URL.',
+          });
+        }
         slug = nextSlug;
       }
 
