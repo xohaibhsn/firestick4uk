@@ -1633,7 +1633,7 @@ export default function AdminPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          isNew ? payload : { ...payload, id: (productModal as { id: number }).id, active: 1 }
+          isNew ? payload : { ...payload, id: (productModal as { id: number }).id }
         ),
       });
       if (r.status === 401) {
