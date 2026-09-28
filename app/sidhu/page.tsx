@@ -267,7 +267,7 @@ export default function AdminPage() {
   const [dashSummary, setDashSummary] = useState<any>(null);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [productModal, setProductModal] = useState<any|null|"new">(null);
-  const [editProduct, setEditProduct] = useState({ name:"", slug:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"" });
+  const [editProduct, setEditProduct] = useState({ name:"", slug:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
   const [imageUploading, setImageUploading] = useState(false);
   const [mediaPicker, setMediaPicker] = useState<{
     purposes: MediaLibraryPurpose[];
@@ -1622,6 +1622,7 @@ export default function AdminPage() {
       seo_title: editProduct.seo_title || "",
       meta_description: editProduct.meta_description || "",
       focus_keyword: editProduct.focus_keyword || "",
+      og_image: editProduct.og_image || "",
     };
     setProductSaving(true);
     setProductMsg("");
@@ -1675,12 +1676,13 @@ export default function AdminPage() {
       seo_title: p.seo_title || "",
       meta_description: p.meta_description || "",
       focus_keyword: p.focus_keyword || "",
+      og_image: p.og_image || "",
     });
     setProductModal(p);
   };
 
   const openNewProduct = () => {
-    setEditProduct({ name:"", slug:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"" });
+    setEditProduct({ name:"", slug:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
     setProductModal("new");
   };
 
@@ -2014,7 +2016,39 @@ export default function AdminPage() {
                 <textarea rows={2} placeholder={`Auto: Short description will be used if empty (max 180 chars)`} maxLength={180} value={editProduct.meta_description} onChange={e => setEditProduct({...editProduct,meta_description:e.target.value})} style={{resize:"none"}} />
                 <div className="char-bar" style={{background:"rgba(255,255,255,0.08)",width:"100%"}}><div className="char-bar" style={{width:`${Math.min(100,(editProduct.meta_description.length/180)*100)}%`,background:editProduct.meta_description.length>=175?"#ff6666":editProduct.meta_description.length>=140?"#00c864":"rgba(139,0,255,0.5)"}} /></div>
               </div>
-              <div className="modal-field" style={{marginBottom:0}}><label>Focus Keyword</label><input placeholder="e.g. firestick 4k uk" value={editProduct.focus_keyword} onChange={e => setEditProduct({...editProduct,focus_keyword:e.target.value})} /></div>
+              <div className="modal-field"><label>Focus Keyword</label><input placeholder="e.g. firestick 4k uk" value={editProduct.focus_keyword} onChange={e => setEditProduct({...editProduct,focus_keyword:e.target.value})} /></div>
+              <div className="modal-field" style={{marginBottom:0}}>
+                <label>Social / OG Image</label>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",marginBottom:8}}>
+                  Used for social sharing previews. If empty, the normal product image/global fallback is used.
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
+                  {editProduct.og_image
+                    ? <img src={editProduct.og_image} alt="OG preview" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid rgba(139,0,255,0.3)"}} />
+                    : <div style={{width:60,height:60,background:"rgba(139,0,255,0.1)",border:"1px dashed rgba(139,0,255,0.4)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"rgba(255,255,255,0.35)"}}>OG</div>
+                  }
+                  <button
+                    type="button"
+                    style={{cursor:"pointer",background:"rgba(91,33,182,0.08)",border:"1px solid rgba(91,33,182,0.3)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6"}}
+                    onClick={() => setMediaPicker({
+                      purposes: ["products"],
+                      title: "Choose Product OG Image",
+                      onSelect: (asset) => setEditProduct((p) => ({ ...p, og_image: asset.url })),
+                    })}
+                  >
+                    Choose from Library
+                  </button>
+                  {editProduct.og_image && (
+                    <button
+                      type="button"
+                      style={{background:"none",border:"none",color:"rgba(255,100,100,0.7)",cursor:"pointer",fontSize:13}}
+                      onClick={() => setEditProduct((p) => ({ ...p, og_image: "" }))}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="modal-actions">
@@ -3591,6 +3625,24 @@ export default function AdminPage() {
               <div style={{maxWidth:600}}>
                 <div className="modal-field"><label>Website Title</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_title||""} onChange={e=>setSiteContent(s=>({...s,site_title:e.target.value}))} placeholder="Firestick4UK" /></div>
                 <div className="modal-field"><label>Website Tagline</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_tagline||""} onChange={e=>setSiteContent(s=>({...s,site_tagline:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
+                <div className="modal-field">
+                  <label style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:12}}>
+                    <span>Site Meta Description</span>
+                    <span style={{fontSize:11,color:(siteContent.site_meta_description||"").length>160?"#ff6666":(siteContent.site_meta_description||"").length>120?"#00c864":"#888"}}>
+                      {(siteContent.site_meta_description||"").length}/160–180
+                    </span>
+                  </label>
+                  <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
+                    Default site/home fallback meta description used where page-specific metadata does not override it.
+                  </div>
+                  <textarea
+                    rows={3}
+                    style={{width:"100%",resize:"vertical"}}
+                    value={siteContent.site_meta_description||""}
+                    onChange={e=>setSiteContent(s=>({...s,site_meta_description:e.target.value}))}
+                    placeholder="Buy Firestick, streaming subscriptions and Android boxes in the UK..."
+                  />
+                </div>
 
                 <div className="modal-field">
                   <label>Site Logo</label>
@@ -3962,7 +4014,7 @@ export default function AdminPage() {
                     {contentMsg}
                   </div>
                 )}
-                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_logo_url","og_default_image","whatsapp_icon_url"])}>
+                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_meta_description","site_logo_url","og_default_image","whatsapp_icon_url"])}>
                   {contentSaving?"Saving...":"💾 Save Settings"}
                 </button>
               </div>
