@@ -210,7 +210,7 @@ ok(
     !/"use cache"/.test(blogSlug) &&
     !/"use cache"/.test(contact)
 );
-ok("erp_layout_untouched_by_h2", !/from ["']react["'].*cache|cache\(async/.test(read("app/erp/ERPLayout.tsx")));
+ok("erp_ui_absent_after_r2b", !exists("app/erp"));
 
 console.log(`\nphase-hostinger-h2-server-dedupe: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

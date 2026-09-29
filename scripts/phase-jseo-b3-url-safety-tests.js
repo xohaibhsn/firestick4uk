@@ -237,7 +237,7 @@ ok(
     typeof BLOG_PUBLISHED_SLUG_PROTECTED_MESSAGE === "string"
 );
 
-ok("erp_untouched", fs.existsSync(path.join(ROOT, "app/erp")));
+ok("erp_ui_retired", !fs.existsSync(path.join(ROOT, "app/erp")));
 ok(
   "no_redirect_manager",
   !/CREATE TABLE.*redirect/i.test(sidhu) &&

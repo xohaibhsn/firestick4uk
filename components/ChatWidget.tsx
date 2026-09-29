@@ -35,7 +35,7 @@ export default function ChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const hidden = pathname?.startsWith("/sidhu") || pathname?.startsWith("/erp");
+  const hidden = pathname?.startsWith("/sidhu");
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

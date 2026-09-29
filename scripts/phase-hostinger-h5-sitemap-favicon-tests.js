@@ -207,12 +207,7 @@ ok(
   "db_pool_untouched",
   /connectionLimit:\s*3/.test(db)
 );
-ok(
-  "erp_layout_untouched",
-  !/invalidateSitemapCache|faviconUrlServer|sitemapDataServer/.test(
-    read("app/erp/ERPLayout.tsx")
-  )
-);
+ok("erp_ui_absent_after_r2b", !exists("app/erp"));
 ok("h5_test_exists", exists("scripts/phase-hostinger-h5-sitemap-favicon-tests.js"));
 
 console.log(

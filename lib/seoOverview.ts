@@ -301,9 +301,7 @@ export function buildKeyPageFacts(subscriptionUrl: string): KeyPageFact[] {
     { path: "/sidhu", url: `${SEO_SITE_ORIGIN}/sidhu`, indexState: "robots-disallow", canonical: `${SEO_SITE_ORIGIN}/sidhu`, inSitemap: false, source: "Hardcoded", note: "robots Disallow + meta noindex" },
     { path: "/A1iptvDownload", url: `${SEO_SITE_ORIGIN}/A1iptvDownload`, indexState: "noindex", canonical: `${SEO_SITE_ORIGIN}/A1iptvDownload`, inSitemap: false, source: "Hardcoded" },
     { path: "/5GNextDownload", url: `${SEO_SITE_ORIGIN}/5GNextDownload`, indexState: "noindex", canonical: `${SEO_SITE_ORIGIN}/5GNextDownload`, inSitemap: false, source: "Hardcoded" },
-    { path: "/player", url: `${SEO_SITE_ORIGIN}/player`, indexState: "noindex", canonical: `${SEO_SITE_ORIGIN}/player`, inSitemap: false, source: "Hardcoded" },
     { path: "/admin", url: `${SEO_SITE_ORIGIN}/admin`, indexState: "redirect", canonical: SEO_SITE_ORIGIN, inSitemap: false, source: "Hardcoded", note: "Server redirect → /" },
-    { path: "/erp", url: `${SEO_SITE_ORIGIN}/erp`, indexState: "robots-disallow", canonical: SEO_SITE_ORIGIN, inSitemap: false, source: "Hardcoded", note: "ERP — internal / robots blocked / frozen" },
   ];
 }
 

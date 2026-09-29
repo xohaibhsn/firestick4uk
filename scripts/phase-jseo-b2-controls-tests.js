@@ -247,9 +247,9 @@ ok(
 );
 ok("seo_overview_no_polling", !/setInterval/.test(seoPanel) && !/setTimeout/.test(seoApi));
 ok(
-  "erp_untouched_marker",
+  "erp_ui_retired_marker",
   !/app\/erp/.test(sidhu.slice(0, 200)) &&
-    fs.existsSync(path.join(ROOT, "app/erp")) === true
+    fs.existsSync(path.join(ROOT, "app/erp")) === false
 );
 
 console.log(`\nJSEO-B2 controls: ${passed} passed, ${failed} failed`);

@@ -118,7 +118,7 @@ ok(
     )
 );
 
-ok("erp_dir_exists_frozen", fs.existsSync(path.join(ROOT, "app/erp")));
+ok("erp_ui_retired", !fs.existsSync(path.join(ROOT, "app/erp")));
 
 console.log(
   `\nPS-ACTIVE product active preservation: ${passed} passed, ${failed} failed`

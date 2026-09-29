@@ -158,10 +158,7 @@ ok(
   /getPublicSiteContent/.test(termsPage) && /force-dynamic/.test(termsPage)
 );
 ok("tracking_consent_remains", /TrackingConsent/.test(layout) && exists("components/TrackingConsent.tsx") && /Privacy|Analytics|Advertising/.test(tracking));
-ok(
-  "erp_untouched_in_h1",
-  !/SiteContentProvider/.test(read("app/erp/ERPLayout.tsx"))
-);
+ok("erp_ui_absent_after_r2b", !exists("app/erp"));
 ok(
   "no_next_config_change_in_scope",
   /Cache-Control.*no-store, no-cache, must-revalidate/.test(

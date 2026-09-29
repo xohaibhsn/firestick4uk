@@ -1,5 +1,5 @@
 /**
- * SEO-R2 — utility route index hygiene (A1 / 5G Next / player).
+ * SEO-R2 — utility route index hygiene (A1 / 5G Next; player retired in ERP-R2B).
  */
 const fs = require("fs");
 const path = require("path");
@@ -38,8 +38,6 @@ const a1Layout = read("app/A1iptvDownload/layout.tsx");
 const a1Page = read("app/A1iptvDownload/page.tsx");
 const g5Layout = read("app/5GNextDownload/layout.tsx");
 const g5Page = read("app/5GNextDownload/page.tsx");
-const playerLayout = read("app/player/layout.tsx");
-const playerPage = read("app/player/page.tsx");
 const sitemap = read("app/sitemap.ts");
 const sitemapData = read("lib/sitemapDataServer.ts");
 const robots = read("public/robots.txt");
@@ -83,27 +81,17 @@ ok(
 );
 ok("g5_page_still_client", /['"]use client['"]/.test(g5Page));
 
-// --- PLAYER ---
-ok("player_layout_exists", exists("app/player/layout.tsx"));
-ok("player_robots_noindex_nofollow", hasNoIndexBlock(playerLayout));
-ok(
-  "player_canonical_self",
-  /canonical:\s*["']https:\/\/firestick4uk\.com\/player["']/.test(playerLayout)
-);
-ok("player_title_exact", /Player — Firestick4UK/.test(playerLayout));
-ok("player_page_still_client", /["']use client["']/.test(playerPage));
-ok(
-  "player_metadata_no_credentials",
-  !/password|username|playlist|xtream|server:/i.test(playerLayout) &&
-    !/\/api\/erp/.test(playerLayout)
-);
+// --- PLAYER retired ---
+ok("player_ui_absent", !exists("app/player"));
+ok("player_api_absent", !exists("pages/api/player"));
 
 // --- SITEMAP ---
 ok(
   "sitemap_utilities_absent",
   !/A1iptvDownload/.test(sitemap) &&
     !/5GNextDownload/.test(sitemap) &&
-    !/\/player["'`]/.test(sitemap)
+    !/\/player["'`]/.test(sitemap) &&
+    !/\/erp["'`]/.test(sitemap)
 );
 ok("sitemap_order_tracking_retained", /\/order-tracking/.test(sitemap));
 ok(
@@ -118,7 +106,7 @@ ok(
 
 // --- ROBOTS ---
 ok("robots_sidhu_disallow", /Disallow:\s*\/sidhu/.test(robots));
-ok("robots_erp_disallow", /Disallow:\s*\/erp/.test(robots));
+ok("robots_no_erp_disallow", !/Disallow:\s*\/erp\b/.test(robots));
 ok("robots_api_disallow", /Disallow:\s*\/api\//.test(robots));
 ok(
   "robots_no_utility_disallow",
@@ -139,12 +127,9 @@ ok(
   !/index:\s*false/.test(orderTracking)
 );
 
-// --- ERP ---
-ok(
-  "erp_not_in_r2_scope",
-  true,
-  "asserted via git diff review; no app/erp edits"
-);
+// --- ERP retired (UI gone; API tombstone only) ---
+ok("erp_ui_absent", !exists("app/erp"));
+ok("erp_api_tombstone_exists", exists("pages/api/erp/[...path].ts"));
 
 console.log(`\nSEO-R2 utility index: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

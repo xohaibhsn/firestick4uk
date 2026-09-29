@@ -230,8 +230,7 @@ ok(
 );
 ok(
   "erp_untouched",
-  !/erp\//.test(orders) &&
-    !/invalidateSitemapCache|faviconUrlServer/.test(read("app/erp/ERPLayout.tsx"))
+  !/erp\//.test(orders) && !fs.existsSync(path.join(ROOT, "app/erp"))
 );
 ok(
   "helper_order_escape_then_br",

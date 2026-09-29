@@ -358,14 +358,22 @@ ok(
 );
 ok("success_noindex", byPath["/cart/success"].indexState === "noindex");
 ok("sidhu_robots_disallow", byPath["/sidhu"].indexState === "robots-disallow");
-ok("utilities_noindex", byPath["/player"].indexState === "noindex");
+ok(
+  "utilities_a1_noindex",
+  byPath["/A1iptvDownload"].indexState === "noindex"
+);
+ok(
+  "utilities_5g_noindex",
+  byPath["/5GNextDownload"].indexState === "noindex"
+);
 ok("admin_redirect", byPath["/admin"].indexState === "redirect");
 ok(
   "order_tracking_index_sitemap",
   byPath["/order-tracking"].indexState === "index" &&
     byPath["/order-tracking"].inSitemap === true
 );
-ok("erp_frozen_note", /frozen/i.test(byPath["/erp"].note || ""));
+ok("erp_key_page_removed", !byPath["/erp"]);
+ok("player_key_page_removed", !byPath["/player"]);
 
 // --- GSC ---
 const v = so.buildProduct8VerificationItems();

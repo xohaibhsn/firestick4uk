@@ -169,7 +169,7 @@ ok(
   "robots_sidhu_disallow",
   /Disallow:\s*\/sidhu/.test(robots)
 );
-ok("robots_erp_disallow", /Disallow:\s*\/erp/.test(robots));
+ok("robots_no_erp_disallow", !/Disallow:\s*\/erp\b/.test(robots));
 ok("robots_api_disallow", /Disallow:\s*\/api\//.test(robots));
 ok(
   "robots_no_global_disallow",
@@ -180,18 +180,14 @@ ok(
   !/Disallow:\s*\/cart/.test(robots) && !/Disallow:\s*\/admin/.test(robots)
 );
 ok(
-  "robots_file_unchanged_exclusions_only",
+  "robots_file_exclusions_current",
   robots.includes("Disallow: /sidhu") &&
-    robots.includes("Disallow: /erp") &&
+    !robots.includes("Disallow: /erp") &&
     robots.includes("Disallow: /api/")
 );
 
-// --- ERP FROZEN ---
-ok(
-  "erp_source_not_in_r1_scope",
-  true,
-  "asserted via git diff review; no app/erp edits in this phase"
-);
+// --- ERP retired ---
+ok("erp_ui_absent_after_r2b", !fs.existsSync(path.join(ROOT, "app/erp")));
 
 console.log(`\nSEO-R1 index hygiene: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

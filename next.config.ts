@@ -54,14 +54,6 @@ const nextConfig: NextConfig = {
         headers: noStoreHeaders,
       },
       {
-        source: "/erp",
-        headers: noStoreHeaders,
-      },
-      {
-        source: "/erp/:path*",
-        headers: noStoreHeaders,
-      },
-      {
         source: "/cart",
         headers: noStoreHeaders,
       },

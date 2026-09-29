@@ -36,7 +36,6 @@ const db = read("lib/db.ts");
 const home = read("app/page.tsx");
 const layout = read("app/layout.tsx");
 const contact = read("lib/contact-config.ts");
-const erpLayout = read("app/erp/ERPLayout.tsx");
 
 // --- Parse header blocks without executing TS ---
 ok(
@@ -121,12 +120,9 @@ ok(
   /source:\s*["']\/sidhu\/:path\*["']/.test(nextConfig)
 );
 ok(
-  "erp_root_no_store",
-  /source:\s*["']\/erp["']/.test(nextConfig)
-);
-ok(
-  "erp_nested_no_store",
-  /source:\s*["']\/erp\/:path\*["']/.test(nextConfig)
+  "erp_no_store_removed",
+  !/source:\s*["']\/erp["']/.test(nextConfig) &&
+    !/source:\s*["']\/erp\/:path\*["']/.test(nextConfig)
 );
 ok(
   "cart_root_no_store",
@@ -147,8 +143,6 @@ function sourceUsesNoStore(sourceLiteral) {
 ok("api_paired_noStore", sourceUsesNoStore("/api/:path*"));
 ok("sidhu_paired_noStore", sourceUsesNoStore("/sidhu"));
 ok("sidhu_nested_paired_noStore", sourceUsesNoStore("/sidhu/:path*"));
-ok("erp_paired_noStore", sourceUsesNoStore("/erp"));
-ok("erp_nested_paired_noStore", sourceUsesNoStore("/erp/:path*"));
 ok("cart_paired_noStore", sourceUsesNoStore("/cart"));
 ok("cart_nested_paired_noStore", sourceUsesNoStore("/cart/:path*"));
 
@@ -208,8 +202,8 @@ ok(
   /connectionLimit:\s*3/.test(db) && /NODE_ENV !== 'production'/.test(db)
 );
 ok(
-  "erp_source_untouched_by_h3",
-  !/noStoreHeaders|Cache-Control/.test(erpLayout)
+  "erp_ui_absent_after_r2b",
+  !exists("app/erp")
 );
 ok(
   "no_use_cache_directive",
