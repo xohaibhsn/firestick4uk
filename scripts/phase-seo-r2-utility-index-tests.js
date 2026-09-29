@@ -127,9 +127,10 @@ ok(
   !/index:\s*false/.test(orderTracking)
 );
 
-// --- ERP retired (UI gone; API tombstone only) ---
+// --- ERP retired (UI + API gone; R2C no tombstone) ---
 ok("erp_ui_absent", !exists("app/erp"));
-ok("erp_api_tombstone_exists", exists("pages/api/erp/[...path].ts"));
+ok("erp_api_absent", !exists("pages/api/erp"));
+ok("erp_tombstone_absent", !exists("pages/api/erp/[...path].ts"));
 
 console.log(`\nSEO-R2 utility index: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -269,9 +269,7 @@ ok(
 ok(
   "erp_untouched",
   !fs.existsSync(path.join(ROOT, "app/erp")) &&
-    !/evaluateLockedCoupon/.test(
-      fs.readFileSync(path.join(ROOT, "pages/api/erp/[...path].ts"), "utf8")
-    )
+    !fs.existsSync(path.join(ROOT, "pages/api/erp"))
 );
 
 console.log(`\nphase-coupon-atomicity: ${passed} passed, ${failed} failed`);
