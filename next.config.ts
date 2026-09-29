@@ -22,6 +22,21 @@ const nextConfig: NextConfig = {
     ],
   },
   compress: true,
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [
+          {
+            type: "host",
+            value: "www.firestick4uk.com",
+          },
+        ],
+        destination: "https://firestick4uk.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return [
       // Browsers auto-request /favicon.ico — serve dynamic DB favicon

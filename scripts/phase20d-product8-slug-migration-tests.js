@@ -135,8 +135,16 @@ fail(
 );
 
 fail(
-  "P_no_redirects_in_next_config",
-  !/async redirects\(/.test(nextConfig)
+  "P_next_config_www_host_redirect_only",
+  /async redirects\(/.test(nextConfig) &&
+    /type:\s*["']host["']/.test(nextConfig) &&
+    /www\.firestick4uk\.com/.test(nextConfig) &&
+    /https:\/\/firestick4uk\.com\/:path\*/.test(nextConfig) &&
+    /permanent:\s*true/.test(nextConfig) &&
+    !/world-cup-offer-3-years/.test(nextConfig) &&
+    !/3-years-season-pass/.test(nextConfig) &&
+    !/2-years-subscription/.test(nextConfig) &&
+    !/b1g-2-years-plan/.test(nextConfig)
 );
 
 // Simulate helper logic
