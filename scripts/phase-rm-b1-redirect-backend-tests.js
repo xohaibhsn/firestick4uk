@@ -49,6 +49,7 @@ const model = loadTsModule("lib/urlRedirects.ts");
 const {
   normalizeInternalPathname,
   normalizeRedirectType,
+  parseRedirectActive,
   validateRedirectFields,
   validateActiveRedirectGraph,
   isProtectedRedirectPath,
@@ -97,6 +98,81 @@ ok("reject_hash", !normalizeInternalPathname("/blog#section", "source").ok);
 ok("reject_proto_rel", !normalizeInternalPathname("//evil.com/x", "source").ok);
 ok("reject_javascript", !normalizeInternalPathname("javascript:alert(1)", "source").ok);
 ok("reject_data", !normalizeInternalPathname("data:text/html,hi", "destination").ok);
+
+// --- Dot segments (reject) / dotted filenames (accept) ---
+for (const p of ["/.", "/..", "/foo/./bar", "/foo/../bar", "/foo/../sidhu", "/safe/../../api"]) {
+  ok(
+    `dotseg_reject_${p}`,
+    !normalizeInternalPathname(p, "source").ok && !normalizeInternalPathname(p, "destination").ok
+  );
+}
+ok(
+  "dotseg_bypass_sidhu_impossible",
+  !validateRedirectFields({ source_path: "/old-dot", destination_path: "/foo/../sidhu", existing: [] }).ok
+);
+ok(
+  "dotseg_bypass_api_impossible",
+  !validateRedirectFields({ source_path: "/old-dot2", destination_path: "/safe/../../api", existing: [] }).ok
+);
+ok(
+  "dotted_name_post_html",
+  normalizeInternalPathname("/post.html", "source").ok &&
+    normalizeInternalPathname("/post.html", "source").path === "/post.html"
+);
+ok(
+  "dotted_name_version_path",
+  normalizeInternalPathname("/version-1.2/page", "destination").ok &&
+    normalizeInternalPathname("/version-1.2/page", "destination").path === "/version-1.2/page"
+);
+ok(
+  "dotted_name_my_page",
+  normalizeInternalPathname("/my.page", "source").ok &&
+    normalizeInternalPathname("/my.page", "source").path === "/my.page"
+);
+
+// --- Active strict parsing ---
+ok("active_default_undefined", parseRedirectActive(undefined, 1).ok && parseRedirectActive(undefined, 1).active === 1);
+ok("active_default_null", parseRedirectActive(null, 1).ok && parseRedirectActive(null, 1).active === 1);
+ok("active_default_empty", parseRedirectActive("", 0).ok && parseRedirectActive("", 0).active === 0);
+ok("active_true", parseRedirectActive(true).ok && parseRedirectActive(true).active === 1);
+ok("active_false", parseRedirectActive(false).ok && parseRedirectActive(false).active === 0);
+ok("active_1", parseRedirectActive(1).ok && parseRedirectActive(1).active === 1);
+ok("active_0", parseRedirectActive(0).ok && parseRedirectActive(0).active === 0);
+ok("active_str1", parseRedirectActive("1").ok && parseRedirectActive("1").active === 1);
+ok("active_str0", parseRedirectActive("0").ok && parseRedirectActive("0").active === 0);
+for (const bad of ["true", "false", "yes", "no", 2, -1, "garbage", {}, []]) {
+  const label = typeof bad === "object" ? JSON.stringify(bad) : String(bad);
+  ok(`active_reject_${label}`, !parseRedirectActive(bad).ok);
+}
+ok(
+  "active_fields_reject_garbage",
+  !validateRedirectFields({
+    source_path: "/old-act",
+    destination_path: "/about",
+    active: "garbage",
+    existing: [],
+  }).ok
+);
+ok(
+  "active_post_default_active",
+  validateRedirectFields({ source_path: "/old-act2", destination_path: "/about", existing: [] }).ok &&
+    validateRedirectFields({ source_path: "/old-act2", destination_path: "/about", existing: [] }).active === 1
+);
+ok(
+  "active_put_preserve_via_explicit_0",
+  validateRedirectFields({
+    source_path: "/old-act3",
+    destination_path: "/about",
+    active: 0,
+    existing: [],
+  }).ok &&
+    validateRedirectFields({
+      source_path: "/old-act3",
+      destination_path: "/about",
+      active: 0,
+      existing: [],
+    }).active === 0
+);
 
 // --- Protected ---
 for (const p of [
@@ -231,6 +307,21 @@ ok("api_no_ddl", !/CREATE TABLE|ALTER TABLE|DROP TABLE/i.test(api));
 ok("migration_create_table", /CREATE TABLE IF NOT EXISTS url_redirects/.test(migration));
 ok("migration_308_default", /DEFAULT 308/.test(migration));
 ok("migration_unique_source", /uq_url_redirects_source/.test(migration));
+ok("migration_uses_information_schema_stats", /information_schema\.statistics/.test(migration));
+ok(
+  "migration_required_index_names",
+  /uq_url_redirects_source/.test(migration) &&
+    /idx_url_redirects_active/.test(migration) &&
+    /idx_url_redirects_updated/.test(migration)
+);
+ok("migration_no_blank_catch_alter", !/catch\s*\{\s*\/\*\s*already exists/i.test(migration));
+ok("migration_fails_on_alter_error", /FAIL \[index\]/.test(migration) && /process\.exit\(1\)/.test(migration));
+ok("migration_skips_via_schema_check", /already exists — skip/.test(migration) && /indexExists/.test(migration));
+ok(
+  "migration_post_checks_indexes",
+  /required index missing/.test(migration) && /SUCCESS: url_redirects table and required indexes/.test(migration)
+);
+ok("migration_controlled_only", /Does NOT run on API requests or builds/.test(migration));
 
 // --- No runtime activation in RM-B1 ---
 ok("no_proxy_file", !exists("proxy.ts") && !exists("middleware.ts"));

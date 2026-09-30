@@ -134,6 +134,17 @@ export function normalizeInternalPathname(input: unknown, kind: "source" | "dest
     return { ok: false, error: `${kind} path contains invalid characters` };
   }
 
+  // Reject "." / ".." segments (URL resolvers may rewrite these into protected paths).
+  // Dots inside segment names (e.g. post.html, v1.2) remain allowed.
+  for (const segment of path.split("/")) {
+    if (segment === "." || segment === "..") {
+      return {
+        ok: false,
+        error: `${kind} path must not contain "." or ".." segments`,
+      };
+    }
+  }
+
   return { ok: true, path };
 }
 
@@ -148,10 +159,28 @@ export function normalizeRedirectType(input: unknown): { ok: true; type: UrlRedi
   return { ok: true, type: URL_REDIRECT_TYPE_V1 };
 }
 
-export function parseRedirectActive(value: unknown, fallback: 0 | 1 = 1): 0 | 1 {
-  if (value === undefined || value === null || value === "") return fallback;
-  if (value === true || value === 1 || value === "1") return 1;
-  return 0;
+export type ParseRedirectActiveResult =
+  | { ok: true; active: 0 | 1 }
+  | { ok: false; error: string };
+
+/**
+ * Strict active flag parsing for the authoritative admin API.
+ * Omitted/null/empty → fallback. Only boolean/0/1/"0"/"1" accepted otherwise.
+ */
+export function parseRedirectActive(
+  value: unknown,
+  fallback: 0 | 1 = 1
+): ParseRedirectActiveResult {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true, active: fallback };
+  }
+  if (value === true || value === 1 || value === "1") {
+    return { ok: true, active: 1 };
+  }
+  if (value === false || value === 0 || value === "0") {
+    return { ok: true, active: 0 };
+  }
+  return { ok: false, error: "active must be true, false, 1, 0, \"1\", or \"0\"" };
 }
 
 /**
@@ -252,13 +281,14 @@ export function validateRedirectFields(input: {
   const type = normalizeRedirectType(input.redirect_type);
   if (!type.ok) return type;
 
-  const active = parseRedirectActive(input.active, 1);
+  const activeParsed = parseRedirectActive(input.active, 1);
+  if (!activeParsed.ok) return activeParsed;
 
   const graph = validateActiveRedirectGraph(input.existing || [], {
     id: input.id ?? null,
     source_path: source.path,
     destination_path: dest.path,
-    active,
+    active: activeParsed.active,
   });
   if (!graph.ok) {
     return { ok: false, error: graph.error, code: "conflict" };
@@ -269,7 +299,7 @@ export function validateRedirectFields(input: {
     source_path: source.path,
     destination_path: dest.path,
     redirect_type: type.type,
-    active,
+    active: activeParsed.active,
   };
 }
 

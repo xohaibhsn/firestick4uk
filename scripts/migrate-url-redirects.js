@@ -3,10 +3,16 @@
  * Run: node scripts/migrate-url-redirects.js
  * Does NOT run on API requests or builds.
  *
- * RM-B1: do NOT execute against production until RM-B1M / approved migration window.
+ * RM-B1/B1.1: do NOT execute against production until RM-B1M / approved migration window.
  */
 const fs = require("fs");
 const path = require("path");
+
+const REQUIRED_INDEXES = [
+  { name: "uq_url_redirects_source", unique: true, column: "source_path" },
+  { name: "idx_url_redirects_active", unique: false, column: "active" },
+  { name: "idx_url_redirects_updated", unique: false, column: "updated_at" },
+];
 
 function loadEnvLocal() {
   const envPath = path.join(process.cwd(), ".env.local");
@@ -21,6 +27,43 @@ function loadEnvLocal() {
     }
     if (!process.env[key]) process.env[key] = val;
   }
+}
+
+async function indexExists(conn, database, indexName) {
+  const [rows] = await conn.query(
+    `SELECT COUNT(*) AS c
+     FROM information_schema.statistics
+     WHERE table_schema = ?
+       AND table_name = 'url_redirects'
+       AND index_name = ?`,
+    [database, indexName]
+  );
+  return Number(rows[0]?.c || 0) > 0;
+}
+
+async function ensureIndex(conn, database, spec) {
+  const exists = await indexExists(conn, database, spec.name);
+  if (exists) {
+    console.log(`OK [index] ${spec.name} already exists — skip`);
+    return;
+  }
+
+  const unique = spec.unique ? "UNIQUE KEY" : "KEY";
+  const sql = `ALTER TABLE url_redirects ADD ${unique} ${spec.name} (${spec.column})`;
+  console.log(`RUN [index] ${sql}`);
+  try {
+    await conn.query(sql);
+  } catch (err) {
+    console.error(`FAIL [index] ${spec.name}:`, err?.message || err);
+    process.exit(1);
+  }
+
+  const verified = await indexExists(conn, database, spec.name);
+  if (!verified) {
+    console.error(`FAIL [index] ${spec.name} missing after ALTER`);
+    process.exit(1);
+  }
+  console.log(`OK [index] ${spec.name} created`);
 }
 
 async function main() {
@@ -58,31 +101,30 @@ async function main() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
-    for (const sql of [
-      "ALTER TABLE url_redirects ADD UNIQUE KEY uq_url_redirects_source (source_path)",
-      "ALTER TABLE url_redirects ADD KEY idx_url_redirects_active (active)",
-      "ALTER TABLE url_redirects ADD KEY idx_url_redirects_updated (updated_at)",
-    ]) {
-      try {
-        await conn.query(sql);
-      } catch {
-        /* already exists */
-      }
+    for (const spec of REQUIRED_INDEXES) {
+      await ensureIndex(conn, database, spec);
     }
 
-    const [rows] = await conn.query(
+    const [tableRows] = await conn.query(
       `SELECT COUNT(*) AS c
        FROM information_schema.tables
        WHERE table_schema = ? AND table_name = 'url_redirects'`,
       [database]
     );
-    const exists = Number(rows[0]?.c || 0) > 0;
-    if (!exists) {
+    if (!(Number(tableRows[0]?.c || 0) > 0)) {
       console.error("FAIL: url_redirects not found after CREATE");
       process.exit(1);
     }
 
-    console.log("SUCCESS: url_redirects is ready");
+    for (const spec of REQUIRED_INDEXES) {
+      const ok = await indexExists(conn, database, spec.name);
+      if (!ok) {
+        console.error(`FAIL: required index missing: ${spec.name}`);
+        process.exit(1);
+      }
+    }
+
+    console.log("SUCCESS: url_redirects table and required indexes are ready");
   } finally {
     await conn.end();
   }
