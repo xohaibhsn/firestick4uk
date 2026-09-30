@@ -12,6 +12,7 @@ import {
   sanitizeUploadFilename,
 } from "../../lib/imageUploadValidation";
 import { invalidateFaviconCache } from "../../lib/hostingerResourceInvalidation";
+import { invalidatePublicCmsCache } from "../../lib/publicCmsDataServer";
 
 export const config = { api: { bodyParser: { sizeLimit: "2mb" } } };
 
@@ -118,6 +119,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     invalidateFaviconCache();
+    invalidatePublicCmsCache();
 
     const mediaId = await recordMediaAsset({
       url: publicUrl,

@@ -15,6 +15,7 @@ import {
   snapshotProduct,
   SUBSCRIPTION_ROUTING_KEYS,
 } from "../../../lib/contentRevisions";
+import { invalidatePublicCmsCache } from "../../../lib/publicCmsDataServer";
 
 const PRODUCT_CATEGORIES = ["Subscription", "Device", "Bundle"] as const;
 
@@ -376,6 +377,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       await conn.commit();
+      invalidatePublicCmsCache();
       const { ip } = getRequestMeta(req);
       await recordAdminAudit({
         actor: admin,
@@ -450,6 +452,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
 
       await conn.commit();
+      invalidatePublicCmsCache();
       const { ip } = getRequestMeta(req);
       await recordAdminAudit({
         actor: admin,

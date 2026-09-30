@@ -166,10 +166,9 @@ ok(
   )
 );
 ok(
-  "site_content_api_uncached_still",
-  !/s-maxage|revalidateTag|unstable_cache/.test(
-    read("pages/api/site-content.ts")
-  )
+  "site_content_page_all_uses_server_cache",
+  /getCachedPublicSiteContentAll/.test(read("pages/api/site-content.ts")) &&
+    !/s-maxage/.test(read("pages/api/site-content.ts"))
 );
 ok(
   "contact_initial_preference",

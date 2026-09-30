@@ -3,6 +3,10 @@ import pool from '../../lib/db';
 import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
 import { recordContentRevision } from '../../lib/contentRevisions';
+import {
+  getCachedPublicVisibleSections,
+  invalidatePublicCmsCache,
+} from '../../lib/publicCmsDataServer';
 
 async function loadSection(key: string) {
   const [rows]: any = await pool.query(
@@ -46,8 +50,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const admin = await requireAdminPermission(req, res, 'page_builder.manage', { mutate: false });
         if (!admin) return;
       }
+      const pageArg = page || 'home';
+      if (!all && typeof pageArg === 'string') {
+        const result = await getCachedPublicVisibleSections(pageArg);
+        return res.status(200).json(result);
+      }
       let query = 'SELECT content_key,content_value,content_type,page_name,label,section_order,is_visible FROM site_content WHERE page_name=? AND content_type="json"';
-      const params: any[] = [page || 'home'];
+      const params: any[] = [pageArg];
       if (!all) query += ' AND is_visible=1';
       query += ' ORDER BY section_order ASC';
       const [rows]: any = await pool.query(query, params);
@@ -108,6 +117,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         metadata: { section_key: key },
         ip,
       });
+      invalidatePublicCmsCache();
       return res.status(200).json({ success: true });
     }
 
@@ -157,6 +167,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           metadata: { section_key: key, visible: !!is_visible },
           ip,
         });
+        invalidatePublicCmsCache();
         return res.status(200).json({ success: true });
       }
       if (action === 'reorder') {
@@ -202,6 +213,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           metadata: { keys },
           ip,
         });
+        invalidatePublicCmsCache();
         return res.status(200).json({ success: true });
       }
       return res.status(400).json({ error: 'Unknown action' });

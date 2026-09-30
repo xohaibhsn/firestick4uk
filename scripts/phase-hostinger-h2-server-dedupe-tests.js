@@ -200,8 +200,9 @@ ok(
     /public, max-age=3600/.test(favicon)
 );
 ok(
-  "site_content_api_no_unstable_cache",
-  !/unstable_cache|revalidateTag|s-maxage/.test(siteContentApi)
+  "site_content_api_no_http_cache_header",
+  /getCachedPublicSiteContentAll/.test(siteContentApi) &&
+    !/s-maxage/.test(siteContentApi)
 );
 ok(
   "no_use_cache_directive",

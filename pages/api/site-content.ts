@@ -21,6 +21,10 @@ import {
   siteContentKeysAffectFavicon,
   siteContentKeysAffectSitemap,
 } from '../../lib/hostingerResourceInvalidation';
+import {
+  getCachedPublicSiteContentAll,
+  invalidatePublicCmsCache,
+} from '../../lib/publicCmsDataServer';
 
 /** Lookup metadata for upserts only — does not seed the database at request time. */
 const DEFAULTS = SITE_CONTENT_DEFAULTS;
@@ -64,6 +68,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'GET') {
       const { page } = req.query;
+      if (page === 'all') {
+        const result = await getCachedPublicSiteContentAll();
+        return res.status(200).json(result);
+      }
       let query = 'SELECT content_key, content_value, content_type, page_name, label FROM site_content';
       const params: any[] = [];
       if (page && page !== 'all') { query += ' WHERE page_name=?'; params.push(page); }
@@ -299,6 +307,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (siteContentKeysAffectFavicon(allKeys)) {
         invalidateFaviconCache();
       }
+      invalidatePublicCmsCache();
 
       return res.status(200).json({
         success: true,
@@ -392,6 +401,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           invalidateFaviconCache();
         }
       }
+      invalidatePublicCmsCache();
       return res.status(200).json({ success: true });
     }
 
@@ -483,6 +493,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (siteContentKeysAffectFavicon([key])) {
         invalidateFaviconCache();
       }
+      invalidatePublicCmsCache();
       return res.status(200).json({ success: true });
     }
 
