@@ -305,38 +305,197 @@ export function buildKeyPageFacts(subscriptionUrl: string): KeyPageFact[] {
   ];
 }
 
+export type VerificationGroup = "priority-migrations" | "core-content";
+
+export type VerificationKind = "current" | "legacy-redirect" | "content";
+
+/** Curated GSC queue row — Firestick4UK technical expectations only; never Google status. */
 export type VerificationItem = {
   url: string;
+  label: string;
+  group: VerificationGroup;
+  kind: VerificationKind;
+  expectedStatus: 200 | 308 | null;
+  expectedCanonical: string | null;
+  expectedTarget: string | null;
+  inSitemap: boolean | null;
+  note: string;
+};
+
+export type GscAccountCheck = {
+  key: "manual-actions" | "security-issues";
   label: string;
   note: string;
 };
 
-export function buildProduct8VerificationItems(): VerificationItem[] {
-  const note = "Verify in GSC — technical state only; no Google status claimed";
-  return [
-    { url: productPublicUrl("3-years-subscription"), label: "Product 8 current", note },
-    { url: productPublicUrl("world-cup-offer-3-years"), label: "Product 8 legacy", note },
-    { url: productPublicUrl("3-years-season-pass"), label: "Product 8 legacy", note },
-    { url: productPublicUrl("b1g-2-years-plan"), label: "Product 9 current", note },
-    { url: productPublicUrl("2-years-subscription"), label: "Product 9 name alias", note },
-  ];
+export const GSC_VERIFY_NOTE =
+  "Verify in GSC — technical state only; no Google status claimed";
+
+export const GSC_ACCOUNT_CHECKS: readonly GscAccountCheck[] = [
+  {
+    key: "manual-actions",
+    label: "Manual Actions",
+    note: "Check Google Search Console → Manual Actions. No live Google status is connected.",
+  },
+  {
+    key: "security-issues",
+    label: "Security Issues",
+    note: "Check Google Search Console → Security Issues. No live Google status is connected.",
+  },
+] as const;
+
+export const PRODUCT8_CURRENT_SLUG = "3-years-subscription";
+export const PRODUCT9_CURRENT_SLUG = "b1g-2-years-plan";
+export const PRODUCT9_ALIAS_SLUG = "2-years-subscription";
+
+/**
+ * Priority Product 8 / Product 9 migration URLs for manual GSC work.
+ * expectedStatus depends on whether the DB target product is active.
+ */
+export function buildProductMigrationVerificationItems(opts: {
+  p8Active: boolean;
+  p9Active: boolean;
+}): VerificationItem[] {
+  const p8Url = productPublicUrl(PRODUCT8_CURRENT_SLUG);
+  const p9Url = productPublicUrl(PRODUCT9_CURRENT_SLUG);
+  const items: VerificationItem[] = [];
+
+  if (opts.p8Active) {
+    items.push({
+      url: p8Url,
+      label: "Product 8 current",
+      group: "priority-migrations",
+      kind: "current",
+      expectedStatus: 200,
+      expectedCanonical: p8Url,
+      expectedTarget: null,
+      inSitemap: true,
+      note: GSC_VERIFY_NOTE,
+    });
+  } else {
+    items.push({
+      url: p8Url,
+      label: "Product 8 current",
+      group: "priority-migrations",
+      kind: "current",
+      expectedStatus: null,
+      expectedCanonical: null,
+      expectedTarget: null,
+      inSitemap: false,
+      note: `${GSC_VERIFY_NOTE}. Technical state requires review — target product inactive or missing.`,
+    });
+  }
+
+  for (const fromSlug of ["world-cup-offer-3-years", "3-years-season-pass"] as const) {
+    const url = productPublicUrl(fromSlug);
+    if (opts.p8Active) {
+      items.push({
+        url,
+        label: "Product 8 legacy",
+        group: "priority-migrations",
+        kind: "legacy-redirect",
+        expectedStatus: 308,
+        expectedCanonical: p8Url,
+        expectedTarget: p8Url,
+        inSitemap: false,
+        note: GSC_VERIFY_NOTE,
+      });
+    } else {
+      items.push({
+        url,
+        label: "Product 8 legacy",
+        group: "priority-migrations",
+        kind: "legacy-redirect",
+        expectedStatus: null,
+        expectedCanonical: null,
+        expectedTarget: p8Url,
+        inSitemap: false,
+        note: `${GSC_VERIFY_NOTE}. Redirect depends on active target; configured target ${p8Url} is inactive or missing.`,
+      });
+    }
+  }
+
+  if (opts.p9Active) {
+    items.push({
+      url: p9Url,
+      label: "Product 9 current",
+      group: "priority-migrations",
+      kind: "current",
+      expectedStatus: 200,
+      expectedCanonical: p9Url,
+      expectedTarget: null,
+      inSitemap: true,
+      note: GSC_VERIFY_NOTE,
+    });
+  } else {
+    items.push({
+      url: p9Url,
+      label: "Product 9 current",
+      group: "priority-migrations",
+      kind: "current",
+      expectedStatus: null,
+      expectedCanonical: null,
+      expectedTarget: null,
+      inSitemap: false,
+      note: `${GSC_VERIFY_NOTE}. Technical state requires review — target product inactive or missing.`,
+    });
+  }
+
+  const aliasUrl = productPublicUrl(PRODUCT9_ALIAS_SLUG);
+  if (opts.p9Active) {
+    items.push({
+      url: aliasUrl,
+      label: "Product 9 alias",
+      group: "priority-migrations",
+      kind: "legacy-redirect",
+      expectedStatus: 308,
+      expectedCanonical: p9Url,
+      expectedTarget: p9Url,
+      inSitemap: false,
+      note: GSC_VERIFY_NOTE,
+    });
+  } else {
+    items.push({
+      url: aliasUrl,
+      label: "Product 9 alias",
+      group: "priority-migrations",
+      kind: "legacy-redirect",
+      expectedStatus: null,
+      expectedCanonical: null,
+      expectedTarget: p9Url,
+      inSitemap: false,
+      note: `${GSC_VERIFY_NOTE}. Redirect depends on active target; configured target ${p9Url} is inactive or missing.`,
+    });
+  }
+
+  return items;
 }
 
 export function buildContentVerificationItems(subscriptionUrl: string): VerificationItem[] {
-  const note = "Verify in GSC — technical state only; no Google status claimed";
   const sub = String(subscriptionUrl || `${SEO_SITE_ORIGIN}/iptv-subscriptions-uk`).replace(
     /\/+$/,
     ""
   );
-  return [
-    { url: SEO_SITE_ORIGIN, label: "Homepage", note },
-    { url: `${SEO_SITE_ORIGIN}/products`, label: "Products listing", note },
-    { url: `${SEO_SITE_ORIGIN}/blog`, label: "Blog listing", note },
-    { url: `${SEO_SITE_ORIGIN}/faq`, label: "FAQ", note },
-    { url: sub, label: "Subscription", note },
-    { url: `${SEO_SITE_ORIGIN}/order-tracking`, label: "Order tracking", note },
-    { url: `${SEO_SITE_ORIGIN}/terms`, label: "Terms", note },
-    { url: `${SEO_SITE_ORIGIN}/privacy-policy`, label: "Privacy", note },
-    { url: `${SEO_SITE_ORIGIN}/refund-policy`, label: "Refund", note },
+  const rows: Array<{ url: string; label: string }> = [
+    { url: SEO_SITE_ORIGIN, label: "Homepage" },
+    { url: `${SEO_SITE_ORIGIN}/products`, label: "Products listing" },
+    { url: `${SEO_SITE_ORIGIN}/blog`, label: "Blog listing" },
+    { url: `${SEO_SITE_ORIGIN}/faq`, label: "FAQ" },
+    { url: sub, label: "Subscription" },
+    { url: `${SEO_SITE_ORIGIN}/order-tracking`, label: "Order tracking" },
+    { url: `${SEO_SITE_ORIGIN}/terms`, label: "Terms" },
+    { url: `${SEO_SITE_ORIGIN}/privacy-policy`, label: "Privacy" },
+    { url: `${SEO_SITE_ORIGIN}/refund-policy`, label: "Refund" },
   ];
+  return rows.map((r) => ({
+    url: r.url,
+    label: r.label,
+    group: "core-content" as const,
+    kind: "content" as const,
+    expectedStatus: 200 as const,
+    expectedCanonical: r.url,
+    expectedTarget: null,
+    inSitemap: true,
+    note: GSC_VERIFY_NOTE,
+  }));
 }

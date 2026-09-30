@@ -4,6 +4,24 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import type { AdminRoleName, SidhuTab } from "@/lib/adminPermissions";
 import { hasAdminPermission } from "@/lib/adminPermissions";
 
+type VerificationRow = {
+  url: string;
+  label: string;
+  group: "priority-migrations" | "core-content";
+  kind: "current" | "legacy-redirect" | "content";
+  expectedStatus: 200 | 308 | null;
+  expectedCanonical: string | null;
+  expectedTarget: string | null;
+  inSitemap: boolean | null;
+  note: string;
+};
+
+type GscAccountCheckRow = {
+  key: string;
+  label: string;
+  note: string;
+};
+
 type OverviewPayload = {
   permissions: {
     products: boolean;
@@ -22,7 +40,8 @@ type OverviewPayload = {
   keyPages?: Array<Record<string, unknown>>;
   redirects?: Array<Record<string, string>>;
   sitemap?: { included: string[]; excluded: string[]; note: string };
-  verificationQueue?: Array<{ url: string; label: string; note: string }>;
+  verificationQueue?: VerificationRow[];
+  gscAccountChecks?: GscAccountCheckRow[];
   orderTracking?: Record<string, unknown>;
 };
 
@@ -62,6 +81,7 @@ export default function SeoOverviewPanel({
   const [data, setData] = useState<OverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [copiedUrl, setCopiedUrl] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -122,6 +142,112 @@ export default function SeoOverviewPanel({
 
   const can = (perm: Parameters<typeof hasAdminPermission>[1]) =>
     hasAdminPermission(role, perm);
+
+  const copyUrl = async (url: string) => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "absolute";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopiedUrl(url);
+      window.setTimeout(() => {
+        setCopiedUrl((prev) => (prev === url ? "" : prev));
+      }, 1600);
+    } catch {
+      setCopiedUrl("");
+    }
+  };
+
+  const migrations = (data?.verificationQueue || []).filter(
+    (i) => i.group === "priority-migrations"
+  );
+  const coreContent = (data?.verificationQueue || []).filter(
+    (i) => i.group === "core-content"
+  );
+  const accountChecks = Array.isArray(data?.gscAccountChecks)
+    ? data.gscAccountChecks
+    : [];
+  const showGscBlock =
+    migrations.length > 0 || coreContent.length > 0 || accountChecks.length > 0;
+
+  const renderQueueTable = (items: VerificationRow[]) => (
+    <div style={{ overflowX: "auto" }}>
+      <table className="data-table" style={{ width: "100%", minWidth: 720 }}>
+        <thead>
+          <tr>
+            <th>Label</th>
+            <th>URL</th>
+            <th>Expected HTTP</th>
+            <th>Target / Canonical</th>
+            <th>Sitemap</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.url}>
+              <td style={{ fontSize: 12, fontWeight: 600 }}>{item.label}</td>
+              <td style={{ fontSize: 11, wordBreak: "break-all" }}>{item.url}</td>
+              <td style={{ fontSize: 12 }}>
+                {item.expectedStatus == null ? (
+                  <span style={badgeStyle("Review")}>Review</span>
+                ) : (
+                  item.expectedStatus
+                )}
+              </td>
+              <td style={{ fontSize: 11, wordBreak: "break-all" }}>
+                {item.kind === "legacy-redirect" ? (
+                  <>
+                    <div>Redirect target: {item.expectedTarget || "—"}</div>
+                    {item.expectedCanonical ? (
+                      <div style={{ color: "#666", marginTop: 4 }}>
+                        Canonical: {item.expectedCanonical}
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <>Canonical: {item.expectedCanonical || "—"}</>
+                )}
+              </td>
+              <td style={{ fontSize: 12 }}>
+                {item.inSitemap == null ? "—" : item.inSitemap ? "Yes" : "No"}
+              </td>
+              <td>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    onClick={() => void copyUrl(item.url)}
+                  >
+                    {copiedUrl === item.url ? "Copied" : "Copy URL"}
+                  </button>
+                  <a
+                    className="action-btn btn-edit"
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: "none", display: "inline-block" }}
+                  >
+                    Open
+                  </a>
+                  <span style={badgeStyle("Review")}>Verify in GSC</span>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div>
@@ -461,35 +587,61 @@ export default function SeoOverviewPanel({
         </div>
       )}
 
-      {Array.isArray(data?.verificationQueue) && data.verificationQueue.length > 0 && (
+      {showGscBlock && (
         <div className="section-card" style={{ marginBottom: 20 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>
             Google Search Console Verification
           </div>
-          <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
-            Not connected to Google. Each URL must be verified manually in GSC.
-            No indexed / clicks / impressions status is shown.
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 14 }}>
+            Not connected to Google. No live indexing / clicks / impressions status
+            is shown. Technical expectations are Firestick4UK source truth only.
+            Each URL must be verified manually in GSC.
           </div>
-          <table className="data-table" style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th>Label</th>
-                <th>URL</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.verificationQueue.map((item) => (
-                <tr key={item.url}>
-                  <td>{item.label}</td>
-                  <td style={{ fontSize: 11, wordBreak: "break-all" }}>{item.url}</td>
-                  <td>
-                    <span style={badgeStyle("Review")}>Verify in GSC</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+          {migrations.length > 0 && (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                Priority URL Migrations
+              </div>
+              {renderQueueTable(migrations)}
+            </div>
+          )}
+
+          {coreContent.length > 0 && (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Core Content</div>
+              {renderQueueTable(coreContent)}
+            </div>
+          )}
+
+          {accountChecks.length > 0 && (
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                Account-Level GSC Checks
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table className="data-table" style={{ width: "100%" }}>
+                  <thead>
+                    <tr>
+                      <th>Check</th>
+                      <th>Instruction</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {accountChecks.map((c) => (
+                      <tr key={c.key}>
+                        <td style={{ fontWeight: 600 }}>{c.label}</td>
+                        <td style={{ fontSize: 12 }}>
+                          Manual check required in Google Search Console.
+                          <div style={{ color: "#666", marginTop: 4 }}>{c.note}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

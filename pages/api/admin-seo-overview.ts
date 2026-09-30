@@ -19,12 +19,15 @@ import {
   subscriptionPageUrl,
 } from "@/lib/subscriptionSlug";
 import {
+  GSC_ACCOUNT_CHECKS,
+  PRODUCT8_CURRENT_SLUG,
+  PRODUCT9_CURRENT_SLUG,
   SEO_SITE_ORIGIN,
   analyzeBlogCanonical,
   blogPublicUrl,
   buildContentVerificationItems,
   buildKeyPageFacts,
-  buildProduct8VerificationItems,
+  buildProductMigrationVerificationItems,
   deriveBlogHealth,
   deriveProductHealth,
   productPublicUrl,
@@ -330,19 +333,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       verificationQueue.push(item);
     }
   };
-  if (canProducts) pushUnique(buildProduct8VerificationItems());
-  if (canContent) pushUnique(buildContentVerificationItems(subscriptionUrl));
-  if (canBlog && Array.isArray(blog)) {
-    pushUnique(
-      (blog as any[])
-        .filter((b) => b.published && b.publicUrl)
-        .map((b) => ({
-          url: b.publicUrl as string,
-          label: `Blog: ${b.title || b.slug}`,
-          note: "Verify in GSC — technical state only; no Google status claimed",
-        }))
+  if (canProducts) {
+    const list = Array.isArray(products) ? (products as Array<{ slug?: string; active?: boolean }>) : [];
+    const p8Active = list.some(
+      (p) => p.active && String(p.slug || "") === PRODUCT8_CURRENT_SLUG
     );
+    const p9Active = list.some(
+      (p) => p.active && String(p.slug || "") === PRODUCT9_CURRENT_SLUG
+    );
+    pushUnique(buildProductMigrationVerificationItems({ p8Active, p9Active }));
   }
+  if (canContent) pushUnique(buildContentVerificationItems(subscriptionUrl));
+  // Published blog posts stay in the Blog SEO table — not this curated GSC queue.
 
   return res.status(200).json({
     permissions,
@@ -355,6 +357,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     redirects: redirects.length ? redirects : undefined,
     sitemap,
     verificationQueue,
+    gscAccountChecks: [...GSC_ACCOUNT_CHECKS],
     orderTracking: canContent
       ? {
           url: `${SEO_SITE_ORIGIN}/order-tracking`,

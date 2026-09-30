@@ -376,13 +376,20 @@ ok("erp_key_page_removed", !byPath["/erp"]);
 ok("player_key_page_removed", !byPath["/player"]);
 
 // --- GSC ---
-const v = so.buildProduct8VerificationItems();
+const v = so.buildProductMigrationVerificationItems({
+  p8Active: true,
+  p9Active: true,
+});
 ok(
   "gsc_verify_label",
   v.every((i) => /Verify in GSC/i.test(i.note)) &&
-    !/Indexed|Impressions|Clicks/i.test(JSON.stringify(v))
+    !/\bIndexed\b|\bImpressions\b|\bClicks\b/i.test(JSON.stringify(v))
 );
-ok("api_gsc_no_fake_metrics", !/impressions|clicks|google-selected/i.test(api));
+ok(
+  "api_gsc_no_fake_metrics",
+  !/\bimpressions\b|\bclicks\b|google-selected/i.test(api) &&
+    !/buildProduct8VerificationItems/.test(api)
+);
 
 // --- UI ---
 ok("panel_exists", exists("components/admin/SeoOverviewPanel.tsx"));
