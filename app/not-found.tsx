@@ -1,8 +1,27 @@
 import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
 
+/**
+ * Leaf notFound() responses inherit parent layout metadata (robots index/follow,
+ * canonical, og:url). Explicit overrides here replace those fields for every
+ * leaf 404 that renders this file. `null` is the typed clear for URL fields.
+ */
 export const metadata: Metadata = {
   title: "Page Not Found — Firestick4UK",
+  robots: {
+    index: false,
+    follow: true,
+    googleBot: {
+      index: false,
+      follow: true,
+    },
+  },
+  alternates: {
+    canonical: null,
+  },
+  openGraph: {
+    url: null,
+  },
 };
 
 export default function NotFound() {
