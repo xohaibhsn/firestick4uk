@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cache } from "react";
 import { notFound, permanentRedirect } from "next/navigation";
+import { resolveManagedRedirectForCurrentRequest } from "@/lib/urlRedirectRuntime";
 import ProductDetail from "./ProductDetail";
 import pool from "../../../lib/db";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
@@ -253,6 +254,9 @@ export default async function ProductDetailPage({
     permanentRedirect(`/products/${resolved.toSlug}`);
   }
   if (resolved.status === "missing") {
+    // Product8/P9 already handled above — CMS redirects only for otherwise-404 misses.
+    const managed = await resolveManagedRedirectForCurrentRequest();
+    if (managed) permanentRedirect(managed);
     notFound();
   }
 

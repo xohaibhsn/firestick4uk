@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cache } from "react";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
+import { resolveManagedRedirectForCurrentRequest } from "@/lib/urlRedirectRuntime";
 import BlogPostClient from "./BlogPostClient";
 import pool from "../../../lib/db";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
@@ -81,7 +82,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function BlogSlugPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = await getPost(slug);
-  if (!post) notFound();
+  if (!post) {
+    const managed = await resolveManagedRedirectForCurrentRequest();
+    if (managed) permanentRedirect(managed);
+    notFound();
+  }
 
   const canonical = post.canonical_url || `https://firestick4uk.com/blog/${post.slug || slug}`;
   const faqsArr = post.faqs

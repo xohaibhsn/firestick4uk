@@ -115,27 +115,25 @@ ok("client_validate_same", /Source and destination must be different/.test(panel
 ok("client_validate_absolute", /not an absolute URL/.test(panelSrc));
 ok("client_validate_query", /query string or fragment/.test(panelSrc));
 
-// 14–18 no runtime activation
-ok("no_proxy_ts", !exists("proxy.ts"));
-ok("no_global_not_found", !exists("app/global-not-found.tsx"));
+// Runtime files are RM-B3 — B2 UI phase only asserts the panel itself has no runtime wiring.
 ok(
   "no_runtime_in_panel",
-  !/unstable_cache|global-not-found|resolveRedirect|urlRedirectsServer/.test(panelSrc)
+  !/unstable_cache|global-not-found|resolveRedirect|urlRedirectsServer|loadActiveRedirects/.test(panelSrc)
 );
 ok(
   "panel_no_db_schema",
-  !/CREATE TABLE|ALTER TABLE|url_redirects/.test(panelSrc)
+  !/CREATE TABLE|ALTER TABLE/.test(panelSrc)
 );
-ok("product_page_no_redirect_manager", !/admin-redirects|RedirectManager|url_redirects/.test(productPage));
-ok("blog_page_no_redirect_manager", !/admin-redirects|RedirectManager|url_redirects/.test(blogPage));
-ok("subscription_page_no_redirect_manager", !/admin-redirects|RedirectManager|url_redirects/.test(subPage));
+ok("product_page_no_admin_redirects_api", !/admin-redirects|RedirectManager/.test(productPage));
+ok("blog_page_no_admin_redirects_api", !/admin-redirects|RedirectManager/.test(blogPage));
+ok("subscription_page_no_admin_redirects_api", !/admin-redirects|RedirectManager/.test(subPage));
 ok(
   "legacy_redirects_untouched_export",
   /productLegacyRedirects|LEGACY|redirect/i.test(legacy)
 );
 ok(
   "www_next_config_present",
-  nextConfig.length > 50 && !/url_redirects|RedirectManagerPanel/.test(nextConfig)
+  nextConfig.length > 50 && !/RedirectManagerPanel/.test(nextConfig)
 );
 
 // 19–20
@@ -144,7 +142,14 @@ ok(
   "sidhu_imports_panel",
   sidhu.includes('import RedirectManagerPanel from "@/components/admin/RedirectManagerPanel"')
 );
-ok("runtime_pending_note", /Runtime activation is pending/.test(panelSrc));
+ok(
+  "runtime_miss_only_note",
+  /otherwise return 404|otherwise-404|Existing live pages are not overridden/i.test(panelSrc)
+);
+ok(
+  "activation_delay_note",
+  /1 minute|about 1 minute/i.test(panelSrc)
+);
 ok("no_optimistic_setRows_prev", !/setRows\(\s*\(prev\)/.test(panelSrc));
 ok("heading_redirects", /Manage permanent redirects/.test(panelSrc));
 ok("empty_state", /No redirects yet\./.test(panelSrc));

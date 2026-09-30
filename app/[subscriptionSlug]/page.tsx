@@ -5,6 +5,7 @@ import {
 } from "@/lib/subscriptionLandingPage";
 import { normalizeSubscriptionSlug } from "@/lib/subscriptionSlug";
 import { getSubscriptionSlugConfig } from "@/lib/subscriptionSlugServer";
+import { resolveManagedRedirectForCurrentRequest } from "@/lib/urlRedirectRuntime";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -68,5 +69,8 @@ export default async function SubscriptionSlugPage({ params }: PageProps) {
     permanentRedirect(route.pagePath);
   }
 
+  // Existing current/previous subscription behavior stays authoritative.
+  const managed = await resolveManagedRedirectForCurrentRequest();
+  if (managed) permanentRedirect(managed);
   notFound();
 }

@@ -15,6 +15,9 @@ const noStoreHeaders = [
 
 const nextConfig: NextConfig = {
   generateEtags: false,
+  experimental: {
+    globalNotFound: true,
+  },
   images: {
     unoptimized: false,
     remotePatterns: [

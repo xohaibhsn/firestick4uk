@@ -323,11 +323,10 @@ ok(
 );
 ok("migration_controlled_only", /Does NOT run on API requests or builds/.test(migration));
 
-// --- No runtime activation in RM-B1 ---
-ok("no_proxy_file", !exists("proxy.ts") && !exists("middleware.ts"));
-ok("no_global_not_found", !exists("app/global-not-found.tsx"));
-// UI wiring is RM-B2; B1 only asserts Sidhu does not activate public runtime redirects.
+// Runtime activation is RM-B3; B1 only asserts Sidhu CMS does not embed DB redirect resolution.
 ok("sidhu_no_runtime_redirect_resolver", !/loadActiveRedirects|urlRedirectsServer|resolveRedirectForPath/.test(sidhu));
+// proxy.ts / global-not-found belong to RM-B3 — B1 no longer asserts their absence.
+ok("b1_no_middleware_file", !exists("middleware.ts"));
 ok("product_page_untouched_rm", !/resolveRmA|urlRedirects|__rmA/.test(productPage));
 ok("blog_page_untouched_rm", !/resolveRmA|urlRedirects|__rmA/.test(blogPage));
 ok("subscription_page_untouched_rm", !/resolveRmA|urlRedirects|__rmA/.test(subPage));

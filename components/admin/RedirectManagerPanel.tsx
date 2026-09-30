@@ -245,11 +245,11 @@ export default function RedirectManagerPanel({ role, adminApi }: Props) {
 
       <div style={{ marginBottom: 16, maxWidth: 640 }}>
         <p style={{ fontSize: 14, color: "#444", lineHeight: 1.65, margin: 0 }}>
-          Manage permanent redirects for old or moved URLs. Rules are stored here and will be
-          activated by the Redirect Manager runtime.
+          Manage permanent redirects for old or moved URLs. Redirects apply to old URLs that would
+          otherwise return 404. Existing live pages are not overridden.
         </p>
         <p style={{ fontSize: 12, color: "#888", margin: "8px 0 0", lineHeight: 1.5 }}>
-          Runtime activation is pending.
+          Changes may take up to about 1 minute to become active.
         </p>
       </div>
 
