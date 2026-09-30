@@ -46,7 +46,8 @@ export type SidhuTab =
   | "audit"
   | "media"
   | "history"
-  | "seo";
+  | "seo"
+  | "redirects";
 
 const ALL_PERMISSIONS: readonly AdminPermission[] = [
   "dashboard.view",
@@ -123,6 +124,7 @@ const TAB_PERMISSION: Record<Exclude<SidhuTab, "seo">, AdminPermission> = {
   audit: "audit.view",
   media: "media.view",
   history: "revisions.view",
+  redirects: "redirects.manage",
 };
 
 /**
