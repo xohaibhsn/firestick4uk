@@ -6,6 +6,7 @@ import {
   GOOGLE_ADS_ID,
   TRACKING_OPEN_PREFERENCES_EVENT,
   anyOptionalTrackingGranted,
+  clearRevokedGoogleTrackingCookies,
   readTrackingConsent,
   writeTrackingConsent,
   type TrackingConsentPreference,
@@ -97,17 +98,6 @@ function configurePermittedProducts(preference: TrackingConsentPreference): void
  * Initialize Google tags only when at least one optional purpose is granted.
  * Does not load gtag.js for deny / no-choice visitors.
  */
-function purposeRevoked(
-  previous: TrackingConsentPreference | null,
-  next: TrackingConsentPreference
-): boolean {
-  if (!previous) return false;
-  return (
-    (previous.analytics && !next.analytics) ||
-    (previous.advertising && !next.advertising)
-  );
-}
-
 function applyTrackingPreference(
   preference: TrackingConsentPreference,
   options?: { reloadIfRevoked?: boolean; previous?: TrackingConsentPreference | null }
@@ -116,10 +106,24 @@ function applyTrackingPreference(
   const hadOptional =
     previous != null && anyOptionalTrackingGranted(previous);
   const hasOptional = anyOptionalTrackingGranted(preference);
-  const revoked = purposeRevoked(previous, preference);
+  const analyticsRevoked = !!(previous?.analytics && !preference.analytics);
+  const advertisingRevoked = !!(previous?.advertising && !preference.advertising);
+  const revoked = analyticsRevoked || advertisingRevoked;
+
+  // Persist order: preference already written by caller → consent update →
+  // narrow first-party Google cookie cleanup → reload if runtime was configured.
+  if (revoked) {
+    if (typeof window.gtag === "function") {
+      issueConsentUpdate(preference);
+    }
+    clearRevokedGoogleTrackingCookies({
+      clearAnalytics: analyticsRevoked,
+      clearAdvertising: advertisingRevoked,
+    });
+  }
 
   if (!hasOptional) {
-    if (typeof window.gtag === "function") {
+    if (typeof window.gtag === "function" && !revoked) {
       issueConsentUpdate(preference);
     }
     if (
@@ -134,7 +138,6 @@ function applyTrackingPreference(
   // If a previously granted purpose was turned off, reload for a clean
   // session so the denied product is not left configured.
   if (options?.reloadIfRevoked && revoked && (session.gaConfigured || session.adsConfigured)) {
-    issueConsentUpdate(preference);
     window.location.reload();
     return;
   }

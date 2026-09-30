@@ -178,17 +178,20 @@ ok(
 
 ok(
   "cart_storage_key_not_cleared_by_consent",
-  !/firestick_cart/.test(consentLib) &&
-    !/removeItem\(\s*["']firestick_cart["']\s*\)/.test(tracking) &&
-    !/clear\(\)/.test(tracking)
+  !/removeItem\(\s*["']firestick_cart["']\s*\)/.test(tracking + consentLib) &&
+    !/localStorage\.clear\s*\(/.test(tracking + consentLib) &&
+    !/sessionStorage\.clear\s*\(/.test(tracking + consentLib)
 );
 ok(
   "orderSuccess_not_cleared_by_consent",
-  !/orderSuccess/.test(consentLib) && !/orderSuccess/.test(tracking)
+  !/removeItem\(\s*["']orderSuccess["']\s*\)/.test(tracking + consentLib) &&
+    !/orderSuccess/.test(tracking)
 );
 ok(
   "admin_cookies_not_touched",
-  !/admin_session/.test(consentLib) && !/document\.cookie\s*=/.test(tracking)
+  !/admin_session/.test(consentLib) &&
+    !/admin_session/.test(tracking) &&
+    !/document\.cookie\s*=/.test(tracking)
 );
 ok(
   "consent_touches_only_own_storage_key",
@@ -196,6 +199,19 @@ ok(
     /localStorage\.(get|set)Item\(\s*["']firestick_tracking_consent_v1["']/.test(
       consentLib
     )
+);
+ok(
+  "withdrawal_clears_google_tracking_cookies",
+  /clearRevokedGoogleTrackingCookies/.test(consentLib) &&
+    /clearRevokedGoogleTrackingCookies/.test(tracking) &&
+    /isGoogleAnalyticsCookieName/.test(consentLib) &&
+    /isGoogleAdsCookieName/.test(consentLib)
+);
+ok(
+  "cleanup_excludes_cart_and_consent_keys",
+  /firestick_cart/.test(consentLib) &&
+    /TRACKING_CONSENT_STORAGE_KEY/.test(consentLib) &&
+    /startsWith\(["']admin["']\)/.test(consentLib)
 );
 ok(
   "malformed_preference_safe",
