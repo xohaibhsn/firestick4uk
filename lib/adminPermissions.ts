@@ -26,7 +26,8 @@ export type AdminPermission =
   | "media.view"
   | "media.upload"
   | "blog_media.upload"
-  | "revisions.view";
+  | "revisions.view"
+  | "redirects.manage";
 
 export type SidhuTab =
   | "dashboard"
@@ -69,6 +70,7 @@ const ALL_PERMISSIONS: readonly AdminPermission[] = [
   "media.upload",
   "blog_media.upload",
   "revisions.view",
+  "redirects.manage",
 ] as const;
 
 const MANAGER_PERMISSIONS: readonly AdminPermission[] = [
