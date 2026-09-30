@@ -11,6 +11,10 @@ import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isInternalHref, linkMarkAttrs } from "@/lib/seoLinks";
+import {
+  htmlContainsUnsupportedStructuralMarkup,
+  normalizeEmptyEditorHtml,
+} from "@/lib/editorHtmlMode";
 
 interface TipTapEditorProps {
   content: string;
@@ -22,6 +26,8 @@ interface TipTapEditorProps {
    */
   onRequestMedia?: (insertImage: (url: string) => void) => void;
 }
+
+type EditorMode = "visual" | "html";
 
 const SmartLink = Link.extend({
   renderHTML({ HTMLAttributes }) {
@@ -107,17 +113,54 @@ const Sep = () => (
   <div style={{ width: 1, background: "#E5E5E5", margin: "2px 4px", alignSelf: "stretch" }} />
 );
 
+const ModeTab = ({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    style={{
+      padding: "5px 12px",
+      borderRadius: 6,
+      border: "1px solid #E5E5E5",
+      background: active ? "#5B21B6" : "#FFFFFF",
+      color: active ? "#FFFFFF" : "#333333",
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700,
+      letterSpacing: 0.3,
+    }}
+  >
+    {label}
+  </button>
+);
+
 export default function TipTapEditor({
   content,
   onChange,
   placeholder = "Write your blog post...",
   onRequestMedia,
 }: TipTapEditorProps) {
+  const [mode, setMode] = useState<EditorMode>("visual");
+  const [sourceHtml, setSourceHtml] = useState(content || "");
+  const [structureWarning, setStructureWarning] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [imgUrl, setImgUrl] = useState("");
   const [showImgInput, setShowImgInput] = useState(false);
   const pendingSelectionRef = useRef<{ from: number; to: number } | null>(null);
+  const modeRef = useRef<EditorMode>("visual");
+  const skipNextExternalSync = useRef(false);
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   const editor = useEditor({
     extensions: [
@@ -131,7 +174,12 @@ export default function TipTapEditor({
       CharacterCount,
     ],
     content: content || "",
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    onUpdate: ({ editor: ed }) => {
+      if (modeRef.current !== "visual") return;
+      const html = ed.getHTML();
+      skipNextExternalSync.current = true;
+      onChange(html);
+    },
     editorProps: {
       attributes: {
         style: "min-height:400px;padding:16px 20px;outline:none;font-family:var(--font-body);font-size:15px;line-height:1.8;color:#111111;",
@@ -139,13 +187,81 @@ export default function TipTapEditor({
     },
   });
 
-  // Sync content if parent changes it externally (e.g. opening edit modal)
+  // Sync from parent when content changes externally (modal open / restore / reload).
   useEffect(() => {
-    if (!editor) return;
-    if (content !== editor.getHTML()) {
-      editor.commands.setContent(content || "");
+    if (skipNextExternalSync.current) {
+      skipNextExternalSync.current = false;
+      return;
+    }
+    const incoming = content || "";
+    setSourceHtml(incoming);
+    setStructureWarning("");
+    if (!editor || modeRef.current !== "visual") return;
+    const current = normalizeEmptyEditorHtml(editor.getHTML());
+    const next = normalizeEmptyEditorHtml(incoming);
+    if (current !== next) {
+      editor.commands.setContent(incoming || "");
     }
   }, [content, editor]);
+
+  const switchToHtml = useCallback(() => {
+    modeRef.current = "html";
+    const html =
+      mode === "visual" && editor
+        ? editor.getHTML()
+        : sourceHtml || content || "";
+    setSourceHtml(html);
+    setStructureWarning("");
+    setMode("html");
+    setShowLinkInput(false);
+    setShowImgInput(false);
+  }, [editor, sourceHtml, content, mode]);
+
+  const switchToVisual = useCallback(() => {
+    const html = mode === "html" ? sourceHtml : content || "";
+    if (htmlContainsUnsupportedStructuralMarkup(html)) {
+      modeRef.current = "html";
+      setStructureWarning(
+        "This HTML contains markup that Visual mode cannot safely preserve. Continue editing in HTML mode."
+      );
+      setMode("html");
+      return;
+    }
+    modeRef.current = "visual";
+    setStructureWarning("");
+    if (editor) {
+      const current = normalizeEmptyEditorHtml(editor.getHTML());
+      const next = normalizeEmptyEditorHtml(html);
+      if (current !== next) {
+        editor.commands.setContent(html || "");
+      }
+      // TipTap may normalize supported markup slightly — push authoritative getHTML.
+      const normalized = editor.getHTML();
+      skipNextExternalSync.current = true;
+      onChange(normalized);
+      setSourceHtml(normalized);
+    } else {
+      skipNextExternalSync.current = true;
+      onChange(html);
+    }
+    setMode("visual");
+  }, [editor, sourceHtml, content, onChange, mode]);
+
+  const onSourceChange = useCallback(
+    (value: string) => {
+      setSourceHtml(value);
+      if (htmlContainsUnsupportedStructuralMarkup(value)) {
+        setStructureWarning(
+          "This HTML contains markup that Visual mode cannot safely preserve. Continue editing in HTML mode."
+        );
+      } else {
+        setStructureWarning("");
+      }
+      skipNextExternalSync.current = true;
+      onChange(value);
+    },
+    [onChange]
+  );
 
   const setLink = useCallback(() => {
     if (!editor) return;
@@ -202,126 +318,192 @@ export default function TipTapEditor({
 
   if (!editor) return null;
 
-  const charCount = editor.storage.characterCount?.characters?.() ?? 0;
+  const charCount =
+    mode === "visual"
+      ? editor.storage.characterCount?.characters?.() ?? 0
+      : sourceHtml.length;
 
   return (
     <div style={{ border: "1px solid #E5E5E5", borderRadius: 10, overflow: "hidden", background: "#FFFFFF" }}>
-      {/* TOOLBAR */}
-      <div style={{ padding: "8px 10px", borderBottom: "1px solid #E5E5E5", background: "#F9F9F9", display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
-
-        {/* Text style */}
-        <ToolBtn active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold (Ctrl+B)"><b>B</b></ToolBtn>
-        <ToolBtn active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic (Ctrl+I)"><i>I</i></ToolBtn>
-        <ToolBtn active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline (Ctrl+U)"><u>U</u></ToolBtn>
-        <ToolBtn active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough"><s>S</s></ToolBtn>
-        <ToolBtn active={false} onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} title="Clear Formatting">✕</ToolBtn>
-        <Sep />
-
-        {/* Headings */}
-        {([1, 2, 3, 4] as const).map(level => (
-          <ToolBtn key={level} active={editor.isActive("heading", { level })} onClick={() => editor.chain().focus().toggleHeading({ level }).run()} title={`Heading ${level}`}>H{level}</ToolBtn>
-        ))}
-        <ToolBtn active={editor.isActive("paragraph")} onClick={() => editor.chain().focus().setParagraph().run()} title="Paragraph">P</ToolBtn>
-        <Sep />
-
-        {/* Lists */}
-        <ToolBtn active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet List">• List</ToolBtn>
-        <ToolBtn active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Ordered List">1. List</ToolBtn>
-        <ToolBtn active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Blockquote">❝</ToolBtn>
-        <Sep />
-
-        {/* Alignment */}
-        <ToolBtn active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()} title="Align Left">⬅</ToolBtn>
-        <ToolBtn active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()} title="Align Center">≡</ToolBtn>
-        <ToolBtn active={editor.isActive({ textAlign: "right" })} onClick={() => editor.chain().focus().setTextAlign("right").run()} title="Align Right">➡</ToolBtn>
-        <Sep />
-
-        {/* Link */}
-        <ToolBtn active={editor.isActive("link") || showLinkInput} onClick={() => { setShowImgInput(false); setShowLinkInput(v => !v); setLinkUrl(editor.getAttributes("link").href || ""); }} title="Insert Link">🔗</ToolBtn>
-
-        {/* Image */}
-        <ToolBtn active={showImgInput} onClick={() => { setShowLinkInput(false); setShowImgInput(v => !v); }} title="Insert Image">🖼️</ToolBtn>
-
-        {/* HR */}
-        <ToolBtn active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Horizontal Rule">—</ToolBtn>
-        <Sep />
-
-        {/* Undo / Redo */}
-        <ToolBtn active={false} onClick={() => editor.chain().focus().undo().run()} title="Undo (Ctrl+Z)">↩</ToolBtn>
-        <ToolBtn active={false} onClick={() => editor.chain().focus().redo().run()} title="Redo (Ctrl+Y)">↪</ToolBtn>
+      {/* Mode selector — Visual default */}
+      <div
+        style={{
+          padding: "8px 10px",
+          borderBottom: "1px solid #E5E5E5",
+          background: "#F3F4F6",
+          display: "flex",
+          gap: 6,
+          alignItems: "center",
+        }}
+      >
+        <ModeTab active={mode === "visual"} label="Visual" onClick={switchToVisual} />
+        <ModeTab active={mode === "html"} label="HTML" onClick={switchToHtml} />
+        <span style={{ marginLeft: 8, fontSize: 11, color: "#888888" }}>
+          {mode === "visual" ? "WYSIWYG editing" : "Raw HTML source (not executed)"}
+        </span>
       </div>
 
-      {/* Link input */}
-      {showLinkInput && (
-        <div style={{ padding: "8px 12px", borderBottom: "1px solid #E5E5E5", background: "#F5F3FF", display: "flex", gap: 8 }}>
-          <input
-            type="url"
-            value={linkUrl}
-            onChange={e => setLinkUrl(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && setLink()}
-            placeholder="https://example.com"
-            autoFocus
-            style={{ flex: 1, border: "1px solid #DDD6FE", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none", color: "#111111" }}
-          />
-          <button type="button" onClick={setLink} style={{ background: "#5B21B6", color: "#FFF", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>Set</button>
-          {editor.isActive("link") && (
-            <button type="button" onClick={() => { editor.chain().focus().unsetLink().run(); setShowLinkInput(false); }} style={{ background: "#DC2626", color: "#FFF", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>Remove</button>
-          )}
-          <button type="button" onClick={() => setShowLinkInput(false)} style={{ background: "#E5E5E5", color: "#333", border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 13, cursor: "pointer" }}>✕</button>
+      {structureWarning ? (
+        <div
+          style={{
+            padding: "8px 12px",
+            borderBottom: "1px solid #FDE68A",
+            background: "#FFFBEB",
+            color: "#92400E",
+            fontSize: 12,
+            lineHeight: 1.45,
+          }}
+        >
+          {structureWarning}
         </div>
+      ) : null}
+
+      {mode === "visual" && (
+        <>
+          {/* TOOLBAR */}
+          <div style={{ padding: "8px 10px", borderBottom: "1px solid #E5E5E5", background: "#F9F9F9", display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+
+            {/* Text style */}
+            <ToolBtn active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold (Ctrl+B)"><b>B</b></ToolBtn>
+            <ToolBtn active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic (Ctrl+I)"><i>I</i></ToolBtn>
+            <ToolBtn active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline (Ctrl+U)"><u>U</u></ToolBtn>
+            <ToolBtn active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough"><s>S</s></ToolBtn>
+            <ToolBtn active={false} onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} title="Clear Formatting">✕</ToolBtn>
+            <Sep />
+
+            {/* Headings */}
+            {([1, 2, 3, 4] as const).map(level => (
+              <ToolBtn key={level} active={editor.isActive("heading", { level })} onClick={() => editor.chain().focus().toggleHeading({ level }).run()} title={`Heading ${level}`}>H{level}</ToolBtn>
+            ))}
+            <ToolBtn active={editor.isActive("paragraph")} onClick={() => editor.chain().focus().setParagraph().run()} title="Paragraph">P</ToolBtn>
+            <Sep />
+
+            {/* Lists */}
+            <ToolBtn active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet List">• List</ToolBtn>
+            <ToolBtn active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Ordered List">1. List</ToolBtn>
+            <ToolBtn active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Blockquote">❝</ToolBtn>
+            <Sep />
+
+            {/* Alignment */}
+            <ToolBtn active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()} title="Align Left">⬅</ToolBtn>
+            <ToolBtn active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()} title="Align Center">≡</ToolBtn>
+            <ToolBtn active={editor.isActive({ textAlign: "right" })} onClick={() => editor.chain().focus().setTextAlign("right").run()} title="Align Right">➡</ToolBtn>
+            <Sep />
+
+            {/* Link */}
+            <ToolBtn active={editor.isActive("link") || showLinkInput} onClick={() => { setShowImgInput(false); setShowLinkInput(v => !v); setLinkUrl(editor.getAttributes("link").href || ""); }} title="Insert Link">🔗</ToolBtn>
+
+            {/* Image */}
+            <ToolBtn active={showImgInput} onClick={() => { setShowLinkInput(false); setShowImgInput(v => !v); }} title="Insert Image">🖼️</ToolBtn>
+
+            {/* HR */}
+            <ToolBtn active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Horizontal Rule">—</ToolBtn>
+            <Sep />
+
+            {/* Undo / Redo */}
+            <ToolBtn active={false} onClick={() => editor.chain().focus().undo().run()} title="Undo (Ctrl+Z)">↩</ToolBtn>
+            <ToolBtn active={false} onClick={() => editor.chain().focus().redo().run()} title="Redo (Ctrl+Y)">↪</ToolBtn>
+          </div>
+
+          {/* Link input */}
+          {showLinkInput && (
+            <div style={{ padding: "8px 12px", borderBottom: "1px solid #E5E5E5", background: "#F5F3FF", display: "flex", gap: 8 }}>
+              <input
+                type="url"
+                value={linkUrl}
+                onChange={e => setLinkUrl(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && setLink()}
+                placeholder="https://example.com"
+                autoFocus
+                style={{ flex: 1, border: "1px solid #DDD6FE", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none", color: "#111111" }}
+              />
+              <button type="button" onClick={setLink} style={{ background: "#5B21B6", color: "#FFF", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>Set</button>
+              {editor.isActive("link") && (
+                <button type="button" onClick={() => { editor.chain().focus().unsetLink().run(); setShowLinkInput(false); }} style={{ background: "#DC2626", color: "#FFF", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>Remove</button>
+              )}
+              <button type="button" onClick={() => setShowLinkInput(false)} style={{ background: "#E5E5E5", color: "#333", border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 13, cursor: "pointer" }}>✕</button>
+            </div>
+          )}
+
+          {/* Image input — manual URL + optional Media Library */}
+          {showImgInput && (
+            <div style={{ padding: "8px 12px", borderBottom: "1px solid #E5E5E5", background: "#F5F3FF", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <input
+                type="url"
+                value={imgUrl}
+                onChange={e => setImgUrl(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && addImage()}
+                placeholder="https://res.cloudinary.com/... or any image URL"
+                autoFocus
+                style={{ flex: "1 1 200px", border: "1px solid #DDD6FE", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none", color: "#111111" }}
+              />
+              <button type="button" onClick={addImage} style={{ background: "#5B21B6", color: "#FFF", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>Insert</button>
+              {onRequestMedia && (
+                <button
+                  type="button"
+                  onClick={openMediaLibrary}
+                  style={{ background: "#FFFFFF", color: "#5B21B6", border: "1px solid #5B21B6", borderRadius: 6, padding: "6px 14px", fontSize: 13, cursor: "pointer", fontWeight: 600 }}
+                >
+                  Choose from Library
+                </button>
+              )}
+              <button type="button" onClick={() => setShowImgInput(false)} style={{ background: "#E5E5E5", color: "#333", border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 13, cursor: "pointer" }}>✕</button>
+            </div>
+          )}
+
+          {/* Editor area */}
+          <div style={{ position: "relative" }}>
+            <style>{`
+              .tiptap-editor .ProseMirror { min-height: 400px; padding: 16px 20px; outline: none; }
+              .tiptap-editor .ProseMirror p { margin: 0 0 0.8em; }
+              .tiptap-editor .ProseMirror h1 { font-size: 2rem; font-weight: 700; margin: 1.2em 0 0.5em; }
+              .tiptap-editor .ProseMirror h2 { font-size: 1.6rem; font-weight: 700; margin: 1.1em 0 0.4em; }
+              .tiptap-editor .ProseMirror h3 { font-size: 1.3rem; font-weight: 600; color: #5B21B6; margin: 1em 0 0.4em; }
+              .tiptap-editor .ProseMirror h4 { font-size: 1.1rem; font-weight: 600; margin: 0.8em 0 0.3em; }
+              .tiptap-editor .ProseMirror ul { list-style: disc; padding-left: 1.4em; margin: 0.5em 0; }
+              .tiptap-editor .ProseMirror ol { list-style: decimal; padding-left: 1.4em; margin: 0.5em 0; }
+              .tiptap-editor .ProseMirror li { margin: 0.3em 0; }
+              .tiptap-editor .ProseMirror blockquote { border-left: 4px solid #5B21B6; padding: 8px 16px; background: #F5F3FF; margin: 1em 0; color: #444; font-style: italic; }
+              .tiptap-editor .ProseMirror a.tiptap-link { color: #5B21B6; text-decoration: underline; cursor: pointer; }
+              .tiptap-editor .ProseMirror img.tiptap-img { max-width: 100%; border-radius: 8px; margin: 1em 0; display: block; }
+              .tiptap-editor .ProseMirror hr { border: none; border-top: 2px solid #E5E5E5; margin: 1.5em 0; }
+              .tiptap-editor .ProseMirror strong { font-weight: 700; }
+              .tiptap-editor .ProseMirror p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: #AAAAAA; pointer-events: none; float: left; height: 0; }
+            `}</style>
+            <div className="tiptap-editor">
+              <EditorContent editor={editor} />
+            </div>
+          </div>
+        </>
       )}
 
-      {/* Image input — manual URL + optional Media Library */}
-      {showImgInput && (
-        <div style={{ padding: "8px 12px", borderBottom: "1px solid #E5E5E5", background: "#F5F3FF", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <input
-            type="url"
-            value={imgUrl}
-            onChange={e => setImgUrl(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addImage()}
-            placeholder="https://res.cloudinary.com/... or any image URL"
-            autoFocus
-            style={{ flex: "1 1 200px", border: "1px solid #DDD6FE", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none", color: "#111111" }}
-          />
-          <button type="button" onClick={addImage} style={{ background: "#5B21B6", color: "#FFF", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>Insert</button>
-          {onRequestMedia && (
-            <button
-              type="button"
-              onClick={openMediaLibrary}
-              style={{ background: "#FFFFFF", color: "#5B21B6", border: "1px solid #5B21B6", borderRadius: 6, padding: "6px 14px", fontSize: 13, cursor: "pointer", fontWeight: 600 }}
-            >
-              Choose from Library
-            </button>
-          )}
-          <button type="button" onClick={() => setShowImgInput(false)} style={{ background: "#E5E5E5", color: "#333", border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 13, cursor: "pointer" }}>✕</button>
-        </div>
+      {mode === "html" && (
+        <textarea
+          value={sourceHtml}
+          onChange={(e) => onSourceChange(e.target.value)}
+          spellCheck={false}
+          aria-label="HTML source"
+          placeholder="<p>Raw HTML…</p>"
+          style={{
+            display: "block",
+            width: "100%",
+            minHeight: 400,
+            padding: "16px 20px",
+            border: "none",
+            outline: "none",
+            resize: "vertical",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            fontSize: 13,
+            lineHeight: 1.55,
+            color: "#111111",
+            background: "#FAFAFA",
+            boxSizing: "border-box",
+          }}
+        />
       )}
 
-      {/* Editor area */}
-      <div style={{ position: "relative" }}>
-        <style>{`
-          .tiptap-editor .ProseMirror { min-height: 400px; padding: 16px 20px; outline: none; }
-          .tiptap-editor .ProseMirror p { margin: 0 0 0.8em; }
-          .tiptap-editor .ProseMirror h1 { font-size: 2rem; font-weight: 700; margin: 1.2em 0 0.5em; }
-          .tiptap-editor .ProseMirror h2 { font-size: 1.6rem; font-weight: 700; margin: 1.1em 0 0.4em; }
-          .tiptap-editor .ProseMirror h3 { font-size: 1.3rem; font-weight: 600; color: #5B21B6; margin: 1em 0 0.4em; }
-          .tiptap-editor .ProseMirror h4 { font-size: 1.1rem; font-weight: 600; margin: 0.8em 0 0.3em; }
-          .tiptap-editor .ProseMirror ul { list-style: disc; padding-left: 1.4em; margin: 0.5em 0; }
-          .tiptap-editor .ProseMirror ol { list-style: decimal; padding-left: 1.4em; margin: 0.5em 0; }
-          .tiptap-editor .ProseMirror li { margin: 0.3em 0; }
-          .tiptap-editor .ProseMirror blockquote { border-left: 4px solid #5B21B6; padding: 8px 16px; background: #F5F3FF; margin: 1em 0; color: #444; font-style: italic; }
-          .tiptap-editor .ProseMirror a.tiptap-link { color: #5B21B6; text-decoration: underline; cursor: pointer; }
-          .tiptap-editor .ProseMirror img.tiptap-img { max-width: 100%; border-radius: 8px; margin: 1em 0; display: block; }
-          .tiptap-editor .ProseMirror hr { border: none; border-top: 2px solid #E5E5E5; margin: 1.5em 0; }
-          .tiptap-editor .ProseMirror strong { font-weight: 700; }
-          .tiptap-editor .ProseMirror p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: #AAAAAA; pointer-events: none; float: left; height: 0; }
-        `}</style>
-        <div className="tiptap-editor">
-          <EditorContent editor={editor} />
-        </div>
-        <div style={{ padding: "6px 12px", borderTop: "1px solid #F0F0F0", fontSize: 11, color: "#888888", textAlign: "right", background: "#FAFAFA" }}>
-          {charCount} characters
-        </div>
+      <div style={{ padding: "6px 12px", borderTop: "1px solid #F0F0F0", fontSize: 11, color: "#888888", textAlign: "right", background: "#FAFAFA" }}>
+        {charCount} characters{mode === "html" ? " (source)" : ""}
       </div>
     </div>
   );

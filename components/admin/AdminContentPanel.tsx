@@ -1,9 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import {
   ADMIN_CONTENT_SECTIONS,
   keysForPage,
 } from "@/lib/adminContentFields";
+
+const TipTapEditor = dynamic(() => import("./TipTapEditor"), { ssr: false });
 
 type Props = {
   page: string;
@@ -61,7 +64,18 @@ export default function AdminContentPanel({
                 style={field.wide ? { gridColumn: "1 / -1" } : undefined}
               >
                 <label>{field.label}</label>
-                {field.type === "textarea" || field.type === "json" ? (
+                {field.type === "html" ? (
+                  <TipTapEditor
+                    content={siteContent[field.key] || ""}
+                    onChange={(html) =>
+                      setSiteContent((s) => ({
+                        ...s,
+                        [field.key]: html,
+                      }))
+                    }
+                    placeholder={`Write ${field.label.toLowerCase()}…`}
+                  />
+                ) : field.type === "textarea" || field.type === "json" ? (
                   <textarea
                     rows={field.type === "json" ? 8 : 3}
                     style={{ width: "100%", resize: "vertical" }}

@@ -2,7 +2,7 @@ export type AdminField = {
   key: string;
   label: string;
   wide?: boolean;
-  type?: "text" | "textarea" | "json";
+  type?: "text" | "textarea" | "json" | "html";
 };
 
 export type AdminSection = {
@@ -43,7 +43,7 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
           key: "about_story_html",
           label: "Story extra HTML",
           wide: true,
-          type: "textarea",
+          type: "html",
         },
         { key: "about_values_tag", label: "Values tag" },
         { key: "about_values_title", label: "Values title" },
@@ -506,7 +506,7 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
           key: "privacy_body",
           label: "Privacy body HTML",
           wide: true,
-          type: "textarea",
+          type: "html",
         },
         { key: "terms_tag", label: "Terms tag" },
         { key: "terms_title", label: "Terms title" },
@@ -515,7 +515,7 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
           key: "terms_body",
           label: "Terms body HTML",
           wide: true,
-          type: "textarea",
+          type: "html",
         },
         { key: "refund_tag", label: "Refund tag" },
         { key: "refund_title", label: "Refund title" },
@@ -524,7 +524,7 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
           key: "refund_body",
           label: "Refund body HTML",
           wide: true,
-          type: "textarea",
+          type: "html",
         },
         { key: "refund_cta_title", label: "Refund CTA title" },
         {
