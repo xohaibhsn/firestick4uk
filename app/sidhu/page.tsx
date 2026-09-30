@@ -20,6 +20,7 @@ import type { MediaLibraryPurpose } from "@/lib/mediaLibrary";
 import {
   isAutoCanonicalForSlug,
 } from "@/lib/blogSeoSafety";
+import { parseCouponAdminInput } from "@/lib/couponValidation";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
 const styles = `
@@ -3004,17 +3005,25 @@ export default function AdminPage() {
               <div className="section-card" style={{padding:20,marginBottom:20}}>
                 <div className="section-title" style={{marginBottom:16}}>Add New Coupon</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
-                  <div className="modal-field"><label>Code *</label><input placeholder="SAVE10" style={{width:"100%",textTransform:"uppercase"}} value={couponForm.code} onChange={e=>setCouponForm(f=>({...f,code:e.target.value.toUpperCase()}))} /></div>
+                  <div className="modal-field"><label>Code *</label><input placeholder="SAVE10" maxLength={50} style={{width:"100%",textTransform:"uppercase"}} value={couponForm.code} onChange={e=>setCouponForm(f=>({...f,code:e.target.value.toUpperCase()}))} /></div>
                   <div className="modal-field"><label>Type</label><select style={{width:"100%"}} value={couponForm.type} onChange={e=>setCouponForm(f=>({...f,type:e.target.value}))}><option value="percentage">% Percentage</option><option value="fixed">£ Fixed</option></select></div>
-                  <div className="modal-field"><label>Value</label><input type="number" placeholder="10" style={{width:"100%"}} value={couponForm.value} onChange={e=>setCouponForm(f=>({...f,value:e.target.value}))} /></div>
-                  <div className="modal-field"><label>Min Order (£)</label><input type="number" placeholder="0" style={{width:"100%"}} value={couponForm.minimum_order} onChange={e=>setCouponForm(f=>({...f,minimum_order:e.target.value}))} /></div>
-                  <div className="modal-field"><label>Usage Limit</label><input type="number" placeholder="Unlimited" style={{width:"100%"}} value={couponForm.usage_limit} onChange={e=>setCouponForm(f=>({...f,usage_limit:e.target.value}))} /></div>
+                  <div className="modal-field"><label>Value</label><input type="number" placeholder="10" min="0.01" step="0.01" max={couponForm.type==="percentage"?100:undefined} style={{width:"100%"}} value={couponForm.value} onChange={e=>setCouponForm(f=>({...f,value:e.target.value}))} /></div>
+                  <div className="modal-field"><label>Min Order (£)</label><input type="number" placeholder="0" min="0" step="0.01" style={{width:"100%"}} value={couponForm.minimum_order} onChange={e=>setCouponForm(f=>({...f,minimum_order:e.target.value}))} /></div>
+                  <div className="modal-field"><label>Usage Limit</label><input type="number" placeholder="Unlimited" min="1" step="1" style={{width:"100%"}} value={couponForm.usage_limit} onChange={e=>setCouponForm(f=>({...f,usage_limit:e.target.value}))} /></div>
                   <div className="modal-field"><label>Expires</label><input type="date" style={{width:"100%"}} value={couponForm.expires_at} onChange={e=>setCouponForm(f=>({...f,expires_at:e.target.value}))} /></div>
                 </div>
                 <button className="btn-primary" style={{marginTop:8}} onClick={async()=>{
-                  if(!couponForm.code||!couponForm.value){setCouponMsg("❌ Code and value required");return;}
-                  const r=await fetch("/api/coupons",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(couponForm)}).then(x=>x.json()).catch(()=>({}));
-                  if(r.success){setCouponMsg("✅ Coupon created!");setCouponForm({code:"",type:"percentage",value:"",minimum_order:"0",usage_limit:"",expires_at:""});fetch("/api/coupons").then(x=>x.json()).then(d=>Array.isArray(d)&&setCoupons(d));}
+                  const parsed = parseCouponAdminInput(couponForm);
+                  if (!parsed.ok) { setCouponMsg(`❌ ${parsed.error}`); setTimeout(()=>setCouponMsg(""),4000); return; }
+                  const r=await fetch("/api/coupons",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({
+                    code: parsed.value.code,
+                    type: parsed.value.type,
+                    value: parsed.value.value,
+                    minimum_order: parsed.value.minimumOrder,
+                    usage_limit: parsed.value.usageLimit,
+                    expires_at: parsed.value.expiresAt,
+                  })}).then(x=>x.json()).catch(()=>({}));
+                  if(r.success){setCouponMsg("✅ Coupon created!");setCouponForm({code:"",type:"percentage",value:"",minimum_order:"0",usage_limit:"",expires_at:""});fetch("/api/coupons",{credentials:"include"}).then(x=>x.json()).then(d=>Array.isArray(d)&&setCoupons(d));}
                   else setCouponMsg(`❌ ${r.error||"Failed"}`);
                   setTimeout(()=>setCouponMsg(""),3000);
                 }}>+ Create Coupon</button>
@@ -3035,7 +3044,11 @@ export default function AdminPage() {
                           <td>{c.used_count}{c.usage_limit?`/${c.usage_limit}`:" / ∞"}</td>
                           <td style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>{c.expires_at?new Date(c.expires_at).toLocaleDateString("en-GB"):"Never"}</td>
                           <td>
-                            <span className={`status-badge ${c.is_active?"status-confirmed":"status-pending"}`} style={{cursor:"pointer"}} onClick={async()=>{await fetch("/api/coupons",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...c,is_active:!c.is_active})});fetch("/api/coupons").then(r=>r.json()).then(d=>Array.isArray(d)&&setCoupons(d));}}>
+                            <span className={`status-badge ${c.is_active?"status-confirmed":"status-pending"}`} style={{cursor:"pointer"}} onClick={async()=>{
+                              const nextActive = !(c.is_active === true || c.is_active === 1 || c.is_active === "1");
+                              await fetch("/api/coupons",{method:"PUT",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({...c,is_active: nextActive})});
+                              fetch("/api/coupons",{credentials:"include"}).then(r=>r.json()).then(d=>Array.isArray(d)&&setCoupons(d));
+                            }}>
                               {c.is_active?"Active":"Inactive"}
                             </span>
                           </td>
