@@ -23,6 +23,7 @@ const fail = (id, ok, detail) => {
 const helper = read("lib/productLegacyRedirects.ts");
 const page = read("app/products/[slug]/page.tsx");
 const sitemap = read("app/sitemap.ts");
+const sitemapData = read("lib/sitemapDataServer.ts");
 const nextConfig = read("next.config.ts");
 const subSlug = read("lib/subscriptionSlug.ts");
 
@@ -104,9 +105,16 @@ fail(
 
 fail(
   "K_sitemap_db_slug_driven",
-  /Only emit authoritative stored slugs/.test(sitemap) &&
+  /getCachedSitemapDynamicData/.test(sitemap) &&
+    /\$\{baseUrl\}\/products\/\$\{p\.slug\}/.test(sitemap) &&
+    /SELECT\s+slug\s*,\s*created_at[\s\S]*FROM\s+products[\s\S]*WHERE\s+active\s*=\s*1/i.test(
+      sitemapData
+    ) &&
+    !/FROM\s+products[\s\S]*REPLACE\s*\(\s*REPLACE\s*\(\s*name/i.test(sitemapData) &&
     !/world-cup-offer-3-years/.test(sitemap) &&
-    !/3-years-season-pass/.test(sitemap)
+    !/3-years-season-pass/.test(sitemap) &&
+    !/world-cup-offer-3-years/.test(sitemapData) &&
+    !/3-years-season-pass/.test(sitemapData)
 );
 
 fail(
