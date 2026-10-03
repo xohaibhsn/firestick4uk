@@ -85,6 +85,79 @@ ok(
     /session\.scriptInjected/.test(tracking)
 );
 
+// Queue-shape invariants — gtag.js ignores Array-queued config/js commands
+ok(
+  "J2_gtag_stub_uses_arguments_queue",
+  /function\s+ensureGtagStub\s*\(/.test(tracking) &&
+    /dataLayer!\.push\(arguments\)/.test(tracking) &&
+    !/dataLayer!\.push\(args\)/.test(tracking) &&
+    !/function\s+gtag\(\.\.\.args/.test(tracking)
+);
+ok(
+  "J3_gtag_stub_not_array_rest_queue",
+  (() => {
+    const start = tracking.indexOf("function ensureGtagStub");
+    const end = tracking.indexOf("function issueConsentDefaults");
+    const stub = start >= 0 && end > start ? tracking.slice(start, end) : "";
+    return (
+      stub.length > 0 &&
+      /push\(arguments\)/.test(stub) &&
+      !/push\(\s*args\s*\)/.test(stub) &&
+      !/function\s+gtag\(\.\.\.args/.test(stub)
+    );
+  })()
+);
+ok(
+  "J4_ga_ads_ids_unchanged",
+  /G-055GHH06KD/.test(consentLib) &&
+    /AW-18404353244/.test(consentLib) &&
+    /GA_MEASUREMENT_ID/.test(tracking) &&
+    /GOOGLE_ADS_ID/.test(tracking)
+);
+
+// Local runtime proof: stub must queue Arguments-like entries, not Arrays
+(function proofGtagStubQueueShape() {
+  let runtimeOk = false;
+  let detail = "";
+  try {
+    const sandbox = {
+      window: { dataLayer: undefined, gtag: undefined },
+    };
+    const stubSrc = `
+      function ensureGtagStub() {
+        window.dataLayer = window.dataLayer || [];
+        if (typeof window.gtag !== "function") {
+          window.gtag = function gtag() {
+            window.dataLayer.push(arguments);
+          };
+        }
+      }
+      ensureGtagStub();
+      window.gtag("config", "G-055GHH06KD");
+      const entry = window.dataLayer[0];
+      ({
+        isArray: Array.isArray(entry),
+        type: Object.prototype.toString.call(entry),
+        hasCallee: Object.prototype.hasOwnProperty.call(entry, "callee"),
+        zero: entry[0],
+        one: entry[1],
+      });
+    `;
+    const result = vm.runInNewContext(stubSrc, sandbox);
+    runtimeOk =
+      result &&
+      result.isArray === false &&
+      result.type === "[object Arguments]" &&
+      result.hasCallee === true &&
+      result.zero === "config" &&
+      result.one === "G-055GHH06KD";
+    detail = JSON.stringify(result);
+  } catch (e) {
+    detail = String(e && e.message ? e.message : e);
+  }
+  ok("J5_runtime_stub_queues_arguments_not_array", runtimeOk, detail);
+})();
+
 ok(
   "K_privacy_choice_persists",
   /writeTrackingConsent/.test(tracking) &&

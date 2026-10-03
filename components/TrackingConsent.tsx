@@ -33,8 +33,11 @@ const session = {
 function ensureGtagStub(): void {
   window.dataLayer = window.dataLayer || [];
   if (typeof window.gtag !== "function") {
-    window.gtag = function gtag(...args: unknown[]) {
-      window.dataLayer!.push(args);
+    // Google's documented queue uses Arguments, not a rest-parameter Array.
+    // gtag.js only recognizes config/js/event/get when entries are Arguments-like.
+    window.gtag = function gtag() {
+      // eslint-disable-next-line prefer-rest-params -- gtag.js requires Arguments objects
+      window.dataLayer!.push(arguments);
     };
   }
 }

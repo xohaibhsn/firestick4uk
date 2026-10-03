@@ -112,6 +112,12 @@ ok(
     /googletagmanager\.com\/gtag\/js/.test(tracking)
 );
 ok(
+  "gtag_stub_queues_arguments_not_array",
+  /dataLayer!\.push\(arguments\)/.test(tracking) &&
+    !/dataLayer!\.push\(args\)/.test(tracking) &&
+    !/function\s+gtag\(\.\.\.args/.test(tracking)
+);
+ok(
   "ga_config_conditional_on_analytics",
   /preference\.analytics && !session\.gaConfigured/.test(tracking) &&
     /gtag!\(["']config["'],\s*GA_MEASUREMENT_ID\)/.test(tracking)
