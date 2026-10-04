@@ -11,12 +11,16 @@ import {
   resolveSocialImagePrecedence,
 } from "@/lib/socialMetadata";
 import { getDefaultOgImageFromSettings } from "@/lib/socialMetadataServer";
+import { resolveArticleDates } from "./blogArticleDates";
 
 interface Post {
   id: number; title: string; slug: string; content: string; excerpt: string;
   category: string; emoji: string; badge: string; badgeText: string;
   featured_image: string; meta_title: string; meta_description: string;
-  created_at: string; updated_at?: string | null; canonical_url: string | null;
+  /** mysql2 returns DATETIME as Date unless dateStrings is enabled. */
+  created_at: string | Date;
+  updated_at?: string | Date | null;
+  canonical_url: string | null;
   faqs: Array<{question:string;answer:string}> | string | null;
 }
 
@@ -55,6 +59,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     resolveSocialImagePrecedence(featured, cmsDefault),
     post.title || "Firestick4UK"
   );
+  const dates = resolveArticleDates(post.created_at, post.updated_at);
 
   return {
     title,
@@ -67,7 +72,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       url: canonical,
       siteName: "Firestick4UK",
       type: "article",
-      publishedTime: post.created_at,
+      ...(dates.publishedTime ? { publishedTime: dates.publishedTime } : {}),
       images: social.images,
     },
     twitter: {
@@ -94,13 +99,12 @@ export default async function BlogSlugPage({ params }: { params: Promise<{ slug:
     : [];
   const image = String(post.featured_image || "").trim();
   const description = stripHtml(post.excerpt || post.meta_description || "");
+  const dates = resolveArticleDates(post.created_at, post.updated_at);
 
   const articleLd: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Article",
     headline: post.title,
-    datePublished: post.created_at,
-    dateModified: post.updated_at || post.created_at,
     author: {
       "@type": "Organization",
       name: "Firestick4UK",
@@ -116,6 +120,8 @@ export default async function BlogSlugPage({ params }: { params: Promise<{ slug:
     },
     mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
   };
+  if (dates.datePublished) articleLd.datePublished = dates.datePublished;
+  if (dates.dateModified) articleLd.dateModified = dates.dateModified;
   if (description) articleLd.description = description;
   if (image) articleLd.image = image;
 
