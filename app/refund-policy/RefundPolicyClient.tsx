@@ -5,6 +5,7 @@ import Footer from "@/components/Footer";
 import CmsBody from "@/components/CmsBody";
 import { cms } from "@/lib/cms";
 import type { ContactConfig } from "@/lib/contactConfigNormalize";
+import { renderLegalCmsContactTokens } from "@/lib/legalCmsTokens";
 import type { PublicSiteContentMap } from "@/lib/publicSiteContentServer";
 
 const styles = `
@@ -141,7 +142,10 @@ export default function RefundPolicyClient({
 
           <div className="policy-content">
             {bodyHtml ? (
-              <CmsBody html={bodyHtml} className="cms-legal-body" />
+              <CmsBody
+                html={renderLegalCmsContactTokens(bodyHtml, contact)}
+                className="cms-legal-body"
+              />
             ) : (
               <>
                 <div className="policy-section" id="overview">
