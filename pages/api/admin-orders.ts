@@ -1,7 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "../../lib/db";
-import { getRequestMeta, requireAdminPermission } from "../../lib/adminAuth";
+import {
+  getRequestMeta,
+  requireAdminPermission,
+  type AdminIdentity,
+} from "../../lib/adminAuth";
 import { recordAdminAudit } from "../../lib/adminAudit";
+import {
+  hasAdminPermission,
+  type AdminRoleName,
+} from "../../lib/adminPermissions";
 import {
   ORDER_STATUSES,
   buildOrderWhere,
@@ -10,7 +18,7 @@ import {
   parseOrderFilters,
 } from "../../lib/adminOrdersQuery";
 
-async function handleSummary(res: NextApiResponse) {
+async function handleSummary(res: NextApiResponse, admin: AdminIdentity) {
   const [[totals]]: any = await pool.query(`
     SELECT
       COUNT(*) AS total_orders,
@@ -41,6 +49,20 @@ async function handleSummary(res: NextApiResponse) {
     }
   }
 
+  // Additive count-only field for Sidhu sidebar badge — no lead PII.
+  let leads_last_24: number | undefined;
+  if (hasAdminPermission(admin.role as AdminRoleName, "leads.view")) {
+    try {
+      const [[leadRow]]: any = await pool.query(
+        `SELECT COUNT(*) AS c FROM chat_leads
+         WHERE created_at >= (NOW() - INTERVAL 24 HOUR)`
+      );
+      leads_last_24 = Number(leadRow?.c || 0);
+    } catch {
+      leads_last_24 = 0;
+    }
+  }
+
   return res.status(200).json({
     total_orders: Number(totals?.total_orders || 0),
     pending_orders: Number(totals?.pending_orders || 0),
@@ -48,6 +70,7 @@ async function handleSummary(res: NextApiResponse) {
     confirmed_revenue: Number(totals?.confirmed_revenue || 0),
     customer_count: Number(cust?.customer_count || 0),
     product_count,
+    ...(leads_last_24 !== undefined ? { leads_last_24 } : {}),
   });
 }
 
@@ -181,7 +204,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const admin = await requireAdminPermission(req, res, "orders.view", { mutate: false });
       if (!admin) return;
 
-      if (req.query.summary === "1") return handleSummary(res);
+      if (req.query.summary === "1") return handleSummary(res, admin);
 
       const orderId = String(req.query.order_id || "").trim();
       if (orderId) return handleOrderDetail(res, orderId.slice(0, 64));

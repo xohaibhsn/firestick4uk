@@ -673,11 +673,52 @@ export default function AdminPage() {
     };
   }, []);
 
+  // Tab-scoped data loads — avoid post-login fanout across every Sidhu panel.
+  // Dashboard keeps summary + recent orders; Writer dashboard keeps Blog counters.
   useEffect(() => {
     if (!loggedIn) return;
 
-    // Blog is allowed for all CMS roles
-    if (can("blog.manage")) {
+    if (tab === "dashboard") {
+      if (can("orders.view")) {
+        fetch("/api/admin-orders?summary=1", { credentials: "include" })
+          .then((r) => {
+            if (r.status === 401) { handleSessionExpired(); return null; }
+            if (r.status === 403) { showPermError(); return null; }
+            return r.json();
+          })
+          .then((data) => { if (data && !data.error) setDashSummary(data); })
+          .catch(() => {});
+        fetch("/api/admin-orders?page=1&limit=10", { credentials: "include" })
+          .then((r) => {
+            if (r.status === 401) { handleSessionExpired(); return null; }
+            if (r.status === 403) { showPermError(); return null; }
+            return r.json();
+          })
+          .then((data) => {
+            if (Array.isArray(data?.items)) {
+              setRecentOrders(data.items.map((o: any) => mapOrderRow(o)));
+            } else {
+              setRecentOrders([]);
+            }
+          })
+          .catch(() => {});
+      } else {
+        setDashSummary(null);
+        setRecentOrders([]);
+        setOrders([]);
+        // Writer Dashboard: Blog counters need Blog data without orders.view
+        if (can("blog.manage")) {
+          fetch("/api/blog", { credentials: "include" })
+            .then((r) => r.json())
+            .then((data) => {
+              if (Array.isArray(data)) setBlogPosts(data);
+            })
+            .catch(() => {});
+        }
+      }
+    }
+
+    if (tab === "blog" && can("blog.manage")) {
       fetch("/api/blog", { credentials: "include" })
         .then((r) => r.json())
         .then((data) => {
@@ -686,103 +727,71 @@ export default function AdminPage() {
         .catch(() => {});
     }
 
-    if (can("products.view")) {
-      loadProducts();
-    } else {
-      setProducts([]);
-      setProductsError("");
+    if (tab === "products") {
+      if (can("products.view")) {
+        loadProducts();
+      } else {
+        setProducts([]);
+        setProductsError("");
+      }
     }
 
-    if (can("orders.view")) {
-      fetch("/api/admin-orders?summary=1", { credentials: "include" })
-        .then((r) => {
-          if (r.status === 401) { handleSessionExpired(); return null; }
-          if (r.status === 403) { showPermError(); return null; }
-          return r.json();
-        })
-        .then((data) => { if (data && !data.error) setDashSummary(data); })
-        .catch(() => {});
-      fetch("/api/admin-orders?page=1&limit=10", { credentials: "include" })
-        .then((r) => {
-          if (r.status === 401) { handleSessionExpired(); return null; }
-          if (r.status === 403) { showPermError(); return null; }
-          return r.json();
-        })
-        .then((data) => {
-          if (Array.isArray(data?.items)) {
-            setRecentOrders(data.items.map((o: any) => mapOrderRow(o)));
-          } else {
-            setRecentOrders([]);
-          }
-        })
-        .catch(() => {});
-    } else {
-      setDashSummary(null);
-      setRecentOrders([]);
-      setOrders([]);
+    if (tab === "coupons") {
+      if (can("coupons.manage")) {
+        fetch("/api/coupons", { credentials: "include" })
+          .then((r) => r.json())
+          .then((d) => {
+            if (Array.isArray(d)) setCoupons(d);
+          })
+          .catch(() => {});
+      } else {
+        setCoupons([]);
+      }
     }
 
-    if (!can("customers.view")) {
-      setCustomers([]);
+    if (tab === "builder") {
+      if (can("page_builder.manage")) {
+        fetch("/api/sections?page=home&all=1", { credentials: "include" })
+          .then((r) => r.json())
+          .then((d) => {
+            if (Array.isArray(d)) setSections(d);
+          })
+          .catch(() => {});
+      } else {
+        setSections([]);
+      }
     }
 
-    if (can("coupons.manage")) {
-      fetch("/api/coupons", { credentials: "include" })
-        .then((r) => r.json())
-        .then((d) => {
-          if (Array.isArray(d)) setCoupons(d);
-        })
-        .catch(() => {});
-    } else {
-      setCoupons([]);
+    if (tab === "faqadmin") {
+      if (can("faqs.manage")) {
+        fetch("/api/faqs?admin=true", { credentials: "include" })
+          .then((r) => r.json())
+          .then((d) => {
+            if (Array.isArray(d)) setFaqs(d);
+          })
+          .catch(() => {});
+      } else {
+        setFaqs([]);
+      }
     }
 
-    if (can("content.manage") || can("settings.manage")) {
-      fetch("/api/site-content?page=all")
-        .then((r) => r.json())
-        .then((d) => {
-          if (d && typeof d === "object") setSiteContent(d);
-        })
-        .catch(() => {});
+    if (tab === "leads") {
+      if (can("leads.view")) {
+        fetch("/api/admin/leads", { credentials: "include" })
+          .then((r) => r.json())
+          .then((d) => {
+            if (Array.isArray(d)) {
+              setChatLeads(d);
+              setSelectedLeadIds([]);
+            }
+          })
+          .catch(() => {});
+      } else {
+        setChatLeads([]);
+      }
     }
 
-    if (can("page_builder.manage")) {
-      fetch("/api/sections?page=home&all=1", { credentials: "include" })
-        .then((r) => r.json())
-        .then((d) => {
-          if (Array.isArray(d)) setSections(d);
-        })
-        .catch(() => {});
-    } else {
-      setSections([]);
-    }
-
-    if (can("faqs.manage")) {
-      fetch("/api/faqs?admin=true", { credentials: "include" })
-        .then((r) => r.json())
-        .then((d) => {
-          if (Array.isArray(d)) setFaqs(d);
-        })
-        .catch(() => {});
-    } else {
-      setFaqs([]);
-    }
-
-    if (can("leads.view")) {
-      fetch("/api/admin/leads", { credentials: "include" })
-        .then((r) => r.json())
-        .then((d) => {
-          if (Array.isArray(d)) {
-            setChatLeads(d);
-            setSelectedLeadIds([]);
-          }
-        })
-        .catch(() => {});
-    } else {
-      setChatLeads([]);
-    }
-
-    if (can("training.manage")) {
+    if (tab === "training" && can("training.manage")) {
       fetch("/api/admin/berlin-training", { credentials: "include" })
         .then((r) => r.json())
         .then((d) => {
@@ -805,17 +814,24 @@ export default function AdminPage() {
         .catch(() => {});
     }
 
-    if (can("staff.manage")) {
-      fetch("/api/admin-staff", { credentials: "include" })
-        .then((r) => r.json())
-        .then((d) => {
-          if (Array.isArray(d)) setStaffUsers(d);
-        })
-        .catch(() => {});
-    } else {
-      setStaffUsers([]);
+    if (tab === "staff") {
+      if (can("staff.manage")) {
+        fetch("/api/admin-staff", { credentials: "include" })
+          .then((r) => r.json())
+          .then((d) => {
+            if (Array.isArray(d)) setStaffUsers(d);
+          })
+          .catch(() => {});
+      } else {
+        setStaffUsers([]);
+      }
     }
-  }, [loggedIn, adminRole]);
+
+    if (!can("customers.view")) {
+      setCustomers([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn, tab, adminRole]);
 
   // Load orders/customers only when their tab is active (no polling)
   useEffect(() => {
@@ -1694,7 +1710,11 @@ export default function AdminPage() {
   };
 
   const pendingCount = Number(dashSummary?.pending_orders || 0);
-  const leadsLast24 = chatLeads.filter(lead => new Date(lead.created_at).getTime() >= leadWindowStart).length;
+  // Prefer summary COUNT for sidebar badge so full /api/admin/leads stays lazy.
+  const leadsLast24 =
+    dashSummary?.leads_last_24 != null && Number.isFinite(Number(dashSummary.leads_last_24))
+      ? Number(dashSummary.leads_last_24)
+      : chatLeads.filter((lead) => new Date(lead.created_at).getTime() >= leadWindowStart).length;
 
   const statusClass = (s: string) => `status-badge status-${s}`;
 
