@@ -40,6 +40,89 @@ export type SeoDiagnosticsResult = {
   issues: SeoDiagnosticIssue[];
 };
 
+/** Compact inline <img> alt scan — counts only, never raw HTML. */
+export type InlineImageAltFinding = {
+  total: number;
+  missingAlt: number;
+  emptyAlt: number;
+};
+
+export const EMPTY_INLINE_IMAGE_ALT: InlineImageAltFinding = {
+  total: 0,
+  missingAlt: 0,
+  emptyAlt: 0,
+};
+
+/**
+ * Pure deterministic scan of stored TipTap/rich HTML for <img> alt presence.
+ * Does not execute HTML, fetch URLs, or judge alt wording quality.
+ */
+export function analyzeInlineImageAlts(
+  html: string | null | undefined
+): InlineImageAltFinding {
+  const src = typeof html === "string" ? html : "";
+  if (!src) return { ...EMPTY_INLINE_IMAGE_ALT };
+
+  const imgTagRe = /<img\b[^>]*>/gi;
+  let total = 0;
+  let missingAlt = 0;
+  let emptyAlt = 0;
+  let m: RegExpExecArray | null;
+  while ((m = imgTagRe.exec(src)) !== null) {
+    total += 1;
+    const tag = m[0];
+    // Real `alt=` only — not `data-alt`, `aria-*`, etc.
+    const altMatch = tag.match(
+      /(?<![\w-])alt\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i
+    );
+    if (!altMatch) {
+      missingAlt += 1;
+      continue;
+    }
+    const raw = altMatch[1] ?? altMatch[2] ?? altMatch[3] ?? "";
+    if (!String(raw).trim()) emptyAlt += 1;
+  }
+  return { total, missingAlt, emptyAlt };
+}
+
+function mergeInlineImageAltFindings(
+  parts: InlineImageAltFinding[]
+): InlineImageAltFinding {
+  return parts.reduce(
+    (acc, part) => ({
+      total: acc.total + part.total,
+      missingAlt: acc.missingAlt + part.missingAlt,
+      emptyAlt: acc.emptyAlt + part.emptyAlt,
+    }),
+    { ...EMPTY_INLINE_IMAGE_ALT }
+  );
+}
+
+/**
+ * Scan product rich-HTML fields with identical-string dedupe so legacy
+ * duplicated fallback copies are not double-counted.
+ */
+export function analyzeProductRichHtmlFields(fields: {
+  short_description?: string | null;
+  description?: string | null;
+  full_description?: string | null;
+}): InlineImageAltFinding {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const raw of [
+    fields.short_description,
+    fields.description,
+    fields.full_description,
+  ]) {
+    const s = typeof raw === "string" ? raw : "";
+    if (!s.trim()) continue;
+    if (seen.has(s)) continue;
+    seen.add(s);
+    unique.push(s);
+  }
+  return mergeInlineImageAltFindings(unique.map(analyzeInlineImageAlts));
+}
+
 /** Normalized product row already produced by /api/admin-seo-overview. */
 export type SeoDiagProductInput = {
   id: number;
@@ -50,6 +133,8 @@ export type SeoDiagProductInput = {
   description: string;
   publicUrl?: string;
   ogSource: ProductOgSource | string;
+  /** Compact server-side scan of description / short_description / full_description. */
+  inlineImageAlt?: InlineImageAltFinding | null;
 };
 
 /** Normalized blog row already produced by /api/admin-seo-overview. */
@@ -65,6 +150,8 @@ export type SeoDiagBlogInput = {
   featuredImage: boolean;
   canonicalHealth: string;
   canonicalDetail: string;
+  /** Compact server-side scan of blog content HTML (content itself is never exposed). */
+  inlineImageAlt?: InlineImageAltFinding | null;
 };
 
 export type SeoDiagnosticsInput = {
@@ -192,6 +279,46 @@ export function diagnoseProduct(
     });
   }
 
+  const inline = p.inlineImageAlt;
+  if (inline && inline.missingAlt > 0) {
+    const n = inline.missingAlt;
+    issues.push({
+      id: issueId("product", id, "inline-image-missing-alt"),
+      severity: "needs-attention",
+      category: "media",
+      entityType: "product",
+      entityId: id,
+      label,
+      url,
+      field: "rich_content",
+      message:
+        n === 1
+          ? "Inline product image is missing an alt attribute."
+          : "Inline product images are missing alt attributes.",
+      evidence: `${n} inline image${n === 1 ? "" : "s"} without an alt attribute.`,
+      editTarget: "products",
+    });
+  }
+  if (inline && inline.emptyAlt > 0) {
+    const n = inline.emptyAlt;
+    issues.push({
+      id: issueId("product", id, "inline-image-empty-alt"),
+      severity: "review",
+      category: "media",
+      entityType: "product",
+      entityId: id,
+      label,
+      url,
+      field: "rich_content",
+      message:
+        n === 1
+          ? "Inline product image has an empty alt attribute."
+          : "Inline product images have empty alt attributes.",
+      evidence: `${n} inline image${n === 1 ? " has" : "s have"} an empty alt attribute. Empty alt may be intentional for a decorative image, so review context.`,
+      editTarget: "products",
+    });
+  }
+
   return issues;
 }
 
@@ -312,6 +439,46 @@ export function diagnoseBlog(b: SeoDiagBlogInput): SeoDiagnosticIssue[] {
       field: "canonical_url",
       message: "Canonical needs review.",
       evidence: String(b.canonicalDetail || "Canonical health is Review."),
+      editTarget: "blog",
+    });
+  }
+
+  const inline = b.inlineImageAlt;
+  if (inline && inline.missingAlt > 0) {
+    const n = inline.missingAlt;
+    issues.push({
+      id: issueId("blog", id, "inline-image-missing-alt"),
+      severity: "needs-attention",
+      category: "media",
+      entityType: "blog",
+      entityId: id,
+      label,
+      url,
+      field: "content",
+      message:
+        n === 1
+          ? "Inline blog image is missing an alt attribute."
+          : "Inline blog images are missing alt attributes.",
+      evidence: `${n} inline image${n === 1 ? "" : "s"} without an alt attribute.`,
+      editTarget: "blog",
+    });
+  }
+  if (inline && inline.emptyAlt > 0) {
+    const n = inline.emptyAlt;
+    issues.push({
+      id: issueId("blog", id, "inline-image-empty-alt"),
+      severity: "review",
+      category: "media",
+      entityType: "blog",
+      entityId: id,
+      label,
+      url,
+      field: "content",
+      message:
+        n === 1
+          ? "Inline blog image has an empty alt attribute."
+          : "Inline blog images have empty alt attributes.",
+      evidence: `${n} inline image${n === 1 ? " has" : "s have"} an empty alt attribute. Empty alt may be intentional for a decorative image, so review context.`,
       editTarget: "blog",
     });
   }

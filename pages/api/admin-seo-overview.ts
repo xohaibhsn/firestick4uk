@@ -18,7 +18,11 @@ import {
   normalizeSubscriptionSlug,
   subscriptionPageUrl,
 } from "@/lib/subscriptionSlug";
-import { buildSeoDiagnostics } from "@/lib/seoDiagnostics";
+import {
+  analyzeInlineImageAlts,
+  analyzeProductRichHtmlFields,
+  buildSeoDiagnostics,
+} from "@/lib/seoDiagnostics";
 import {
   GSC_ACCOUNT_CHECKS,
   PRODUCT8_CURRENT_SLUG,
@@ -165,6 +169,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           image: p.image,
           og_image: p.og_image,
         });
+        // Compact counts only — never expose raw rich HTML to the client.
+        const inlineImageAlt = analyzeProductRichHtmlFields({
+          short_description: p.short_description,
+          description: p.description,
+          full_description: p.full_description,
+        });
         return {
           id: Number(p.id),
           name: String(p.name || ""),
@@ -179,6 +189,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           hasCustomOg: !!String(p.og_image || "").trim(),
           focus_keyword: String(p.focus_keyword || ""),
           health: derived.flags,
+          inlineImageAlt,
         };
       });
 
@@ -210,9 +221,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (canBlog) {
     try {
+      // Widened SELECT only — still a single blog_posts query (total remains 3).
       const [rows]: any = await pool.query(
         `SELECT id, title, slug, status, active, meta_title, meta_description,
-                focus_keyword, canonical_url, featured_image, excerpt
+                focus_keyword, canonical_url, featured_image, excerpt, content
          FROM blog_posts
          ORDER BY id DESC`
       );
@@ -233,6 +245,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           canonical_url: b.canonical_url,
         });
         const canon = analyzeBlogCanonical(b.canonical_url, slug);
+        // Scan content server-side; never return raw HTML.
+        const inlineImageAlt = analyzeInlineImageAlts(b.content);
         return {
           id: Number(b.id),
           title: String(b.title || ""),
@@ -253,6 +267,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           focusKeywordNote:
             "Stored — not currently emitted in page metadata",
           health: derived.flags,
+          inlineImageAlt,
         };
       });
     } catch {
