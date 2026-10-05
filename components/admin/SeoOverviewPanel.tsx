@@ -22,6 +22,31 @@ type GscAccountCheckRow = {
   note: string;
 };
 
+type DiagnosticIssue = {
+  id: string;
+  severity: "needs-attention" | "review";
+  category: string;
+  entityType: "product" | "blog";
+  entityId: string;
+  label: string;
+  url: string | null;
+  field: string | null;
+  message: string;
+  evidence: string;
+  editTarget: "products" | "blog";
+};
+
+type DiagnosticsPayload = {
+  summary: {
+    eligibleEntities: number;
+    healthyEntities: number;
+    needsAttentionEntities: number;
+    reviewEntities: number;
+    totalIssues: number;
+  };
+  issues: DiagnosticIssue[];
+};
+
 type OverviewPayload = {
   permissions: {
     products: boolean;
@@ -42,6 +67,7 @@ type OverviewPayload = {
   sitemap?: { included: string[]; excluded: string[]; note: string };
   verificationQueue?: VerificationRow[];
   gscAccountChecks?: GscAccountCheckRow[];
+  diagnostics?: DiagnosticsPayload;
   orderTracking?: Record<string, unknown>;
 };
 
@@ -61,10 +87,15 @@ function badgeStyle(flag: string): CSSProperties {
     marginRight: 4,
     marginBottom: 2,
   };
-  if (flag === "OK" || flag === "Auto") {
+  if (flag === "OK" || flag === "Auto" || flag === "Healthy") {
     return { ...base, background: "#DCFCE7", color: "#166534" };
   }
-  if (flag === "Missing" || flag === "Inactive" || flag === "Draft") {
+  if (
+    flag === "Missing" ||
+    flag === "Inactive" ||
+    flag === "Draft" ||
+    flag === "Needs attention"
+  ) {
     return { ...base, background: "#FEE2E2", color: "#991B1B" };
   }
   if (flag === "Noindex" || flag === "Redirect" || flag === "Not in sitemap") {
@@ -306,6 +337,155 @@ export default function SeoOverviewPanel({
 
       {loading && !data && (
         <div className="section-card">Loading SEO overview…</div>
+      )}
+
+      {data?.diagnostics && (
+        <div className="section-card" style={{ marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>SEO Diagnostics</div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 14 }}>
+            Deterministic CMS checks only — not Google Search Console status or a
+            ranking score. &quot;Healthy&quot; means no issue detected by this
+            deterministic CMS ruleset.
+          </div>
+
+          {(() => {
+            const s = data.diagnostics!.summary;
+            const cards: Array<{ label: string; value: number; flag: string }> = [
+              {
+                label: "Needs attention",
+                value: s.needsAttentionEntities,
+                flag: "Needs attention",
+              },
+              { label: "Review", value: s.reviewEntities, flag: "Review" },
+              { label: "Healthy", value: s.healthyEntities, flag: "Healthy" },
+              { label: "Total issues", value: s.totalIssues, flag: "Review" },
+            ];
+            return (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 10,
+                  marginBottom: 14,
+                }}
+              >
+                {cards.map((c) => (
+                  <div
+                    key={c.label}
+                    style={{
+                      border: "1px solid #E5E7EB",
+                      borderRadius: 8,
+                      padding: "10px 14px",
+                      minWidth: 120,
+                    }}
+                  >
+                    <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>
+                      {c.label}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontWeight: 700, fontSize: 18 }}>{c.value}</span>
+                      <span style={badgeStyle(c.flag)}>{c.label}</span>
+                    </div>
+                  </div>
+                ))}
+                <div
+                  style={{
+                    border: "1px solid #E5E7EB",
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    minWidth: 120,
+                  }}
+                >
+                  <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>
+                    Eligible entities
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 18 }}>
+                    {s.eligibleEntities}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {data.diagnostics.issues.length === 0 ? (
+            <div style={{ fontSize: 13 }}>
+              <div>
+                No deterministic SEO issues found in the current public
+                Products/Blog scope.
+              </div>
+              <div style={{ color: "#666", marginTop: 8, fontSize: 12 }}>
+                Google indexing and performance still require GSC verification.
+              </div>
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="data-table" style={{ width: "100%", minWidth: 880 }}>
+                <thead>
+                  <tr>
+                    <th>Severity</th>
+                    <th>Type</th>
+                    <th>Item</th>
+                    <th>Issue</th>
+                    <th>Evidence</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.diagnostics.issues.map((issue) => (
+                    <tr key={issue.id}>
+                      <td>
+                        <span
+                          style={badgeStyle(
+                            issue.severity === "needs-attention"
+                              ? "Needs attention"
+                              : "Review"
+                          )}
+                        >
+                          {issue.severity === "needs-attention"
+                            ? "Needs attention"
+                            : "Review"}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        {issue.entityType === "product" ? "Product" : "Blog"}
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        <div style={{ fontWeight: 600 }}>{issue.label}</div>
+                        {issue.url ? (
+                          <a
+                            href={issue.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: 11, wordBreak: "break-all" }}
+                          >
+                            Open
+                          </a>
+                        ) : null}
+                      </td>
+                      <td style={{ fontSize: 12 }}>{issue.message}</td>
+                      <td style={{ fontSize: 11, color: "#555" }}>{issue.evidence}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="action-btn btn-edit"
+                          onClick={() =>
+                            onNavigate(
+                              issue.editTarget === "products" ? "products" : "blog"
+                            )
+                          }
+                        >
+                          {issue.editTarget === "products"
+                            ? "Open Products"
+                            : "Open Blog"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
 
       {data?.site && (

@@ -18,6 +18,7 @@ import {
   normalizeSubscriptionSlug,
   subscriptionPageUrl,
 } from "@/lib/subscriptionSlug";
+import { buildSeoDiagnostics } from "@/lib/seoDiagnostics";
 import {
   GSC_ACCOUNT_CHECKS,
   PRODUCT8_CURRENT_SLUG,
@@ -346,6 +347,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (canContent) pushUnique(buildContentVerificationItems(subscriptionUrl));
   // Published blog posts stay in the Blog SEO table — not this curated GSC queue.
 
+  // Diagnostics reuse already-fetched product/blog rows — no additional DB reads.
+  const diagnostics = buildSeoDiagnostics({
+    products: canProducts && Array.isArray(products) ? (products as any[]) : undefined,
+    blog: canBlog && Array.isArray(blog) ? (blog as any[]) : undefined,
+  });
+
   return res.status(200).json({
     permissions,
     siteOrigin: SEO_SITE_ORIGIN,
@@ -358,6 +365,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     sitemap,
     verificationQueue,
     gscAccountChecks: [...GSC_ACCOUNT_CHECKS],
+    diagnostics,
     orderTracking: canContent
       ? {
           url: `${SEO_SITE_ORIGIN}/order-tracking`,
