@@ -238,13 +238,29 @@ ok(
       !/"seo\./.test(JSON.stringify(ROLE_PERMISSIONS)))
 );
 
-// --- B1 OVERVIEW UNCHANGED ---
-ok(
-  "seo_overview_still_read_only",
-  !/method:\s*["']PUT["']/.test(seoPanel) &&
-    !/method:\s*["']POST["']/.test(seoPanel) &&
-    /Panel mounts only when SEO tab opens/.test(seoPanel)
-);
+// --- B1 OVERVIEW UNCHANGED (explicit issue-memory reconcile POST is allowed) ---
+{
+  const hasPut = /method:\s*["']PUT["']/.test(seoPanel);
+  const overviewPosts = /fetch\(\s*["']\/api\/admin-seo-overview["'][\s\S]{0,200}?method:\s*["']POST["']/.test(
+    seoPanel
+  );
+  const reconcilePost =
+    /fetch\(\s*["']\/api\/admin-seo-issues\/reconcile["']\s*,\s*\{[\s\S]{0,180}?method:\s*["']POST["']/.test(
+      seoPanel
+    );
+  const otherPosts = [
+    ...seoPanel.matchAll(/method:\s*["']POST["']/g),
+  ].length;
+  ok(
+    "seo_overview_still_read_only",
+    !hasPut &&
+      !overviewPosts &&
+      reconcilePost &&
+      otherPosts === 1 &&
+      /Panel mounts only when SEO tab opens/.test(seoPanel) &&
+      /req\.method !== ["']GET["']/.test(seoApi)
+  );
+}
 ok("seo_overview_no_polling", !/setInterval/.test(seoPanel) && !/setTimeout/.test(seoApi));
 ok(
   "erp_ui_retired_marker",

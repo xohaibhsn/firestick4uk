@@ -18,23 +18,19 @@ import {
   normalizeSubscriptionSlug,
   subscriptionPageUrl,
 } from "@/lib/subscriptionSlug";
+import { buildSeoDiagnostics } from "@/lib/seoDiagnostics";
 import {
-  analyzeInlineImageAlts,
-  analyzeProductRichHtmlFields,
-  buildSeoDiagnostics,
-} from "@/lib/seoDiagnostics";
+  normalizeBlogDiagnosticRow,
+  normalizeProductDiagnosticRow,
+} from "@/lib/seoDiagnosticRows";
 import {
   GSC_ACCOUNT_CHECKS,
   PRODUCT8_CURRENT_SLUG,
   PRODUCT9_CURRENT_SLUG,
   SEO_SITE_ORIGIN,
-  analyzeBlogCanonical,
-  blogPublicUrl,
   buildContentVerificationItems,
   buildKeyPageFacts,
   buildProductMigrationVerificationItems,
-  deriveBlogHealth,
-  deriveProductHealth,
   productPublicUrl,
   type VerificationItem,
 } from "@/lib/seoOverview";
@@ -152,46 +148,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          FROM products
          ORDER BY id ASC`
       );
-      products = (Array.isArray(rows) ? rows : []).map((p: any) => {
-        const active = Number(p.active) === 1;
-        const slug = String(p.slug || "")
-          .trim()
-          .toLowerCase();
-        const derived = deriveProductHealth({
-          name: String(p.name || ""),
-          slug,
-          active,
-          seo_title: p.seo_title,
-          meta_description: p.meta_description,
-          short_description: p.short_description,
-          description: p.description,
-          full_description: p.full_description,
-          image: p.image,
-          og_image: p.og_image,
-        });
-        // Compact counts only — never expose raw rich HTML to the client.
-        const inlineImageAlt = analyzeProductRichHtmlFields({
-          short_description: p.short_description,
-          description: p.description,
-          full_description: p.full_description,
-        });
-        return {
-          id: Number(p.id),
-          name: String(p.name || ""),
-          slug,
-          active,
-          publicUrl: slug ? productPublicUrl(slug) : "",
-          title: derived.title,
-          description: derived.description,
-          canonical: derived.canonical,
-          inSitemap: derived.inSitemap,
-          ogSource: derived.ogSource,
-          hasCustomOg: !!String(p.og_image || "").trim(),
-          focus_keyword: String(p.focus_keyword || ""),
-          health: derived.flags,
-          inlineImageAlt,
-        };
-      });
+      products = (Array.isArray(rows) ? rows : []).map((p: any) =>
+        normalizeProductDiagnosticRow(p)
+      );
 
       const p8Live = (products as any[]).some(
         (p) => p.active && p.slug === PRODUCT8_CANONICAL_SLUG
@@ -228,48 +187,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          FROM blog_posts
          ORDER BY id DESC`
       );
-      blog = (Array.isArray(rows) ? rows : []).map((b: any) => {
-        const slug = String(b.slug || "")
-          .trim()
-          .toLowerCase();
-        const active = Number(b.active) === 1;
-        const derived = deriveBlogHealth({
-          title: String(b.title || ""),
-          slug,
-          status: String(b.status || ""),
-          active,
-          meta_title: b.meta_title,
-          meta_description: b.meta_description,
-          excerpt: b.excerpt,
-          featured_image: b.featured_image,
-          canonical_url: b.canonical_url,
-        });
-        const canon = analyzeBlogCanonical(b.canonical_url, slug);
-        // Scan content server-side; never return raw HTML.
-        const inlineImageAlt = analyzeInlineImageAlts(b.content);
-        return {
-          id: Number(b.id),
-          title: String(b.title || ""),
-          slug,
-          status: String(b.status || ""),
-          active,
-          published: derived.published,
-          publicUrl: slug ? blogPublicUrl(slug) : "",
-          effectiveTitle: derived.title,
-          effectiveDescription: derived.description,
-          storedCanonical: String(b.canonical_url || ""),
-          effectiveCanonical: canon.effectiveCanonical,
-          canonicalHealth: canon.label,
-          canonicalDetail: canon.detail,
-          inSitemap: derived.inSitemap,
-          featuredImage: !!String(b.featured_image || "").trim(),
-          focus_keyword: String(b.focus_keyword || ""),
-          focusKeywordNote:
-            "Stored — not currently emitted in page metadata",
-          health: derived.flags,
-          inlineImageAlt,
-        };
-      });
+      blog = (Array.isArray(rows) ? rows : []).map((b: any) =>
+        normalizeBlogDiagnosticRow(b)
+      );
     } catch {
       blog = [];
     }

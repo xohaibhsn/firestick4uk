@@ -44,10 +44,17 @@ function loadTsModule(rel) {
 
 const perms = read("lib/adminPermissions.ts");
 const api = read("pages/api/admin-seo-overview.ts");
+const rowsHelper = exists("lib/seoDiagnosticRows.ts")
+  ? read("lib/seoDiagnosticRows.ts")
+  : "";
 const panel = read("components/admin/SeoOverviewPanel.tsx");
 const sidhu = read("app/sidhu/page.tsx");
 const seoHelper = read("lib/seoOverview.ts");
 const productLegacy = read("lib/productLegacyRedirects.ts");
+// Shared normalizer may hold derive/field mapping (parity with issue-memory reconcile).
+const productNormSrc = /normalizeProductDiagnosticRow/.test(api)
+  ? `${api}\n${rowsHelper}`
+  : api;
 
 const so = loadTsModule("lib/seoOverview.ts");
 const {
@@ -120,14 +127,16 @@ ok(
 );
 ok(
   "api_passes_full_description_to_derive",
-  /full_description:\s*p\.full_description/.test(api)
+  /full_description:\s*p\.full_description/.test(productNormSrc)
 );
 ok(
   "api_does_not_expose_raw_full_description",
   /description,\s*full_description/.test(api) &&
-    /full_description:\s*p\.full_description/.test(api) &&
+    /full_description:\s*p\.full_description/.test(productNormSrc) &&
     !/\breturn\s*\{[\s\S]*?\bfull_description\s*:/.test(
-      api.slice(api.indexOf("products = "))
+      /normalizeProductDiagnosticRow/.test(api)
+        ? rowsHelper
+        : api.slice(api.indexOf("products = "))
     )
 );
 ok(

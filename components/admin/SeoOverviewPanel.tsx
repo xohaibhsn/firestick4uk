@@ -71,11 +71,45 @@ type OverviewPayload = {
   orderTracking?: Record<string, unknown>;
 };
 
+type MemoryRow = {
+  issue_key: string;
+  rule_code: string;
+  entity_type: "product" | "blog";
+  entity_id: string;
+  entity_label: string | null;
+  category: string;
+  severity: string;
+  field_name: string | null;
+  status: "open" | "resolved";
+  resolution_reason: "fixed" | "entity_out_of_scope" | "deleted" | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  resolved_at: string | null;
+  reopened_count: number;
+  occurrence_count: number;
+  latest_message: string;
+  latest_evidence: string;
+};
+
 type Props = {
   role: AdminRoleName;
   onNavigate: (tab: SidhuTab) => void;
   getRoleHeaders: () => Record<string, string>;
 };
+
+function formatMemoryWhen(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString();
+}
+
+function resolutionLabel(reason: MemoryRow["resolution_reason"]): string {
+  if (reason === "fixed") return "No longer detected";
+  if (reason === "entity_out_of_scope") return "No longer in public SEO scope";
+  if (reason === "deleted") return "Entity deleted";
+  return "—";
+}
 
 function badgeStyle(flag: string): CSSProperties {
   const base: CSSProperties = {
@@ -110,9 +144,37 @@ export default function SeoOverviewPanel({
   getRoleHeaders,
 }: Props) {
   const [data, setData] = useState<OverviewPayload | null>(null);
+  const [memory, setMemory] = useState<MemoryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [memoryLoading, setMemoryLoading] = useState(false);
   const [error, setError] = useState("");
+  const [memoryError, setMemoryError] = useState("");
+  const [reconcileMsg, setReconcileMsg] = useState("");
+  const [reconciling, setReconciling] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState("");
+
+  const loadMemory = useCallback(async () => {
+    setMemoryLoading(true);
+    setMemoryError("");
+    try {
+      const res = await fetch("/api/admin-seo-issues?status=all&limit=50", {
+        credentials: "include",
+        headers: { ...getRoleHeaders() },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMemory([]);
+        setMemoryError(json.error || json.message || `HTTP ${res.status}`);
+      } else {
+        setMemory(Array.isArray(json.items) ? (json.items as MemoryRow[]) : []);
+      }
+    } catch {
+      setMemory([]);
+      setMemoryError("Failed to load issue memory");
+    } finally {
+      setMemoryLoading(false);
+    }
+  }, [getRoleHeaders]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -128,6 +190,8 @@ export default function SeoOverviewPanel({
         setData(null);
       } else {
         setData(json as OverviewPayload);
+        // Sequential: overview first, then memory — no parallel fanout.
+        await loadMemory();
       }
     } catch {
       setError("Failed to load SEO overview");
@@ -135,7 +199,7 @@ export default function SeoOverviewPanel({
     } finally {
       setLoading(false);
     }
-  }, [getRoleHeaders]);
+  }, [getRoleHeaders, loadMemory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,6 +218,7 @@ export default function SeoOverviewPanel({
           setData(null);
         } else {
           setData(json as OverviewPayload);
+          if (!cancelled) await loadMemory();
         }
       } catch {
         if (!cancelled) {
@@ -173,6 +238,43 @@ export default function SeoOverviewPanel({
 
   const can = (perm: Parameters<typeof hasAdminPermission>[1]) =>
     hasAdminPermission(role, perm);
+
+  const canRecordAll = role === "super_admin";
+
+  const recordCurrentDiagnostics = async () => {
+    if (!canRecordAll || reconciling) return;
+    setReconciling(true);
+    setReconcileMsg("");
+    try {
+      const res = await fetch("/api/admin-seo-issues/reconcile", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...getRoleHeaders(),
+        },
+        body: JSON.stringify({ scope: "all" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setReconcileMsg(json.message || json.error || `HTTP ${res.status}`);
+      } else {
+        setReconcileMsg(
+          `Recorded: detected ${json.detectedIssues}, opened ${json.opened}, updated ${json.updated}, reopened ${json.reopened}, resolved ${json.resolved}`
+        );
+        await load();
+      }
+    } catch {
+      setReconcileMsg("Reconcile failed");
+    } finally {
+      setReconciling(false);
+    }
+  };
+
+  const memoryByKey = new Map(memory.map((m) => [m.issue_key, m]));
+  const resolvedRecent = memory
+    .filter((m) => m.status === "resolved")
+    .slice(0, 10);
 
   const copyUrl = async (url: string) => {
     try {
@@ -341,12 +443,49 @@ export default function SeoOverviewPanel({
 
       {data?.diagnostics && (
         <div className="section-card" style={{ marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>SEO Diagnostics</div>
-          <div style={{ fontSize: 12, color: "#666", marginBottom: 14 }}>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              marginBottom: 6,
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>SEO Diagnostics</div>
+            {canRecordAll ? (
+              <button
+                type="button"
+                className="action-btn btn-edit"
+                disabled={reconciling || loading}
+                onClick={() => void recordCurrentDiagnostics()}
+              >
+                {reconciling ? "Recording…" : "Record current diagnostics"}
+              </button>
+            ) : null}
+          </div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
             Deterministic CMS checks only — not Google Search Console status or a
             ranking score. &quot;Healthy&quot; means no issue detected by this
-            deterministic CMS ruleset.
+            deterministic CMS ruleset. Issue memory is updated only by an
+            explicit Record action — not by opening or refreshing this page.
           </div>
+          {reconcileMsg ? (
+            <div style={{ fontSize: 12, marginBottom: 10, color: "#166534" }}>
+              {reconcileMsg}
+            </div>
+          ) : null}
+          {memoryError ? (
+            <div style={{ fontSize: 12, marginBottom: 10, color: "#991B1B" }}>
+              Memory: {memoryError}
+            </div>
+          ) : null}
+          {memoryLoading ? (
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
+              Loading issue memory…
+            </div>
+          ) : null}
 
           {(() => {
             const s = data.diagnostics!.summary;
@@ -419,7 +558,7 @@ export default function SeoOverviewPanel({
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
-              <table className="data-table" style={{ width: "100%", minWidth: 880 }}>
+              <table className="data-table" style={{ width: "100%", minWidth: 1080 }}>
                 <thead>
                   <tr>
                     <th>Severity</th>
@@ -427,64 +566,129 @@ export default function SeoOverviewPanel({
                     <th>Item</th>
                     <th>Issue</th>
                     <th>Evidence</th>
+                    <th>Status</th>
+                    <th>First seen</th>
+                    <th>Last seen</th>
+                    <th>Reopened</th>
                     <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.diagnostics.issues.map((issue) => (
-                    <tr key={issue.id}>
-                      <td>
-                        <span
-                          style={badgeStyle(
-                            issue.severity === "needs-attention"
-                              ? "Needs attention"
-                              : "Review"
-                          )}
-                        >
-                          {issue.severity === "needs-attention"
-                            ? "Needs attention"
-                            : "Review"}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: 12 }}>
-                        {issue.entityType === "product" ? "Product" : "Blog"}
-                      </td>
-                      <td style={{ fontSize: 12 }}>
-                        <div style={{ fontWeight: 600 }}>{issue.label}</div>
-                        {issue.url ? (
-                          <a
-                            href={issue.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ fontSize: 11, wordBreak: "break-all" }}
+                  {data.diagnostics.issues.map((issue) => {
+                    const mem = memoryByKey.get(issue.id);
+                    return (
+                      <tr key={issue.id}>
+                        <td>
+                          <span
+                            style={badgeStyle(
+                              issue.severity === "needs-attention"
+                                ? "Needs attention"
+                                : "Review"
+                            )}
                           >
-                            Open
-                          </a>
-                        ) : null}
-                      </td>
-                      <td style={{ fontSize: 12 }}>{issue.message}</td>
-                      <td style={{ fontSize: 11, color: "#555" }}>{issue.evidence}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="action-btn btn-edit"
-                          onClick={() =>
-                            onNavigate(
-                              issue.editTarget === "products" ? "products" : "blog"
-                            )
-                          }
-                        >
-                          {issue.editTarget === "products"
-                            ? "Open Products"
-                            : "Open Blog"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                            {issue.severity === "needs-attention"
+                              ? "Needs attention"
+                              : "Review"}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: 12 }}>
+                          {issue.entityType === "product" ? "Product" : "Blog"}
+                        </td>
+                        <td style={{ fontSize: 12 }}>
+                          <div style={{ fontWeight: 600 }}>{issue.label}</div>
+                          {issue.url ? (
+                            <a
+                              href={issue.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: 11, wordBreak: "break-all" }}
+                            >
+                              Open
+                            </a>
+                          ) : null}
+                        </td>
+                        <td style={{ fontSize: 12 }}>{issue.message}</td>
+                        <td style={{ fontSize: 11, color: "#555" }}>{issue.evidence}</td>
+                        <td style={{ fontSize: 12 }}>
+                          {mem
+                            ? mem.status === "open"
+                              ? "Open"
+                              : "Resolved"
+                            : "Not recorded"}
+                        </td>
+                        <td style={{ fontSize: 11 }}>
+                          {mem ? formatMemoryWhen(mem.first_seen_at) : "—"}
+                        </td>
+                        <td style={{ fontSize: 11 }}>
+                          {mem ? formatMemoryWhen(mem.last_seen_at) : "—"}
+                        </td>
+                        <td style={{ fontSize: 12 }}>
+                          {mem && mem.reopened_count > 0 ? mem.reopened_count : "—"}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="action-btn btn-edit"
+                            onClick={() =>
+                              onNavigate(
+                                issue.editTarget === "products" ? "products" : "blog"
+                              )
+                            }
+                          >
+                            {issue.editTarget === "products"
+                              ? "Open Products"
+                              : "Open Blog"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
+
+          <div style={{ marginTop: 18 }}>
+            <div style={{ fontWeight: 650, marginBottom: 8, fontSize: 13 }}>
+              Recently resolved
+            </div>
+            {resolvedRecent.length === 0 ? (
+              <div style={{ fontSize: 12, color: "#666" }}>
+                No resolved diagnostic issues recorded yet.
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table className="data-table" style={{ width: "100%", minWidth: 720 }}>
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Rule</th>
+                      <th>Resolved</th>
+                      <th>Reason</th>
+                      <th>Reopened</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resolvedRecent.map((row) => (
+                      <tr key={row.issue_key}>
+                        <td style={{ fontSize: 12 }}>
+                          {row.entity_label || `${row.entity_type}:${row.entity_id}`}
+                        </td>
+                        <td style={{ fontSize: 12 }}>{row.rule_code}</td>
+                        <td style={{ fontSize: 11 }}>
+                          {formatMemoryWhen(row.resolved_at)}
+                        </td>
+                        <td style={{ fontSize: 12 }}>
+                          {resolutionLabel(row.resolution_reason)}
+                        </td>
+                        <td style={{ fontSize: 12 }}>{row.reopened_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -42,6 +42,12 @@ const so = loadTsModule("lib/seoOverview.ts");
 const helper = read("lib/seoOverview.ts");
 const api = read("pages/api/admin-seo-overview.ts");
 const panel = read("components/admin/SeoOverviewPanel.tsx");
+const rowsHelper = fs.existsSync(path.join(ROOT, "lib/seoDiagnosticRows.ts"))
+  ? read("lib/seoDiagnosticRows.ts")
+  : "";
+const blogNormSrc = /normalizeBlogDiagnosticRow/.test(api)
+  ? `${api}\n${rowsHelper}`
+  : api;
 const perms = read("lib/adminPermissions.ts");
 const productPage = read("app/products/[slug]/page.tsx");
 const blogPage = read("app/blog/[slug]/page.tsx");
@@ -196,8 +202,8 @@ ok(
 // I — blog health intact
 ok(
   "I_blog_health_intact",
-  /deriveBlogHealth/.test(api) &&
-    /analyzeBlogCanonical/.test(api) &&
+  /deriveBlogHealth/.test(blogNormSrc) &&
+    /analyzeBlogCanonical/.test(blogNormSrc) &&
     /Blog SEO/.test(panel) &&
     /canBlog/.test(api)
 );

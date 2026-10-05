@@ -49,9 +49,14 @@ function loadTsModule(rel) {
 
 const helperSrc = read("lib/seoDiagnostics.ts");
 const api = read("pages/api/admin-seo-overview.ts");
+const rowsHelper = read("lib/seoDiagnosticRows.ts");
 const panel = read("components/admin/SeoOverviewPanel.tsx");
 const tipTap = read("components/admin/TipTapEditor.tsx");
 const db = read("lib/db.ts");
+// Overview may normalize via shared rows helper (parity with reconcile).
+const normSrc = /normalize(Product|Blog)DiagnosticRow/.test(api)
+  ? `${api}\n${rowsHelper}`
+  : api;
 
 const {
   analyzeInlineImageAlts,
@@ -304,9 +309,9 @@ ok(
 
 ok(
   "V_raw_blog_content_not_in_normalized_row",
-  /inlineImageAlt\s*=\s*analyzeInlineImageAlts\(\s*b\.content\s*\)/.test(api) &&
-    !/content:\s*(?:String\(|b\.content)/.test(api) &&
-    !/return\s*\{[\s\S]*?\bcontent:\s*b\.content/.test(api)
+  /inlineImageAlt\s*=\s*analyzeInlineImageAlts\(\s*b\.content\s*\)/.test(normSrc) &&
+    !/content:\s*(?:String\(|b\.content)/.test(rowsHelper) &&
+    !/return\s*\{[\s\S]*?\bcontent:\s*b\.content/.test(normSrc)
 );
 
 {
@@ -351,16 +356,21 @@ ok(
 
 ok(
   "product_fields_use_analyzeProductRichHtmlFields",
-  /analyzeProductRichHtmlFields/.test(api)
+  /analyzeProductRichHtmlFields/.test(normSrc) &&
+    (/normalizeProductDiagnosticRow/.test(api) ||
+      /analyzeProductRichHtmlFields/.test(api))
 );
 
 ok(
   "product_raw_html_not_returned",
-  !/short_description:\s*/.test(
-    api.slice(api.indexOf("return {"), api.indexOf("inlineImageAlt"))
-  ) ||
-    (!/full_description:\s*String\(p\.full_description/.test(api) &&
-      !/short_description:\s*String\(p\.short_description/.test(api))
+  !/short_description:\s*String\(p\.short_description/.test(rowsHelper) &&
+    !/full_description:\s*String\(p\.full_description/.test(rowsHelper) &&
+    !/description:\s*String\(p\.description/.test(
+      rowsHelper.slice(
+        rowsHelper.indexOf("return {"),
+        rowsHelper.indexOf("inlineImageAlt")
+      )
+    )
 );
 
 console.log(
