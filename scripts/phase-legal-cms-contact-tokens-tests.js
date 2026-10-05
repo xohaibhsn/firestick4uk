@@ -119,16 +119,18 @@ ok(
 );
 
 ok(
-  "privacy_fallback_still_uses_contact_email",
-  /To exercise any of these rights, please contact us at \{contact\.email\}/.test(
+  "privacy_empty_body_no_legacy_rights_email_interp",
+  !/To exercise any of these rights, please contact us at \{contact\.email\}/.test(
     privacyClient
-  )
+  ) && /LegalContentUnavailable/.test(privacyClient)
 );
 ok(
-  "refund_fallback_still_uses_contact_fields",
-  /contact\.phone/.test(refundClient) &&
+  "refund_component_contact_still_uses_contact_fields",
+  /id="contact"/.test(refundClient) &&
+    /contact\.phone/.test(refundClient) &&
     /contact\.telegram/.test(refundClient) &&
-    /contact\.email/.test(refundClient)
+    /contact\.email/.test(refundClient) &&
+    !/Contact us via WhatsApp \(\{contact\.phone\}\)/.test(refundClient)
 );
 ok(
   "terms_not_wired_to_helper",

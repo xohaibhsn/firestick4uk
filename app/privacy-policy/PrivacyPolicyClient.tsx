@@ -3,6 +3,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CmsBody from "@/components/CmsBody";
+import LegalContentUnavailable from "@/components/LegalContentUnavailable";
 import { cms } from "@/lib/cms";
 import type { ContactConfig } from "@/lib/contactConfigNormalize";
 import { renderLegalCmsContactTokens } from "@/lib/legalCmsTokens";
@@ -136,89 +137,7 @@ export default function PrivacyPolicyClient({
                 className="cms-legal-body"
               />
             ) : (
-              <>
-                <div className="policy-section" id="overview">
-                  <h2>1. Overview</h2>
-                  <div className="highlight-box">
-                    <p>Firestick4UK (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) is committed to protecting your personal data. This Privacy Policy explains how we collect, use, and safeguard information when you use our website firestick4uk.com.</p>
-                  </div>
-                  <p>By placing an order or using our website, you agree to the collection and use of information as described in this policy. We comply with the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018.</p>
-                </div>
-
-                <div className="policy-section" id="data-collect">
-                  <h2>2. Data We Collect</h2>
-                  <p>When you place an order or contact us, we may collect the following information:</p>
-                  <ul>
-                    <li>Full name</li>
-                    <li>Email address</li>
-                    <li>Phone number / WhatsApp number / Telegram username if provided</li>
-                    <li>Delivery address (street, city, postcode)</li>
-                    <li>Order details and payment receipts</li>
-                    <li>IP address and browser information (via cookies)</li>
-                    <li>Any messages or communications you send us</li>
-                  </ul>
-                  <p>We do not collect or store credit/debit card details. Payments are made via bank transfer, and we only receive a receipt image uploaded by the customer.</p>
-                </div>
-
-                <div className="policy-section" id="how-use">
-                  <h2>3. How We Use Your Data</h2>
-                  <p>We use your personal data for the following purposes:</p>
-                  <ul>
-                    <li>Processing and fulfilling your orders</li>
-                    <li>Verifying bank transfer payments</li>
-                    <li>Sending order confirmations and status updates</li>
-                    <li>Providing customer support via WhatsApp, Telegram or email</li>
-                    <li>Improving our website and services</li>
-                    <li>Complying with legal obligations</li>
-                  </ul>
-                  <p>We will not use your data for unsolicited marketing without your consent.</p>
-                </div>
-
-                <div className="policy-section" id="sharing">
-                  <h2>4. Data Sharing</h2>
-                  <p>We do not sell, trade, or rent your personal data to third parties. We may share your information only in the following circumstances:</p>
-                  <ul>
-                    <li><strong>Delivery partners</strong> — your name and address may be shared with our courier service to fulfil your order.</li>
-                    <li><strong>Legal requirements</strong> — we may disclose your data if required by law or in response to a valid legal request.</li>
-                    <li><strong>Business transfers</strong> — in the event of a merger or acquisition, your data may be transferred to the new owner.</li>
-                  </ul>
-                </div>
-
-                <div className="policy-section" id="cookies">
-                  <h2>5. Cookies</h2>
-                  <p>Our website uses cookies to improve your browsing experience. Cookies are small text files stored on your device. We use:</p>
-                  <ul>
-                    <li><strong>Essential cookies</strong> — required for the website to function (e.g. shopping cart).</li>
-                    <li><strong>Analytics cookies</strong> — to understand how visitors use our site (e.g. Google Analytics).</li>
-                  </ul>
-                  <p>You can disable cookies in your browser settings, although this may affect website functionality.</p>
-                </div>
-
-                <div className="policy-section" id="security">
-                  <h2>6. Data Security</h2>
-                  <p>We take reasonable technical and organisational measures to protect your personal data from unauthorised access, loss, or misuse. Our website uses HTTPS encryption to secure data in transit.</p>
-                  <p>However, no method of transmission over the internet is 100% secure. While we strive to protect your data, we cannot guarantee absolute security.</p>
-                </div>
-
-                <div className="policy-section" id="rights">
-                  <h2>7. Your Rights</h2>
-                  <p>Under UK GDPR, you have the following rights regarding your personal data:</p>
-                  <ul>
-                    <li><strong>Right to access</strong> — request a copy of the data we hold about you.</li>
-                    <li><strong>Right to rectification</strong> — request correction of inaccurate data.</li>
-                    <li><strong>Right to erasure</strong> — request deletion of your data (&quot;right to be forgotten&quot;).</li>
-                    <li><strong>Right to restrict processing</strong> — request we limit how we use your data.</li>
-                    <li><strong>Right to data portability</strong> — request your data in a machine-readable format.</li>
-                    <li><strong>Right to object</strong> — object to processing of your data in certain circumstances.</li>
-                  </ul>
-                  <p>To exercise any of these rights, please contact us at {contact.email}.</p>
-                </div>
-
-                <div className="policy-section" id="retention">
-                  <h2>8. Data Retention</h2>
-                  <p>We retain your personal data for as long as necessary to fulfil the purposes outlined in this policy. Order data is typically retained for 6 years in accordance with UK tax and accounting requirements. You may request deletion of your data at any time, subject to legal obligations.</p>
-                </div>
-              </>
+              <LegalContentUnavailable />
             )}
 
             <div className="policy-section" id="contact">

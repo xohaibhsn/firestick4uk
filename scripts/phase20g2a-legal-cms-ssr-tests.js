@@ -82,11 +82,25 @@ ok(
   /refund_body/.test(refundClient) && !/useSiteContent/.test(refundClient)
 );
 
-ok("terms_fallback_exists", /Agreement to Terms/.test(termsClient) && /Governing Law/.test(termsClient));
-ok("privacy_fallback_exists", /Data We Collect/.test(privacyClient) && /Data Retention/.test(privacyClient));
 ok(
-  "refund_fallback_exists",
-  /Physical Products/.test(refundClient) && /Refund Timing/.test(refundClient)
+  "terms_empty_body_uses_neutral_safety",
+  /LegalContentUnavailable/.test(termsClient) &&
+    /bodyHtml \?/.test(termsClient) &&
+    !/By accessing or placing an order on firestick4uk\.com, you agree to be bound/.test(
+      termsClient
+    )
+);
+ok(
+  "privacy_empty_body_uses_neutral_safety",
+  /LegalContentUnavailable/.test(privacyClient) &&
+    /bodyHtml \?/.test(privacyClient) &&
+    !/We do not collect or store credit\/debit card details/.test(privacyClient)
+);
+ok(
+  "refund_empty_body_uses_neutral_safety",
+  /LegalContentUnavailable/.test(refundClient) &&
+    /bodyHtml \?/.test(refundClient) &&
+    !/To initiate a return, please follow these steps/.test(refundClient)
 );
 
 // TOC / layout parity — TOC outside bodyHtml-only branch
@@ -114,14 +128,13 @@ ok(
   (() => {
     const cta = refundClient.indexOf('className="contact-cta"');
     const body = refundClient.indexOf("bodyHtml ?");
-    const closingLayout = refundClient.indexOf("</div>\n\n        <div className=\"contact-cta\"");
     // CTA appears after the bodyHtml ternary (policy-content switch), not nested inside it
     return (
       cta > 0 &&
       body > 0 &&
       cta > body &&
       /refund_cta_title/.test(refundClient) &&
-      closingLayout > body
+      /<\/div>\s*<div className="contact-cta">/.test(refundClient)
     );
   })()
 );
@@ -170,8 +183,11 @@ ok(
 );
 
 ok(
-  "refund_meta_mismatch_untouched",
-  /7-day returns on physical devices/.test(refundLayout)
+  "refund_meta_description_untouched",
+  /14-day returns on eligible physical products/.test(refundLayout) &&
+    /7-day money-back guarantee on 1 Year subscription plans and above/.test(
+      refundLayout
+    )
 );
 
 ok("erp_untouched", !fs.existsSync(path.join(ROOT, "app/erp")) || true);

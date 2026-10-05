@@ -3,6 +3,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CmsBody from "@/components/CmsBody";
+import LegalContentUnavailable from "@/components/LegalContentUnavailable";
 import { cms } from "@/lib/cms";
 import type { ContactConfig } from "@/lib/contactConfigNormalize";
 import { renderLegalCmsContactTokens } from "@/lib/legalCmsTokens";
@@ -147,93 +148,7 @@ export default function RefundPolicyClient({
                 className="cms-legal-body"
               />
             ) : (
-              <>
-                <div className="policy-section" id="overview">
-                  <h2>1. Overview</h2>
-                  <div className="highlight-box">
-                    <p>No free trials are offered. We provide a 7-day money back guarantee on 1 Year subscription plans and above only.</p>
-                  </div>
-                  <p>This Refund Policy applies to all purchases made on firestick4uk.com. By placing an order, you agree to the terms set out in this policy.</p>
-                </div>
-
-                <div className="policy-section" id="physical">
-                  <h2>2. Physical Products</h2>
-                  <p>We accept returns on physical products (Firestick devices and Android Boxes) under the following conditions:</p>
-                  <ul>
-                    <li>Return request must be made within <strong>14 days</strong> of the delivery date.</li>
-                    <li>The item must be <strong>unused</strong> and in its <strong>original packaging</strong>.</li>
-                    <li>All accessories and documentation originally included must be returned.</li>
-                    <li>Items showing signs of use, damage, or tampering will not be accepted for return.</li>
-                  </ul>
-                  <p>Once we receive and inspect the returned item, we will process your refund within 5-7 working days to your original payment method or via bank transfer.</p>
-                </div>
-
-                <div className="policy-section" id="subscriptions">
-                  <h2>3. Subscription Plans</h2>
-                  <div className="warning-box">
-                    <p>⚠️ No free trials. A 7-day money back guarantee applies to <strong>1 Year plans and above only</strong>.</p>
-                  </div>
-                  <p>Subscription services are active within 1 hour of payment confirmation. Please check device compatibility before purchasing.</p>
-                  <ul>
-                    <li>Monthly and shorter plans are not covered by the 7-day money back guarantee.</li>
-                    <li>Each subscription includes one connection at a time. For simultaneous use on 2 devices, you need 2 separate subscriptions.</li>
-                    <li>Compatible devices include Firestick (all generations), Android box, Smart TV (Samsung/LG), iPhone, Android phone/tablet, Roku and Windows.</li>
-                    <li>Service is available outside UK, but performance is not guaranteed due to regional restrictions.</li>
-                    <li>If your service is buffering or not working, please try using a VPN or switching to mobile hotspot because some ISPs may affect streaming performance.</li>
-                  </ul>
-                </div>
-
-                <div className="policy-section" id="faulty">
-                  <h2>4. Faulty or Damaged Items</h2>
-                  <p>If you receive a faulty or damaged item, please contact us immediately (within 48 hours of delivery) with:</p>
-                  <ul>
-                    <li>Your Order ID</li>
-                    <li>A clear description of the fault or damage</li>
-                    <li>Photos or video evidence of the issue</li>
-                  </ul>
-                  <p>We will offer one of the following resolutions at no additional cost to you:</p>
-                  <ul>
-                    <li><strong>Replacement</strong> — we will send a replacement item.</li>
-                    <li><strong>Full refund</strong> — a complete refund including any delivery charges paid.</li>
-                  </ul>
-                  <p>We will cover return postage costs for faulty or damaged items.</p>
-                </div>
-
-                <div className="policy-section" id="process">
-                  <h2>5. How to Return an Item</h2>
-                  <p>To initiate a return, please follow these steps:</p>
-                  <ul>
-                    <li>Contact us via WhatsApp ({contact.phone}), Telegram ({contact.telegram}) or email ({contact.email}) with your Order ID and reason for return.</li>
-                    <li>Wait for our team to confirm your return request and provide return instructions.</li>
-                    <li>Package the item securely in its original packaging.</li>
-                    <li>Send the item to the address provided by our team.</li>
-                    <li>Share your tracking number with us once posted.</li>
-                  </ul>
-                  <p>Please do not send items back without contacting us first — unrequested returns cannot be processed.</p>
-                </div>
-
-                <div className="policy-section" id="refund-timing">
-                  <h2>6. Refund Timing</h2>
-                  <p>Once your return has been received and approved:</p>
-                  <ul>
-                    <li>Refunds are processed within <strong>5-7 working days</strong>.</li>
-                    <li>Refunds will be made via UK bank transfer to the account you provide.</li>
-                    <li>We will notify you by email, WhatsApp or Telegram once the refund has been processed.</li>
-                  </ul>
-                </div>
-
-                <div className="policy-section" id="exceptions">
-                  <h2>7. Exceptions</h2>
-                  <p>The following items and situations are not eligible for a refund:</p>
-                  <ul>
-                    <li>Subscription plans below 1 Year.</li>
-                    <li>Physical products returned after the 14-day window.</li>
-                    <li>Items that have been used, damaged by the customer, or returned without original packaging.</li>
-                    <li>Orders where the customer provided incorrect delivery details.</li>
-                    <li>Issues caused by incompatible third-party software or misuse of the product.</li>
-                  </ul>
-                </div>
-              </>
+              <LegalContentUnavailable />
             )}
 
             <div className="policy-section" id="contact">

@@ -3,6 +3,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CmsBody from "@/components/CmsBody";
+import LegalContentUnavailable from "@/components/LegalContentUnavailable";
 import { cms } from "@/lib/cms";
 import type { ContactConfig } from "@/lib/contactConfigNormalize";
 import type { PublicSiteContentMap } from "@/lib/publicSiteContentServer";
@@ -107,97 +108,7 @@ export default function TermsClient({
             {bodyHtml ? (
               <CmsBody html={bodyHtml} className="cms-legal-body" />
             ) : (
-              <>
-                <div className="policy-section" id="agreement">
-                  <h2>1. Agreement to Terms</h2>
-                  <div className="highlight-box">
-                    <p>By accessing or placing an order on firestick4uk.com, you agree to be bound by these Terms & Conditions. Please read them carefully before making a purchase.</p>
-                  </div>
-                  <p>These terms apply to all visitors, users, and customers of Firestick4UK. We reserve the right to update these terms at any time. Continued use of our website after changes constitutes acceptance of the new terms.</p>
-                </div>
-
-                <div className="policy-section" id="products">
-                  <h2>2. Products & Services</h2>
-                  <p>Firestick4UK sells physical streaming devices (Firestick, Android Boxes) and digital subscription plans. All products are subject to availability.</p>
-                  <ul>
-                    <li>Product descriptions and images are for illustrative purposes. Actual products may vary slightly.</li>
-                    <li>We reserve the right to modify or discontinue any product or service without prior notice.</li>
-                    <li>Subscription plans are for personal, non-commercial use only.</li>
-                    <li>Compatible devices include Firestick (all generations), Android box, Smart TV (Samsung/LG), iPhone, Android phone/tablet, Roku and Windows.</li>
-                    <li>Reselling or redistributing our subscription plans is strictly prohibited.</li>
-                  </ul>
-                </div>
-
-                <div className="policy-section" id="orders">
-                  <h2>3. Orders</h2>
-                  <p>When you place an order, you are making an offer to purchase. We reserve the right to accept or decline any order at our discretion.</p>
-                  <ul>
-                    <li>You must provide accurate and complete information when placing an order.</li>
-                    <li>An order is confirmed only after payment has been verified by our team.</li>
-                    <li>We will notify you of order confirmation via email, WhatsApp or Telegram.</li>
-                    <li>Orders cannot be modified once payment has been verified and fulfilment has begun.</li>
-                  </ul>
-                </div>
-
-                <div className="policy-section" id="payment">
-                  <h2>4. Payment</h2>
-                  <p>We accept UK bank transfer and cash on delivery as payment methods.</p>
-                  <ul>
-                    <li><strong>Bank Transfer:</strong> Payment must be made to the account details shown at checkout. Use your first name as the payment reference. Upload your receipt to complete the order.</li>
-                    <li><strong>Cash on Delivery:</strong> Payment is due upon delivery of physical goods. Available for UK mainland addresses only.</li>
-                    <li>We verify all bank transfer receipts manually. Subscription services are active within 1 hour of payment confirmation.</li>
-                    <li>Orders will not be fulfilled until payment is verified.</li>
-                  </ul>
-                </div>
-
-                <div className="policy-section" id="delivery">
-                  <h2>5. Delivery</h2>
-                  <ul>
-                    <li>Physical products are delivered within 2-3 working days to UK mainland addresses.</li>
-                    <li>Subscription plans are activated digitally and are active within 1 hour of payment confirmation.</li>
-                    <li>Delivery times are estimates and not guaranteed. We are not liable for delays caused by couriers or circumstances beyond our control.</li>
-                    <li>Risk of loss passes to you upon delivery.</li>
-                    <li>Service is available outside UK, but performance is not guaranteed due to regional restrictions.</li>
-                  </ul>
-                </div>
-
-                <div className="policy-section" id="returns">
-                  <h2>6. Returns & Refunds</h2>
-                  <p>Please refer to our <a href="/refund-policy" style={{color:"#5B21B6"}}>Refund Policy</a> for full details on returns and refunds.</p>
-                  <ul>
-                    <li>Physical products may be returned within 14 days of delivery if unused and in original packaging.</li>
-                    <li>No free trials are offered. Subscription plans include a 7-day money back guarantee on 1 Year plans and above only.</li>
-                    <li>Each subscription includes one connection at a time. For simultaneous use on 2 devices, you need 2 separate subscriptions.</li>
-                    <li>Faulty items will be replaced or refunded at no additional cost.</li>
-                  </ul>
-                </div>
-
-                <div className="policy-section" id="intellectual">
-                  <h2>7. Intellectual Property</h2>
-                  <p>All content on firestick4uk.com — including text, images, logos, and design — is the property of Firestick4UK and is protected by UK copyright law.</p>
-                  <ul>
-                    <li>You may not reproduce, distribute, or use our content without prior written permission.</li>
-                    <li>Our brand name and logo may not be used without explicit consent.</li>
-                  </ul>
-                </div>
-
-                <div className="policy-section" id="liability">
-                  <h2>8. Limitation of Liability</h2>
-                  <p>To the fullest extent permitted by law, Firestick4UK shall not be liable for:</p>
-                  <ul>
-                    <li>Any indirect, incidental, or consequential damages arising from use of our products or website.</li>
-                    <li>Loss of data, revenue, or profits.</li>
-                    <li>Streaming performance issues caused by ISP blocking, regional restrictions, device setup, or third-party network conditions. If your ISP affects performance, please try a VPN or mobile hotspot.</li>
-                    <li>Delays or failures caused by circumstances beyond our reasonable control (including courier delays, technical outages, or force majeure events).</li>
-                  </ul>
-                  <p>Our total liability shall not exceed the value of the order in question.</p>
-                </div>
-
-                <div className="policy-section" id="governing">
-                  <h2>9. Governing Law</h2>
-                  <p>These Terms & Conditions are governed by and construed in accordance with the laws of England and Wales. Any disputes shall be subject to the exclusive jurisdiction of the courts of England and Wales.</p>
-                </div>
-              </>
+              <LegalContentUnavailable />
             )}
 
             <div className="policy-section" id="contact">
