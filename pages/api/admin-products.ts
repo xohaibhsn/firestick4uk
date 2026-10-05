@@ -4,6 +4,10 @@ import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
 import { recordContentRevision, snapshotProduct } from '../../lib/contentRevisions';
 import { invalidateSitemapCache } from '../../lib/hostingerResourceInvalidation';
+import {
+  runPostSaveSeoGuard,
+  shouldRunPostSaveSeoGuard,
+} from '../../lib/postSaveSeoGuard';
 
 const PRODUCT_CATEGORIES = ['Subscription', 'Device', 'Bundle'] as const;
 
@@ -174,7 +178,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ip,
         });
         invalidateSitemapCache();
-        return res.status(200).json({ success: true, id: result.insertId, slug: finalSlug });
+        const seo_guard = await runPostSaveSeoGuard({
+          entityType: 'product',
+          entityId: result.insertId,
+          operation: 'create',
+        });
+        return res.status(200).json({
+          success: true,
+          id: result.insertId,
+          slug: finalSlug,
+          seo_guard,
+        });
       } catch (err: any) {
         if (err?.code === 'ER_DUP_ENTRY') {
           return res.status(409).json({ error: 'Slug already exists. Choose a different URL slug.' });
@@ -284,10 +298,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       try {
         if (changedFields.length === 0) {
+          const skip = shouldRunPostSaveSeoGuard({
+            entityType: 'product',
+            operation: 'update',
+            changedFields,
+          });
           return res.status(200).json({
             success: true,
             slug: merged.slug,
             changed_fields: changedFields,
+            seo_guard: {
+              status: 'skipped' as const,
+              entity_type: 'product' as const,
+              entity_id: String(id),
+              operation: 'update' as const,
+              issue_count: 0,
+              needs_attention: 0,
+              review: 0,
+              issues: [],
+              memory_synced: false,
+              skip_reason: skip.skip_reason || 'noop_update',
+            },
           });
         }
 
@@ -350,10 +381,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         invalidateSitemapCache();
+        const seo_guard = await runPostSaveSeoGuard({
+          entityType: 'product',
+          entityId: id,
+          operation: 'update',
+          changedFields,
+        });
         return res.status(200).json({
           success: true,
           slug: merged.slug,
           changed_fields: changedFields,
+          seo_guard,
         });
       } catch (err: any) {
         if (err?.code === 'REVISION_TOO_LARGE') {
@@ -407,7 +445,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ip,
       });
       invalidateSitemapCache();
-      return res.status(200).json({ success: true });
+      const seo_guard = await runPostSaveSeoGuard({
+        entityType: 'product',
+        entityId: String(id),
+        operation: 'delete',
+      });
+      return res.status(200).json({ success: true, seo_guard });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

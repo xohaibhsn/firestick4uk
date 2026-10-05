@@ -21,6 +21,16 @@ import {
 } from "@/lib/seoIssueMemory";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 
+/** Compact current issues from the same diagnostic pass (no extra SELECT). */
+export type SeoIssueCompactCurrent = {
+  id: string;
+  severity: string;
+  category: string;
+  field: string | null;
+  message: string;
+  evidence: string;
+};
+
 export type SeoIssueReconcileResult = {
   scope: string;
   evaluatedProducts: number;
@@ -31,6 +41,8 @@ export type SeoIssueReconcileResult = {
   reopened: number;
   resolved: number;
   resolutionReasons: Record<SeoIssueResolutionReason, number>;
+  /** Deterministic issues from this reconcile's diagnostic pass (no extra query). */
+  currentIssues: SeoIssueCompactCurrent[];
 };
 
 function clampLimit(raw: unknown, def = 50): number {
@@ -397,6 +409,7 @@ export async function reconcileSeoIssueMemory(
 
     const detected: SeoIssueDetectedPayload[] = [];
     const detectedKeys = new Set<string>();
+    const currentIssues: SeoIssueCompactCurrent[] = [];
     for (const issue of diagnostics.issues) {
       if (entityFilter) {
         if (
@@ -410,6 +423,14 @@ export async function reconcileSeoIssueMemory(
       if (!payload) continue;
       detected.push(payload);
       detectedKeys.add(payload.issue_key);
+      currentIssues.push({
+        id: issue.id,
+        severity: String(issue.severity || ""),
+        category: String(issue.category || "").slice(0, 32),
+        field: issue.field ? String(issue.field).slice(0, 64) : null,
+        message: String(issue.message || "").slice(0, 500),
+        evidence: String(issue.evidence || "").slice(0, 500),
+      });
     }
 
     const openMemory = await loadOpenMemory(conn, {
@@ -456,6 +477,7 @@ export async function reconcileSeoIssueMemory(
         entity_out_of_scope: byReason.get("entity_out_of_scope")!.length,
         deleted: byReason.get("deleted")!.length,
       },
+      currentIssues,
     };
   } catch (err) {
     try {

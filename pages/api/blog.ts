@@ -10,6 +10,10 @@ import {
   normalizeBlogSlug,
   resolveBlogCanonicalForPut,
 } from '../../lib/blogSeoSafety';
+import {
+  runPostSaveSeoGuard,
+  shouldRunPostSaveSeoGuard,
+} from '../../lib/postSaveSeoGuard';
 
 function valuesEqual(a: unknown, b: unknown): boolean {
   const na = a === null || a === undefined ? '' : String(a);
@@ -108,7 +112,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
       invalidateSitemapCache();
-      return res.status(200).json({ success: true, id: result.insertId });
+      const seo_guard = await runPostSaveSeoGuard({
+        entityType: 'blog',
+        entityId: result.insertId,
+        operation: 'create',
+      });
+      return res.status(200).json({ success: true, id: result.insertId, seo_guard });
     }
 
     if (req.method === 'PUT') {
@@ -191,7 +200,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       track('faqs', next.faqs, typeof current.faqs === 'string' ? current.faqs : normalizeFaqs(current.faqs));
 
       if (changedFields.length === 0) {
-        return res.status(200).json({ success: true, changed_fields: [] });
+        const skip = shouldRunPostSaveSeoGuard({
+          entityType: 'blog',
+          operation: 'update',
+          changedFields,
+        });
+        return res.status(200).json({
+          success: true,
+          changed_fields: [],
+          seo_guard: {
+            status: 'skipped' as const,
+            entity_type: 'blog' as const,
+            entity_id: String(id),
+            operation: 'update' as const,
+            issue_count: 0,
+            needs_attention: 0,
+            review: 0,
+            issues: [],
+            memory_synced: false,
+            skip_reason: skip.skip_reason || 'noop_update',
+          },
+        });
       }
 
       const conn = await pool.getConnection();
@@ -257,7 +286,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ip,
       });
       invalidateSitemapCache();
-      return res.status(200).json({ success: true, changed_fields: changedFields });
+      const seo_guard = await runPostSaveSeoGuard({
+        entityType: 'blog',
+        entityId: id,
+        operation: 'update',
+        changedFields,
+      });
+      return res.status(200).json({
+        success: true,
+        changed_fields: changedFields,
+        seo_guard,
+      });
     }
 
     if (req.method === 'DELETE') {
@@ -305,7 +344,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ip,
       });
       invalidateSitemapCache();
-      return res.status(200).json({ success: true });
+      const seo_guard = await runPostSaveSeoGuard({
+        entityType: 'blog',
+        entityId: String(id),
+        operation: 'delete',
+      });
+      return res.status(200).json({ success: true, seo_guard });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

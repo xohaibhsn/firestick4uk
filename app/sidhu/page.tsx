@@ -208,6 +208,32 @@ type ChatLead = { id:number; customer_name:string; customer_whatsapp:string; cus
 type BerlinTraining = { id:number; title:string; content:string; is_active:number; created_at:string; updated_at:string; };
 type TrainingChatMessage = { role:"user"|"assistant"; content:string; saved?:boolean; };
 
+/** Additive SEO banner from post-save guard (client-safe; no server import). */
+function formatSeoGuardBannerClient(guard: any): string {
+  if (!guard || guard.status === "skipped") return "";
+  if (guard.status === "unavailable") {
+    return " — SEO check temporarily unavailable";
+  }
+  const issueCount = Number(guard.issue_count || 0);
+  if (issueCount === 0) {
+    return " — SEO: no deterministic issues found";
+  }
+  const parts: string[] = [];
+  if (Number(guard.needs_attention || 0) > 0) {
+    parts.push(`${guard.needs_attention} Needs attention`);
+  }
+  if (Number(guard.review || 0) > 0) {
+    parts.push(`${guard.review} Review`);
+  }
+  const countLabel = parts.length ? parts.join(", ") : `${issueCount} issue(s)`;
+  const first =
+    Array.isArray(guard.issues) && guard.issues[0]?.message
+      ? String(guard.issues[0].message)
+      : "";
+  if (first) return ` — SEO: ${countLabel} — ${first}`;
+  return ` — SEO: ${countLabel}`;
+}
+
 export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [adminRole, setAdminRole] = useState<AdminRole>("super_admin");
@@ -1410,7 +1436,8 @@ export default function AdminPage() {
       body: JSON.stringify(isNew ? payload : { ...payload, id: (blogModal as BlogPost).id }),
     }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
-      setBlogMsg(isNew ? "✅ Post published!" : "✅ Post updated!");
+      const base = isNew ? "✅ Post published!" : "✅ Post updated!";
+      setBlogMsg(`${base}${formatSeoGuardBannerClient(res.seo_guard)}`);
       setBlogModal(null);
       fetchBlogs();
     } else {
@@ -1674,7 +1701,7 @@ export default function AdminPage() {
         return;
       }
       setProductModal(null);
-      setProductMsg("✅ Product saved");
+      setProductMsg(`✅ Product saved${formatSeoGuardBannerClient(res.seo_guard)}`);
       await loadProducts();
     } catch {
       setProductMsg("❌ Failed to save product");
