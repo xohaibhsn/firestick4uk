@@ -326,8 +326,10 @@ ok(
       /seo\.issues_reconciled/.test(reconcileApi)
   );
   ok(
-    "AL_restore_no_guard_hook",
-    !/postSaveSeoGuard|runPostSaveSeoGuard/.test(restore)
+    "AL_restore_guard_hook_after_commit",
+    /runPostSaveSeoGuard/.test(restore) &&
+      /operation:\s*"restore"/.test(restore) &&
+      /await conn\.commit\(\)[\s\S]*runPostSaveSeoGuard/.test(restore)
   );
   ok(
     "AM_currentIssues_from_detected_pass",

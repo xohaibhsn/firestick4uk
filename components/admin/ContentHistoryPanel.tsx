@@ -30,6 +30,32 @@ const ACTION_LABELS: Record<string, string> = {
   restore: "Restore",
 };
 
+/** Client-local SEO banner from restore response (no server import). */
+function formatRestoreSeoBanner(guard: any): string {
+  if (!guard || guard.status === "skipped") return "";
+  if (guard.status === "unavailable") {
+    return " — SEO check temporarily unavailable";
+  }
+  const issueCount = Number(guard.issue_count || 0);
+  if (issueCount === 0) {
+    return " — SEO: no deterministic issues found";
+  }
+  const parts: string[] = [];
+  if (Number(guard.needs_attention || 0) > 0) {
+    parts.push(`${guard.needs_attention} Needs attention`);
+  }
+  if (Number(guard.review || 0) > 0) {
+    parts.push(`${guard.review} Review`);
+  }
+  const countLabel = parts.length ? parts.join(", ") : `${issueCount} issue(s)`;
+  const first =
+    Array.isArray(guard.issues) && guard.issues[0]?.message
+      ? String(guard.issues[0].message)
+      : "";
+  if (first) return ` — SEO: ${countLabel} — ${first}`;
+  return ` — SEO: ${countLabel}`;
+}
+
 function canOfferRestore(item: RevisionItem, role: AdminRoleName): boolean {
   if (item.revision_action === "delete") {
     return item.entity_type === "site_content" || item.entity_type === "site_settings";
@@ -140,7 +166,9 @@ export default function ContentHistoryPanel({
         setMsg(`❌ ${data.error || "Restore failed"}`);
         return;
       }
-      setMsg("✅ Version restored. Current state was saved to History first.");
+      const base =
+        "✅ Version restored. Current state was saved to History first.";
+      setMsg(`${base}${formatRestoreSeoBanner(data.seo_guard)}`);
       setConfirmRestore(null);
       setViewItem(null);
       await load(page);

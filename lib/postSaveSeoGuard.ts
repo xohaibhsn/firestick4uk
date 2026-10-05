@@ -31,7 +31,7 @@ export const BLOG_SEO_FIELDS = [
   "content",
 ] as const;
 
-export type SeoGuardOperation = "create" | "update" | "delete";
+export type SeoGuardOperation = "create" | "update" | "delete" | "restore";
 export type SeoGuardStatus = "checked" | "skipped" | "unavailable";
 export type SeoGuardEntityType = "product" | "blog";
 
@@ -88,7 +88,11 @@ export function shouldRunPostSaveSeoGuard(args: {
   operation: SeoGuardOperation;
   changedFields?: string[] | null;
 }): { run: boolean; skip_reason?: "no_seo_field_change" | "noop_update" } {
-  if (args.operation === "create" || args.operation === "delete") {
+  if (
+    args.operation === "create" ||
+    args.operation === "delete" ||
+    args.operation === "restore"
+  ) {
     return { run: true };
   }
   const fields = Array.isArray(args.changedFields) ? args.changedFields : [];
@@ -166,7 +170,7 @@ export async function runPostSaveSeoGuard(args: {
       entity_id,
     });
 
-    const issues: SeoGuardIssue[] = (result.currentIssues || [])
+    const allIssues: SeoGuardIssue[] = (result.currentIssues || [])
       .filter(
         (i) =>
           i.severity === "needs-attention" || i.severity === "review"
@@ -178,21 +182,20 @@ export async function runPostSaveSeoGuard(args: {
         field: i.field,
         message: i.message,
         evidence: i.evidence,
-      }))
-      .slice(0, 10);
+      }));
 
-    const needs_attention = issues.filter(
+    const needs_attention = allIssues.filter(
       (i) => i.severity === "needs-attention"
     ).length;
-    const review = issues.filter((i) => i.severity === "review").length;
+    const review = allIssues.filter((i) => i.severity === "review").length;
 
     return emptyResult({
       ...base,
       status: "checked",
-      issue_count: issues.length,
+      issue_count: allIssues.length,
       needs_attention,
       review,
-      issues,
+      issues: allIssues.slice(0, 10),
       memory_synced: true,
     });
   } catch (err: any) {

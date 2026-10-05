@@ -16,24 +16,62 @@ import {
   SUBSCRIPTION_ROUTING_KEYS,
 } from "../../../lib/contentRevisions";
 import { invalidatePublicCmsCache } from "../../../lib/publicCmsDataServer";
+import {
+  normalizeBlogCanonicalInput,
+  normalizeBlogSlug,
+} from "../../../lib/blogSeoSafety";
+import { invalidateSitemapCache } from "../../../lib/hostingerResourceInvalidation";
+import { runPostSaveSeoGuard } from "../../../lib/postSaveSeoGuard";
 
 const PRODUCT_CATEGORIES = ["Subscription", "Device", "Bundle"] as const;
 
+const PRICE_ERROR = "Price must be a finite non-negative number";
+
+/** Whole pounds or up to 2 decimal places; optional thousands commas. No silent junk stripping.
+ * Semantic twin of pages/api/admin-products.ts — do not weaken. */
+const STRICT_PRICE_NUMERIC = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?$/;
+
 function validatePrice(value: unknown): { ok: true; price: number } | { ok: false; error: string } {
   if (value === null || value === undefined || value === "") {
-    return { ok: false, error: "Price must be a finite non-negative number" };
+    return { ok: false, error: PRICE_ERROR };
   }
-  const raw = String(value).trim();
-  const cleaned = raw.replace(/[^0-9.\-]/g, "");
-  if (!cleaned || !/[0-9]/.test(raw)) {
-    return { ok: false, error: "Price must be a finite non-negative number" };
+
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value < 0) {
+      return { ok: false, error: PRICE_ERROR };
+    }
+    if (Math.abs(value * 100 - Math.round(value * 100)) > 1e-6) {
+      return { ok: false, error: PRICE_ERROR };
+    }
+    return { ok: true, price: value };
   }
-  const n = Number(cleaned);
+
+  if (typeof value !== "string") {
+    return { ok: false, error: PRICE_ERROR };
+  }
+
+  let raw = value.trim();
+  if (!raw || /^(nan|infinity|\+infinity|-infinity)$/i.test(raw)) {
+    return { ok: false, error: PRICE_ERROR };
+  }
+
+  if (raw.startsWith("£")) {
+    raw = raw.slice(1).trim();
+  }
+
+  if (!STRICT_PRICE_NUMERIC.test(raw)) {
+    return { ok: false, error: PRICE_ERROR };
+  }
+
+  const n = Number(raw.replace(/,/g, ""));
   if (!Number.isFinite(n) || n < 0) {
-    return { ok: false, error: "Price must be a finite non-negative number" };
+    return { ok: false, error: PRICE_ERROR };
   }
   return { ok: true, price: n };
 }
+
+const SLUG_RESTORE_BLOCKED =
+  "This version uses a different public URL slug. Restore is blocked to protect the current indexed URL. Use a controlled SEO URL migration if the slug must change.";
 
 function toSlug(value: string): string {
   return String(value || "")
@@ -107,9 +145,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const snap = snapshot as Record<string, unknown>;
       const name = String(snap.name || "").trim();
       const slug = toSlug(String(snap.slug || name));
+      const currentSlug = toSlug(String(current.slug || "")) || String(current.slug || "").trim();
       if (!name || !slug) {
         await conn.rollback();
         return res.status(400).json({ error: "Historical product snapshot is missing name/slug" });
+      }
+      if (slug !== currentSlug) {
+        await conn.rollback();
+        return res.status(409).json({ error: SLUG_RESTORE_BLOCKED });
       }
       const priceCheck = validatePrice(snap.price);
       if (!priceCheck.ok) {
@@ -120,17 +163,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!(PRODUCT_CATEGORIES as readonly string[]).includes(category)) {
         await conn.rollback();
         return res.status(400).json({ error: "Historical product category is invalid" });
-      }
-
-      if (slug !== String(current.slug || "")) {
-        const [dup] = await conn.query<RowDataPacket[]>(
-          "SELECT id FROM products WHERE slug=? AND id<>? LIMIT 1",
-          [slug, productId]
-        );
-        if (dup.length) {
-          await conn.rollback();
-          return res.status(409).json({ error: "Slug already exists. Choose a different URL slug." });
-        }
       }
 
       await recordContentRevision(
@@ -152,7 +184,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          WHERE id=?`,
         [
           name,
-          slug,
+          currentSlug,
           snap.description ?? "",
           priceCheck.price,
           category,
@@ -182,7 +214,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         metadata: { revision_id: revisionId, changed_fields: ["restore"] },
         ip,
       });
-      return res.status(200).json({ success: true, entity_type: "product", entity_id: String(productId) });
+      invalidateSitemapCache();
+      const seo_guard = await runPostSaveSeoGuard({
+        entityType: "product",
+        entityId: productId,
+        operation: "restore",
+      });
+      return res.status(200).json({
+        success: true,
+        entity_type: "product",
+        entity_id: String(productId),
+        seo_guard,
+      });
     }
 
     if (revision.entity_type === "blog") {
@@ -199,20 +242,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const snap = snapshot as Record<string, unknown>;
       const title = String(snap.title || "").trim();
-      const slug = String(snap.slug || "").trim();
+      const snapSlug = normalizeBlogSlug(String(snap.slug || ""));
+      const currentSlug = normalizeBlogSlug(String(current.slug || ""));
       if (!title) {
         await conn.rollback();
         return res.status(400).json({ error: "Historical blog snapshot is missing title" });
       }
-      if (slug && slug !== String(current.slug || "")) {
-        const [dup] = await conn.query<RowDataPacket[]>(
-          "SELECT id FROM blog_posts WHERE slug=? AND id<>? LIMIT 1",
-          [slug, blogId]
-        );
-        if (dup.length) {
-          await conn.rollback();
-          return res.status(409).json({ error: "Slug already exists on another blog post." });
-        }
+      if (!snapSlug) {
+        await conn.rollback();
+        return res.status(400).json({ error: "Historical blog snapshot is missing slug" });
+      }
+      if (snapSlug !== currentSlug) {
+        await conn.rollback();
+        return res.status(409).json({ error: SLUG_RESTORE_BLOCKED });
+      }
+
+      const canon = normalizeBlogCanonicalInput(
+        snap.canonical_url as string | null | undefined,
+        currentSlug
+      );
+      if (!canon.ok) {
+        await conn.rollback();
+        return res.status(400).json({ error: canon.error });
       }
 
       await recordContentRevision(
@@ -241,7 +292,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           canonical_url=?, faqs=?, active=? WHERE id=?`,
         [
           title,
-          slug,
+          currentSlug,
           snap.excerpt ?? "",
           snap.content ?? "",
           snap.category ?? "Guides",
@@ -254,7 +305,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           snap.focus_keyword ?? "",
           snap.status ?? "published",
           snap.featured ? 1 : 0,
-          snap.canonical_url ?? "",
+          canon.canonical,
           faqsVal,
           snap.active === 0 || snap.active === "0" || snap.active === false ? 0 : 1,
           blogId,
@@ -272,7 +323,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         metadata: { revision_id: revisionId, changed_fields: ["restore"] },
         ip,
       });
-      return res.status(200).json({ success: true, entity_type: "blog", entity_id: String(blogId) });
+      invalidateSitemapCache();
+      const seo_guard = await runPostSaveSeoGuard({
+        entityType: "blog",
+        entityId: blogId,
+        operation: "restore",
+      });
+      return res.status(200).json({
+        success: true,
+        entity_type: "blog",
+        entity_id: String(blogId),
+        seo_guard,
+      });
     }
 
     if (
