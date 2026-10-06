@@ -14,13 +14,21 @@ import {
 } from "@/lib/seoDiagnosticRows";
 import {
   SEO_AI_EXPLANATION_JSON_SCHEMA,
+  SEO_AI_METADATA_JSON_SCHEMA,
   SEO_AI_PROVIDER_TIMEOUT_MS,
+  buildSeoAiMetadataSystemInstruction,
+  buildSeoAiMetadataUserPrompt,
   buildSeoAiSystemInstruction,
   buildSeoAiUserPrompt,
   buildVerifiedIssueContext,
+  htmlToPlainTextBounded,
   parseExplanationJsonText,
   parseIssueId,
+  parseMetadataJsonText,
+  type SeoAiDraftUnsaved,
   type SeoAiExplanation,
+  type SeoAiMetadataDraft,
+  type SeoAiMetadataDraftContext,
   type SeoAiProvider,
   type SeoAiPublicErrorCode,
   type SeoAiVerifiedIssueContext,
@@ -41,10 +49,47 @@ export type SeoAiExplainSuccess = {
   explanation: SeoAiExplanation;
 };
 
+export type SeoAiDraftSuccess = {
+  ok: true;
+  provider: SeoAiProvider;
+  task: "draft_metadata";
+  entityType: "product" | "blog";
+  entityId: string;
+  result: SeoAiMetadataDraft;
+};
+
+export type ProductDraftRow = {
+  id: number | string;
+  name?: string | null;
+  slug?: string | null;
+  category?: string | null;
+  seo_title?: string | null;
+  meta_description?: string | null;
+  focus_keyword?: string | null;
+  short_description?: string | null;
+};
+
+export type BlogDraftRow = {
+  id: number | string;
+  title?: string | null;
+  slug?: string | null;
+  category?: string | null;
+  meta_title?: string | null;
+  meta_description?: string | null;
+  focus_keyword?: string | null;
+  excerpt?: string | null;
+};
+
 export type LoadProductRowFn = (
   entityId: string
 ) => Promise<ProductDbRow | null>;
 export type LoadBlogRowFn = (entityId: string) => Promise<BlogDbRow | null>;
+export type LoadProductDraftRowFn = (
+  entityId: string
+) => Promise<ProductDraftRow | null>;
+export type LoadBlogDraftRowFn = (
+  entityId: string
+) => Promise<BlogDraftRow | null>;
 
 export type ProviderCallFn = (
   context: SeoAiVerifiedIssueContext
@@ -52,6 +97,10 @@ export type ProviderCallFn = (
   | { ok: true; explanation: SeoAiExplanation }
   | SeoAiFailure
 >;
+
+export type DraftProviderCallFn = (
+  context: SeoAiMetadataDraftContext
+) => Promise<{ ok: true; draft: SeoAiMetadataDraft } | SeoAiFailure>;
 
 const GEMINI_INTERACTIONS_URL =
   "https://generativelanguage.googleapis.com/v1beta/interactions";
@@ -111,6 +160,79 @@ export async function defaultLoadBlogRow(
   );
   const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
   return row as BlogDbRow | null;
+}
+
+export async function loadProductDraftRow(
+  entityId: string
+): Promise<ProductDraftRow | null> {
+  const id = Number(entityId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const [rows]: any = await pool.query(
+    `SELECT id, name, slug, category, seo_title, meta_description,
+            focus_keyword, short_description
+     FROM products
+     WHERE id = ?
+     LIMIT 1`,
+    [id]
+  );
+  const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
+  return row as ProductDraftRow | null;
+}
+
+export async function loadBlogDraftRow(
+  entityId: string
+): Promise<BlogDraftRow | null> {
+  const id = Number(entityId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const [rows]: any = await pool.query(
+    `SELECT id, title, slug, category, meta_title, meta_description,
+            focus_keyword, excerpt
+     FROM blog_posts
+     WHERE id = ?
+     LIMIT 1`,
+    [id]
+  );
+  const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
+  return row as BlogDraftRow | null;
+}
+
+export function buildMetadataDraftContext(
+  entityType: "product" | "blog",
+  row: ProductDraftRow | BlogDraftRow,
+  unsaved: SeoAiDraftUnsaved = {}
+): SeoAiMetadataDraftContext {
+  if (entityType === "product") {
+    const product = row as ProductDraftRow;
+    return {
+      entityType,
+      entityId: String(product.id),
+      authoritative: {
+        slug: String(product.slug || "").trim(),
+        category: String(product.category || "").trim(),
+        displayTitle: String(product.name || "").trim(),
+        seoTitle: String(product.seo_title || "").trim(),
+        metaDescription: String(product.meta_description || "").trim(),
+        focusKeyword: String(product.focus_keyword || "").trim(),
+        summaryText: htmlToPlainTextBounded(product.short_description),
+      },
+      unsaved,
+    };
+  }
+  const blog = row as BlogDraftRow;
+  return {
+    entityType,
+    entityId: String(blog.id),
+    authoritative: {
+      slug: String(blog.slug || "").trim(),
+      category: String(blog.category || "").trim(),
+      displayTitle: String(blog.title || "").trim(),
+      seoTitle: String(blog.meta_title || "").trim(),
+      metaDescription: String(blog.meta_description || "").trim(),
+      focusKeyword: String(blog.focus_keyword || "").trim(),
+      summaryText: htmlToPlainTextBounded(blog.excerpt),
+    },
+    unsaved,
+  };
 }
 
 /**
@@ -424,6 +546,172 @@ export async function dispatchSeoAiExplain(
   }
   if (provider === "gemini") {
     const call = deps?.callGemini || callGeminiExplain;
+    return call(context);
+  }
+  return fail(400, "invalid_request", "provider must be gemini or openai.");
+}
+
+export async function callOpenAiDraft(
+  context: SeoAiMetadataDraftContext
+): Promise<{ ok: true; draft: SeoAiMetadataDraft } | SeoAiFailure> {
+  const cfg = getProviderEnvConfig("openai");
+  if (!cfg.configured) {
+    return fail(
+      503,
+      "provider_not_configured",
+      "Selected AI provider is not configured."
+    );
+  }
+
+  const client = new OpenAI({
+    apiKey: cfg.apiKey,
+    maxRetries: 0,
+    timeout: SEO_AI_PROVIDER_TIMEOUT_MS,
+  });
+
+  try {
+    const response = await client.responses.create({
+      model: cfg.model,
+      store: false,
+      instructions: buildSeoAiMetadataSystemInstruction(),
+      input: buildSeoAiMetadataUserPrompt(context),
+      text: {
+        format: {
+          type: "json_schema",
+          name: "seo_ai_metadata",
+          strict: true,
+          schema: SEO_AI_METADATA_JSON_SCHEMA as unknown as {
+            [key: string]: unknown;
+          },
+        },
+      },
+    });
+
+    const text =
+      typeof response.output_text === "string" ? response.output_text : "";
+    const parsed = parseMetadataJsonText(text, context.entityType);
+    if (!parsed.ok) {
+      console.error("[seo-ai] openai malformed metadata output");
+      return fail(
+        502,
+        "malformed_provider_output",
+        "The AI provider returned unusable suggestions."
+      );
+    }
+    return { ok: true, draft: parsed.draft };
+  } catch (err) {
+    const status =
+      err && typeof err === "object" && "status" in err
+        ? Number((err as { status?: unknown }).status)
+        : NaN;
+    if (Number.isFinite(status) && status > 0) {
+      console.error(`[seo-ai] openai upstream failed: status ${status}`);
+      if (status === 408 || status === 504) {
+        return fail(
+          503,
+          "provider_timeout",
+          "The selected AI provider timed out. Please try again shortly."
+        );
+      }
+      return fail(
+        503,
+        "provider_upstream",
+        "The selected AI provider is temporarily unavailable."
+      );
+    }
+    return mapAbortOrTimeout(err, "openai");
+  }
+}
+
+export async function callGeminiDraft(
+  context: SeoAiMetadataDraftContext
+): Promise<{ ok: true; draft: SeoAiMetadataDraft } | SeoAiFailure> {
+  const cfg = getProviderEnvConfig("gemini");
+  if (!cfg.configured) {
+    return fail(
+      503,
+      "provider_not_configured",
+      "Selected AI provider is not configured."
+    );
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    SEO_AI_PROVIDER_TIMEOUT_MS
+  );
+
+  try {
+    const res = await fetch(GEMINI_INTERACTIONS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": cfg.apiKey,
+        "Api-Revision": "2026-05-20",
+      },
+      body: JSON.stringify({
+        model: cfg.model,
+        input: buildSeoAiMetadataUserPrompt(context),
+        system_instruction: buildSeoAiMetadataSystemInstruction(),
+        store: false,
+        response_format: {
+          type: "text",
+          mime_type: "application/json",
+          schema: SEO_AI_METADATA_JSON_SCHEMA,
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      console.error(`[seo-ai] gemini upstream failed: status ${res.status}`);
+      if (res.status === 408 || res.status === 504) {
+        return fail(
+          503,
+          "provider_timeout",
+          "The selected AI provider timed out. Please try again shortly."
+        );
+      }
+      return fail(
+        503,
+        "provider_upstream",
+        "The selected AI provider is temporarily unavailable."
+      );
+    }
+
+    const body = await res.json().catch(() => null);
+    const text = extractGeminiInteractionText(body);
+    const parsed = parseMetadataJsonText(text, context.entityType);
+    if (!parsed.ok) {
+      console.error("[seo-ai] gemini malformed metadata output");
+      return fail(
+        502,
+        "malformed_provider_output",
+        "The AI provider returned unusable suggestions."
+      );
+    }
+    return { ok: true, draft: parsed.draft };
+  } catch (err) {
+    return mapAbortOrTimeout(err, "gemini");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function dispatchSeoAiDraft(
+  provider: SeoAiProvider,
+  context: SeoAiMetadataDraftContext,
+  deps?: {
+    callOpenAI?: DraftProviderCallFn;
+    callGemini?: DraftProviderCallFn;
+  }
+): Promise<{ ok: true; draft: SeoAiMetadataDraft } | SeoAiFailure> {
+  if (provider === "openai") {
+    const call = deps?.callOpenAI || callOpenAiDraft;
+    return call(context);
+  }
+  if (provider === "gemini") {
+    const call = deps?.callGemini || callGeminiDraft;
     return call(context);
   }
   return fail(400, "invalid_request", "provider must be gemini or openai.");

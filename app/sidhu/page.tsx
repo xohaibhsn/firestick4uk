@@ -297,6 +297,15 @@ export default function AdminPage() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [productModal, setProductModal] = useState<any|null|"new">(null);
   const [editProduct, setEditProduct] = useState({ name:"", slug:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
+  type MetaDraftAiState = {
+    status: "idle" | "loading" | "ok" | "error";
+    provider?: "gemini" | "openai";
+    entityId?: number;
+    result?: { titles: string[]; meta_descriptions: string[] };
+    error?: string;
+  };
+  const [productMetaAi, setProductMetaAi] = useState<MetaDraftAiState>({ status: "idle" });
+  const [blogMetaAi, setBlogMetaAi] = useState<MetaDraftAiState>({ status: "idle" });
   const [imageUploading, setImageUploading] = useState(false);
   const [mediaPicker, setMediaPicker] = useState<{
     purposes: MediaLibraryPurpose[];
@@ -1394,6 +1403,7 @@ export default function AdminPage() {
     if (res.success) {
       const base = isNew ? "✅ Post published!" : "✅ Post updated!";
       setBlogMsg(`${base}${formatSeoGuardBannerClient(res.seo_guard)}`);
+      setBlogMetaAi({ status: "idle" });
       setBlogModal(null);
       fetchBlogs();
     } else {
@@ -1565,6 +1575,7 @@ export default function AdminPage() {
         setProductMsg(`❌ ${res.error || "Failed to save product"}`);
         return;
       }
+      setProductMetaAi({ status: "idle" });
       setProductModal(null);
       setProductMsg(`✅ Product saved${formatSeoGuardBannerClient(res.seo_guard)}`);
       await loadProducts();
@@ -1578,6 +1589,7 @@ export default function AdminPage() {
 
   const openEditProduct = (p: any) => {
     const rawPrice = p.price ? `£${Number(String(p.price).replace(/[^0-9.]/g,'')).toFixed(2)}` : "";
+    setProductMetaAi({ status: "idle" });
     setEditProduct({
       name: p.name || "",
       slug: p.slug || toSlug(p.name || ""),
@@ -1597,8 +1609,107 @@ export default function AdminPage() {
   };
 
   const openNewProduct = () => {
+    setProductMetaAi({ status: "idle" });
     setEditProduct({ name:"", slug:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
     setProductModal("new");
+  };
+
+  const draftProductMetadata = async (provider: "gemini" | "openai") => {
+    if (productModal === "new" || !productModal || !productModal.id) return;
+    const entityId = Number(productModal.id);
+    if (!Number.isFinite(entityId) || entityId <= 0) return;
+    setProductMetaAi({ status: "loading", provider, entityId });
+    try {
+      const res = await fetch("/api/admin-seo-ai", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider,
+          task: "draft_metadata",
+          entityType: "product",
+          entityId,
+          unsaved: {
+            seoTitle: editProduct.seo_title,
+            metaDescription: editProduct.meta_description,
+            focusKeyword: editProduct.focus_keyword,
+            displayTitle: editProduct.name,
+          },
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok) {
+        setProductMetaAi({
+          status: "error",
+          provider,
+          entityId,
+          error: json.message || json.error || `HTTP ${res.status}`,
+        });
+        return;
+      }
+      setProductMetaAi({
+        status: "ok",
+        provider,
+        entityId,
+        result: json.result,
+      });
+    } catch {
+      setProductMetaAi({
+        status: "error",
+        provider,
+        entityId,
+        error: "Draft request failed.",
+      });
+    }
+  };
+
+  const draftBlogMetadata = async (provider: "gemini" | "openai") => {
+    if (blogModal === "new" || !blogModal || !blogModal.id) return;
+    const entityId = Number(blogModal.id);
+    if (!Number.isFinite(entityId) || entityId <= 0) return;
+    setBlogMetaAi({ status: "loading", provider, entityId });
+    try {
+      const res = await fetch("/api/admin-seo-ai", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider,
+          task: "draft_metadata",
+          entityType: "blog",
+          entityId,
+          unsaved: {
+            seoTitle: editBlog.meta_title,
+            metaDescription: editBlog.meta_description,
+            focusKeyword: editBlog.focus_keyword,
+            displayTitle: editBlog.title,
+          },
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok) {
+        setBlogMetaAi({
+          status: "error",
+          provider,
+          entityId,
+          error: json.message || json.error || `HTTP ${res.status}`,
+        });
+        return;
+      }
+      setBlogMetaAi({
+        status: "ok",
+        provider,
+        entityId,
+        result: json.result,
+      });
+    } catch {
+      setBlogMetaAi({
+        status: "error",
+        provider,
+        entityId,
+        error: "Draft request failed.",
+      });
+    }
   };
 
   const pendingCount = Number(dashSummary?.pending_orders || 0);
@@ -1932,6 +2043,76 @@ export default function AdminPage() {
             {/* SEO Section */}
             <div className="seo-box">
               <div className="seo-box-title">🔍 SEO Settings</div>
+              {productModal !== "new" && productModal?.id ? (
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    disabled={productMetaAi.status === "loading"}
+                    onClick={() => void draftProductMetadata("gemini")}
+                  >
+                    Draft with Gemini
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    disabled={productMetaAi.status === "loading"}
+                    onClick={() => void draftProductMetadata("openai")}
+                  >
+                    Draft with OpenAI
+                  </button>
+                </div>
+              ) : null}
+              {productMetaAi.status === "loading" ? (
+                <div style={{fontSize:12,color:"rgba(255,255,255,0.55)",marginBottom:10}}>
+                  {productMetaAi.provider === "gemini" ? "Drafting with Gemini…" : "Drafting with OpenAI…"}
+                </div>
+              ) : null}
+              {productMetaAi.status === "error" ? (
+                <div style={{fontSize:12,color:"#ff6666",marginBottom:10}}>
+                  {productMetaAi.error || "Draft failed."}
+                </div>
+              ) : null}
+              {productMetaAi.status === "ok" && productMetaAi.result ? (
+                <div style={{fontSize:12,marginBottom:14,padding:"10px 12px",background:"rgba(255,255,255,0.04)",borderRadius:8}}>
+                  <div style={{marginBottom:8}}>
+                    <strong>Provider:</strong>{" "}
+                    {productMetaAi.provider === "gemini" ? "Gemini" : "OpenAI"}
+                  </div>
+                  <div style={{fontWeight:600,marginBottom:6}}>SEO title suggestions</div>
+                  {productMetaAi.result.titles.map((t) => (
+                    <div key={t} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:6}}>
+                      <div style={{flex:1}}>
+                        {t}{" "}
+                        <span style={{opacity:0.5}}>({t.length})</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="action-btn btn-edit"
+                        onClick={() => setEditProduct((p) => ({ ...p, seo_title: t }))}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{fontWeight:600,margin:"10px 0 6px"}}>Meta description suggestions</div>
+                  {productMetaAi.result.meta_descriptions.map((d) => (
+                    <div key={d} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:6}}>
+                      <div style={{flex:1}}>
+                        {d}{" "}
+                        <span style={{opacity:0.5}}>({d.length})</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="action-btn btn-edit"
+                        onClick={() => setEditProduct((p) => ({ ...p, meta_description: d }))}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <div className="modal-field">
                 <label style={{display:"flex",justifyContent:"space-between"}}>
                   SEO Title <span style={{fontSize:11,color:editProduct.seo_title.length>55?"#ff6666":editProduct.seo_title.length>40?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.seo_title.length}/60</span>
@@ -1982,13 +2163,14 @@ export default function AdminPage() {
             </div>
 
             <div className="modal-actions">
-              <button className="modal-cancel" onClick={() => setProductModal(null)}>Cancel</button>
+              <button className="modal-cancel" onClick={() => { setProductMetaAi({ status: "idle" }); setProductModal(null); }}>Cancel</button>
               {productModal !== "new" && productModal?.id && can("revisions.view") && (
                 <button
                   type="button"
                   className="modal-cancel"
                   onClick={() => {
                     setHistoryFilter({ entityType: "product", entityId: String(productModal.id) });
+                    setProductMetaAi({ status: "idle" });
                     setProductModal(null);
                     setTab("history");
                   }}
@@ -2106,6 +2288,76 @@ export default function AdminPage() {
             {/* SEO Section */}
             <div className="seo-section">
               <h5>🔍 SEO Settings</h5>
+              {blogModal !== "new" && blogModal?.id ? (
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    disabled={blogMetaAi.status === "loading"}
+                    onClick={() => void draftBlogMetadata("gemini")}
+                  >
+                    Draft with Gemini
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    disabled={blogMetaAi.status === "loading"}
+                    onClick={() => void draftBlogMetadata("openai")}
+                  >
+                    Draft with OpenAI
+                  </button>
+                </div>
+              ) : null}
+              {blogMetaAi.status === "loading" ? (
+                <div style={{fontSize:12,color:"rgba(255,255,255,0.55)",marginBottom:10}}>
+                  {blogMetaAi.provider === "gemini" ? "Drafting with Gemini…" : "Drafting with OpenAI…"}
+                </div>
+              ) : null}
+              {blogMetaAi.status === "error" ? (
+                <div style={{fontSize:12,color:"#ff6666",marginBottom:10}}>
+                  {blogMetaAi.error || "Draft failed."}
+                </div>
+              ) : null}
+              {blogMetaAi.status === "ok" && blogMetaAi.result ? (
+                <div style={{fontSize:12,marginBottom:14,padding:"10px 12px",background:"rgba(255,255,255,0.04)",borderRadius:8}}>
+                  <div style={{marginBottom:8}}>
+                    <strong>Provider:</strong>{" "}
+                    {blogMetaAi.provider === "gemini" ? "Gemini" : "OpenAI"}
+                  </div>
+                  <div style={{fontWeight:600,marginBottom:6}}>SEO title suggestions</div>
+                  {blogMetaAi.result.titles.map((t) => (
+                    <div key={t} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:6}}>
+                      <div style={{flex:1}}>
+                        {t}{" "}
+                        <span style={{opacity:0.5}}>({t.length})</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="action-btn btn-edit"
+                        onClick={() => setEditBlog((p) => ({ ...p, meta_title: t }))}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{fontWeight:600,margin:"10px 0 6px"}}>Meta description suggestions</div>
+                  {blogMetaAi.result.meta_descriptions.map((d) => (
+                    <div key={d} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:6}}>
+                      <div style={{flex:1}}>
+                        {d}{" "}
+                        <span style={{opacity:0.5}}>({d.length})</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="action-btn btn-edit"
+                        onClick={() => setEditBlog((p) => ({ ...p, meta_description: d }))}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <div className="modal-field"><label>Meta Title</label><input placeholder="SEO title (50-60 chars)" value={editBlog.meta_title} onChange={e=>setEditBlog(p=>({...p,meta_title:e.target.value}))} /></div>
               <div className="modal-field">
                 <label>Meta Description</label>
@@ -2155,7 +2407,7 @@ export default function AdminPage() {
             </div>
 
             <div className="modal-actions" style={{marginTop:"20px"}}>
-              <button className="modal-cancel" onClick={()=>setBlogModal(null)}>Cancel</button>
+              <button className="modal-cancel" onClick={()=>{ setBlogMetaAi({ status: "idle" }); setBlogModal(null); }}>Cancel</button>
               {blogModal !== "new" && typeof blogModal === "object" && blogModal?.id && can("revisions.view") && (
                 <button
                   type="button"
@@ -2556,7 +2808,7 @@ export default function AdminPage() {
             <div className="section-card">
               <div className="section-header">
                 <div className="section-title">Blog Posts ({blogPosts.length})</div>
-                <button className="add-btn" onClick={() => { setEditBlog(defaultBlog); setBlogSlugLocked(false); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML="";},50); setBlogModal("new"); }}>+ Add Post</button>
+                <button className="add-btn" onClick={() => { setBlogMetaAi({ status: "idle" }); setEditBlog(defaultBlog); setBlogSlugLocked(false); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML="";},50); setBlogModal("new"); }}>+ Add Post</button>
               </div>
               <div className="table-wrap">
                 <table>
@@ -2572,7 +2824,7 @@ export default function AdminPage() {
                         <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{p.category}</span></td>
                         <td><span style={{fontSize:"11px",padding:"3px 10px",borderRadius:"10px",fontWeight:700,background:p.status==="published"?"rgba(0,200,100,0.12)":"rgba(255,180,0,0.12)",border:p.status==="published"?"1px solid rgba(0,200,100,0.3)":"1px solid rgba(255,180,0,0.3)",color:p.status==="published"?"#00c864":"#ffb400"}}>{p.status==="published"?"Published":"Draft"}</span></td>
                         <td style={{whiteSpace:"nowrap"}}>
-                          <button className="action-btn btn-edit" onClick={() => { const faqsParsed = p.faqs ? (typeof p.faqs==="string" ? JSON.parse(p.faqs) : p.faqs) : []; setEditBlog({title:p.title,slug:p.slug||"",excerpt:p.excerpt||"",content:p.content||"",category:p.category||"Guides",emoji:p.emoji||"📝",badge:p.badge||"guide",badgeText:p.badgeText||"Guide",featured_image:p.featured_image||"",meta_title:p.meta_title||"",meta_description:p.meta_description||"",focus_keyword:p.focus_keyword||"",status:p.status||"published",featured:!!p.featured,canonical_url:p.canonical_url||"",faqs:faqsParsed}); setBlogSlugLocked(p.status === "published"); setBlogModal(p); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML=p.content||"";},80); }}>Edit</button>
+                          <button className="action-btn btn-edit" onClick={() => { setBlogMetaAi({ status: "idle" }); const faqsParsed = p.faqs ? (typeof p.faqs==="string" ? JSON.parse(p.faqs) : p.faqs) : []; setEditBlog({title:p.title,slug:p.slug||"",excerpt:p.excerpt||"",content:p.content||"",category:p.category||"Guides",emoji:p.emoji||"📝",badge:p.badge||"guide",badgeText:p.badgeText||"Guide",featured_image:p.featured_image||"",meta_title:p.meta_title||"",meta_description:p.meta_description||"",focus_keyword:p.focus_keyword||"",status:p.status||"published",featured:!!p.featured,canonical_url:p.canonical_url||"",faqs:faqsParsed}); setBlogSlugLocked(p.status === "published"); setBlogModal(p); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML=p.content||"";},80); }}>Edit</button>
                           <button className="action-btn btn-delete" onClick={() => deleteBlog(p.id)}>Delete</button>
                         </td>
                       </tr>

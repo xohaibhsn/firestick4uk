@@ -4,13 +4,54 @@
  */
 
 export type SeoAiProvider = "gemini" | "openai";
-export type SeoAiTask = "explain_issue";
+export type SeoAiTask = "explain_issue" | "draft_metadata";
 
 export type SeoAiExplainRequest = {
   provider: SeoAiProvider;
-  task: SeoAiTask;
+  task: "explain_issue";
   issueId: string;
 };
+
+export type SeoAiDraftUnsaved = {
+  seoTitle?: string;
+  metaDescription?: string;
+  focusKeyword?: string;
+  displayTitle?: string;
+};
+
+export type SeoAiDraftRequest = {
+  provider: SeoAiProvider;
+  task: "draft_metadata";
+  entityType: "product" | "blog";
+  entityId: string;
+  unsaved?: SeoAiDraftUnsaved;
+};
+
+export type SeoAiRequest = SeoAiExplainRequest | SeoAiDraftRequest;
+
+export type SeoAiMetadataDraft = {
+  titles: string[];
+  meta_descriptions: string[];
+};
+
+export type SeoAiMetadataDraftContext = {
+  entityType: "product" | "blog";
+  entityId: string;
+  authoritative: {
+    slug: string;
+    category: string;
+    displayTitle: string;
+    seoTitle: string;
+    metaDescription: string;
+    focusKeyword: string;
+    summaryText: string;
+  };
+  unsaved: SeoAiDraftUnsaved;
+};
+
+export const PRODUCT_TITLE_MAX = 70;
+export const BLOG_TITLE_MAX = 75;
+export const META_DESC_MAX = 180;
 
 export type SeoAiExplanation = {
   summary: string;
@@ -47,6 +88,7 @@ export type SeoAiVerifiedIssueContext = {
 export type SeoAiPublicErrorCode =
   | "invalid_request"
   | "issue_not_found"
+  | "entity_not_found"
   | "rate_limited"
   | "provider_not_configured"
   | "provider_timeout"
@@ -71,9 +113,48 @@ export const SEO_AI_EXPLANATION_JSON_SCHEMA = {
   },
 } as const;
 
+export const SEO_AI_METADATA_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["titles", "meta_descriptions"],
+  properties: {
+    titles: {
+      type: "array",
+      items: { type: "string" },
+      minItems: 1,
+      maxItems: 3,
+    },
+    meta_descriptions: {
+      type: "array",
+      items: { type: "string" },
+      minItems: 1,
+      maxItems: 3,
+    },
+  },
+} as const;
+
 const ISSUE_ID_RE = /^(product|blog):(\d+):([a-z0-9][a-z0-9_-]{0,80})$/i;
 
-const ALLOWED_REQUEST_KEYS = new Set(["provider", "task", "issueId"]);
+const ALLOWED_EXPLAIN_REQUEST_KEYS = new Set(["provider", "task", "issueId"]);
+const ALLOWED_DRAFT_REQUEST_KEYS = new Set([
+  "provider",
+  "task",
+  "entityType",
+  "entityId",
+  "unsaved",
+]);
+const ALLOWED_UNSAVED_KEYS = new Set([
+  "seoTitle",
+  "metaDescription",
+  "focusKeyword",
+  "displayTitle",
+]);
+const UNSAVED_FIELD_MAX: Record<keyof SeoAiDraftUnsaved, number> = {
+  seoTitle: 200,
+  metaDescription: 500,
+  focusKeyword: 200,
+  displayTitle: 300,
+};
 
 function looksLikeHtmlOrScript(value: string): boolean {
   return /<\s*\/?\s*[a-z]|javascript\s*:|on\w+\s*=/i.test(value);
@@ -114,7 +195,7 @@ export function parseExplainIssueRequest(
   }
   const obj = body as Record<string, unknown>;
   for (const key of Object.keys(obj)) {
-    if (!ALLOWED_REQUEST_KEYS.has(key)) {
+    if (!ALLOWED_EXPLAIN_REQUEST_KEYS.has(key)) {
       return {
         ok: false,
         code: "invalid_request",
@@ -159,6 +240,148 @@ export function parseExplainIssueRequest(
       provider,
       task,
       issueId: issueId.trim(),
+    },
+  };
+}
+
+function isEntityId(value: unknown): value is string {
+  if (typeof value !== "string" || !value.trim()) return false;
+  const trimmed = value.trim();
+  const id = Number(trimmed);
+  return Number.isFinite(id) && id > 0 && String(Math.trunc(id)) === trimmed;
+}
+
+function parseDraftUnsaved(
+  value: unknown
+):
+  | { ok: true; unsaved: SeoAiDraftUnsaved }
+  | { ok: false; code: "invalid_request"; message: string } {
+  if (value === undefined) {
+    return { ok: true, unsaved: {} };
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "unsaved must be an object when provided.",
+    };
+  }
+  const obj = value as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (!ALLOWED_UNSAVED_KEYS.has(key)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "unsaved contains unsupported fields.",
+      };
+    }
+  }
+  const unsaved: SeoAiDraftUnsaved = {};
+  for (const key of ALLOWED_UNSAVED_KEYS) {
+    if (!(key in obj)) continue;
+    const raw = obj[key];
+    if (raw === undefined || raw === null) continue;
+    if (typeof raw !== "string") {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: `unsaved.${key} is invalid.`,
+      };
+    }
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const max = UNSAVED_FIELD_MAX[key as keyof SeoAiDraftUnsaved];
+    if (trimmed.length > max || looksLikeHtmlOrScript(trimmed)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: `unsaved.${key} is invalid.`,
+      };
+    }
+    unsaved[key as keyof SeoAiDraftUnsaved] = trimmed;
+  }
+  return { ok: true, unsaved };
+}
+
+export function parseSeoAiRequest(
+  body: unknown
+):
+  | { ok: true; request: SeoAiExplainRequest }
+  | { ok: true; request: SeoAiDraftRequest }
+  | { ok: false; code: "invalid_request"; message: string } {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "Request body must be a JSON object.",
+    };
+  }
+  const obj = body as Record<string, unknown>;
+  const task = obj.task;
+  if (task === "explain_issue") {
+    for (const key of Object.keys(obj)) {
+      if (!ALLOWED_EXPLAIN_REQUEST_KEYS.has(key)) {
+        return {
+          ok: false,
+          code: "invalid_request",
+          message: "Request contains unsupported fields.",
+        };
+      }
+    }
+    return parseExplainIssueRequest(body);
+  }
+  if (task !== "draft_metadata") {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "task must be explain_issue or draft_metadata.",
+    };
+  }
+  for (const key of Object.keys(obj)) {
+    if (!ALLOWED_DRAFT_REQUEST_KEYS.has(key)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "Request contains unsupported fields.",
+      };
+    }
+  }
+  const provider = obj.provider;
+  if (provider !== "gemini" && provider !== "openai") {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "provider must be gemini or openai.",
+    };
+  }
+  const entityType = obj.entityType;
+  if (entityType !== "product" && entityType !== "blog") {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "entityType must be product or blog.",
+    };
+  }
+  const entityId = obj.entityId;
+  if (!isEntityId(entityId)) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "entityId is invalid.",
+    };
+  }
+  const unsavedParsed = parseDraftUnsaved(obj.unsaved);
+  if (!unsavedParsed.ok) return unsavedParsed;
+  return {
+    ok: true,
+    request: {
+      provider,
+      task: "draft_metadata",
+      entityType,
+      entityId: entityId.trim(),
+      ...(Object.keys(unsavedParsed.unsaved).length
+        ? { unsaved: unsavedParsed.unsaved }
+        : {}),
     },
   };
 }
@@ -321,6 +544,167 @@ export function buildSeoAiUserPrompt(context: SeoAiVerifiedIssueContext): string
 
 export function contextContainsRawHtml(
   context: SeoAiVerifiedIssueContext
+): boolean {
+  const blob = JSON.stringify(context);
+  return /<\s*(?:img|p|div|span|script|style|a|h[1-6]|ul|ol|li|table|br|strong|em)\b/i.test(
+    blob
+  );
+}
+
+function dedupeTrimmedStrings(items: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of items) {
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+function filterMetadataStrings(
+  items: unknown[],
+  maxLen: number
+): string[] | null {
+  if (!Array.isArray(items)) return null;
+  const kept: string[] = [];
+  for (const item of items) {
+    if (typeof item !== "string") return null;
+    const trimmed = item.trim();
+    if (!trimmed || looksLikeHtmlOrScript(trimmed)) continue;
+    if (trimmed.length > maxLen) continue;
+    kept.push(trimmed);
+  }
+  return dedupeTrimmedStrings(kept);
+}
+
+export function validateSeoAiMetadataDraft(
+  value: unknown,
+  entityType: "product" | "blog"
+):
+  | { ok: true; draft: SeoAiMetadataDraft }
+  | { ok: false; code: "malformed_provider_output"; message: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable suggestions.",
+    };
+  }
+  const obj = value as Record<string, unknown>;
+  const allowed = new Set(["titles", "meta_descriptions"]);
+  for (const key of Object.keys(obj)) {
+    if (!allowed.has(key)) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned unusable suggestions.",
+      };
+    }
+  }
+  const titleMax =
+    entityType === "product" ? PRODUCT_TITLE_MAX : BLOG_TITLE_MAX;
+  const titlesFiltered = filterMetadataStrings(
+    obj.titles as unknown[],
+    titleMax
+  );
+  const descriptionsFiltered = filterMetadataStrings(
+    obj.meta_descriptions as unknown[],
+    META_DESC_MAX
+  );
+  if (titlesFiltered === null || descriptionsFiltered === null) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable suggestions.",
+    };
+  }
+  const titles = titlesFiltered.slice(0, 3);
+  const meta_descriptions = descriptionsFiltered.slice(0, 3);
+  if (titles.length < 1 || meta_descriptions.length < 1) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable suggestions.",
+    };
+  }
+  return { ok: true, draft: { titles, meta_descriptions } };
+}
+
+export function parseMetadataJsonText(
+  text: string,
+  entityType: "product" | "blog"
+):
+  | { ok: true; draft: SeoAiMetadataDraft }
+  | { ok: false; code: "malformed_provider_output"; message: string } {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable suggestions.",
+    };
+  }
+  try {
+    return validateSeoAiMetadataDraft(JSON.parse(raw), entityType);
+  } catch {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable suggestions.",
+    };
+  }
+}
+
+export function htmlToPlainTextBounded(html: unknown, max = 600): string {
+  const raw = String(html ?? "");
+  const plain = raw
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (plain.length <= max) return plain;
+  return plain.slice(0, max);
+}
+
+export function buildSeoAiMetadataSystemInstruction(): string {
+  return [
+    "Draft SEO title and meta description suggestions for ONE Firestick4UK CMS entity.",
+    "Use the authoritative saved fields and any unsaved editor overrides as context only.",
+    "Return 1 to 3 distinct title options and 1 to 3 distinct meta description options.",
+    `Product SEO titles must be at most ${PRODUCT_TITLE_MAX} characters; blog SEO titles at most ${BLOG_TITLE_MAX}.`,
+    `Meta descriptions must be at most ${META_DESC_MAX} characters.`,
+    "Plain text only — no HTML, markdown, or scripts.",
+    "Do not claim Google ranking, index status, traffic, or search volume.",
+    "Do not invent prices, guarantees, device support, or other business claims.",
+    "Do not perform or claim CMS changes or publishing.",
+    "Return only the required normalized structured JSON fields.",
+    "No persona or roleplay.",
+  ].join(" ");
+}
+
+export function buildSeoAiMetadataUserPrompt(
+  context: SeoAiMetadataDraftContext
+): string {
+  return [
+    "CMS metadata draft context (compact JSON):",
+    JSON.stringify(context),
+    "Draft title and meta description suggestions using the required structured output.",
+  ].join("\n");
+}
+
+export function draftContextContainsRawHtml(
+  context: SeoAiMetadataDraftContext
 ): boolean {
   const blob = JSON.stringify(context);
   return /<\s*(?:img|p|div|span|script|style|a|h[1-6]|ul|ol|li|table|br|strong|em)\b/i.test(
