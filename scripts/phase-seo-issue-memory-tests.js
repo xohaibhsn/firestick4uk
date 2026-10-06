@@ -279,7 +279,11 @@ ok(
 
 ok(
   "V_no_ai",
-  !/openai|anthropic|gemini|generateAlt/i.test(server + migrate + panel + memoryGet)
+  // Issue Memory server/migrate/GET remain non-AI. Panel may host AI-1A explain
+  // controls that call /api/admin-seo-ai only on explicit click (not reconcile).
+  !/openai|anthropic|gemini|generateAlt/i.test(server + migrate + memoryGet) &&
+    !/admin-seo-ai|openai|anthropic|gemini/i.test(reconcile) &&
+    !/generateAlt/i.test(panel)
 );
 
 ok(

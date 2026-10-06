@@ -321,9 +321,15 @@ ok(
 
 ok(
   "X_no_ai_integration",
+  // Deterministic diagnostics helper + overview API remain non-AI.
   !/openai|anthropic|gemini|generateAlt|ai\.|chatgpt/i.test(helperSrc) &&
     !/openai|anthropic|gemini|generateAlt/i.test(api) &&
-    !/openai|anthropic|gemini|generateAlt/i.test(panel)
+    !/generateAlt|chatgpt/i.test(panel) &&
+    // AI-1A explain controls are click-only on the dedicated endpoint.
+    /admin-seo-ai/.test(panel) &&
+    !/admin-seo-ai/.test(
+      panel.slice(panel.indexOf("useEffect(()"), panel.indexOf("const can ="))
+    )
 );
 
 ok(

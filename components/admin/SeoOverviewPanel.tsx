@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useState,
+  type CSSProperties,
+} from "react";
 import type { AdminRoleName, SidhuTab } from "@/lib/adminPermissions";
 import { hasAdminPermission } from "@/lib/adminPermissions";
 
@@ -91,6 +97,22 @@ type MemoryRow = {
   latest_evidence: string;
 };
 
+type SeoAiProviderChoice = "gemini" | "openai";
+
+type SeoAiExplanation = {
+  summary: string;
+  why_it_matters: string;
+  recommended_action: string;
+  cautions: string[];
+};
+
+type IssueExplainState = {
+  status: "loading" | "ok" | "error";
+  provider: SeoAiProviderChoice;
+  explanation?: SeoAiExplanation;
+  error?: string;
+};
+
 type Props = {
   role: AdminRoleName;
   onNavigate: (tab: SidhuTab) => void;
@@ -152,6 +174,66 @@ export default function SeoOverviewPanel({
   const [reconcileMsg, setReconcileMsg] = useState("");
   const [reconciling, setReconciling] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState("");
+  const [explainByIssue, setExplainByIssue] = useState<
+    Record<string, IssueExplainState>
+  >({});
+
+  const explainIssue = async (
+    issueId: string,
+    provider: SeoAiProviderChoice
+  ) => {
+    setExplainByIssue((prev) => ({
+      ...prev,
+      [issueId]: { status: "loading", provider },
+    }));
+    try {
+      const res = await fetch("/api/admin-seo-ai", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...getRoleHeaders(),
+        },
+        body: JSON.stringify({
+          provider,
+          task: "explain_issue",
+          issueId,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok) {
+        setExplainByIssue((prev) => ({
+          ...prev,
+          [issueId]: {
+            status: "error",
+            provider,
+            error:
+              json.message ||
+              json.error ||
+              `HTTP ${res.status}`,
+          },
+        }));
+        return;
+      }
+      setExplainByIssue((prev) => ({
+        ...prev,
+        [issueId]: {
+          status: "ok",
+          provider,
+          explanation: json.explanation as SeoAiExplanation,
+        },
+      }));
+    } catch {
+      setExplainByIssue((prev) => ({
+        ...prev,
+        [issueId]: {
+          status: "error",
+          provider,
+          error: "Explanation request failed.",
+        },
+      }));
+    }
+  };
 
   const loadMemory = useCallback(async () => {
     setMemoryLoading(true);
@@ -576,71 +658,173 @@ export default function SeoOverviewPanel({
                 <tbody>
                   {data.diagnostics.issues.map((issue) => {
                     const mem = memoryByKey.get(issue.id);
+                    const explain = explainByIssue[issue.id];
+                    const explaining = explain?.status === "loading";
                     return (
-                      <tr key={issue.id}>
-                        <td>
-                          <span
-                            style={badgeStyle(
-                              issue.severity === "needs-attention"
-                                ? "Needs attention"
-                                : "Review"
-                            )}
-                          >
-                            {issue.severity === "needs-attention"
-                              ? "Needs attention"
-                              : "Review"}
-                          </span>
-                        </td>
-                        <td style={{ fontSize: 12 }}>
-                          {issue.entityType === "product" ? "Product" : "Blog"}
-                        </td>
-                        <td style={{ fontSize: 12 }}>
-                          <div style={{ fontWeight: 600 }}>{issue.label}</div>
-                          {issue.url ? (
-                            <a
-                              href={issue.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ fontSize: 11, wordBreak: "break-all" }}
+                      <Fragment key={issue.id}>
+                        <tr>
+                          <td>
+                            <span
+                              style={badgeStyle(
+                                issue.severity === "needs-attention"
+                                  ? "Needs attention"
+                                  : "Review"
+                              )}
                             >
-                              Open
-                            </a>
-                          ) : null}
-                        </td>
-                        <td style={{ fontSize: 12 }}>{issue.message}</td>
-                        <td style={{ fontSize: 11, color: "#555" }}>{issue.evidence}</td>
-                        <td style={{ fontSize: 12 }}>
-                          {mem
-                            ? mem.status === "open"
-                              ? "Open"
-                              : "Resolved"
-                            : "Not recorded"}
-                        </td>
-                        <td style={{ fontSize: 11 }}>
-                          {mem ? formatMemoryWhen(mem.first_seen_at) : "—"}
-                        </td>
-                        <td style={{ fontSize: 11 }}>
-                          {mem ? formatMemoryWhen(mem.last_seen_at) : "—"}
-                        </td>
-                        <td style={{ fontSize: 12 }}>
-                          {mem && mem.reopened_count > 0 ? mem.reopened_count : "—"}
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="action-btn btn-edit"
-                            onClick={() =>
-                              onNavigate(
-                                issue.editTarget === "products" ? "products" : "blog"
-                              )
-                            }
-                          >
-                            {issue.editTarget === "products"
-                              ? "Open Products"
-                              : "Open Blog"}
-                          </button>
-                        </td>
-                      </tr>
+                              {issue.severity === "needs-attention"
+                                ? "Needs attention"
+                                : "Review"}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: 12 }}>
+                            {issue.entityType === "product" ? "Product" : "Blog"}
+                          </td>
+                          <td style={{ fontSize: 12 }}>
+                            <div style={{ fontWeight: 600 }}>{issue.label}</div>
+                            {issue.url ? (
+                              <a
+                                href={issue.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ fontSize: 11, wordBreak: "break-all" }}
+                              >
+                                Open
+                              </a>
+                            ) : null}
+                          </td>
+                          <td style={{ fontSize: 12 }}>{issue.message}</td>
+                          <td style={{ fontSize: 11, color: "#555" }}>
+                            {issue.evidence}
+                          </td>
+                          <td style={{ fontSize: 12 }}>
+                            {mem
+                              ? mem.status === "open"
+                                ? "Open"
+                                : "Resolved"
+                              : "Not recorded"}
+                          </td>
+                          <td style={{ fontSize: 11 }}>
+                            {mem ? formatMemoryWhen(mem.first_seen_at) : "—"}
+                          </td>
+                          <td style={{ fontSize: 11 }}>
+                            {mem ? formatMemoryWhen(mem.last_seen_at) : "—"}
+                          </td>
+                          <td style={{ fontSize: 12 }}>
+                            {mem && mem.reopened_count > 0
+                              ? mem.reopened_count
+                              : "—"}
+                          </td>
+                          <td>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 6,
+                                alignItems: "flex-start",
+                              }}
+                            >
+                              <button
+                                type="button"
+                                className="action-btn btn-edit"
+                                onClick={() =>
+                                  onNavigate(
+                                    issue.editTarget === "products"
+                                      ? "products"
+                                      : "blog"
+                                  )
+                                }
+                              >
+                                {issue.editTarget === "products"
+                                  ? "Open Products"
+                                  : "Open Blog"}
+                              </button>
+                              <button
+                                type="button"
+                                className="action-btn btn-view"
+                                disabled={explaining}
+                                onClick={() =>
+                                  void explainIssue(issue.id, "gemini")
+                                }
+                              >
+                                Explain with Gemini
+                              </button>
+                              <button
+                                type="button"
+                                className="action-btn btn-view"
+                                disabled={explaining}
+                                onClick={() =>
+                                  void explainIssue(issue.id, "openai")
+                                }
+                              >
+                                Explain with OpenAI
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {explain ? (
+                          <tr>
+                            <td
+                              colSpan={10}
+                              style={{
+                                background: "#FAFAFA",
+                                fontSize: 12,
+                                color: "#333",
+                              }}
+                            >
+                              {explain.status === "loading" ? (
+                                <div>
+                                  {explain.provider === "gemini"
+                                    ? "Explaining with Gemini…"
+                                    : "Explaining with OpenAI…"}
+                                </div>
+                              ) : null}
+                              {explain.status === "error" ? (
+                                <div style={{ color: "#991B1B" }}>
+                                  {explain.error || "Explanation failed."}
+                                </div>
+                              ) : null}
+                              {explain.status === "ok" && explain.explanation ? (
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gap: 8,
+                                    maxWidth: 900,
+                                  }}
+                                >
+                                  <div>
+                                    <strong>Provider:</strong>{" "}
+                                    {explain.provider === "gemini"
+                                      ? "Gemini"
+                                      : "OpenAI"}
+                                  </div>
+                                  <div>
+                                    <strong>Summary:</strong>{" "}
+                                    {explain.explanation.summary}
+                                  </div>
+                                  <div>
+                                    <strong>Why it matters:</strong>{" "}
+                                    {explain.explanation.why_it_matters}
+                                  </div>
+                                  <div>
+                                    <strong>Recommended action:</strong>{" "}
+                                    {explain.explanation.recommended_action}
+                                  </div>
+                                  {explain.explanation.cautions.length > 0 ? (
+                                    <div>
+                                      <strong>Cautions:</strong>
+                                      <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                                        {explain.explanation.cautions.map((c) => (
+                                          <li key={c}>{c}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
                     );
                   })}
                 </tbody>

@@ -37,6 +37,9 @@ export function rateLimit(
 export const RL_GENERAL = (ip: string) => rateLimit(ip, 100, 15 * 60 * 1000);
 export const RL_AUTH    = (ip: string) => rateLimit(`auth:${ip}`, 5, 15 * 60 * 1000);
 export const RL_SEARCH  = (ip: string) => rateLimit(`search:${ip}`, 60, 60 * 1000);
+/** SEO AI assist — 10 calls / 15m, keyed by authenticated admin session id. */
+export const RL_SEO_AI = (sessionId: string | number) =>
+  rateLimit(`seo-ai:session:${sessionId}`, 10, 15 * 60 * 1000);
 
 export function getClientIp(req: { headers: any; socket?: any }): string {
   return (
