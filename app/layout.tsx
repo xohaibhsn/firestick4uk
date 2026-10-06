@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import "./globals.css";
 import { CartProvider } from "./lib/cartContext";
-// import ChatWidget from "@/components/ChatWidget"; // BERLIN TEMPORARILY HIDDEN
 import WhatsAppButton from "@/components/WhatsAppButton";
 import TrackingConsent from "@/components/TrackingConsent";
 import JsonLd from "@/components/JsonLd";
@@ -169,9 +168,6 @@ export default async function RootLayout({
         <SiteContentProvider>
           <CartProvider>{children}</CartProvider>
           <TrackingConsent />
-          {/* BERLIN TEMPORARILY HIDDEN
-          <ChatWidget />
-          */}
           <WhatsAppButton />
         </SiteContentProvider>
       </body>

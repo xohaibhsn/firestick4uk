@@ -92,13 +92,11 @@ ok(
 );
 
 ok(
-  "I_training_lazy",
-  /tab === ["']training["']/.test(tabRegion) &&
-    /\/api\/admin\/berlin-training["']/.test(tabRegion) === false
-      ? /\/api\/admin\/berlin-training/.test(tabRegion) &&
-        /\/api\/admin\/berlin-training-chat/.test(tabRegion)
-      : /\/api\/admin\/berlin-training/.test(tabRegion) &&
-        /\/api\/admin\/berlin-training-chat/.test(tabRegion)
+  "I_training_retired",
+  !/tab === ["']training["']/.test(tabRegion) &&
+    !/\/api\/admin\/berlin-training/.test(sidhu) &&
+    !/Berlin Training/.test(sidhu) &&
+    !/training\.manage/.test(sidhu)
 );
 
 ok(

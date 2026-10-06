@@ -45,7 +45,6 @@ function listFiles(dirRel) {
 const robots = read("public/robots.txt");
 const nextConfig = read("next.config.ts");
 const seoOverview = read("lib/seoOverview.ts");
-const chat = read("components/ChatWidget.tsx");
 
 // --- ERP UI gone ---
 ok("erp_ui_absent", !exists("app/erp"));
@@ -128,8 +127,13 @@ ok("seo_no_erp_key_page", !/path:\s*["']\/erp["']/.test(seoOverview));
 ok("seo_no_player_key_page", !/path:\s*["']\/player["']/.test(seoOverview));
 
 // --- Chat ---
-ok("chat_hides_sidhu", /startsWith\(\s*["']\/sidhu["']\s*\)/.test(chat));
-ok("chat_no_erp_case", !/startsWith\(\s*["']\/erp["']\s*\)/.test(chat));
+ok("chat_widget_retired", !exists("components/ChatWidget.tsx"));
+ok("public_chat_api_retired", !exists("pages/api/chat.ts"));
+ok(
+  "whatsapp_only_floating_contact",
+  /<WhatsAppButton\s*\/>/.test(read("app/layout.tsx")) &&
+    !/ChatWidget/.test(read("app/layout.tsx"))
+);
 
 // --- No open proxy / xtream ---
 ok("no_open_proxy_impl", !exists("pages/api/player/proxy.ts"));

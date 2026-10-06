@@ -14,7 +14,6 @@ export type AdminPermission =
   | "products.manage"
   | "leads.view"
   | "leads.manage"
-  | "training.manage"
   | "blog.manage"
   | "faqs.manage"
   | "content.manage"
@@ -35,7 +34,6 @@ export type SidhuTab =
   | "products"
   | "customers"
   | "leads"
-  | "training"
   | "blog"
   | "coupons"
   | "builder"
@@ -58,7 +56,6 @@ const ALL_PERMISSIONS: readonly AdminPermission[] = [
   "products.manage",
   "leads.view",
   "leads.manage",
-  "training.manage",
   "blog.manage",
   "faqs.manage",
   "content.manage",
@@ -83,7 +80,6 @@ const MANAGER_PERMISSIONS: readonly AdminPermission[] = [
   "products.manage",
   "leads.view",
   "leads.manage",
-  "training.manage",
   "blog.manage",
   "faqs.manage",
   "content.manage",
@@ -113,7 +109,6 @@ const TAB_PERMISSION: Record<Exclude<SidhuTab, "seo">, AdminPermission> = {
   products: "products.view",
   customers: "customers.view",
   leads: "leads.view",
-  training: "training.manage",
   blog: "blog.manage",
   coupons: "coupons.manage",
   builder: "page_builder.manage",
@@ -236,6 +231,6 @@ export function canUploadPurpose(role: AdminRoleName, purpose: UploadPurpose): b
 
 export const ROLE_UI_DESCRIPTIONS: Record<AdminRoleName, string> = {
   super_admin: "Full CMS and administration",
-  manager: "Orders, customers, products, leads, training, blog, FAQs and content",
+  manager: "Orders, customers, products, leads, blog, FAQs and content",
   writer: "Blog authoring only",
 };

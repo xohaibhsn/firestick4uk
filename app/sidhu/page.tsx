@@ -200,13 +200,11 @@ const styles = `
   }
 `;
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"training"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history"|"seo"|"redirects";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history"|"seo"|"redirects";
 type AdminRole = "super_admin"|"manager"|"writer";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
 type ChatLead = { id:number; customer_name:string; customer_whatsapp:string; customer_email:string|null; interested_in:string; chat_history:string; ip_address:string; created_at:string; };
-type BerlinTraining = { id:number; title:string; content:string; is_active:number; created_at:string; updated_at:string; };
-type TrainingChatMessage = { role:"user"|"assistant"; content:string; saved?:boolean; };
 
 /** Additive SEO banner from post-save guard (client-safe; no server import). */
 function formatSeoGuardBannerClient(guard: any): string {
@@ -357,18 +355,8 @@ export default function AdminPage() {
   const [leadModal, setLeadModal] = useState<ChatLead|null>(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
   const [leadWindowStart] = useState(() => Date.now() - 24 * 60 * 60 * 1000);
-  const [berlinTraining, setBerlinTraining] = useState<BerlinTraining[]>([]);
-  const [trainingForm, setTrainingForm] = useState({ id:0, title:"", content:"", is_active:true });
-  const [trainingMsg, setTrainingMsg] = useState("");
-  const [trainingChat, setTrainingChat] = useState<TrainingChatMessage[]>([
-    { role:"assistant", content:"Professor, Berlin is ready. Ask me what I know, test my answers, or say 'save this' when you want a correction added to my training." },
-  ]);
-  const [trainingChatInput, setTrainingChatInput] = useState("");
-  const [trainingChatLoading, setTrainingChatLoading] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
   const [permMsg, setPermMsg] = useState("");
-  const trainingChatInputRef = useRef<HTMLInputElement>(null);
-  const trainingChatEndRef = useRef<HTMLDivElement>(null);
 
   const can = (permission: Parameters<typeof hasAdminPermission>[1]) =>
     hasAdminPermission(adminRole, permission);
@@ -817,29 +805,6 @@ export default function AdminPage() {
       }
     }
 
-    if (tab === "training" && can("training.manage")) {
-      fetch("/api/admin/berlin-training", { credentials: "include" })
-        .then((r) => r.json())
-        .then((d) => {
-          if (Array.isArray(d)) setBerlinTraining(d);
-        })
-        .catch(() => {});
-      fetch("/api/admin/berlin-training-chat", { credentials: "include" })
-        .then((r) => r.json())
-        .then((d) => {
-          if (Array.isArray(d) && d.length > 0) {
-            setTrainingChat(
-              d.map((m: TrainingChatMessage) => ({
-                role: m.role,
-                content: m.content,
-                saved: !!m.saved,
-              }))
-            );
-          }
-        })
-        .catch(() => {});
-    }
-
     if (tab === "staff") {
       if (can("staff.manage")) {
         fetch("/api/admin-staff", { credentials: "include" })
@@ -909,15 +874,6 @@ export default function AdminPage() {
     loadAuditLog(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedIn, tab, adminRole]);
-
-  useEffect(() => {
-    if (tab !== "training") return;
-    trainingChatEndRef.current?.scrollIntoView({ behavior:"smooth", block:"end" });
-    if (!trainingChatLoading) {
-      const focusTimer = window.setTimeout(() => trainingChatInputRef.current?.focus(), 50);
-      return () => window.clearTimeout(focusTimer);
-    }
-  }, [tab, trainingChat, trainingChatLoading]);
 
   // Refresh all site_content when Site Settings or Content Editor opens
   useEffect(() => {
@@ -1521,7 +1477,7 @@ export default function AdminPage() {
 
   const deleteSelectedLeads = async () => {
     if (selectedLeadIds.length === 0) return;
-    if (!confirm(`Delete ${selectedLeadIds.length} selected Berlin chat lead${selectedLeadIds.length === 1 ? "" : "s"}?`)) return;
+    if (!confirm(`Delete ${selectedLeadIds.length} selected chat lead${selectedLeadIds.length === 1 ? "" : "s"}?`)) return;
     const res = await fetch("/api/admin/leads", {
       method: "DELETE",
       credentials: "include", headers: { "Content-Type": "application/json" },
@@ -1534,97 +1490,6 @@ export default function AdminPage() {
     } else {
       alert(`❌ Bulk delete failed: ${res.error || "Unknown error"}`);
     }
-  };
-
-  const loadBerlinTraining = () => {
-    fetch("/api/admin/berlin-training", { credentials: "include" })
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d)) setBerlinTraining(d); })
-      .catch(() => {});
-  };
-
-  const loadBerlinTrainingChat = () => {
-    fetch("/api/admin/berlin-training-chat", { credentials: "include" })
-      .then(r => r.json())
-      .then(d => {
-        if (Array.isArray(d) && d.length > 0) {
-          setTrainingChat(d.map((m: TrainingChatMessage) => ({ role:m.role, content:m.content, saved:!!m.saved })));
-        }
-        trainingChatInputRef.current?.focus();
-      })
-      .catch(() => {});
-  };
-
-  const sendTrainingChat = async () => {
-    const message = trainingChatInput.trim();
-    if (!message || trainingChatLoading) return;
-
-    const nextMessages: TrainingChatMessage[] = [...trainingChat, { role:"user", content:message }];
-    setTrainingChat(nextMessages);
-    setTrainingChatInput("");
-    setTrainingChatLoading(true);
-
-    const res = await fetch("/api/admin/berlin-training-chat", {
-      method: "POST",
-      credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
-    }).then(r => r.json()).catch(() => ({ error:"Training chat failed" }));
-
-    setTrainingChatLoading(false);
-    if (res.response) {
-      setTrainingChat(prev => [...prev, { role:"assistant", content:res.response, saved:!!res.saved }]);
-      if (res.saved) {
-        setTrainingMsg("✅ Berlin saved that correction to training");
-        loadBerlinTraining();
-        setTimeout(() => setTrainingMsg(""), 3000);
-      }
-    } else {
-      setTrainingChat(prev => [...prev, { role:"assistant", content:`Sorry Professor, ${res.error || "I could not process that training message."}` }]);
-    }
-  };
-
-  const saveBerlinTraining = async () => {
-    if (!trainingForm.title.trim() || !trainingForm.content.trim()) {
-      setTrainingMsg("❌ Title and instruction required");
-      return;
-    }
-    const isEdit = trainingForm.id > 0;
-    const res = await fetch("/api/admin/berlin-training", {
-      method: isEdit ? "PUT" : "POST",
-      credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(trainingForm),
-    }).then(r => r.json()).catch(() => ({}));
-    if (res.success) {
-      setTrainingMsg(isEdit ? "✅ Berlin training updated" : "✅ Berlin training added");
-      setTrainingForm({ id:0, title:"", content:"", is_active:true });
-      loadBerlinTraining();
-    } else {
-      setTrainingMsg(`❌ ${res.error || "Save failed"}`);
-    }
-    setTimeout(() => setTrainingMsg(""), 3000);
-  };
-
-  const editBerlinTraining = (item: BerlinTraining) => {
-    setTrainingForm({ id:item.id, title:item.title || "", content:item.content || "", is_active:!!item.is_active });
-    setTab("training");
-  };
-
-  const toggleBerlinTraining = async (item: BerlinTraining) => {
-    await fetch("/api/admin/berlin-training", {
-      method: "PUT",
-      credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...item, is_active: !item.is_active }),
-    });
-    loadBerlinTraining();
-  };
-
-  const deleteBerlinTraining = async (id: number) => {
-    if (!confirm("Delete this Berlin training note?")) return;
-    await fetch(`/api/admin/berlin-training?id=${id}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    loadBerlinTraining();
   };
 
   const handleProductImage = async (file: File) => {
@@ -1898,7 +1763,7 @@ export default function AdminPage() {
       {leadModal && (
         <div className="modal-overlay">
           <div className="modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()} style={{maxWidth:680}}>
-            <div className="modal-title">Berlin Chat Lead — {leadModal.customer_name || "Unknown"}</div>
+            <div className="modal-title">Chat Lead — {leadModal.customer_name || "Unknown"}</div>
             <div className="modal-field"><label>Name</label><input readOnly value={leadModal.customer_name || "—"} /></div>
             <div className="modal-field"><label>WhatsApp</label><input readOnly value={leadModal.customer_whatsapp || "—"} /></div>
             <div className="modal-field"><label>Interested In</label><input readOnly value={leadModal.interested_in || "—"} /></div>
@@ -2341,7 +2206,6 @@ export default function AdminPage() {
               { id:"products",  icon:"📦", label:"Products",     roles:["super_admin","manager"] },
               { id:"customers", icon:"👥", label:"Customers",    roles:["super_admin","manager"] },
               { id:"leads",     icon:"💬", label:"Leads",        badge: leadsLast24 > 0 ? String(leadsLast24) : null, badgeColor:"orange", roles:["super_admin","manager"] },
-              { id:"training",  icon:"🧠", label:"Berlin Training", roles:["super_admin","manager"] },
               { id:"blog",      icon:"📝", label:"Blog",         roles:["super_admin","manager","writer"] },
               { id:"seo",       icon:"🔎", label:"SEO",          roles:["super_admin","manager","writer"] },
               { id:"redirects", icon:"↪️", label:"Redirects",    roles:["super_admin"] },
@@ -2383,8 +2247,7 @@ export default function AdminPage() {
                 {tab==="orders" && <>Manage <span>Orders</span></>}
                 {tab==="products" && <>Manage <span>Products</span></>}
                 {tab==="customers" && <>Customer <span>Data</span></>}
-                {tab==="leads" && <>Berlin <span>Leads</span></>}
-                {tab==="training" && <>Berlin <span>Training</span></>}
+                {tab==="leads" && <>Chat <span>Leads</span></>}
                 {tab==="blog" && <>Manage <span>Blog</span></>}
                 {tab==="seo" && <>SEO <span>Overview</span></>}
                 {tab==="redirects" && <>Manage <span>Redirects</span></>}
@@ -2854,7 +2717,7 @@ export default function AdminPage() {
 
               <div className="section-card">
                 <div className="section-header">
-                  <div className="section-title">Berlin Chat Leads ({chatLeads.length})</div>
+                  <div className="section-title">Chat Leads ({chatLeads.length})</div>
                   {selectedLeadIds.length > 0 && (
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
                       <span style={{fontSize:12,color:"#666666"}}>{selectedLeadIds.length} selected</span>
@@ -2867,7 +2730,7 @@ export default function AdminPage() {
                     <thead><tr><th><input type="checkbox" checked={chatLeads.length > 0 && selectedLeadIds.length === chatLeads.length} onChange={toggleAllLeads} aria-label="Select all leads" /></th><th>Name</th><th>WhatsApp</th><th>Interested In</th><th>Date</th><th>Actions</th></tr></thead>
                     <tbody>
                       {chatLeads.length === 0 && (
-                        <tr><td colSpan={6} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No Berlin chat leads yet.</td></tr>
+                        <tr><td colSpan={6} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No chat leads yet.</td></tr>
                       )}
                       {chatLeads.map(lead => {
                         const waNumber = (lead.customer_whatsapp || "").replace(/\D/g,"");
@@ -2892,151 +2755,6 @@ export default function AdminPage() {
                           </tr>
                         );
                       })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 🧠 BERLIN TRAINING */}
-          {tab==="training" && can("training.manage") && (
-            <div>
-              {trainingMsg && (
-                <div style={{marginBottom:14,padding:"10px 14px",background:trainingMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:trainingMsg.startsWith("✅")?"#00c864":"#ff6666"}}>
-                  {trainingMsg}
-                </div>
-              )}
-
-              <div className="section-card" style={{padding:0,marginBottom:20,overflow:"hidden"}}>
-                <div style={{padding:"16px 20px",background:"linear-gradient(135deg,#111111,#4C1D95)",color:"#FFFFFF",display:"flex",justifyContent:"space-between",gap:12,alignItems:"center"}}>
-                  <div>
-                    <div style={{fontFamily:"var(--font-display)",fontWeight:800,fontSize:16,color:"#FFFFFF"}}>Professor ↔ Berlin Training Chat</div>
-                    <div style={{fontSize:12,color:"rgba(255,255,255,0.72)",marginTop:4}}>
-                      Test Berlin, ask what he knows, then say “save this” or “remember this” to add training automatically.
-                    </div>
-                  </div>
-                  <button
-                    className="action-btn btn-view"
-                    onClick={loadBerlinTrainingChat}
-                    style={{background:"rgba(255,255,255,0.12)",borderColor:"rgba(255,255,255,0.22)",color:"#FFFFFF"}}
-                  >
-                    Refresh History
-                  </button>
-                </div>
-                <div style={{height:360,overflowY:"auto",padding:18,background:"#F8F8FA",display:"flex",flexDirection:"column",gap:12}}>
-                  {trainingChat.map((msg, idx) => (
-                    <div key={idx} style={{display:"flex",justifyContent:msg.role==="user"?"flex-end":"flex-start"}}>
-                      <div style={{maxWidth:"78%",background:msg.role==="user"?"#5B21B6":"#FFFFFF",color:msg.role==="user"?"#FFFFFF":"#111111",border:msg.role==="user"?"none":"1px solid #E5E5E5",borderRadius:msg.role==="user"?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"11px 13px",boxShadow:"0 2px 8px rgba(0,0,0,0.05)",whiteSpace:"pre-wrap",fontSize:13,lineHeight:1.55}}>
-                        <div style={{fontSize:10,fontWeight:800,letterSpacing:1,textTransform:"uppercase",opacity:0.68,marginBottom:4}}>
-                          {msg.role==="user" ? "Professor" : "Berlin"} {msg.saved ? "• Saved to Training" : ""}
-                        </div>
-                        {msg.content}
-                      </div>
-                    </div>
-                  ))}
-                  {trainingChatLoading && (
-                    <div style={{alignSelf:"flex-start",background:"#FFFFFF",border:"1px solid #E5E5E5",borderRadius:"16px 16px 16px 4px",padding:"11px 13px",fontSize:13,color:"#666666"}}>
-                      Berlin is thinking, Professor...
-                    </div>
-                  )}
-                  <div ref={trainingChatEndRef} />
-                </div>
-                <div style={{padding:14,borderTop:"1px solid #E5E5E5",display:"flex",gap:10,background:"#FFFFFF"}}>
-                  <input
-                    ref={trainingChatInputRef}
-                    value={trainingChatInput}
-                    onChange={e => setTrainingChatInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        sendTrainingChat();
-                      }
-                    }}
-                    placeholder="Professor: ask Berlin something, or say 'save this correction: ...'"
-                    disabled={trainingChatLoading}
-                    style={{flex:1,border:"1px solid #E5E5E5",borderRadius:10,padding:"12px 14px",fontSize:13,outline:"none"}}
-                  />
-                  <button className="btn-primary" onClick={sendTrainingChat} disabled={trainingChatLoading || !trainingChatInput.trim()}>
-                    Send
-                  </button>
-                </div>
-              </div>
-
-              <div className="section-card" style={{padding:20,marginBottom:20}}>
-                <div className="section-header" style={{padding:0,marginBottom:16,borderBottom:"none"}}>
-                  <div>
-                    <div className="section-title">{trainingForm.id ? "Edit Manual Training" : "Add Manual Training"}</div>
-                    <div style={{fontSize:12,color:"#888888",marginTop:6}}>
-                      You can still add corrections manually if you do not want to use chat.
-                    </div>
-                  </div>
-                  {trainingForm.id > 0 && (
-                    <button className="action-btn btn-view" onClick={() => setTrainingForm({ id:0, title:"", content:"", is_active:true })}>Cancel Edit</button>
-                  )}
-                </div>
-                <div className="modal-field">
-                  <label>Training Title *</label>
-                  <input
-                    placeholder="e.g. Do not mention reseller pricing"
-                    value={trainingForm.title}
-                    onChange={e => setTrainingForm(f => ({ ...f, title:e.target.value }))}
-                  />
-                </div>
-                <div className="modal-field">
-                  <label>Knowledge / Instruction *</label>
-                  <textarea
-                    rows={7}
-                    placeholder={"Example:\nIf a customer asks about buffering, tell them to try VPN first, then mobile hotspot. Do not blame their device unless they have tried both."}
-                    value={trainingForm.content}
-                    onChange={e => setTrainingForm(f => ({ ...f, content:e.target.value }))}
-                    style={{resize:"vertical"}}
-                  />
-                </div>
-                <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#555555",marginBottom:14}}>
-                  <input
-                    type="checkbox"
-                    checked={trainingForm.is_active}
-                    onChange={e => setTrainingForm(f => ({ ...f, is_active:e.target.checked }))}
-                  />
-                  Active and used by Berlin
-                </label>
-                <button className="btn-primary" onClick={saveBerlinTraining}>
-                  {trainingForm.id ? "💾 Update Training" : "+ Add Training"}
-                </button>
-              </div>
-
-              <div className="section-card">
-                <div className="section-header">
-                  <div className="section-title">Training Knowledge ({berlinTraining.length})</div>
-                  <button className="action-btn btn-view" onClick={loadBerlinTraining}>🔄 Refresh</button>
-                </div>
-                <div className="table-wrap">
-                  <table>
-                    <thead><tr><th>Title</th><th>Instruction</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead>
-                    <tbody>
-                      {berlinTraining.length === 0 && (
-                        <tr><td colSpan={5} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No Berlin training added yet.</td></tr>
-                      )}
-                      {berlinTraining.map(item => (
-                        <tr key={item.id}>
-                          <td style={{fontWeight:600,minWidth:180}}>{item.title}</td>
-                          <td style={{maxWidth:420,whiteSpace:"pre-wrap",fontSize:12,lineHeight:1.6,color:"rgba(255,255,255,0.65)"}}>{item.content}</td>
-                          <td>
-                            <span
-                              style={{fontSize:11,background:item.is_active?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${item.is_active?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,color:item.is_active?"#00c864":"#ff6666",padding:"3px 10px",borderRadius:20,cursor:"pointer"}}
-                              onClick={() => toggleBerlinTraining(item)}
-                            >
-                              {item.is_active ? "Active" : "Inactive"}
-                            </span>
-                          </td>
-                          <td style={{fontSize:12,color:"rgba(255,255,255,0.4)",whiteSpace:"nowrap"}}>{item.updated_at ? new Date(item.updated_at).toLocaleString("en-GB") : "—"}</td>
-                          <td style={{whiteSpace:"nowrap"}}>
-                            <button className="action-btn btn-edit" onClick={() => editBerlinTraining(item)}>Edit</button>
-                            <button className="action-btn btn-delete" onClick={() => deleteBerlinTraining(item.id)}>Delete</button>
-                          </td>
-                        </tr>
-                      ))}
                     </tbody>
                   </table>
                 </div>
