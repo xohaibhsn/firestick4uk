@@ -244,11 +244,21 @@ export function parseExplainIssueRequest(
   };
 }
 
-function isEntityId(value: unknown): value is string {
-  if (typeof value !== "string" || !value.trim()) return false;
+/**
+ * Accept JSON number or canonical positive-integer string.
+ * Always returns a decimal string for downstream DB/auth use.
+ */
+export function normalizeEntityId(value: unknown): string | null {
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value) || value <= 0) return null;
+    return String(value);
+  }
+  if (typeof value !== "string") return null;
   const trimmed = value.trim();
+  if (!/^[1-9][0-9]*$/.test(trimmed)) return null;
   const id = Number(trimmed);
-  return Number.isFinite(id) && id > 0 && String(Math.trunc(id)) === trimmed;
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
+  return trimmed;
 }
 
 function parseDraftUnsaved(
@@ -362,8 +372,8 @@ export function parseSeoAiRequest(
       message: "entityType must be product or blog.",
     };
   }
-  const entityId = obj.entityId;
-  if (!isEntityId(entityId)) {
+  const entityId = normalizeEntityId(obj.entityId);
+  if (!entityId) {
     return {
       ok: false,
       code: "invalid_request",
@@ -378,7 +388,7 @@ export function parseSeoAiRequest(
       provider,
       task: "draft_metadata",
       entityType,
-      entityId: entityId.trim(),
+      entityId,
       ...(Object.keys(unsavedParsed.unsaved).length
         ? { unsaved: unsavedParsed.unsaved }
         : {}),

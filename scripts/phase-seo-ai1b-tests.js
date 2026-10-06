@@ -70,6 +70,7 @@ const packageJson = JSON.parse(read("package.json"));
 const {
   parseSeoAiRequest,
   parseExplainIssueRequest,
+  normalizeEntityId,
   validateSeoAiMetadataDraft,
   parseMetadataJsonText,
   draftContextContainsRawHtml,
@@ -284,6 +285,116 @@ console.log("\nSEO AI-1B Metadata Draft Suggestions\n");
       badText.code === "invalid_request"
   );
 }
+
+// --- NUMERIC / CANONICAL ENTITY ID (UI/API integration shape) ---
+{
+  const numericProduct = parseSeoAiRequest({
+    provider: "gemini",
+    task: "draft_metadata",
+    entityType: "product",
+    entityId: 8,
+    unsaved: { seoTitle: "Draft title", displayTitle: "Firestick 4K Max" },
+  });
+  ok(
+    "H2_numeric_product_entityId_accepted",
+    numericProduct.ok === true &&
+      numericProduct.request.entityId === "8" &&
+      normalizeEntityId(8) === "8"
+  );
+}
+
+{
+  const numericBlog = parseSeoAiRequest({
+    provider: "openai",
+    task: "draft_metadata",
+    entityType: "blog",
+    entityId: 5,
+    unsaved: { seoTitle: "Blog meta", displayTitle: "Speed up Firestick" },
+  });
+  ok(
+    "H3_numeric_blog_entityId_accepted",
+    numericBlog.ok === true &&
+      numericBlog.request.entityId === "5" &&
+      normalizeEntityId(5) === "5"
+  );
+}
+
+{
+  const stringId = parseSeoAiRequest({
+    provider: "gemini",
+    task: "draft_metadata",
+    entityType: "product",
+    entityId: "8",
+  });
+  ok(
+    "H4_canonical_string_entityId_accepted",
+    stringId.ok === true && stringId.request.entityId === "8"
+  );
+}
+
+{
+  const trimmed = parseSeoAiRequest({
+    provider: "gemini",
+    task: "draft_metadata",
+    entityType: "product",
+    entityId: " 8 ",
+  });
+  ok(
+    "H5_trimmed_string_entityId_accepted",
+    trimmed.ok === true && trimmed.request.entityId === "8"
+  );
+}
+
+{
+  const cases = [
+    ["H6_zero_number_rejected", 0],
+    ["H7_negative_number_rejected", -1],
+    ["H8_decimal_number_rejected", 1.5],
+    ["H9_unsafe_integer_rejected", Number.MAX_SAFE_INTEGER + 1],
+    ["H10_string_zero_rejected", "0"],
+    ["H11_string_negative_rejected", "-1"],
+    ["H12_string_decimal_rejected", "1.5"],
+    ["H13_string_abc_rejected", "abc"],
+    ["H14_string_leading_zero_rejected", "01"],
+  ];
+  for (const [name, entityId] of cases) {
+    const bad = parseSeoAiRequest({
+      provider: "openai",
+      task: "draft_metadata",
+      entityType: "product",
+      entityId,
+    });
+    ok(
+      name,
+      bad.ok === false &&
+        bad.code === "invalid_request" &&
+        normalizeEntityId(entityId) === null
+    );
+  }
+}
+
+ok(
+  "H15_product_ui_sends_numeric_entityId_and_parser_accepts",
+  /const entityId = Number\(productModal\.id\)/.test(sidhuSrc) &&
+    /task:\s*"draft_metadata"[\s\S]{0,120}entityId,/.test(sidhuSrc) &&
+    parseSeoAiRequest({
+      provider: "gemini",
+      task: "draft_metadata",
+      entityType: "product",
+      entityId: 8,
+    }).ok === true
+);
+
+ok(
+  "H16_blog_ui_sends_numeric_entityId_and_parser_accepts",
+  /const entityId = Number\(blogModal\.id\)/.test(sidhuSrc) &&
+    parseSeoAiRequest({
+      provider: "openai",
+      task: "draft_metadata",
+      entityType: "blog",
+      entityId: 5,
+    }).ok === true
+);
 
 // --- AUTH I–M ---
 ok(
