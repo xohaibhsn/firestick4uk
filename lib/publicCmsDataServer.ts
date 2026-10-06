@@ -1,9 +1,12 @@
-import { revalidateTag, unstable_cache } from "next/cache";
+import { unstable_cache } from "next/cache";
 import pool from "@/lib/db";
 
-/** Shared tag so a site_content write expires both public payloads together. */
-export const PUBLIC_CMS_CACHE_TAG = "public-cms";
-export const PUBLIC_CMS_CACHE_TTL_SECONDS = 300;
+/**
+ * Pages Router mutation handlers do not have the App Router static-generation
+ * store required by `revalidateTag` in this production architecture.
+ * Public CMS freshness is TTL-only (approximately 60 seconds max staleness).
+ */
+export const PUBLIC_CMS_CACHE_TTL_SECONDS = 60;
 
 export type PublicSiteContentAllMap = Record<string, string>;
 
@@ -59,7 +62,6 @@ export const getCachedPublicSiteContentAll = unstable_cache(
   ["public-site-content-all-v1"],
   {
     revalidate: PUBLIC_CMS_CACHE_TTL_SECONDS,
-    tags: [PUBLIC_CMS_CACHE_TAG],
   }
 );
 
@@ -68,19 +70,14 @@ export const getCachedPublicVisibleSections = unstable_cache(
   ["public-sections-visible-v1"],
   {
     revalidate: PUBLIC_CMS_CACHE_TTL_SECONDS,
-    tags: [PUBLIC_CMS_CACHE_TAG],
   }
 );
 
 /**
- * Immediate expiry. Next 16 treats `{ expire: 0 }` as expired now, so the next
- * public read recomputes instead of serving the previous value.
- * Swallows errors so a committed CMS write is not turned into an API 500.
+ * Pages mutation compatibility: public CMS cache is TTL-only; maximum server
+ * staleness approximately 60 seconds.
+ * No Next cache API call, no log, no throw, no DB work.
  */
 export function invalidatePublicCmsCache(): void {
-  try {
-    revalidateTag(PUBLIC_CMS_CACHE_TAG, { expire: 0 });
-  } catch (err) {
-    console.error("[cms] public cache invalidate failed:", err);
-  }
+  // no-op — Pages Router lacks the static-generation store for revalidateTag
 }

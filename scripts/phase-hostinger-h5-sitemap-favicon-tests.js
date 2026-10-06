@@ -52,9 +52,11 @@ ok(
     /unstable_cache/.test(sitemapData)
 );
 ok(
-  "sitemap_cache_tag_explicit",
-  /SITEMAP_CACHE_TAG\s*=\s*["']sitemap["']/.test(sitemapData) &&
-    /tags:\s*\[[^\]]*SITEMAP_CACHE_TAG/.test(sitemapData)
+  "sitemap_cache_ttl_only_no_tag",
+  /SITEMAP_CACHE_TTL_SECONDS\s*=\s*300/.test(sitemapData) &&
+    /unstable_cache/.test(sitemapData) &&
+    !/SITEMAP_CACHE_TAG/.test(sitemapData) &&
+    !/tags:\s*\[/.test(sitemapData)
 );
 ok(
   "sitemap_ttl_conservative",
@@ -118,14 +120,18 @@ ok(
     /subscription_canonical/.test(invalidation)
 );
 ok(
-  "invalidation_uses_revalidateTag_max",
-  /revalidateTag\(SITEMAP_CACHE_TAG,\s*["']max["']\)/.test(invalidation) &&
-    /revalidateTag\(FAVICON_CACHE_TAG,\s*["']max["']\)/.test(invalidation)
+  "invalidation_ttl_only_shims_no_revalidateTag",
+  /export function invalidateSitemapCache\(\):\s*void/.test(invalidation) &&
+    /export function invalidateFaviconCache\(\):\s*void/.test(invalidation) &&
+    !/revalidateTag\s*\(/.test(invalidation) &&
+    !/revalidatePath\s*\(/.test(invalidation) &&
+    /TTL-only compatibility shim/.test(invalidation)
 );
 ok(
-  "invalidation_swallows_errors",
-  /sitemap cache invalidate failed/.test(invalidation) &&
-    /favicon cache invalidate failed/.test(invalidation)
+  "invalidation_shims_do_not_log_errors",
+  !/sitemap cache invalidate failed/.test(invalidation) &&
+    !/favicon cache invalidate failed/.test(invalidation) &&
+    !/console\.(error|warn|log)/.test(invalidation)
 );
 
 // --- Favicon ---

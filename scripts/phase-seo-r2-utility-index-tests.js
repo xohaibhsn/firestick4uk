@@ -98,7 +98,8 @@ ok(
   "sitemap_h5_architecture_unchanged",
   /getCachedSitemapDynamicData/.test(sitemap) &&
     /export const dynamic = ["']force-dynamic["']/.test(sitemap) &&
-    /SITEMAP_CACHE_TAG\s*=\s*["']sitemap["']/.test(sitemapData) &&
+    /SITEMAP_CACHE_TTL_SECONDS\s*=\s*300/.test(sitemapData) &&
+    /unstable_cache/.test(sitemapData) &&
     /data\.products/.test(sitemap) &&
     /data\.posts/.test(sitemap) &&
     /data\.subscriptionUrl/.test(sitemap)

@@ -86,13 +86,14 @@ ok(
     /pool\.query/.test(allLoader) &&
     /pool\.query/.test(sectionLoader)
 );
-ok("I_ttl_is_300", /PUBLIC_CMS_CACHE_TTL_SECONDS = 300/.test(helper) && /revalidate: PUBLIC_CMS_CACHE_TTL_SECONDS/.test(helper));
+ok("I_ttl_is_60", /PUBLIC_CMS_CACHE_TTL_SECONDS = 60/.test(helper) && /revalidate: PUBLIC_CMS_CACHE_TTL_SECONDS/.test(helper));
 ok(
-  "J_shared_tag",
-  /PUBLIC_CMS_CACHE_TAG = "public-cms"/.test(helper) &&
-    (helper.match(/tags: \[PUBLIC_CMS_CACHE_TAG\]/g) || []).length === 2 &&
-    /revalidateTag\(PUBLIC_CMS_CACHE_TAG, \{ expire: 0 \}\)/.test(helper) &&
-    !/revalidateTag\(PUBLIC_CMS_CACHE_TAG,\s*["']max["']\)/.test(helper)
+  "J_ttl_only_shim_no_tag",
+  !/PUBLIC_CMS_CACHE_TAG/.test(helper) &&
+    !/tags:\s*\[/.test(helper) &&
+    !/revalidateTag\s*\(/.test(helper) &&
+    /export function invalidatePublicCmsCache\(\):\s*void/.test(helper) &&
+    /TTL-only/.test(helper)
 );
 ok(
   "K_no_session_fields_cached",

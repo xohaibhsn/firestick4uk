@@ -154,8 +154,8 @@ ok(
   /getCachedSitemapDynamicData/.test(sitemap) &&
     /export const dynamic = ["']force-dynamic["']/.test(sitemap) &&
     /export const revalidate = 0/.test(sitemap) &&
-    /SITEMAP_CACHE_TAG\s*=\s*["']sitemap["']/.test(sitemapData) &&
-    /SITEMAP_CACHE_TTL_SECONDS\s*=\s*300/.test(sitemapData)
+    /SITEMAP_CACHE_TTL_SECONDS\s*=\s*300/.test(sitemapData) &&
+    /unstable_cache/.test(sitemapData)
 );
 ok(
   "sitemap_products_blog_subscription_retained",

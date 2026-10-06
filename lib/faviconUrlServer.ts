@@ -1,8 +1,12 @@
 import { unstable_cache } from "next/cache";
 import pool from "@/lib/db";
 
-export const FAVICON_CACHE_TAG = "favicon-url";
-export const FAVICON_CACHE_TTL_SECONDS = 3600;
+/**
+ * Pages Router mutation handlers do not have the App Router static-generation
+ * store required by `revalidateTag` in this production architecture.
+ * Favicon server lookup freshness is TTL-only (≤300 seconds).
+ */
+export const FAVICON_CACHE_TTL_SECONDS = 300;
 export const FAVICON_FALLBACK_URL = "https://firestick4uk.com/og-default.png";
 
 function applyCloudinaryFaviconTransform(url: string): string {
@@ -41,6 +45,5 @@ export const getCachedFaviconRedirectUrl = unstable_cache(
   ["favicon-redirect-url-v1"],
   {
     revalidate: FAVICON_CACHE_TTL_SECONDS,
-    tags: [FAVICON_CACHE_TAG],
   }
 );

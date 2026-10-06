@@ -1,25 +1,24 @@
-import { revalidateTag } from "next/cache";
-import { SITEMAP_CACHE_TAG } from "@/lib/sitemapDataServer";
-import { FAVICON_CACHE_TAG } from "@/lib/faviconUrlServer";
+/**
+ * Pages Router mutation handlers do not have the App Router static-generation
+ * store required by `revalidateTag` in this production architecture.
+ * Call sites remain so mutations still document which caches they affect;
+ * freshness is TTL-only until a supported invalidation path exists.
+ */
 
 /**
- * Safe post-commit cache purge. Never throws to callers — DB commit already won.
- * Next 16 requires a cacheLife profile on revalidateTag (use "max").
+ * TTL-only compatibility shim; sitemap refresh bound is 300 seconds.
+ * No Next cache API call, no log, no throw, no DB work.
  */
 export function invalidateSitemapCache(): void {
-  try {
-    revalidateTag(SITEMAP_CACHE_TAG, "max");
-  } catch (err) {
-    console.error("[h5] sitemap cache invalidate failed:", err);
-  }
+  // no-op — Pages Router lacks the static-generation store for revalidateTag
 }
 
+/**
+ * TTL-only compatibility shim; favicon server lookup refresh bound is ≤300 seconds.
+ * No Next cache API call, no log, no throw, no DB work.
+ */
 export function invalidateFaviconCache(): void {
-  try {
-    revalidateTag(FAVICON_CACHE_TAG, "max");
-  } catch (err) {
-    console.error("[h5] favicon cache invalidate failed:", err);
-  }
+  // no-op — Pages Router lacks the static-generation store for revalidateTag
 }
 
 const SUBSCRIPTION_SITEMAP_KEYS = new Set([

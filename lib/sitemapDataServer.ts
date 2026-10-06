@@ -2,9 +2,11 @@ import { unstable_cache } from "next/cache";
 import pool from "@/lib/db";
 import { getSubscriptionSlugConfig } from "@/lib/subscriptionSlugServer";
 
-export const SITEMAP_CACHE_TAG = "sitemap";
-
-/** Conservative fallback TTL (seconds). Mutations also call revalidateTag. */
+/**
+ * Pages Router mutation handlers do not have the App Router static-generation
+ * store required by `revalidateTag` in this production architecture.
+ * Sitemap freshness is TTL-only (300 seconds).
+ */
 export const SITEMAP_CACHE_TTL_SECONDS = 300;
 
 export type SitemapDynamicData = {
@@ -93,6 +95,5 @@ export const getCachedSitemapDynamicData = unstable_cache(
   ["sitemap-dynamic-data-v1"],
   {
     revalidate: SITEMAP_CACHE_TTL_SECONDS,
-    tags: [SITEMAP_CACHE_TAG],
   }
 );
