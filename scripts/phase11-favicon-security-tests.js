@@ -101,6 +101,37 @@ function dataUrl(mime, buf) {
   return `data:${mime};base64,${buf.toString("base64")}`;
 }
 
+/**
+ * Resolve a known-safe local favicon path from a captured upload URL.
+ * Only `/uploads/favicon/<basename>` under `public/uploads/favicon` is allowed.
+ * Returns null on any traversal / unexpected shape.
+ */
+function resolveSafeLocalFaviconPath(url) {
+  const raw = String(url || "").trim().split("?")[0];
+  if (!raw.startsWith("/uploads/favicon/")) return null;
+  const baseName = path.basename(raw);
+  if (!baseName || baseName !== raw.slice("/uploads/favicon/".length)) return null;
+  if (baseName.includes("..") || baseName.includes("/") || baseName.includes("\\")) return null;
+  if (!/^favicon-\d+\.(png|jpe?g|ico|webp)$/i.test(baseName)) return null;
+
+  const faviconDir = path.resolve(process.cwd(), "public", "uploads", "favicon");
+  const resolved = path.resolve(faviconDir, baseName);
+  const rel = path.relative(faviconDir, resolved);
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return null;
+  return resolved;
+}
+
+function unlinkLocalFaviconIfPresent(filePath) {
+  if (!filePath) return { ok: true, skipped: true };
+  try {
+    if (!fs.existsSync(filePath)) return { ok: true, missing: true };
+    fs.unlinkSync(filePath);
+    return { ok: true, deleted: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 const TINY_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
   "base64"
@@ -268,11 +299,65 @@ async function main() {
     );
   }
 
+  // S Source: current-run artifact cleanup protections (non-mutating)
+  {
+    const selfSrc = fs.readFileSync(__filename, "utf8");
+    const tracksExactId =
+      /createdTestAsset\s*=/.test(selfSrc) &&
+      /mediaId/.test(selfSrc) &&
+      /originalName/.test(selfSrc) &&
+      /phase11-favicon-\$\{stamp\}\.png/.test(selfSrc);
+    const exactRowDelete =
+      /DELETE FROM media_assets\s+WHERE id=\?\s+AND original_name=\?/.test(selfSrc);
+    const noBroadPurposeDelete = !/DELETE FROM media_assets\s+WHERE\s+purpose\s*=\s*['"]favicon['"]/.test(
+      selfSrc
+    );
+    const noBroadNameLike =
+      !/DELETE FROM media_assets[\s\S]{0,120}original_name\s+LIKE\s+['"]%?phase11/.test(selfSrc);
+    const localPathGuard =
+      /resolveSafeLocalFaviconPath/.test(selfSrc) &&
+      /public['",\s]*uploads['",\s]*favicon/.test(selfSrc) &&
+      /startsWith\("\.\."\)/.test(selfSrc);
+    const faviconRestore =
+      /UPDATE site_content SET content_value=\? WHERE content_key='favicon_url'/.test(selfSrc) &&
+      /previousFavicon/.test(selfSrc);
+    const cleanupObservable =
+      /cleanupFailures/.test(selfSrc) && /console\.error\(\s*"[^\"]*cleanup/.test(selfSrc);
+    mark(
+      "S",
+      tracksExactId &&
+        exactRowDelete &&
+        noBroadPurposeDelete &&
+        noBroadNameLike &&
+        localPathGuard &&
+        faviconRestore &&
+        cleanupObservable,
+      `track=${tracksExactId} exactDel=${exactRowDelete} noBroadPurpose=${noBroadPurposeDelete} noLike=${noBroadNameLike} pathGuard=${localPathGuard} restore=${faviconRestore} observable=${cleanupObservable}`
+    );
+
+    // Local path helper unit checks (no filesystem writes)
+    {
+      const okPath = resolveSafeLocalFaviconPath("/uploads/favicon/favicon-1234567890123.png?v=1");
+      const trav = resolveSafeLocalFaviconPath("/uploads/favicon/../../etc/passwd");
+      const outside = resolveSafeLocalFaviconPath("/uploads/other/x.png");
+      const abs = resolveSafeLocalFaviconPath("C:\\\\Windows\\\\evil.png");
+      mark(
+        "S2",
+        !!okPath &&
+          okPath.includes(`${path.sep}public${path.sep}uploads${path.sep}favicon${path.sep}`) &&
+          trav == null &&
+          outside == null &&
+          abs == null,
+        `ok=${!!okPath} trav=${trav} outside=${outside} abs=${abs}`
+      );
+    }
+  }
+
   // ---- Auth + mutating integration (optional gate) ----
   const mutate = process.env.ALLOW_DB_MUTATION_TESTS === "YES_I_UNDERSTAND";
   if (!mutate) {
-    console.log("\nSKIP A–C,N–P — set ALLOW_DB_MUTATION_TESTS=YES_I_UNDERSTAND for auth/upload integration");
-    for (const id of ["A", "B", "C", "N", "O", "P"]) {
+    console.log("\nSKIP A–C,N–P,T — set ALLOW_DB_MUTATION_TESTS=YES_I_UNDERSTAND for auth/upload integration");
+    for (const id of ["A", "B", "C", "N", "O", "P", "T"]) {
       skip(id, "mutation opt-in required");
     }
   } else {
@@ -289,12 +374,16 @@ async function main() {
     });
 
     const stamp = Date.now();
+    const expectedOriginalName = `phase11-favicon-${stamp}.png`;
     const tempPw = "Phase11FaviconPass99!";
     const hash = await bcrypt.hash(tempPw, 10);
     const mgrEmail = "phase11.manager@test.local";
     const wrEmail = "phase11.writer@test.local";
     const sessionTokenHashes = [];
     let previousFavicon = null;
+    /** @type {{ stamp: number, originalName: string, url: string, mediaId: number, provider: string|null, publicId: string|null } | null} */
+    let createdTestAsset = null;
+    const cleanupFailures = [];
 
     try {
       async function ensureStaff(email, role, name) {
@@ -392,7 +481,7 @@ async function main() {
           cookie: saCookie,
           body: {
             file: dataUrl("image/png", TINY_PNG),
-            name: `phase11-favicon-${stamp}.png`,
+            name: expectedOriginalName,
           },
         });
 
@@ -408,17 +497,35 @@ async function main() {
           "N",
           up.status === 200 && !!up.json?.success && !!up.json?.url && favUpdated,
           `status=${up.status} url=${!!up.json?.url} favUpdated=${favUpdated} err=${up.json?.error || ""}`
-        )
+        );
 
         let mediaOk = false;
         if (up.json?.url) {
           const [mrows] = await db.query(
-            `SELECT id, purpose FROM media_assets WHERE purpose='favicon' AND url=? LIMIT 1`,
-            [up.json.url]
+            `SELECT id, purpose, provider, public_id, original_name, url
+             FROM media_assets
+             WHERE purpose='favicon' AND url=? AND original_name=?
+             LIMIT 1`,
+            [up.json.url, expectedOriginalName]
           );
-          mediaOk = !!mrows?.[0]?.id;
+          const row = mrows?.[0] || null;
+          mediaOk = !!row?.id;
+          if (row?.id) {
+            createdTestAsset = {
+              stamp,
+              originalName: String(row.original_name || expectedOriginalName),
+              url: String(row.url || up.json.url),
+              mediaId: Number(row.id),
+              provider: row.provider != null ? String(row.provider) : null,
+              publicId: row.public_id != null ? String(row.public_id) : null,
+            };
+          }
         }
-        mark("O", up.status === 200 && mediaOk, `indexed=${mediaOk}`);
+        mark(
+          "O",
+          up.status === 200 && mediaOk && !!createdTestAsset?.mediaId,
+          `indexed=${mediaOk} mediaId=${createdTestAsset?.mediaId || "none"} provider=${createdTestAsset?.provider || "?"}`
+        );
 
         const afterAudits = await db.query(
           `SELECT COUNT(*) AS c FROM admin_audit_log WHERE action='media.uploaded' AND summary='Uploaded favicon'`
@@ -427,6 +534,7 @@ async function main() {
         mark("P", up.status === 200 && afterCount === beforeCount + 1, `before=${beforeCount} after=${afterCount}`);
       }
     } finally {
+      // Each cleanup step is independent so one failure does not block the rest.
       try {
         if (sessionTokenHashes.length) {
           await db.query(
@@ -434,9 +542,12 @@ async function main() {
             sessionTokenHashes
           );
         }
-      } catch {
-        /* ignore */
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        cleanupFailures.push(`sessions: ${msg}`);
+        console.error("[phase11 cleanup] sessions failed:", msg);
       }
+
       // Restore prior favicon_url so local/dev test does not leave a local path on shared DB.
       try {
         if (previousFavicon != null) {
@@ -445,21 +556,86 @@ async function main() {
             [previousFavicon]
           );
         }
-      } catch {
-        /* ignore */
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        cleanupFailures.push(`favicon_restore: ${msg}`);
+        console.error("[phase11 cleanup] favicon restore failed:", msg);
       }
+
+      // Exact current-run media_assets row only (id + original_name + url ownership guards).
+      try {
+        if (createdTestAsset?.mediaId) {
+          const [delResult] = await db.query(
+            `DELETE FROM media_assets
+             WHERE id=? AND original_name=? AND url=?`,
+            [createdTestAsset.mediaId, createdTestAsset.originalName, createdTestAsset.url]
+          );
+          const affected = Number(delResult?.affectedRows || 0);
+          if (affected !== 1) {
+            cleanupFailures.push(
+              `media_row: expected 1 deleted row for id=${createdTestAsset.mediaId}, got ${affected}`
+            );
+            console.error(
+              "[phase11 cleanup] media_assets delete mismatch:",
+              `id=${createdTestAsset.mediaId} affected=${affected}`
+            );
+          }
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        cleanupFailures.push(`media_row: ${msg}`);
+        console.error("[phase11 cleanup] media_assets delete failed:", msg);
+      }
+
+      // Local provider file only — never touch Cloudinary/production binaries here.
+      try {
+        if (createdTestAsset && createdTestAsset.provider === "local") {
+          const localPath = resolveSafeLocalFaviconPath(createdTestAsset.url);
+          if (!localPath) {
+            cleanupFailures.push(
+              `local_file: refused unsafe path for url=${String(createdTestAsset.url).slice(0, 120)}`
+            );
+            console.error("[phase11 cleanup] local path rejected");
+          } else {
+            const removed = unlinkLocalFaviconIfPresent(localPath);
+            if (!removed.ok) {
+              cleanupFailures.push(`local_file: ${removed.error}`);
+              console.error("[phase11 cleanup] local unlink failed:", removed.error);
+            }
+          }
+        } else if (createdTestAsset && createdTestAsset.provider === "cloudinary") {
+          // No exact-resource destroy helper exists in this repo; DB row cleanup is the hard requirement.
+          console.warn(
+            "[phase11 cleanup] Cloudinary binary not destroyed (no safe project destroy helper); DB row cleaned if present.",
+            `public_id=${createdTestAsset.publicId || "none"}`
+          );
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        cleanupFailures.push(`local_file: ${msg}`);
+        console.error("[phase11 cleanup] local file step failed:", msg);
+      }
+
       try {
         await db.end();
-      } catch {
-        /* ignore */
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        cleanupFailures.push(`db_end: ${msg}`);
+        console.error("[phase11 cleanup] db.end failed:", msg);
       }
     }
+
+    mark(
+      "T",
+      cleanupFailures.length === 0,
+      cleanupFailures.length ? cleanupFailures.join("; ") : "cleanup ok"
+    );
   }
 
   const fails = Object.entries(out).filter(([, status]) => status === "FAIL");
   const skips = Object.entries(out).filter(([, status]) => status === "SKIP");
   console.log("\n========== SUMMARY ==========");
-  for (const id of "ABCDEFGHIJKLMNOPQR".split("")) {
+  for (const id of ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "S2", "T"]) {
     console.log(`${out[id] || "MISSING"} ${id}`);
   }
   if (fails.length) {
