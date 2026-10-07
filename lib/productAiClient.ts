@@ -1,5 +1,6 @@
 /**
- * Client-safe helpers for PAI-3 New Product AI drafting UI.
+ * Client-safe helpers for PAI-3 New Product AI drafting UI
+ * and PAI-4 Existing Product AI review Apply.
  * No DB. No CMS writes. No provider calls.
  */
 
@@ -8,9 +9,13 @@ import {
   PRODUCT_AI_EXISTING_EDITABLE_FIELDS,
   PRODUCT_AI_FIELD_MAX,
   PRODUCT_AI_NEW_EDITABLE_FIELDS,
+  PRODUCT_AI_REVIEW_FIELDS,
   normalizeProductAiSlug,
   type ProductAiEditableField,
+  type ProductAiExistingEditableField,
   type ProductAiNewEditableField,
+  type ProductAiReviewField,
+  type ProductAiReviewItem,
   type ProductKindHint,
 } from "@/lib/seoAi";
 
@@ -32,6 +37,22 @@ export const NEW_PRODUCT_AI_APPLY_FIELDS = [
 ] as const;
 
 export type NewProductAiApplyField = (typeof NEW_PRODUCT_AI_APPLY_FIELDS)[number];
+
+/**
+ * Strict existing-product Apply allowlist (Class-A only).
+ * Never includes name, slug, or C-class fields.
+ */
+export const EXISTING_PRODUCT_AI_APPLY_FIELDS = [
+  "short_description",
+  "full_description",
+  "features",
+  "seo_title",
+  "meta_description",
+  "focus_keyword",
+] as const;
+
+export type ExistingProductAiApplyField =
+  (typeof EXISTING_PRODUCT_AI_APPLY_FIELDS)[number];
 
 export const PRODUCT_AI_C_CLASS_APPLY_BLOCKED = [
   "price",
@@ -177,6 +198,12 @@ export function isNewProductAiApplyField(
   return (NEW_PRODUCT_AI_APPLY_FIELDS as readonly string[]).includes(field);
 }
 
+export function isExistingProductAiApplyField(
+  field: string
+): field is ExistingProductAiApplyField {
+  return (EXISTING_PRODUCT_AI_APPLY_FIELDS as readonly string[]).includes(field);
+}
+
 export function isBlockedCClassApplyField(field: string): boolean {
   return (PRODUCT_AI_C_CLASS_APPLY_BLOCKED as readonly string[]).includes(field);
 }
@@ -206,6 +233,38 @@ export function applyNewProductAiFieldLocally<
     if (!normalized) return editProduct;
     nextValue = normalized;
   } else if (field === "short_description" || field === "full_description") {
+    nextValue = plainTextToSafeTipTapHtml(nextValue);
+  } else {
+    nextValue = nextValue.trim();
+    const max = PRODUCT_AI_FIELD_MAX[field];
+    if (max && nextValue.length > max) {
+      nextValue = nextValue.slice(0, max);
+    }
+  }
+
+  return { ...editProduct, [field]: nextValue };
+}
+
+/**
+ * Apply one Class-A AI suggestion into a shallow copy of editor state.
+ * Existing products only — never name/slug/C-class.
+ */
+export function applyExistingProductAiFieldLocally<
+  T extends Record<string, unknown>,
+>(
+  editProduct: T,
+  field: string,
+  value: string
+): T {
+  if (!isExistingProductAiApplyField(field)) {
+    return editProduct;
+  }
+  if (isBlockedCClassApplyField(field)) {
+    return editProduct;
+  }
+
+  let nextValue = String(value ?? "");
+  if (field === "short_description" || field === "full_description") {
     nextValue = plainTextToSafeTipTapHtml(nextValue);
   } else {
     nextValue = nextValue.trim();
@@ -441,6 +500,166 @@ export function existingProductDraftAllowsNameOrSlug(): boolean {
   );
 }
 
+/** Existing Apply allowlist must never include name/slug. */
+export function existingProductApplyAllowsNameOrSlug(): boolean {
+  return (
+    (EXISTING_PRODUCT_AI_APPLY_FIELDS as readonly string[]).includes(
+      "name" as ExistingProductAiApplyField
+    ) ||
+    (EXISTING_PRODUCT_AI_APPLY_FIELDS as readonly string[]).includes(
+      "slug" as ExistingProductAiApplyField
+    )
+  );
+}
+
 export function suggestionContainsUnsafeHtml(value: string): boolean {
   return /<\s*\/?\s*[a-z]|javascript\s*:|on\w+\s*=/i.test(String(value || ""));
 }
+
+export type ProductReviewUiEntry = ProductAiReviewItem & {
+  selected: boolean;
+};
+
+export type ProductReviewUiState = {
+  status: "idle" | "loading" | "ok" | "error";
+  provider: ProductAiProviderChoice;
+  error: string;
+  productId: number | null;
+  items: ProductReviewUiEntry[];
+};
+
+export function createIdleProductReviewUi(
+  provider: ProductAiProviderChoice = "gemini"
+): ProductReviewUiState {
+  return {
+    status: "idle",
+    provider,
+    error: "",
+    productId: null,
+    items: [],
+  };
+}
+
+export type BuildExistingProductReviewRequestInput = {
+  provider: ProductAiProviderChoice;
+  productId: number;
+  productKind?: ProductKindHint;
+  editProduct: {
+    short_description: string;
+    full_description: string;
+    features: string;
+    seo_title: string;
+    meta_description: string;
+    focus_keyword: string;
+  };
+};
+
+export type BuildExistingProductReviewRequestResult =
+  | {
+      ok: true;
+      body: {
+        provider: ProductAiProviderChoice;
+        task: "review_product";
+        productId: number;
+        productKind?: ProductKindHint;
+        currentEditorCopy: Record<string, string>;
+      };
+    }
+  | { ok: false; message: string };
+
+export function buildExistingProductReviewRequest(
+  input: BuildExistingProductReviewRequestInput
+): BuildExistingProductReviewRequestResult {
+  const productId = Number(input.productId);
+  if (!Number.isSafeInteger(productId) || productId <= 0) {
+    return { ok: false, message: "productId is invalid." };
+  }
+
+  const shortPlain = tipTapHtmlToPlainContext(
+    input.editProduct.short_description,
+    PRODUCT_AI_FIELD_MAX.short_description
+  );
+  const fullPlain = tipTapHtmlToPlainContext(
+    input.editProduct.full_description,
+    PRODUCT_AI_FIELD_MAX.full_description
+  );
+
+  const currentEditorCopy: Record<string, string> = {};
+  if (shortPlain) currentEditorCopy.short_description = shortPlain;
+  if (fullPlain) currentEditorCopy.full_description = fullPlain;
+  const feat = String(input.editProduct.features || "").trim();
+  if (feat) {
+    currentEditorCopy.features = feat.slice(0, PRODUCT_AI_FIELD_MAX.features);
+  }
+  const seo = String(input.editProduct.seo_title || "").trim();
+  if (seo) {
+    currentEditorCopy.seo_title = seo.slice(0, PRODUCT_AI_FIELD_MAX.seo_title);
+  }
+  const meta = String(input.editProduct.meta_description || "").trim();
+  if (meta) {
+    currentEditorCopy.meta_description = meta.slice(
+      0,
+      PRODUCT_AI_FIELD_MAX.meta_description
+    );
+  }
+  const kw = String(input.editProduct.focus_keyword || "").trim();
+  if (kw) {
+    currentEditorCopy.focus_keyword = kw.slice(
+      0,
+      PRODUCT_AI_FIELD_MAX.focus_keyword
+    );
+  }
+
+  return {
+    ok: true,
+    body: {
+      provider: input.provider,
+      task: "review_product" as const,
+      productId,
+      ...(input.productKind ? { productKind: input.productKind } : {}),
+      currentEditorCopy,
+    },
+  };
+}
+
+export function mapProductReviewToUi(
+  review: ProductAiReviewItem[] | null | undefined
+): ProductReviewUiEntry[] {
+  const list = Array.isArray(review) ? review : [];
+  const out: ProductReviewUiEntry[] = [];
+  const allowed = new Set<string>(PRODUCT_AI_REVIEW_FIELDS);
+  const seen = new Set<string>();
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const field = String(item.field || "");
+    if (!allowed.has(field) || seen.has(field)) continue;
+    if (field === "slug" || isBlockedCClassApplyField(field)) continue;
+    seen.add(field);
+    out.push({
+      field: field as ProductAiReviewField,
+      current: String(item.current ?? ""),
+      suggested: item.suggested == null ? null : String(item.suggested),
+      reason: String(item.reason || ""),
+      status: item.status,
+      ...(item.confidence ? { confidence: item.confidence } : {}),
+      selected: false,
+    });
+  }
+  return out;
+}
+
+export function isReviewFieldApplyable(field: string): boolean {
+  return isExistingProductAiApplyField(field);
+}
+
+/** Assert review contract includes name as review-only and Class-A apply fields. */
+export function reviewContractIncludesNameAsReviewOnly(): boolean {
+  return (
+    (PRODUCT_AI_REVIEW_FIELDS as readonly string[]).includes("name") &&
+    !(EXISTING_PRODUCT_AI_APPLY_FIELDS as readonly string[]).includes(
+      "name" as ExistingProductAiApplyField
+    )
+  );
+}
+
+export type { ProductAiExistingEditableField, ProductAiReviewField };

@@ -16,27 +16,38 @@ import {
   SEO_AI_EXPLANATION_JSON_SCHEMA,
   SEO_AI_METADATA_JSON_SCHEMA,
   SEO_AI_PROVIDER_TIMEOUT_MS,
+  PRODUCT_AI_FIELD_MAX,
+  PRODUCT_AI_REVIEW_FIELDS,
   buildProductFieldsJsonSchema,
   buildProductFieldsSystemInstruction,
   buildProductFieldsUserPrompt,
+  buildReviewProductJsonSchema,
+  buildReviewProductSystemInstruction,
+  buildReviewProductUserPrompt,
   buildSeoAiMetadataSystemInstruction,
   buildSeoAiMetadataUserPrompt,
   buildSeoAiSystemInstruction,
   buildSeoAiUserPrompt,
   buildVerifiedIssueContext,
+  defaultProductKindFromCategory,
   htmlToPlainTextBounded,
   mergeProductAuthoritativeWithDb,
   parseExplanationJsonText,
   parseIssueId,
   parseMetadataJsonText,
   parseProductFieldsJsonText,
+  parseProductReviewJsonText,
   type ProductAiDraftContext,
+  type ProductAiReviewContext,
+  type ProductAiReviewField,
+  type ProductAiReviewItem,
   type ProductAiSuggestions,
   type SeoAiDraftUnsaved,
   type SeoAiExplanation,
   type SeoAiMetadataDraft,
   type SeoAiMetadataDraftContext,
   type SeoAiProductFieldsRequest,
+  type SeoAiProductReviewRequest,
   type SeoAiProvider,
   type SeoAiPublicErrorCode,
   type SeoAiVerifiedIssueContext,
@@ -965,6 +976,261 @@ export async function dispatchProductFieldsDraft(
   }
   return fail(400, "invalid_request", "provider must be gemini or openai.");
 }
+
+function plainFromMaybeHtml(value: unknown, max: number): string {
+  const raw = String(value ?? "");
+  if (!raw.trim()) return "";
+  // TipTap HTML → plain; also safe for already-plain features/seo fields.
+  if (/<[a-z][\s\S]*>/i.test(raw)) {
+    return htmlToPlainTextBounded(raw, max);
+  }
+  return raw.trim().slice(0, max);
+}
+
+/**
+ * Build PAI-4 review context. DB wins for identity/C-class; Class-A uses editor copy when present.
+ * SELECT-only. Never writes.
+ */
+export function buildProductReviewContext(
+  request: SeoAiProductReviewRequest,
+  dbRow: ProductFieldsAuthorityRow
+): ProductAiReviewContext {
+  const id = Number(dbRow.id);
+  const priceNum = Number(dbRow.price);
+  const productKind =
+    request.productKind || defaultProductKindFromCategory(dbRow.category);
+
+  const dbName = String(dbRow.name || "").trim();
+  const dbShort = plainFromMaybeHtml(
+    dbRow.short_description,
+    PRODUCT_AI_FIELD_MAX.short_description
+  );
+  const dbFull = plainFromMaybeHtml(
+    dbRow.full_description,
+    PRODUCT_AI_FIELD_MAX.full_description
+  );
+  const dbFeatures = plainFromMaybeHtml(
+    dbRow.features,
+    PRODUCT_AI_FIELD_MAX.features
+  );
+  const dbSeo = String(dbRow.seo_title || "").trim().slice(0, PRODUCT_AI_FIELD_MAX.seo_title);
+  const dbMeta = String(dbRow.meta_description || "")
+    .trim()
+    .slice(0, PRODUCT_AI_FIELD_MAX.meta_description);
+  const dbKw = String(dbRow.focus_keyword || "")
+    .trim()
+    .slice(0, PRODUCT_AI_FIELD_MAX.focus_keyword);
+
+  const editor = request.currentEditorCopy || {};
+
+  return {
+    productId: id,
+    productKind,
+    dbTruth: {
+      id,
+      name: dbName,
+      slug: String(dbRow.slug || "").trim(),
+      category: String(dbRow.category || "").trim(),
+      priceGbp: Number.isFinite(priceNum) ? priceNum : undefined,
+      stockLabel: String(dbRow.stock || "").trim() || undefined,
+      active:
+        dbRow.active === true || dbRow.active === 1
+          ? true
+          : dbRow.active === false || dbRow.active === 0
+            ? false
+            : undefined,
+      imageUrl: String(dbRow.image || "").trim() || null,
+      ogImageUrl: String(dbRow.og_image || "").trim() || null,
+    },
+    reviewCopy: {
+      name: dbName,
+      short_description: editor.short_description || dbShort,
+      full_description: editor.full_description || dbFull,
+      features: editor.features || dbFeatures,
+      seo_title: editor.seo_title || dbSeo,
+      meta_description: editor.meta_description || dbMeta,
+      focus_keyword: editor.focus_keyword || dbKw,
+    },
+  };
+}
+
+export type ProductReviewProviderCallFn = (
+  context: ProductAiReviewContext
+) => Promise<{ ok: true; review: ProductAiReviewItem[] } | SeoAiFailure>;
+
+export async function callOpenAiProductReview(
+  context: ProductAiReviewContext
+): Promise<{ ok: true; review: ProductAiReviewItem[] } | SeoAiFailure> {
+  const cfg = getProviderEnvConfig("openai");
+  if (!cfg.configured) {
+    return fail(
+      503,
+      "provider_not_configured",
+      "Selected AI provider is not configured."
+    );
+  }
+
+  const client = new OpenAI({
+    apiKey: cfg.apiKey,
+    maxRetries: 0,
+    timeout: SEO_AI_PROVIDER_TIMEOUT_MS,
+  });
+
+  try {
+    const response = await client.responses.create({
+      model: cfg.model,
+      store: false,
+      instructions: buildReviewProductSystemInstruction(context),
+      input: buildReviewProductUserPrompt(context),
+      text: {
+        format: {
+          type: "json_schema",
+          name: "product_ai_review",
+          strict: true,
+          schema: buildReviewProductJsonSchema() as unknown as {
+            [key: string]: unknown;
+          },
+        },
+      },
+    });
+
+    const text =
+      typeof response.output_text === "string" ? response.output_text : "";
+    const expected = context.reviewCopy as Record<ProductAiReviewField, string>;
+    const parsed = parseProductReviewJsonText(text, expected);
+    if (!parsed.ok) {
+      console.error("[seo-ai] openai malformed product review output");
+      return fail(
+        502,
+        "malformed_provider_output",
+        "The AI provider returned an unusable product review."
+      );
+    }
+    return { ok: true, review: parsed.review };
+  } catch (err) {
+    const status =
+      err && typeof err === "object" && "status" in err
+        ? Number((err as { status?: unknown }).status)
+        : NaN;
+    if (Number.isFinite(status) && status > 0) {
+      console.error(`[seo-ai] openai upstream failed: status ${status}`);
+      if (status === 408 || status === 504) {
+        return fail(
+          503,
+          "provider_timeout",
+          "The selected AI provider timed out. Please try again shortly."
+        );
+      }
+      return fail(
+        503,
+        "provider_upstream",
+        "The selected AI provider is temporarily unavailable."
+      );
+    }
+    return mapAbortOrTimeout(err, "openai");
+  }
+}
+
+export async function callGeminiProductReview(
+  context: ProductAiReviewContext
+): Promise<{ ok: true; review: ProductAiReviewItem[] } | SeoAiFailure> {
+  const cfg = getProviderEnvConfig("gemini");
+  if (!cfg.configured) {
+    return fail(
+      503,
+      "provider_not_configured",
+      "Selected AI provider is not configured."
+    );
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    SEO_AI_PROVIDER_TIMEOUT_MS
+  );
+
+  try {
+    const res = await fetch(GEMINI_INTERACTIONS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": cfg.apiKey,
+        "Api-Revision": "2026-05-20",
+      },
+      body: JSON.stringify({
+        model: cfg.model,
+        input: buildReviewProductUserPrompt(context),
+        system_instruction: buildReviewProductSystemInstruction(context),
+        store: false,
+        response_format: {
+          type: "text",
+          mime_type: "application/json",
+          schema: buildReviewProductJsonSchema(),
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      console.error(`[seo-ai] gemini upstream failed: status ${res.status}`);
+      if (res.status === 408 || res.status === 504) {
+        return fail(
+          503,
+          "provider_timeout",
+          "The selected AI provider timed out. Please try again shortly."
+        );
+      }
+      return fail(
+        503,
+        "provider_upstream",
+        "The selected AI provider is temporarily unavailable."
+      );
+    }
+
+    const body = await res.json().catch(() => null);
+    const text = extractGeminiInteractionText(body);
+    const expected = context.reviewCopy as Record<ProductAiReviewField, string>;
+    const parsed = parseProductReviewJsonText(text, expected);
+    if (!parsed.ok) {
+      console.error("[seo-ai] gemini malformed product review output");
+      return fail(
+        502,
+        "malformed_provider_output",
+        "The AI provider returned an unusable product review."
+      );
+    }
+    return { ok: true, review: parsed.review };
+  } catch (err) {
+    return mapAbortOrTimeout(err, "gemini");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Exactly one provider call for existing product review. No fallback. No retry.
+ */
+export async function dispatchProductReview(
+  provider: SeoAiProvider,
+  context: ProductAiReviewContext,
+  deps?: {
+    callOpenAI?: ProductReviewProviderCallFn;
+    callGemini?: ProductReviewProviderCallFn;
+  }
+): Promise<{ ok: true; review: ProductAiReviewItem[] } | SeoAiFailure> {
+  if (provider === "openai") {
+    const call = deps?.callOpenAI || callOpenAiProductReview;
+    return call(context);
+  }
+  if (provider === "gemini") {
+    const call = deps?.callGemini || callGeminiProductReview;
+    return call(context);
+  }
+  return fail(400, "invalid_request", "provider must be gemini or openai.");
+}
+
+/** Exported for tests — review fields contract. */
+export const PRODUCT_REVIEW_FIELD_LIST = PRODUCT_AI_REVIEW_FIELDS;
 
 export async function explainDeterministicIssue(input: {
   provider: SeoAiProvider;

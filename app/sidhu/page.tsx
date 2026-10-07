@@ -23,16 +23,22 @@ import {
 import { parseCouponAdminInput } from "@/lib/couponValidation";
 import {
   NEW_PRODUCT_AI_GENERATE_ALL_FIELDS,
+  applyExistingProductAiFieldLocally,
   applyNewProductAiFieldLocally,
+  buildExistingProductReviewRequest,
   buildNewProductDraftRequest,
   createDefaultProductAiFacts,
   createIdleProductAiUi,
+  createIdleProductReviewUi,
   currentEditorPlainPreview,
   defaultProductKindFromCategory,
+  isReviewFieldApplyable,
+  mapProductReviewToUi,
   mapProviderSuggestionsToUi,
   type ProductAiFactsState,
   type ProductAiProviderChoice,
   type ProductAiUiState,
+  type ProductReviewUiState,
 } from "@/lib/productAiClient";
 import type { ProductAiEditableField, ProductKindHint } from "@/lib/seoAi";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
@@ -323,6 +329,9 @@ export default function AdminPage() {
     createDefaultProductAiFacts("Subscription")
   );
   const [productAiUi, setProductAiUi] = useState<ProductAiUiState>(createIdleProductAiUi());
+  const [productReviewUi, setProductReviewUi] = useState<ProductReviewUiState>(
+    createIdleProductReviewUi()
+  );
   const [blogMetaAi, setBlogMetaAi] = useState<MetaDraftAiState>({ status: "idle" });
   const [imageUploading, setImageUploading] = useState(false);
   const [mediaPicker, setMediaPicker] = useState<{
@@ -1595,6 +1604,7 @@ export default function AdminPage() {
       }
       setProductMetaAi({ status: "idle" });
       setProductAiUi(createIdleProductAiUi());
+      setProductReviewUi(createIdleProductReviewUi());
       setProductAiFacts(createDefaultProductAiFacts("Subscription"));
       setProductModal(null);
       setProductMsg(`✅ Product saved${formatSeoGuardBannerClient(res.seo_guard)}`);
@@ -1610,6 +1620,7 @@ export default function AdminPage() {
   const resetProductAiState = (category = "Subscription") => {
     setProductMetaAi({ status: "idle" });
     setProductAiUi(createIdleProductAiUi());
+    setProductReviewUi(createIdleProductReviewUi());
     setProductAiFacts(createDefaultProductAiFacts(category));
   };
 
@@ -1748,6 +1759,112 @@ export default function AdminPage() {
       delete unavailable[field];
       return { ...s, suggestions, unavailable };
     });
+  };
+
+  const reviewExistingProduct = async () => {
+    if (productModal === "new" || !productModal?.id) return;
+    if (!can("products.manage")) return;
+    if (productReviewUi.status === "loading") return;
+
+    const productId = Number(productModal.id);
+    const built = buildExistingProductReviewRequest({
+      provider: productReviewUi.provider,
+      productId,
+      productKind: defaultProductKindFromCategory(editProduct.category),
+      editProduct,
+    });
+    if (!built.ok) {
+      setProductReviewUi((s) => ({
+        ...s,
+        status: "error",
+        error: built.message,
+        productId,
+        items: [],
+      }));
+      return;
+    }
+
+    setProductReviewUi((s) => ({
+      ...s,
+      status: "loading",
+      error: "",
+      productId,
+      items: [],
+    }));
+
+    try {
+      const res = await fetch("/api/admin-seo-ai", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(built.body),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok) {
+        const code = String(json?.code || "");
+        const message =
+          code === "provider_not_configured" || res.status === 503
+            ? "Selected AI provider is not configured yet."
+            : String(json?.message || json?.error || `HTTP ${res.status}`);
+        setProductReviewUi((s) => ({
+          ...s,
+          status: "error",
+          error: message,
+          productId,
+          items: [],
+        }));
+        return;
+      }
+      setProductReviewUi((s) => ({
+        ...s,
+        status: "ok",
+        error: "",
+        productId,
+        items: mapProductReviewToUi(json.review || []),
+      }));
+    } catch {
+      setProductReviewUi((s) => ({
+        ...s,
+        status: "error",
+        error: "Review request failed.",
+        productId,
+        items: [],
+      }));
+    }
+  };
+
+  const applyExistingProductReviewField = (field: string) => {
+    if (productModal === "new" || !productModal?.id) return;
+    if (!isReviewFieldApplyable(field)) return;
+    const entry = productReviewUi.items.find((i) => i.field === field);
+    if (!entry?.suggested) return;
+    setEditProduct((p) =>
+      applyExistingProductAiFieldLocally(p, field, entry.suggested as string)
+    );
+  };
+
+  const applySelectedExistingProductReview = () => {
+    if (productModal === "new" || !productModal?.id) return;
+    setEditProduct((p) => {
+      let next = p;
+      for (const entry of productReviewUi.items) {
+        if (!entry.selected || !entry.suggested) continue;
+        if (!isReviewFieldApplyable(entry.field)) continue;
+        next = applyExistingProductAiFieldLocally(
+          next,
+          entry.field,
+          entry.suggested
+        );
+      }
+      return next;
+    });
+  };
+
+  const discardExistingProductReviewField = (field: string) => {
+    setProductReviewUi((s) => ({
+      ...s,
+      items: s.items.filter((i) => i.field !== field),
+    }));
   };
 
   const draftProductMetadata = async (provider: "gemini" | "openai") => {
@@ -2510,6 +2627,178 @@ export default function AdminPage() {
                         </div>
                       )
                     )}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* PAI-4 — Review Existing Product (existing modal only) */}
+            {productModal !== "new" && productModal?.id && can("products.manage") ? (
+              <div
+                className="seo-box"
+                data-testid="existing-product-ai-review"
+                style={{ marginTop: 8 }}
+              >
+                <div className="seo-box-title">Review Existing Product</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 12 }}>
+                  Advisory review only. Apply updates local editor fields — Save Product is still required to persist.
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "rgba(255,255,255,0.55)",
+                    marginBottom: 12,
+                    padding: "8px 10px",
+                    background: "rgba(255,255,255,0.04)",
+                    borderRadius: 8,
+                  }}
+                  data-testid="existing-product-slug-protected-notice"
+                >
+                  Public slug is protected. Changing it requires a separate URL migration workflow:
+                  redirect → canonical → sitemap → GSC/Junaid verification.
+                </div>
+
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
+                  <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="radio"
+                      name="existing-product-review-provider"
+                      checked={productReviewUi.provider === "gemini"}
+                      disabled={productReviewUi.status === "loading"}
+                      onChange={() =>
+                        setProductReviewUi((s) => ({
+                          ...s,
+                          provider: "gemini" as ProductAiProviderChoice,
+                        }))
+                      }
+                    />
+                    Gemini
+                  </label>
+                  <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="radio"
+                      name="existing-product-review-provider"
+                      checked={productReviewUi.provider === "openai"}
+                      disabled={productReviewUi.status === "loading"}
+                      onChange={() =>
+                        setProductReviewUi((s) => ({
+                          ...s,
+                          provider: "openai" as ProductAiProviderChoice,
+                        }))
+                      }
+                    />
+                    OpenAI
+                  </label>
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    data-testid="existing-product-review-button"
+                    disabled={productReviewUi.status === "loading"}
+                    onClick={() => void reviewExistingProduct()}
+                  >
+                    Review Product
+                  </button>
+                  {productReviewUi.items.some(
+                    (i) => i.selected && i.suggested && isReviewFieldApplyable(i.field)
+                  ) ? (
+                    <button
+                      type="button"
+                      className="action-btn btn-edit"
+                      data-testid="existing-product-review-apply-selected"
+                      onClick={() => applySelectedExistingProductReview()}
+                    >
+                      Apply selected
+                    </button>
+                  ) : null}
+                </div>
+
+                {productReviewUi.status === "loading" ? (
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginBottom: 10 }}>
+                    Reviewing with {productReviewUi.provider === "gemini" ? "Gemini" : "OpenAI"}…
+                  </div>
+                ) : null}
+                {productReviewUi.status === "error" ? (
+                  <div style={{ fontSize: 12, color: "#ff6666", marginBottom: 10 }}>
+                    {productReviewUi.error || "Review failed."}
+                  </div>
+                ) : null}
+
+                {productReviewUi.status === "ok" && productReviewUi.items.length ? (
+                  <div style={{ fontSize: 12 }}>
+                    {productReviewUi.items.map((item) => {
+                      const applyable = isReviewFieldApplyable(item.field);
+                      const isName = item.field === "name";
+                      return (
+                        <div
+                          key={item.field}
+                          data-testid={`existing-product-review-item-${item.field}`}
+                          style={{
+                            borderTop: "1px solid rgba(255,255,255,0.08)",
+                            paddingTop: 10,
+                            marginTop: 10,
+                          }}
+                        >
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                            {applyable && item.suggested ? (
+                              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.selected}
+                                  onChange={(e) =>
+                                    setProductReviewUi((s) => ({
+                                      ...s,
+                                      items: s.items.map((it) =>
+                                        it.field === item.field
+                                          ? { ...it, selected: e.target.checked }
+                                          : it
+                                      ),
+                                    }))
+                                  }
+                                />
+                                Select
+                              </label>
+                            ) : null}
+                            <strong>{item.field}</strong>
+                            <span style={{ opacity: 0.6 }}>status: {item.status}</span>
+                            {item.confidence ? (
+                              <span style={{ opacity: 0.55 }}>confidence: {item.confidence}</span>
+                            ) : null}
+                          </div>
+                          {isName ? (
+                            <div style={{ color: "#FBBF24", marginTop: 4 }}>
+                              Identity-sensitive — review manually.
+                            </div>
+                          ) : null}
+                          <div style={{ marginTop: 6, opacity: 0.75 }}>
+                            <div><em>Current:</em> {item.current || "(empty)"}</div>
+                            <div style={{ marginTop: 4 }}>
+                              <em>Suggested:</em>{" "}
+                              {item.suggested == null ? "(none — already ok)" : item.suggested}
+                            </div>
+                            <div style={{ marginTop: 4 }}><em>Reason:</em> {item.reason}</div>
+                          </div>
+                          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                            {applyable && item.suggested ? (
+                              <button
+                                type="button"
+                                className="action-btn btn-edit"
+                                data-testid={`existing-product-review-apply-${item.field}`}
+                                onClick={() => applyExistingProductReviewField(item.field)}
+                              >
+                                Apply
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="action-btn btn-view"
+                              onClick={() => discardExistingProductReviewField(item.field)}
+                            >
+                              Discard
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : null}
               </div>

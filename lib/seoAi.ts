@@ -8,7 +8,8 @@ export type ProductAiProvider = SeoAiProvider;
 export type SeoAiTask =
   | "explain_issue"
   | "draft_metadata"
-  | "draft_product_fields";
+  | "draft_product_fields"
+  | "review_product";
 
 export type SeoAiExplainRequest = {
   provider: SeoAiProvider;
@@ -59,10 +60,26 @@ export const PRODUCT_AI_EXISTING_EDITABLE_FIELDS = [
   "focus_keyword",
 ] as const;
 
+/**
+ * PAI-4 review fields: Class-A editable + identity-sensitive name (review-only).
+ * Never includes slug or other C-class fields.
+ */
+export const PRODUCT_AI_REVIEW_FIELDS = [
+  "name",
+  "short_description",
+  "full_description",
+  "features",
+  "seo_title",
+  "meta_description",
+  "focus_keyword",
+] as const;
+
 export type ProductAiNewEditableField =
   (typeof PRODUCT_AI_NEW_EDITABLE_FIELDS)[number];
 export type ProductAiExistingEditableField =
   (typeof PRODUCT_AI_EXISTING_EDITABLE_FIELDS)[number];
+export type ProductAiReviewField =
+  (typeof PRODUCT_AI_REVIEW_FIELDS)[number];
 export type ProductAiEditableField =
   | ProductAiNewEditableField
   | ProductAiExistingEditableField;
@@ -107,6 +124,63 @@ export type SeoAiProductFieldsRequest = {
   currentEditorCopy: ProductAiEditorCopy;
 };
 
+/** Class-A editor copy only — never name/slug for review request body. */
+export type ProductAiReviewEditorCopy = {
+  short_description?: string;
+  full_description?: string;
+  features?: string;
+  seo_title?: string;
+  meta_description?: string;
+  focus_keyword?: string;
+};
+
+export type SeoAiProductReviewRequest = {
+  provider: SeoAiProvider;
+  task: "review_product";
+  productId: number;
+  productKind?: ProductKindHint;
+  currentEditorCopy: ProductAiReviewEditorCopy;
+};
+
+export type ProductAiReviewStatus = "ok" | "suggest" | "warning";
+export type ProductAiReviewConfidence = "high" | "medium" | "low";
+
+export type ProductAiReviewItem = {
+  field: ProductAiReviewField;
+  current: string;
+  suggested: string | null;
+  reason: string;
+  status: ProductAiReviewStatus;
+  confidence?: ProductAiReviewConfidence;
+};
+
+export type ProductAiReviewContext = {
+  productId: number;
+  productKind: ProductKindHint;
+  /** DB-authoritative identity / C-class facts (read-only context). */
+  dbTruth: {
+    id: number;
+    name: string;
+    slug: string;
+    category: string;
+    priceGbp?: number;
+    stockLabel?: string;
+    active?: boolean;
+    imageUrl?: string | null;
+    ogImageUrl?: string | null;
+  };
+  /** Plain-text Class-A copy from current editor (or DB fallback). */
+  reviewCopy: {
+    name: string;
+    short_description: string;
+    full_description: string;
+    features: string;
+    seo_title: string;
+    meta_description: string;
+    focus_keyword: string;
+  };
+};
+
 export type ProductAiFieldSuggestion = {
   value: string;
   reason?: string;
@@ -132,7 +206,8 @@ export type ProductAiDraftContext = {
 export type SeoAiRequest =
   | SeoAiExplainRequest
   | SeoAiDraftRequest
-  | SeoAiProductFieldsRequest;
+  | SeoAiProductFieldsRequest
+  | SeoAiProductReviewRequest;
 
 export type SeoAiMetadataDraft = {
   titles: string[];
@@ -171,6 +246,8 @@ export const PRODUCT_AI_FIELD_MAX: Record<ProductAiNewEditableField, number> = {
 };
 
 export const PRODUCT_AI_REASON_MAX = 300;
+export const PRODUCT_AI_REVIEW_CURRENT_MAX = 8000;
+export const PRODUCT_AI_REVIEW_SUGGESTED_MAX = 8000;
 export const PRODUCT_AI_CANONICAL_NAME_MAX = 200;
 export const PRODUCT_AI_CLAIM_ITEM_MAX = 200;
 export const PRODUCT_AI_CLAIM_LIST_MAX = 12;
@@ -274,6 +351,32 @@ const ALLOWED_PRODUCT_FIELDS_REQUEST_KEYS = new Set([
   "requestedFields",
   "authoritative",
   "currentEditorCopy",
+]);
+const ALLOWED_PRODUCT_REVIEW_REQUEST_KEYS = new Set([
+  "provider",
+  "task",
+  "productId",
+  "productKind",
+  "currentEditorCopy",
+]);
+const ALLOWED_REVIEW_EDITOR_COPY_KEYS = new Set([
+  "short_description",
+  "full_description",
+  "features",
+  "seo_title",
+  "meta_description",
+  "focus_keyword",
+]);
+const REVIEW_FIELD_SET = new Set<string>(PRODUCT_AI_REVIEW_FIELDS);
+const REVIEW_STATUS_SET = new Set<ProductAiReviewStatus>([
+  "ok",
+  "suggest",
+  "warning",
+]);
+const REVIEW_CONFIDENCE_SET = new Set<ProductAiReviewConfidence>([
+  "high",
+  "medium",
+  "low",
 ]);
 const ALLOWED_UNSAVED_KEYS = new Set([
   "seoTitle",
@@ -502,6 +605,7 @@ export function parseSeoAiRequest(
   | { ok: true; request: SeoAiExplainRequest }
   | { ok: true; request: SeoAiDraftRequest }
   | { ok: true; request: SeoAiProductFieldsRequest }
+  | { ok: true; request: SeoAiProductReviewRequest }
   | { ok: false; code: "invalid_request"; message: string } {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return {
@@ -527,12 +631,15 @@ export function parseSeoAiRequest(
   if (task === "draft_product_fields") {
     return parseProductFieldsRequest(body);
   }
+  if (task === "review_product") {
+    return parseReviewProductRequest(body);
+  }
   if (task !== "draft_metadata") {
     return {
       ok: false,
       code: "invalid_request",
       message:
-        "task must be explain_issue, draft_metadata, or draft_product_fields.",
+        "task must be explain_issue, draft_metadata, draft_product_fields, or review_product.",
     };
   }
   for (const key of Object.keys(obj)) {
@@ -1734,4 +1841,490 @@ export function mergeProductAuthoritativeWithDb(
     productKind: client.productKind,
     brand: client.brand || "Firestick4UK",
   };
+}
+
+function parseReviewEditorCopy(
+  value: unknown
+):
+  | { ok: true; currentEditorCopy: ProductAiReviewEditorCopy }
+  | { ok: false; code: "invalid_request"; message: string } {
+  if (value === undefined || value === null) {
+    return { ok: true, currentEditorCopy: {} };
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "currentEditorCopy must be an object.",
+    };
+  }
+  const obj = value as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (!ALLOWED_REVIEW_EDITOR_COPY_KEYS.has(key)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "currentEditorCopy contains unsupported fields.",
+      };
+    }
+  }
+  const copy: ProductAiReviewEditorCopy = {};
+  for (const field of PRODUCT_AI_EXISTING_EDITABLE_FIELDS) {
+    if (!(field in obj)) continue;
+    const max =
+      PRODUCT_AI_FIELD_MAX[field as ProductAiNewEditableField] ?? 600;
+    const parsed = optionalPlainText(obj[field], max);
+    if (!parsed.ok) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: `currentEditorCopy.${field} ${parsed.message}`,
+      };
+    }
+    if (parsed.value) {
+      (copy as Record<string, string>)[field] = parsed.value;
+    }
+  }
+  return { ok: true, currentEditorCopy: copy };
+}
+
+export function parseReviewProductRequest(
+  body: unknown
+):
+  | { ok: true; request: SeoAiProductReviewRequest }
+  | { ok: false; code: "invalid_request"; message: string } {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "Request body must be a JSON object.",
+    };
+  }
+  const obj = body as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (!ALLOWED_PRODUCT_REVIEW_REQUEST_KEYS.has(key)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "Request contains unsupported fields.",
+      };
+    }
+  }
+
+  const provider = obj.provider;
+  if (provider !== "gemini" && provider !== "openai") {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "provider must be gemini or openai.",
+    };
+  }
+  if (obj.task !== "review_product") {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "task must be review_product.",
+    };
+  }
+
+  let productId: number | null = null;
+  if (typeof obj.productId === "number") {
+    if (!Number.isSafeInteger(obj.productId) || obj.productId <= 0) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "productId is invalid.",
+      };
+    }
+    productId = obj.productId;
+  } else if (typeof obj.productId === "string") {
+    const normalized = normalizeEntityId(obj.productId);
+    if (!normalized) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "productId is invalid.",
+      };
+    }
+    productId = Number(normalized);
+  } else {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "productId is required.",
+    };
+  }
+
+  let productKind: ProductKindHint | undefined;
+  if (obj.productKind !== undefined) {
+    if (
+      typeof obj.productKind !== "string" ||
+      !PRODUCT_KIND_HINTS.has(obj.productKind as ProductKindHint)
+    ) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "productKind is invalid.",
+      };
+    }
+    productKind = obj.productKind as ProductKindHint;
+  }
+
+  const copyParsed = parseReviewEditorCopy(obj.currentEditorCopy);
+  if (!copyParsed.ok) return copyParsed;
+
+  return {
+    ok: true,
+    request: {
+      provider,
+      task: "review_product",
+      productId,
+      ...(productKind ? { productKind } : {}),
+      currentEditorCopy: copyParsed.currentEditorCopy,
+    },
+  };
+}
+
+export function buildReviewProductSystemInstruction(
+  context: ProductAiReviewContext
+): string {
+  return [
+    "You are the Firestick4UK CMS existing-product copy reviewer.",
+    "You advise on wording and SEO copy only. You are NOT the SEO health authority.",
+    "Deterministic CMS diagnostics remain authoritative for SEO health.",
+    "Supplied dbTruth is the only source of protected business identity facts.",
+    "Do not propose or generate a replacement public slug.",
+    "Do not suggest changes to price, category, stock, active, image, og_image, badge, or id.",
+    "name is identity-sensitive: you may suggest/flag wording, but treat rename as cautionary.",
+    "If a field is already good, set suggested to null and status to ok.",
+    "Do not force changes merely to produce output.",
+    "Plain text only — no HTML, markdown fences, or scripts.",
+    "Do not claim Google ranking, indexing, GSC status, traffic, or search volume.",
+    "Do not fabricate ratings, reviews, channel counts, trials, discounts, offers, uptime, guarantees,",
+    "unsupported device compatibility, or unsupported service claims.",
+    "Do not invent missing business facts.",
+    productKindGuardText(context.productKind),
+    `Review these fields only: ${PRODUCT_AI_REVIEW_FIELDS.join(", ")}.`,
+    `Reason max ${PRODUCT_AI_REASON_MAX} characters.`,
+    "status must be ok, suggest, or warning.",
+    "confidence if present must be high, medium, or low.",
+    "Return only the required normalized structured JSON.",
+    "No persona or roleplay.",
+  ].join(" ");
+}
+
+export function buildReviewProductUserPrompt(
+  context: ProductAiReviewContext
+): string {
+  return [
+    "Existing product AI review context (compact JSON):",
+    JSON.stringify({
+      productId: context.productId,
+      productKind: context.productKind,
+      reviewFields: PRODUCT_AI_REVIEW_FIELDS,
+      dbTruth: {
+        id: context.dbTruth.id,
+        name: context.dbTruth.name,
+        slug: context.dbTruth.slug,
+        category: context.dbTruth.category,
+        priceGbp: context.dbTruth.priceGbp,
+        stockLabel: context.dbTruth.stockLabel,
+        active: context.dbTruth.active,
+        // URLs omitted from prompt body size; presence flags only
+        hasImage: Boolean(context.dbTruth.imageUrl),
+        hasOgImage: Boolean(context.dbTruth.ogImageUrl),
+      },
+      reviewCopy: context.reviewCopy,
+    }),
+    "Return one review entry per reviewFields item. Do not invent a slug suggestion.",
+  ].join("\n");
+}
+
+export function buildReviewProductJsonSchema(): Record<string, unknown> {
+  const itemSchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["field", "current", "suggested", "reason", "status"],
+    properties: {
+      field: { type: "string", enum: [...PRODUCT_AI_REVIEW_FIELDS] },
+      current: { type: "string" },
+      suggested: { type: ["string", "null"] },
+      reason: { type: "string" },
+      status: { type: "string", enum: ["ok", "suggest", "warning"] },
+      confidence: { type: "string", enum: ["high", "medium", "low"] },
+    },
+  };
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["review"],
+    properties: {
+      review: {
+        type: "array",
+        minItems: PRODUCT_AI_REVIEW_FIELDS.length,
+        maxItems: PRODUCT_AI_REVIEW_FIELDS.length,
+        items: itemSchema,
+      },
+    },
+  };
+}
+
+function reviewFieldMax(field: ProductAiReviewField): number {
+  if (field === "name") return PRODUCT_AI_FIELD_MAX.name;
+  return PRODUCT_AI_FIELD_MAX[field as ProductAiNewEditableField] ?? 600;
+}
+
+function validateOneReviewItem(
+  raw: unknown,
+  expectedCurrent: Record<ProductAiReviewField, string>
+):
+  | { ok: true; item: ProductAiReviewItem }
+  | { ok: false; code: "malformed_provider_output"; message: string } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  const obj = raw as Record<string, unknown>;
+  const allowed = new Set([
+    "field",
+    "current",
+    "suggested",
+    "reason",
+    "status",
+    "confidence",
+  ]);
+  for (const key of Object.keys(obj)) {
+    if (!allowed.has(key)) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned an unusable product review.",
+      };
+    }
+  }
+  if (typeof obj.field !== "string" || !REVIEW_FIELD_SET.has(obj.field)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  if (obj.field === "slug" || C_CLASS_FIELDS.has(obj.field) || obj.field === "badge") {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  const field = obj.field as ProductAiReviewField;
+  if (typeof obj.current !== "string") {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  const current = obj.current.trim();
+  if (
+    current.length > PRODUCT_AI_REVIEW_CURRENT_MAX ||
+    looksLikeHtmlOrScript(current)
+  ) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  // Prefer server-known current text; accept provider current if empty/match-ish.
+  const authoritativeCurrent = expectedCurrent[field] || "";
+  const normalizedCurrent =
+    authoritativeCurrent || current.slice(0, reviewFieldMax(field));
+
+  if (typeof obj.reason !== "string") {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  const reason = obj.reason.trim();
+  if (
+    !reason ||
+    reason.length > PRODUCT_AI_REASON_MAX ||
+    looksLikeHtmlOrScript(reason)
+  ) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  if (typeof obj.status !== "string" || !REVIEW_STATUS_SET.has(obj.status as ProductAiReviewStatus)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  const status = obj.status as ProductAiReviewStatus;
+
+  let suggested: string | null = null;
+  if (obj.suggested === null || obj.suggested === undefined) {
+    suggested = null;
+  } else if (typeof obj.suggested === "string") {
+    const s = obj.suggested.trim();
+    if (!s) {
+      suggested = null;
+    } else if (
+      s.length > PRODUCT_AI_REVIEW_SUGGESTED_MAX ||
+      looksLikeHtmlOrScript(s) ||
+      s.length > reviewFieldMax(field)
+    ) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned an unusable product review.",
+      };
+    } else {
+      suggested = s;
+    }
+  } else {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+
+  if (status === "ok" && suggested !== null) {
+    // Allow ok with null only — coerce inconsistent ok+suggestion.
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  if ((status === "suggest" || status === "warning") && suggested === null) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+
+  let confidence: ProductAiReviewConfidence | undefined;
+  if (obj.confidence !== undefined) {
+    if (
+      typeof obj.confidence !== "string" ||
+      !REVIEW_CONFIDENCE_SET.has(obj.confidence as ProductAiReviewConfidence)
+    ) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned an unusable product review.",
+      };
+    }
+    confidence = obj.confidence as ProductAiReviewConfidence;
+  }
+
+  const item: ProductAiReviewItem = {
+    field,
+    current: normalizedCurrent,
+    suggested,
+    reason,
+    status,
+  };
+  if (confidence) item.confidence = confidence;
+  return { ok: true, item };
+}
+
+export function validateProductReview(
+  value: unknown,
+  expectedCurrent: Record<ProductAiReviewField, string>
+):
+  | { ok: true; review: ProductAiReviewItem[] }
+  | { ok: false; code: "malformed_provider_output"; message: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  const root = value as Record<string, unknown>;
+  if (Object.keys(root).some((k) => k !== "review")) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  if (!Array.isArray(root.review)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  if (root.review.length !== PRODUCT_AI_REVIEW_FIELDS.length) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+
+  const seen = new Set<string>();
+  const review: ProductAiReviewItem[] = [];
+  for (const raw of root.review) {
+    const one = validateOneReviewItem(raw, expectedCurrent);
+    if (!one.ok) return one;
+    if (seen.has(one.item.field)) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned an unusable product review.",
+      };
+    }
+    seen.add(one.item.field);
+    review.push(one.item);
+  }
+  for (const field of PRODUCT_AI_REVIEW_FIELDS) {
+    if (!seen.has(field)) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned an unusable product review.",
+      };
+    }
+  }
+  return { ok: true, review };
+}
+
+export function parseProductReviewJsonText(
+  text: string,
+  expectedCurrent: Record<ProductAiReviewField, string>
+):
+  | { ok: true; review: ProductAiReviewItem[] }
+  | { ok: false; code: "malformed_provider_output"; message: string } {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
+  try {
+    return validateProductReview(JSON.parse(raw), expectedCurrent);
+  } catch {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable product review.",
+    };
+  }
 }

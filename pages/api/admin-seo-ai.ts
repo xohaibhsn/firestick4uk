@@ -1,7 +1,8 @@
 /**
- * Authenticated SEO AI assistance (AI-1A explain, AI-1B draft metadata, PAI-2 product fields).
- * POST only: explain one verified deterministic SEO issue, draft metadata suggestions,
- * or draft product fields via exactly one selected provider.
+ * Authenticated SEO AI assistance (AI-1A explain, AI-1B draft metadata,
+ * PAI-2 product fields, PAI-4 existing product review).
+ * POST only: explain, draft metadata, draft product fields, or review product
+ * via exactly one selected provider.
  * No CMS writes. No Issue Memory. No Berlin coupling.
  */
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -15,7 +16,9 @@ import { parseSeoAiRequest } from "@/lib/seoAi";
 import {
   buildMetadataDraftContext,
   buildProductFieldsDraftContext,
+  buildProductReviewContext,
   dispatchProductFieldsDraft,
+  dispatchProductReview,
   dispatchSeoAiDraft,
   dispatchSeoAiExplain,
   getProviderEnvConfig,
@@ -171,6 +174,52 @@ export default async function handler(
       productId:
         request.productId == null ? null : String(request.productId),
       suggestions: result.suggestions,
+    });
+  }
+
+  if (parsed.request.task === "review_product") {
+    if (!hasAdminPermission(role, "products.manage")) {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "You do not have permission for this action.",
+      });
+    }
+
+    const request = parsed.request;
+    const dbRow = await loadProductFieldsAuthorityRow(request.productId);
+    if (!dbRow) {
+      return res.status(404).json({
+        ok: false,
+        code: "entity_not_found",
+        message: "Entity not found.",
+      });
+    }
+
+    const context = buildProductReviewContext(request, dbRow);
+    const cfg = getProviderEnvConfig(request.provider);
+    if (!cfg.configured) {
+      return res.status(503).json({
+        ok: false,
+        code: "provider_not_configured",
+        message: "Selected AI provider is not configured.",
+      });
+    }
+
+    const result = await dispatchProductReview(request.provider, context);
+    if (!result.ok) {
+      return res.status(result.status).json({
+        ok: false,
+        code: result.code,
+        message: result.message,
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      provider: request.provider,
+      task: "review_product",
+      productId: String(request.productId),
+      review: result.review,
     });
   }
 
