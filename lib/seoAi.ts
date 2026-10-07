@@ -4,7 +4,11 @@
  */
 
 export type SeoAiProvider = "gemini" | "openai";
-export type SeoAiTask = "explain_issue" | "draft_metadata";
+export type ProductAiProvider = SeoAiProvider;
+export type SeoAiTask =
+  | "explain_issue"
+  | "draft_metadata"
+  | "draft_product_fields";
 
 export type SeoAiExplainRequest = {
   provider: SeoAiProvider;
@@ -27,7 +31,108 @@ export type SeoAiDraftRequest = {
   unsaved?: SeoAiDraftUnsaved;
 };
 
-export type SeoAiRequest = SeoAiExplainRequest | SeoAiDraftRequest;
+/** Request-time only; never persisted. */
+export type ProductKindHint =
+  | "digital_subscription"
+  | "physical"
+  | "unknown";
+
+/** New unsaved product — draft/apply whitelist (no badge). */
+export const PRODUCT_AI_NEW_EDITABLE_FIELDS = [
+  "name",
+  "slug",
+  "short_description",
+  "full_description",
+  "features",
+  "seo_title",
+  "meta_description",
+  "focus_keyword",
+] as const;
+
+/** Existing saved product — draft/apply-safe whitelist (no name/slug/badge). */
+export const PRODUCT_AI_EXISTING_EDITABLE_FIELDS = [
+  "short_description",
+  "full_description",
+  "features",
+  "seo_title",
+  "meta_description",
+  "focus_keyword",
+] as const;
+
+export type ProductAiNewEditableField =
+  (typeof PRODUCT_AI_NEW_EDITABLE_FIELDS)[number];
+export type ProductAiExistingEditableField =
+  (typeof PRODUCT_AI_EXISTING_EDITABLE_FIELDS)[number];
+export type ProductAiEditableField =
+  | ProductAiNewEditableField
+  | ProductAiExistingEditableField;
+
+export type ProductAiAuthoritative = {
+  productKind: ProductKindHint;
+  brand?: string;
+  canonicalName: string;
+  category?: "Subscription" | "Device" | "Bundle";
+  priceGbp?: number;
+  stockLabel?: string;
+  active?: boolean;
+  slug?: string | null;
+  productId?: number | null;
+  duration?: string;
+  variant?: string;
+  confirmedCompatibility?: string[];
+  confirmedFeatures?: string[];
+  approvedClaims?: string[];
+  imageUrl?: string | null;
+  ogImageUrl?: string | null;
+};
+
+export type ProductAiEditorCopy = {
+  name?: string;
+  slug?: string;
+  short_description?: string;
+  full_description?: string;
+  features?: string;
+  seo_title?: string;
+  meta_description?: string;
+  focus_keyword?: string;
+};
+
+export type SeoAiProductFieldsRequest = {
+  provider: SeoAiProvider;
+  task: "draft_product_fields";
+  productId: number | null;
+  productKind: ProductKindHint;
+  requestedFields: ProductAiEditableField[];
+  authoritative: ProductAiAuthoritative;
+  currentEditorCopy: ProductAiEditorCopy;
+};
+
+export type ProductAiFieldSuggestion = {
+  value: string;
+  reason?: string;
+};
+
+export type ProductAiFieldUnavailable = {
+  unavailable: true;
+  reason: string;
+};
+
+export type ProductAiSuggestions = Partial<
+  Record<ProductAiEditableField, ProductAiFieldSuggestion>
+>;
+
+export type ProductAiDraftContext = {
+  productId: number | null;
+  productKind: ProductKindHint;
+  requestedFields: ProductAiEditableField[];
+  authoritative: ProductAiAuthoritative;
+  currentEditorCopy: ProductAiEditorCopy;
+};
+
+export type SeoAiRequest =
+  | SeoAiExplainRequest
+  | SeoAiDraftRequest
+  | SeoAiProductFieldsRequest;
 
 export type SeoAiMetadataDraft = {
   titles: string[];
@@ -52,6 +157,24 @@ export type SeoAiMetadataDraftContext = {
 export const PRODUCT_TITLE_MAX = 70;
 export const BLOG_TITLE_MAX = 75;
 export const META_DESC_MAX = 180;
+
+/** Deterministic output/input bounds for product AI drafting. */
+export const PRODUCT_AI_FIELD_MAX: Record<ProductAiNewEditableField, number> = {
+  name: 200,
+  slug: 120,
+  short_description: 600,
+  full_description: 8000,
+  features: 4000,
+  seo_title: PRODUCT_TITLE_MAX,
+  meta_description: META_DESC_MAX,
+  focus_keyword: 120,
+};
+
+export const PRODUCT_AI_REASON_MAX = 300;
+export const PRODUCT_AI_CANONICAL_NAME_MAX = 200;
+export const PRODUCT_AI_CLAIM_ITEM_MAX = 200;
+export const PRODUCT_AI_CLAIM_LIST_MAX = 12;
+export const PRODUCT_AI_BRAND_MAX = 80;
 
 export type SeoAiExplanation = {
   summary: string;
@@ -143,6 +266,15 @@ const ALLOWED_DRAFT_REQUEST_KEYS = new Set([
   "entityId",
   "unsaved",
 ]);
+const ALLOWED_PRODUCT_FIELDS_REQUEST_KEYS = new Set([
+  "provider",
+  "task",
+  "productId",
+  "productKind",
+  "requestedFields",
+  "authoritative",
+  "currentEditorCopy",
+]);
 const ALLOWED_UNSAVED_KEYS = new Set([
   "seoTitle",
   "metaDescription",
@@ -155,6 +287,57 @@ const UNSAVED_FIELD_MAX: Record<keyof SeoAiDraftUnsaved, number> = {
   focusKeyword: 200,
   displayTitle: 300,
 };
+
+const PRODUCT_KIND_HINTS = new Set<ProductKindHint>([
+  "digital_subscription",
+  "physical",
+  "unknown",
+]);
+const PRODUCT_CATEGORIES = new Set(["Subscription", "Device", "Bundle"]);
+const NEW_FIELD_SET = new Set<string>(PRODUCT_AI_NEW_EDITABLE_FIELDS);
+const EXISTING_FIELD_SET = new Set<string>(PRODUCT_AI_EXISTING_EDITABLE_FIELDS);
+const C_CLASS_FIELDS = new Set([
+  "id",
+  "price",
+  "stock",
+  "active",
+  "image",
+  "og_image",
+  "category",
+  "badge",
+  "priceGbp",
+  "stockLabel",
+  "imageUrl",
+  "ogImageUrl",
+]);
+const ALLOWED_AUTHORITATIVE_KEYS = new Set([
+  "productKind",
+  "brand",
+  "canonicalName",
+  "category",
+  "priceGbp",
+  "stockLabel",
+  "active",
+  "slug",
+  "productId",
+  "duration",
+  "variant",
+  "confirmedCompatibility",
+  "confirmedFeatures",
+  "approvedClaims",
+  "imageUrl",
+  "ogImageUrl",
+]);
+const ALLOWED_EDITOR_COPY_KEYS = new Set([
+  "name",
+  "slug",
+  "short_description",
+  "full_description",
+  "features",
+  "seo_title",
+  "meta_description",
+  "focus_keyword",
+]);
 
 function looksLikeHtmlOrScript(value: string): boolean {
   return /<\s*\/?\s*[a-z]|javascript\s*:|on\w+\s*=/i.test(value);
@@ -318,6 +501,7 @@ export function parseSeoAiRequest(
 ):
   | { ok: true; request: SeoAiExplainRequest }
   | { ok: true; request: SeoAiDraftRequest }
+  | { ok: true; request: SeoAiProductFieldsRequest }
   | { ok: false; code: "invalid_request"; message: string } {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return {
@@ -340,11 +524,15 @@ export function parseSeoAiRequest(
     }
     return parseExplainIssueRequest(body);
   }
+  if (task === "draft_product_fields") {
+    return parseProductFieldsRequest(body);
+  }
   if (task !== "draft_metadata") {
     return {
       ok: false,
       code: "invalid_request",
-      message: "task must be explain_issue or draft_metadata.",
+      message:
+        "task must be explain_issue, draft_metadata, or draft_product_fields.",
     };
   }
   for (const key of Object.keys(obj)) {
@@ -720,4 +908,830 @@ export function draftContextContainsRawHtml(
   return /<\s*(?:img|p|div|span|script|style|a|h[1-6]|ul|ol|li|table|br|strong|em)\b/i.test(
     blob
   );
+}
+
+// ---------------------------------------------------------------------------
+// PAI-2 — draft_product_fields
+// ---------------------------------------------------------------------------
+
+export function defaultProductKindFromCategory(
+  category: unknown
+): ProductKindHint {
+  const c = String(category || "").trim();
+  if (c === "Subscription") return "digital_subscription";
+  if (c === "Device") return "physical";
+  return "unknown";
+}
+
+export function productAiWhitelistFor(
+  productId: number | null
+): readonly ProductAiEditableField[] {
+  return productId == null
+    ? PRODUCT_AI_NEW_EDITABLE_FIELDS
+    : PRODUCT_AI_EXISTING_EDITABLE_FIELDS;
+}
+
+export function normalizeProductAiSlug(value: string): string | null {
+  const raw = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  if (!raw) return null;
+  if (raw.includes("/") || raw.includes("\\") || raw.includes("..")) return null;
+  if (raw.length > PRODUCT_AI_FIELD_MAX.slug) return null;
+  return raw;
+}
+
+function optionalPlainText(
+  value: unknown,
+  max: number
+):
+  | { ok: true; value?: string }
+  | { ok: false; message: string } {
+  if (value === undefined || value === null) return { ok: true };
+  if (typeof value !== "string") {
+    return { ok: false, message: "must be a string." };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: true };
+  if (trimmed.length > max || looksLikeHtmlOrScript(trimmed)) {
+    return { ok: false, message: "is invalid." };
+  }
+  return { ok: true, value: trimmed };
+}
+
+function parseStringList(
+  value: unknown,
+  label: string
+):
+  | { ok: true; value?: string[] }
+  | { ok: false; message: string } {
+  if (value === undefined || value === null) return { ok: true };
+  if (!Array.isArray(value)) {
+    return { ok: false, message: `${label} must be an array.` };
+  }
+  if (value.length > PRODUCT_AI_CLAIM_LIST_MAX) {
+    return { ok: false, message: `${label} is too long.` };
+  }
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") {
+      return { ok: false, message: `${label} items must be strings.` };
+    }
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    if (
+      trimmed.length > PRODUCT_AI_CLAIM_ITEM_MAX ||
+      looksLikeHtmlOrScript(trimmed)
+    ) {
+      return { ok: false, message: `${label} contains an invalid item.` };
+    }
+    out.push(trimmed);
+  }
+  return { ok: true, value: out.length ? out : undefined };
+}
+
+function parseOptionalUrl(
+  value: unknown,
+  label: string
+):
+  | { ok: true; value?: string | null }
+  | { ok: false; message: string } {
+  if (value === undefined) return { ok: true };
+  if (value === null) return { ok: true, value: null };
+  if (typeof value !== "string") {
+    return { ok: false, message: `${label} must be a string or null.` };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: true, value: null };
+  if (trimmed.length > 500 || looksLikeHtmlOrScript(trimmed)) {
+    return { ok: false, message: `${label} is invalid.` };
+  }
+  return { ok: true, value: trimmed };
+}
+
+export function parseProductAiAuthoritative(
+  value: unknown,
+  productId: number | null
+):
+  | { ok: true; authoritative: ProductAiAuthoritative }
+  | { ok: false; code: "invalid_request"; message: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "authoritative must be an object.",
+    };
+  }
+  const obj = value as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (!ALLOWED_AUTHORITATIVE_KEYS.has(key)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "authoritative contains unsupported fields.",
+      };
+    }
+  }
+
+  const productKind = obj.productKind;
+  if (
+    typeof productKind !== "string" ||
+    !PRODUCT_KIND_HINTS.has(productKind as ProductKindHint)
+  ) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "authoritative.productKind is invalid.",
+    };
+  }
+
+  const nameParsed = optionalPlainText(
+    obj.canonicalName,
+    PRODUCT_AI_CANONICAL_NAME_MAX
+  );
+  if (!nameParsed.ok) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: `authoritative.canonicalName ${nameParsed.message}`,
+    };
+  }
+  if (!nameParsed.value) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "authoritative.canonicalName is required.",
+    };
+  }
+
+  const authoritative: ProductAiAuthoritative = {
+    productKind: productKind as ProductKindHint,
+    canonicalName: nameParsed.value,
+  };
+
+  const brand = optionalPlainText(obj.brand, PRODUCT_AI_BRAND_MAX);
+  if (!brand.ok) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: `authoritative.brand ${brand.message}`,
+    };
+  }
+  if (brand.value) authoritative.brand = brand.value;
+
+  if (obj.category !== undefined && obj.category !== null) {
+    const cat = String(obj.category).trim();
+    if (!PRODUCT_CATEGORIES.has(cat)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "authoritative.category is invalid.",
+      };
+    }
+    authoritative.category = cat as ProductAiAuthoritative["category"];
+  }
+
+  if (obj.priceGbp !== undefined && obj.priceGbp !== null) {
+    if (typeof obj.priceGbp !== "number" || !Number.isFinite(obj.priceGbp) || obj.priceGbp < 0) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "authoritative.priceGbp is invalid.",
+      };
+    }
+    authoritative.priceGbp = obj.priceGbp;
+  }
+
+  const stock = optionalPlainText(obj.stockLabel, 120);
+  if (!stock.ok) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: `authoritative.stockLabel ${stock.message}`,
+    };
+  }
+  if (stock.value) authoritative.stockLabel = stock.value;
+
+  if (obj.active !== undefined && obj.active !== null) {
+    if (typeof obj.active !== "boolean") {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "authoritative.active must be a boolean.",
+      };
+    }
+    authoritative.active = obj.active;
+  }
+
+  if (obj.slug !== undefined) {
+    if (obj.slug === null) {
+      authoritative.slug = null;
+    } else if (typeof obj.slug === "string") {
+      const trimmed = obj.slug.trim();
+      if (!trimmed) {
+        authoritative.slug = null;
+      } else {
+        const normalized = normalizeProductAiSlug(trimmed);
+        if (!normalized) {
+          return {
+            ok: false,
+            code: "invalid_request",
+            message: "authoritative.slug is invalid.",
+          };
+        }
+        authoritative.slug = normalized;
+      }
+    } else {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "authoritative.slug is invalid.",
+      };
+    }
+  }
+
+  if (obj.productId !== undefined && obj.productId !== null) {
+    if (
+      typeof obj.productId !== "number" ||
+      !Number.isSafeInteger(obj.productId) ||
+      obj.productId <= 0
+    ) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "authoritative.productId is invalid.",
+      };
+    }
+    if (productId != null && obj.productId !== productId) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "authoritative.productId must match productId.",
+      };
+    }
+    authoritative.productId = obj.productId;
+  } else if (productId != null) {
+    authoritative.productId = productId;
+  } else {
+    authoritative.productId = null;
+  }
+
+  for (const key of ["duration", "variant"] as const) {
+    const parsed = optionalPlainText(obj[key], 120);
+    if (!parsed.ok) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: `authoritative.${key} ${parsed.message}`,
+      };
+    }
+    if (parsed.value) authoritative[key] = parsed.value;
+  }
+
+  for (const key of [
+    "confirmedCompatibility",
+    "confirmedFeatures",
+    "approvedClaims",
+  ] as const) {
+    const list = parseStringList(obj[key], `authoritative.${key}`);
+    if (!list.ok) {
+      return { ok: false, code: "invalid_request", message: list.message };
+    }
+    if (list.value) authoritative[key] = list.value;
+  }
+
+  const imageUrl = parseOptionalUrl(obj.imageUrl, "authoritative.imageUrl");
+  if (!imageUrl.ok) {
+    return { ok: false, code: "invalid_request", message: imageUrl.message };
+  }
+  if (imageUrl.value !== undefined) authoritative.imageUrl = imageUrl.value;
+
+  const ogImageUrl = parseOptionalUrl(obj.ogImageUrl, "authoritative.ogImageUrl");
+  if (!ogImageUrl.ok) {
+    return { ok: false, code: "invalid_request", message: ogImageUrl.message };
+  }
+  if (ogImageUrl.value !== undefined) authoritative.ogImageUrl = ogImageUrl.value;
+
+  return { ok: true, authoritative };
+}
+
+export function parseProductAiEditorCopy(
+  value: unknown
+):
+  | { ok: true; currentEditorCopy: ProductAiEditorCopy }
+  | { ok: false; code: "invalid_request"; message: string } {
+  if (value === undefined || value === null) {
+    return { ok: true, currentEditorCopy: {} };
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "currentEditorCopy must be an object.",
+    };
+  }
+  const obj = value as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (!ALLOWED_EDITOR_COPY_KEYS.has(key)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "currentEditorCopy contains unsupported fields.",
+      };
+    }
+  }
+  const copy: ProductAiEditorCopy = {};
+  for (const field of ALLOWED_EDITOR_COPY_KEYS) {
+    if (!(field in obj)) continue;
+    const max =
+      PRODUCT_AI_FIELD_MAX[field as ProductAiNewEditableField] ?? 600;
+    const parsed = optionalPlainText(obj[field], max);
+    if (!parsed.ok) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: `currentEditorCopy.${field} ${parsed.message}`,
+      };
+    }
+    if (parsed.value) {
+      (copy as Record<string, string>)[field] = parsed.value;
+    }
+  }
+  return { ok: true, currentEditorCopy: copy };
+}
+
+export function parseProductFieldsRequest(
+  body: unknown
+):
+  | { ok: true; request: SeoAiProductFieldsRequest }
+  | { ok: false; code: "invalid_request"; message: string } {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "Request body must be a JSON object.",
+    };
+  }
+  const obj = body as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (!ALLOWED_PRODUCT_FIELDS_REQUEST_KEYS.has(key)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "Request contains unsupported fields.",
+      };
+    }
+  }
+
+  const provider = obj.provider;
+  if (provider !== "gemini" && provider !== "openai") {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "provider must be gemini or openai.",
+    };
+  }
+  if (obj.task !== "draft_product_fields") {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "task must be draft_product_fields.",
+    };
+  }
+
+  let productId: number | null = null;
+  if (obj.productId === null || obj.productId === undefined) {
+    productId = null;
+  } else if (typeof obj.productId === "number") {
+    if (!Number.isSafeInteger(obj.productId) || obj.productId <= 0) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "productId is invalid.",
+      };
+    }
+    productId = obj.productId;
+  } else if (typeof obj.productId === "string") {
+    const normalized = normalizeEntityId(obj.productId);
+    if (!normalized) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "productId is invalid.",
+      };
+    }
+    productId = Number(normalized);
+  } else {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "productId is invalid.",
+    };
+  }
+
+  const productKind = obj.productKind;
+  if (
+    typeof productKind !== "string" ||
+    !PRODUCT_KIND_HINTS.has(productKind as ProductKindHint)
+  ) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "productKind is invalid.",
+    };
+  }
+
+  if (!Array.isArray(obj.requestedFields) || obj.requestedFields.length < 1) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "requestedFields must be a non-empty array.",
+    };
+  }
+  if (obj.requestedFields.length > PRODUCT_AI_NEW_EDITABLE_FIELDS.length) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "requestedFields is too long.",
+    };
+  }
+
+  const whitelist = new Set(productAiWhitelistFor(productId));
+  const seen = new Set<string>();
+  const requestedFields: ProductAiEditableField[] = [];
+  for (const field of obj.requestedFields) {
+    if (typeof field !== "string") {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "requestedFields contains an invalid field.",
+      };
+    }
+    if (C_CLASS_FIELDS.has(field) || field === "badge") {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: `Field '${field}' is not allowed for AI drafting.`,
+      };
+    }
+    if (seen.has(field)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "requestedFields must not contain duplicates.",
+      };
+    }
+    seen.add(field);
+    if (!NEW_FIELD_SET.has(field) && !EXISTING_FIELD_SET.has(field)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: `Field '${field}' is not supported.`,
+      };
+    }
+    if (!whitelist.has(field as ProductAiEditableField)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message:
+          productId == null
+            ? `Field '${field}' is not allowed for new products.`
+            : `Field '${field}' is not allowed for existing product drafting.`,
+      };
+    }
+    requestedFields.push(field as ProductAiEditableField);
+  }
+
+  const authParsed = parseProductAiAuthoritative(obj.authoritative, productId);
+  if (!authParsed.ok) return authParsed;
+  if (authParsed.authoritative.productKind !== productKind) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "authoritative.productKind must match productKind.",
+    };
+  }
+
+  const copyParsed = parseProductAiEditorCopy(obj.currentEditorCopy);
+  if (!copyParsed.ok) return copyParsed;
+
+  return {
+    ok: true,
+    request: {
+      provider,
+      task: "draft_product_fields",
+      productId,
+      productKind: productKind as ProductKindHint,
+      requestedFields,
+      authoritative: authParsed.authoritative,
+      currentEditorCopy: copyParsed.currentEditorCopy,
+    },
+  };
+}
+
+function productKindGuardText(kind: ProductKindHint): string {
+  if (kind === "digital_subscription") {
+    return [
+      "Product kind is digital_subscription.",
+      "Do not invent channel counts, uptime, trials, device compatibility, activation guarantees, duration, or service guarantees unless explicitly supplied in authoritative facts.",
+    ].join(" ");
+  }
+  if (kind === "physical") {
+    return [
+      "Product kind is physical.",
+      "Do not invent dimensions, weight, material, shipping times, warranty, accessories, or stock quantity/specifications unless explicitly supplied in authoritative facts.",
+    ].join(" ");
+  }
+  return [
+    "Product kind is unknown.",
+    "Be conservative. Draft only generic copy grounded in explicitly supplied authoritative facts.",
+  ].join(" ");
+}
+
+export function buildProductFieldsSystemInstruction(
+  context: ProductAiDraftContext
+): string {
+  const maxLines = context.requestedFields.map(
+    (f) => `${f}<=${PRODUCT_AI_FIELD_MAX[f as ProductAiNewEditableField]}`
+  );
+  return [
+    "You are the Firestick4UK CMS product content assistant.",
+    "Supplied authoritative facts are the only source of business truth.",
+    "Do not invent missing business facts.",
+    "Do not rewrite price, stock, active, category, image URL, or OG image URL.",
+    "Return only the requested fields.",
+    "Plain text only — no HTML, markdown fences, or scripts.",
+    "Do not claim Google ranking, indexing, traffic, or search volume.",
+    "Do not fabricate ratings, reviews, or search volume.",
+    "Do not claim auto-save or publish.",
+    productKindGuardText(context.productKind),
+    `Character limits: ${maxLines.join(", ")}.`,
+    "If a requested field cannot be drafted safely from supplied facts, mark it unavailable with a short reason instead of inventing content.",
+    "Return only the required normalized structured JSON.",
+    "No persona or roleplay.",
+  ].join(" ");
+}
+
+export function buildProductFieldsUserPrompt(
+  context: ProductAiDraftContext
+): string {
+  return [
+    "Product AI drafting context (compact JSON):",
+    JSON.stringify({
+      productId: context.productId,
+      productKind: context.productKind,
+      requestedFields: context.requestedFields,
+      authoritative: context.authoritative,
+      currentEditorCopy: context.currentEditorCopy,
+    }),
+    "Draft suggestions only for requestedFields using the required structured output.",
+  ].join("\n");
+}
+
+export function buildProductFieldsJsonSchema(
+  requestedFields: ProductAiEditableField[]
+): Record<string, unknown> {
+  const suggestionSchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["unavailable", "value", "reason"],
+    properties: {
+      unavailable: { type: "boolean" },
+      value: { type: "string" },
+      reason: { type: "string" },
+    },
+  };
+  const properties: Record<string, unknown> = {};
+  for (const field of requestedFields) {
+    properties[field] = suggestionSchema;
+  }
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["suggestions"],
+    properties: {
+      suggestions: {
+        type: "object",
+        additionalProperties: false,
+        required: requestedFields,
+        properties,
+      },
+    },
+  };
+}
+
+function validateOneProductSuggestion(
+  field: ProductAiEditableField,
+  raw: unknown
+):
+  | { ok: true; suggestion?: ProductAiFieldSuggestion }
+  | { ok: false; code: "malformed_provider_output"; message: string } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable product suggestions.",
+    };
+  }
+  const obj = raw as Record<string, unknown>;
+  const allowed = new Set(["unavailable", "value", "reason"]);
+  for (const key of Object.keys(obj)) {
+    if (!allowed.has(key)) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned unusable product suggestions.",
+      };
+    }
+  }
+  if (typeof obj.unavailable !== "boolean") {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable product suggestions.",
+    };
+  }
+  if (typeof obj.value !== "string" || typeof obj.reason !== "string") {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable product suggestions.",
+    };
+  }
+  const reason = obj.reason.trim();
+  if (reason.length > PRODUCT_AI_REASON_MAX || looksLikeHtmlOrScript(reason)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable product suggestions.",
+    };
+  }
+  if (obj.unavailable) {
+    if (!reason) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned unusable product suggestions.",
+      };
+    }
+    return { ok: true };
+  }
+
+  let value = obj.value.trim();
+  if (!value || looksLikeHtmlOrScript(value)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable product suggestions.",
+    };
+  }
+  if (field === "slug") {
+    const normalized = normalizeProductAiSlug(value);
+    if (!normalized) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned unusable product suggestions.",
+      };
+    }
+    value = normalized;
+  }
+  const max = PRODUCT_AI_FIELD_MAX[field as ProductAiNewEditableField];
+  if (value.length > max) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable product suggestions.",
+    };
+  }
+  const suggestion: ProductAiFieldSuggestion = { value };
+  if (reason) suggestion.reason = reason;
+  return { ok: true, suggestion };
+}
+
+export function validateProductFieldsDraft(
+  value: unknown,
+  requestedFields: ProductAiEditableField[]
+):
+  | { ok: true; suggestions: ProductAiSuggestions }
+  | { ok: false; code: "malformed_provider_output"; message: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable product suggestions.",
+    };
+  }
+  const root = value as Record<string, unknown>;
+  if (Object.keys(root).some((k) => k !== "suggestions")) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable product suggestions.",
+    };
+  }
+  if (!root.suggestions || typeof root.suggestions !== "object" || Array.isArray(root.suggestions)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable product suggestions.",
+    };
+  }
+  const suggestionsObj = root.suggestions as Record<string, unknown>;
+  const requested = new Set(requestedFields);
+  for (const key of Object.keys(suggestionsObj)) {
+    if (!requested.has(key as ProductAiEditableField)) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned unusable product suggestions.",
+      };
+    }
+  }
+  for (const field of requestedFields) {
+    if (!(field in suggestionsObj)) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned unusable product suggestions.",
+      };
+    }
+  }
+
+  const suggestions: ProductAiSuggestions = {};
+  for (const field of requestedFields) {
+    const one = validateOneProductSuggestion(field, suggestionsObj[field]);
+    if (!one.ok) return one;
+    if (one.suggestion) suggestions[field] = one.suggestion;
+  }
+  return { ok: true, suggestions };
+}
+
+export function parseProductFieldsJsonText(
+  text: string,
+  requestedFields: ProductAiEditableField[]
+):
+  | { ok: true; suggestions: ProductAiSuggestions }
+  | { ok: false; code: "malformed_provider_output"; message: string } {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable product suggestions.",
+    };
+  }
+  try {
+    return validateProductFieldsDraft(JSON.parse(raw), requestedFields);
+  } catch {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned unusable product suggestions.",
+    };
+  }
+}
+
+/**
+ * Merge DB truth over client authoritative for C-class / identity fields.
+ * Text drafting context still comes from currentEditorCopy.
+ */
+export function mergeProductAuthoritativeWithDb(
+  client: ProductAiAuthoritative,
+  row: {
+    id: number | string;
+    name?: string | null;
+    slug?: string | null;
+    category?: string | null;
+    price?: number | string | null;
+    stock?: string | null;
+    active?: number | boolean | null;
+    image?: string | null;
+    og_image?: string | null;
+  }
+): ProductAiAuthoritative {
+  const priceNum = Number(row.price);
+  return {
+    ...client,
+    productId: Number(row.id),
+    canonicalName: String(row.name || client.canonicalName).trim() || client.canonicalName,
+    slug: String(row.slug || "").trim() || null,
+    category: (String(row.category || "").trim() ||
+      client.category) as ProductAiAuthoritative["category"],
+    priceGbp: Number.isFinite(priceNum) ? priceNum : client.priceGbp,
+    stockLabel: String(row.stock || "").trim() || client.stockLabel,
+    active:
+      row.active === true || row.active === 1
+        ? true
+        : row.active === false || row.active === 0
+          ? false
+          : client.active,
+    imageUrl: String(row.image || "").trim() || null,
+    ogImageUrl: String(row.og_image || "").trim() || null,
+    productKind: client.productKind,
+    brand: client.brand || "Firestick4UK",
+  };
 }

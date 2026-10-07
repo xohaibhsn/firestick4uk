@@ -1,7 +1,7 @@
 /**
- * Authenticated SEO AI assistance (AI-1A explain, AI-1B draft metadata).
- * POST only: explain one verified deterministic SEO issue or draft metadata suggestions
- * via exactly one selected provider.
+ * Authenticated SEO AI assistance (AI-1A explain, AI-1B draft metadata, PAI-2 product fields).
+ * POST only: explain one verified deterministic SEO issue, draft metadata suggestions,
+ * or draft product fields via exactly one selected provider.
  * No CMS writes. No Issue Memory. No Berlin coupling.
  */
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -14,11 +14,14 @@ import { RL_SEO_AI } from "@/lib/rateLimit";
 import { parseSeoAiRequest } from "@/lib/seoAi";
 import {
   buildMetadataDraftContext,
+  buildProductFieldsDraftContext,
+  dispatchProductFieldsDraft,
   dispatchSeoAiDraft,
   dispatchSeoAiExplain,
   getProviderEnvConfig,
   loadBlogDraftRow,
   loadProductDraftRow,
+  loadProductFieldsAuthorityRow,
   verifyDeterministicIssue,
 } from "@/lib/seoAiServer";
 
@@ -118,6 +121,56 @@ export default async function handler(
       task: "explain_issue",
       issueId: parsed.request.issueId,
       explanation: result.explanation,
+    });
+  }
+
+  if (parsed.request.task === "draft_product_fields") {
+    if (!hasAdminPermission(role, "products.manage")) {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "You do not have permission for this action.",
+      });
+    }
+
+    const request = parsed.request;
+    let dbRow = null;
+    if (request.productId != null) {
+      dbRow = await loadProductFieldsAuthorityRow(request.productId);
+      if (!dbRow) {
+        return res.status(404).json({
+          ok: false,
+          code: "entity_not_found",
+          message: "Entity not found.",
+        });
+      }
+    }
+
+    const context = buildProductFieldsDraftContext(request, dbRow);
+    const cfg = getProviderEnvConfig(request.provider);
+    if (!cfg.configured) {
+      return res.status(503).json({
+        ok: false,
+        code: "provider_not_configured",
+        message: "Selected AI provider is not configured.",
+      });
+    }
+
+    const result = await dispatchProductFieldsDraft(request.provider, context);
+    if (!result.ok) {
+      return res.status(result.status).json({
+        ok: false,
+        code: result.code,
+        message: result.message,
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      provider: request.provider,
+      task: "draft_product_fields",
+      productId:
+        request.productId == null ? null : String(request.productId),
+      suggestions: result.suggestions,
     });
   }
 

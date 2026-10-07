@@ -16,19 +16,27 @@ import {
   SEO_AI_EXPLANATION_JSON_SCHEMA,
   SEO_AI_METADATA_JSON_SCHEMA,
   SEO_AI_PROVIDER_TIMEOUT_MS,
+  buildProductFieldsJsonSchema,
+  buildProductFieldsSystemInstruction,
+  buildProductFieldsUserPrompt,
   buildSeoAiMetadataSystemInstruction,
   buildSeoAiMetadataUserPrompt,
   buildSeoAiSystemInstruction,
   buildSeoAiUserPrompt,
   buildVerifiedIssueContext,
   htmlToPlainTextBounded,
+  mergeProductAuthoritativeWithDb,
   parseExplanationJsonText,
   parseIssueId,
   parseMetadataJsonText,
+  parseProductFieldsJsonText,
+  type ProductAiDraftContext,
+  type ProductAiSuggestions,
   type SeoAiDraftUnsaved,
   type SeoAiExplanation,
   type SeoAiMetadataDraft,
   type SeoAiMetadataDraftContext,
+  type SeoAiProductFieldsRequest,
   type SeoAiProvider,
   type SeoAiPublicErrorCode,
   type SeoAiVerifiedIssueContext,
@@ -67,6 +75,25 @@ export type ProductDraftRow = {
   meta_description?: string | null;
   focus_keyword?: string | null;
   short_description?: string | null;
+};
+
+/** SELECT-only row for PAI-2 product field drafting (DB truth for C-class fields). */
+export type ProductFieldsAuthorityRow = {
+  id: number | string;
+  name?: string | null;
+  slug?: string | null;
+  category?: string | null;
+  price?: number | string | null;
+  stock?: string | null;
+  active?: number | boolean | null;
+  image?: string | null;
+  og_image?: string | null;
+  short_description?: string | null;
+  full_description?: string | null;
+  features?: string | null;
+  seo_title?: string | null;
+  meta_description?: string | null;
+  focus_keyword?: string | null;
 };
 
 export type BlogDraftRow = {
@@ -177,6 +204,57 @@ export async function loadProductDraftRow(
   );
   const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
   return row as ProductDraftRow | null;
+}
+
+export async function loadProductFieldsAuthorityRow(
+  productId: number
+): Promise<ProductFieldsAuthorityRow | null> {
+  const id = Number(productId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const [rows]: any = await pool.query(
+    `SELECT id, name, slug, category, price, stock, active, image, og_image,
+            short_description, full_description, features,
+            seo_title, meta_description, focus_keyword
+     FROM products
+     WHERE id = ?
+     LIMIT 1`,
+    [id]
+  );
+  const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
+  return row as ProductFieldsAuthorityRow | null;
+}
+
+export type LoadProductFieldsAuthorityRowFn = (
+  productId: number
+) => Promise<ProductFieldsAuthorityRow | null>;
+
+export type ProductFieldsProviderCallFn = (
+  context: ProductAiDraftContext
+) => Promise<{ ok: true; suggestions: ProductAiSuggestions } | SeoAiFailure>;
+
+/**
+ * Build drafting context. For saved products, DB truth wins for identity/C-class fields.
+ * SELECT-only. Never writes.
+ */
+export function buildProductFieldsDraftContext(
+  request: SeoAiProductFieldsRequest,
+  dbRow?: ProductFieldsAuthorityRow | null
+): ProductAiDraftContext {
+  const authoritative =
+    request.productId != null && dbRow
+      ? mergeProductAuthoritativeWithDb(request.authoritative, dbRow)
+      : {
+          ...request.authoritative,
+          productId: request.productId,
+          brand: request.authoritative.brand || "Firestick4UK",
+        };
+  return {
+    productId: request.productId,
+    productKind: request.productKind,
+    requestedFields: request.requestedFields,
+    authoritative,
+    currentEditorCopy: request.currentEditorCopy,
+  };
 }
 
 export async function loadBlogDraftRow(
@@ -712,6 +790,177 @@ export async function dispatchSeoAiDraft(
   }
   if (provider === "gemini") {
     const call = deps?.callGemini || callGeminiDraft;
+    return call(context);
+  }
+  return fail(400, "invalid_request", "provider must be gemini or openai.");
+}
+
+export async function callOpenAiProductFields(
+  context: ProductAiDraftContext
+): Promise<{ ok: true; suggestions: ProductAiSuggestions } | SeoAiFailure> {
+  const cfg = getProviderEnvConfig("openai");
+  if (!cfg.configured) {
+    return fail(
+      503,
+      "provider_not_configured",
+      "Selected AI provider is not configured."
+    );
+  }
+
+  const client = new OpenAI({
+    apiKey: cfg.apiKey,
+    maxRetries: 0,
+    timeout: SEO_AI_PROVIDER_TIMEOUT_MS,
+  });
+
+  try {
+    const response = await client.responses.create({
+      model: cfg.model,
+      store: false,
+      instructions: buildProductFieldsSystemInstruction(context),
+      input: buildProductFieldsUserPrompt(context),
+      text: {
+        format: {
+          type: "json_schema",
+          name: "product_ai_fields",
+          strict: true,
+          schema: buildProductFieldsJsonSchema(
+            context.requestedFields
+          ) as unknown as {
+            [key: string]: unknown;
+          },
+        },
+      },
+    });
+
+    const text =
+      typeof response.output_text === "string" ? response.output_text : "";
+    const parsed = parseProductFieldsJsonText(text, context.requestedFields);
+    if (!parsed.ok) {
+      console.error("[seo-ai] openai malformed product fields output");
+      return fail(
+        502,
+        "malformed_provider_output",
+        "The AI provider returned unusable product suggestions."
+      );
+    }
+    return { ok: true, suggestions: parsed.suggestions };
+  } catch (err) {
+    const status =
+      err && typeof err === "object" && "status" in err
+        ? Number((err as { status?: unknown }).status)
+        : NaN;
+    if (Number.isFinite(status) && status > 0) {
+      console.error(`[seo-ai] openai upstream failed: status ${status}`);
+      if (status === 408 || status === 504) {
+        return fail(
+          503,
+          "provider_timeout",
+          "The selected AI provider timed out. Please try again shortly."
+        );
+      }
+      return fail(
+        503,
+        "provider_upstream",
+        "The selected AI provider is temporarily unavailable."
+      );
+    }
+    return mapAbortOrTimeout(err, "openai");
+  }
+}
+
+export async function callGeminiProductFields(
+  context: ProductAiDraftContext
+): Promise<{ ok: true; suggestions: ProductAiSuggestions } | SeoAiFailure> {
+  const cfg = getProviderEnvConfig("gemini");
+  if (!cfg.configured) {
+    return fail(
+      503,
+      "provider_not_configured",
+      "Selected AI provider is not configured."
+    );
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    SEO_AI_PROVIDER_TIMEOUT_MS
+  );
+
+  try {
+    const res = await fetch(GEMINI_INTERACTIONS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": cfg.apiKey,
+        "Api-Revision": "2026-05-20",
+      },
+      body: JSON.stringify({
+        model: cfg.model,
+        input: buildProductFieldsUserPrompt(context),
+        system_instruction: buildProductFieldsSystemInstruction(context),
+        store: false,
+        response_format: {
+          type: "text",
+          mime_type: "application/json",
+          schema: buildProductFieldsJsonSchema(context.requestedFields),
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      console.error(`[seo-ai] gemini upstream failed: status ${res.status}`);
+      if (res.status === 408 || res.status === 504) {
+        return fail(
+          503,
+          "provider_timeout",
+          "The selected AI provider timed out. Please try again shortly."
+        );
+      }
+      return fail(
+        503,
+        "provider_upstream",
+        "The selected AI provider is temporarily unavailable."
+      );
+    }
+
+    const body = await res.json().catch(() => null);
+    const text = extractGeminiInteractionText(body);
+    const parsed = parseProductFieldsJsonText(text, context.requestedFields);
+    if (!parsed.ok) {
+      console.error("[seo-ai] gemini malformed product fields output");
+      return fail(
+        502,
+        "malformed_provider_output",
+        "The AI provider returned unusable product suggestions."
+      );
+    }
+    return { ok: true, suggestions: parsed.suggestions };
+  } catch (err) {
+    return mapAbortOrTimeout(err, "gemini");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Exactly one provider call for product field drafting. No fallback. No retry.
+ */
+export async function dispatchProductFieldsDraft(
+  provider: SeoAiProvider,
+  context: ProductAiDraftContext,
+  deps?: {
+    callOpenAI?: ProductFieldsProviderCallFn;
+    callGemini?: ProductFieldsProviderCallFn;
+  }
+): Promise<{ ok: true; suggestions: ProductAiSuggestions } | SeoAiFailure> {
+  if (provider === "openai") {
+    const call = deps?.callOpenAI || callOpenAiProductFields;
+    return call(context);
+  }
+  if (provider === "gemini") {
+    const call = deps?.callGemini || callGeminiProductFields;
     return call(context);
   }
   return fail(400, "invalid_request", "provider must be gemini or openai.");
