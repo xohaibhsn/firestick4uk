@@ -463,9 +463,9 @@ export default function CartPage() {
           '🛍️ *NEW ORDER — firestick4uk.com*',
           '',
           `📋 *Order ID:* ${oid}`,
-          `👤 *Name:* ${form.name}`,
-          `📧 *Email:* ${form.email}`,
-          `📱 *Phone:* ${form.phone}`,
+          `👤 *Name:* ${identity.customer_name}`,
+          `📧 *Email:* ${identity.customer_email}`,
+          `📱 *Phone:* ${identity.customer_phone}`,
           `📍 *Address:* ${fullAddress}`,
           form.notes ? `📝 *Notes:* ${form.notes}` : null,
           '',
@@ -486,9 +486,16 @@ export default function CartPage() {
           '— Sent from firestick4uk.com',
         ].filter(Boolean).join('\n');
 
+        const normalizedForm = {
+          ...form,
+          name: identity.customer_name,
+          email: identity.customer_email,
+          phone: identity.customer_phone,
+        };
+
         sessionStorage.setItem('orderSuccess', JSON.stringify({
           orderId: oid, items: serverItems, subtotal: authSubtotal, shipping: authShipping, vatAmount: authVat,
-          discountAmount: authDiscount, grandTotal: authTotal, couponApplied: authCouponApplied, form, paymentMethod, waMessage,
+          discountAmount: authDiscount, grandTotal: authTotal, couponApplied: authCouponApplied, form: normalizedForm, paymentMethod, waMessage,
           digitalSupplyAcknowledged: classification.hasDigitalItems,
         }));
         clearCart();

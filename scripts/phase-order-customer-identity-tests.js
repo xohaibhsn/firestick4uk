@@ -134,6 +134,28 @@ ok(
   /CUSTOMER_IDENTITY_REQUIRED_MSG/.test(cart) && /setOrderError/.test(cart)
 );
 
+ok(
+  "cart_wa_uses_normalized_name",
+  /`👤 \*Name:\* \$\{identity\.customer_name\}`/.test(cart) &&
+    !/`👤 \*Name:\* \$\{form\.name\}`/.test(cart)
+);
+ok(
+  "cart_wa_uses_normalized_email",
+  /`📧 \*Email:\* \$\{identity\.customer_email\}`/.test(cart) &&
+    !/`📧 \*Email:\* \$\{form\.email\}`/.test(cart)
+);
+ok(
+  "cart_wa_uses_normalized_phone",
+  /`📱 \*Phone:\* \$\{identity\.customer_phone\}`/.test(cart) &&
+    !/`📱 \*Phone:\* \$\{form\.phone\}`/.test(cart)
+);
+ok(
+  "cart_orderSuccess_stores_normalized_form",
+  /const normalizedForm = \{[\s\S]*?name:\s*identity\.customer_name[\s\S]*?email:\s*identity\.customer_email[\s\S]*?phone:\s*identity\.customer_phone[\s\S]*?\}/.test(
+    cart
+  ) && /form:\s*normalizedForm/.test(cart) && !/couponApplied: authCouponApplied, form, paymentMethod/.test(cart)
+);
+
 // TEST 1 — all empty
 {
   const r = earlyOrderGate({
