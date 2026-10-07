@@ -13,6 +13,11 @@ import {
   cartShippingPounds,
   isDigitalProduct,
 } from "@/lib/productFulfilment";
+import {
+  CUSTOMER_IDENTITY_REQUIRED_MSG,
+  hasMeaningfulCustomerIdentity,
+  normalizeOrderCustomerIdentity,
+} from "@/lib/orderCustomerIdentity";
 
 type ProductFacts = {
   id: number;
@@ -349,6 +354,16 @@ export default function CartPage() {
       return;
     }
 
+    const identity = normalizeOrderCustomerIdentity({
+      customer_name: form.name,
+      customer_email: form.email,
+      customer_phone: form.phone,
+    });
+    if (!hasMeaningfulCustomerIdentity(identity)) {
+      setOrderError(CUSTOMER_IDENTITY_REQUIRED_MSG);
+      return;
+    }
+
     setPlacing(true);
 
     try {
@@ -378,9 +393,9 @@ export default function CartPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customer_name: form.name,
-          customer_email: form.email,
-          customer_phone: form.phone,
+          customer_name: identity.customer_name,
+          customer_email: identity.customer_email,
+          customer_phone: identity.customer_phone,
           delivery_address: form.address,
           city: form.city,
           postcode: form.postcode,

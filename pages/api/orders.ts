@@ -18,6 +18,11 @@ import {
   roundMoney,
   type AuthoritativeLineItem,
 } from '../../lib/orderPricing';
+import {
+  CUSTOMER_IDENTITY_REQUIRED_MSG,
+  hasMeaningfulCustomerIdentity,
+  normalizeOrderCustomerIdentity,
+} from '../../lib/orderCustomerIdentity';
 
 type DbProduct = {
   id: number;
@@ -48,9 +53,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const {
-      customer_name,
-      customer_email,
-      customer_phone,
+      customer_name: rawCustomerName,
+      customer_email: rawCustomerEmail,
+      customer_phone: rawCustomerPhone,
       delivery_address,
       city,
       postcode,
@@ -63,6 +68,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       digital_supply_acknowledgement,
     } = req.body;
     // Client total / discount_amount / vat_amount / item.price / item.name are intentionally ignored.
+
+    const { customer_name, customer_email, customer_phone } =
+      normalizeOrderCustomerIdentity({
+        customer_name: rawCustomerName,
+        customer_email: rawCustomerEmail,
+        customer_phone: rawCustomerPhone,
+      });
+
+    if (!hasMeaningfulCustomerIdentity({ customer_name, customer_email, customer_phone })) {
+      return res.status(400).json({ error: CUSTOMER_IDENTITY_REQUIRED_MSG });
+    }
 
     if (!ALLOWED_PAYMENT_METHODS.has(String(payment_method || ''))) {
       return res.status(400).json({ error: 'Invalid payment method.' });
