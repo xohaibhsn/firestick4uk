@@ -15,6 +15,7 @@ import {
   normalizeProductSlug,
   resolveProductLegacyRedirect,
   PRODUCT8_LEGACY_SLUG_REDIRECTS,
+  PRODUCT9_LEGACY_SLUG_REDIRECTS,
 } from "@/lib/productLegacyRedirects";
 
 interface Product {
@@ -122,12 +123,13 @@ const resolveProduct = cache(async (rawSlug: string): Promise<ResolveResult> => 
     );
     if (exactRows?.[0]) return { status: "ok", product: exactRows[0] };
 
-    // Phase 20D: legacy sources → canonical only when target slug is live in DB.
-    // Before migration (target absent), fall through so season-pass stays exact-hit
-    // above and world-cup keeps current 404 / name-alias behavior.
-    if (PRODUCT8_LEGACY_SLUG_REDIRECTS[s]) {
-      const mapped = PRODUCT8_LEGACY_SLUG_REDIRECTS[s];
-      const targetLive = await activeProductExistsBySlug(mapped);
+    // Legacy sources → canonical only when target slug is live in DB.
+    // Product 8 (Phase 20D) + Product 9 historical name-derived alias
+    // (`2-years-subscription`) are code-owned and must not depend on current name.
+    const mappedLegacy =
+      PRODUCT8_LEGACY_SLUG_REDIRECTS[s] || PRODUCT9_LEGACY_SLUG_REDIRECTS[s];
+    if (mappedLegacy) {
+      const targetLive = await activeProductExistsBySlug(mappedLegacy);
       const legacyTarget = resolveProductLegacyRedirect(s, targetLive);
       if (legacyTarget) {
         return { status: "redirect", toSlug: legacyTarget };
