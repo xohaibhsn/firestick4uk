@@ -21,6 +21,20 @@ import {
   isAutoCanonicalForSlug,
 } from "@/lib/blogSeoSafety";
 import { parseCouponAdminInput } from "@/lib/couponValidation";
+import {
+  NEW_PRODUCT_AI_GENERATE_ALL_FIELDS,
+  applyNewProductAiFieldLocally,
+  buildNewProductDraftRequest,
+  createDefaultProductAiFacts,
+  createIdleProductAiUi,
+  currentEditorPlainPreview,
+  defaultProductKindFromCategory,
+  mapProviderSuggestionsToUi,
+  type ProductAiFactsState,
+  type ProductAiProviderChoice,
+  type ProductAiUiState,
+} from "@/lib/productAiClient";
+import type { ProductAiEditableField, ProductKindHint } from "@/lib/seoAi";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
 const styles = `
@@ -305,6 +319,10 @@ export default function AdminPage() {
     error?: string;
   };
   const [productMetaAi, setProductMetaAi] = useState<MetaDraftAiState>({ status: "idle" });
+  const [productAiFacts, setProductAiFacts] = useState<ProductAiFactsState>(
+    createDefaultProductAiFacts("Subscription")
+  );
+  const [productAiUi, setProductAiUi] = useState<ProductAiUiState>(createIdleProductAiUi());
   const [blogMetaAi, setBlogMetaAi] = useState<MetaDraftAiState>({ status: "idle" });
   const [imageUploading, setImageUploading] = useState(false);
   const [mediaPicker, setMediaPicker] = useState<{
@@ -1576,6 +1594,8 @@ export default function AdminPage() {
         return;
       }
       setProductMetaAi({ status: "idle" });
+      setProductAiUi(createIdleProductAiUi());
+      setProductAiFacts(createDefaultProductAiFacts("Subscription"));
       setProductModal(null);
       setProductMsg(`✅ Product saved${formatSeoGuardBannerClient(res.seo_guard)}`);
       await loadProducts();
@@ -1587,9 +1607,16 @@ export default function AdminPage() {
     }
   };
 
+  const resetProductAiState = (category = "Subscription") => {
+    setProductMetaAi({ status: "idle" });
+    setProductAiUi(createIdleProductAiUi());
+    setProductAiFacts(createDefaultProductAiFacts(category));
+  };
+
   const openEditProduct = (p: any) => {
     const rawPrice = p.price ? `£${Number(String(p.price).replace(/[^0-9.]/g,'')).toFixed(2)}` : "";
     setProductMetaAi({ status: "idle" });
+    resetProductAiState(p.category || "Subscription");
     setEditProduct({
       name: p.name || "",
       slug: p.slug || toSlug(p.name || ""),
@@ -1610,8 +1637,117 @@ export default function AdminPage() {
 
   const openNewProduct = () => {
     setProductMetaAi({ status: "idle" });
+    resetProductAiState("Subscription");
     setEditProduct({ name:"", slug:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
     setProductModal("new");
+  };
+
+  const draftNewProductFields = async (
+    requestedFields: ProductAiEditableField[]
+  ) => {
+    if (productModal !== "new") return;
+    if (!can("products.manage")) return;
+    if (productAiUi.status === "loading") return;
+
+    const built = buildNewProductDraftRequest({
+      provider: productAiUi.provider,
+      requestedFields,
+      editProduct,
+      facts: productAiFacts,
+    });
+    if (!built.ok) {
+      setProductAiUi((s) => ({
+        ...s,
+        status: "error",
+        error: built.message,
+        suggestions: {},
+        unavailable: {},
+        lastRequestedFields: [],
+      }));
+      return;
+    }
+
+    setProductAiUi((s) => ({
+      ...s,
+      status: "loading",
+      error: "",
+      lastRequestedFields: built.body.requestedFields,
+    }));
+
+    try {
+      const res = await fetch("/api/admin-seo-ai", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(built.body),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok) {
+        const code = String(json?.code || "");
+        const message =
+          code === "provider_not_configured" || res.status === 503
+            ? "Selected AI provider is not configured yet."
+            : String(json?.message || json?.error || `HTTP ${res.status}`);
+        setProductAiUi((s) => ({
+          ...s,
+          status: "error",
+          error: message,
+          suggestions: {},
+          unavailable: {},
+        }));
+        return;
+      }
+      const mapped = mapProviderSuggestionsToUi(
+        json.suggestions || {},
+        built.body.requestedFields
+      );
+      setProductAiUi((s) => ({
+        ...s,
+        status: "ok",
+        error: "",
+        suggestions: mapped.suggestions,
+        unavailable: mapped.unavailable,
+        lastRequestedFields: built.body.requestedFields,
+      }));
+    } catch {
+      setProductAiUi((s) => ({
+        ...s,
+        status: "error",
+        error: "Draft request failed.",
+        suggestions: {},
+        unavailable: {},
+      }));
+    }
+  };
+
+  const applyProductAiSuggestion = (field: ProductAiEditableField) => {
+    if (productModal !== "new") return;
+    const entry = productAiUi.suggestions[field];
+    if (!entry?.value) return;
+    setEditProduct((p) => applyNewProductAiFieldLocally(p, field, entry.value));
+  };
+
+  const applySelectedProductAiSuggestions = () => {
+    if (productModal !== "new") return;
+    setEditProduct((p) => {
+      let next = p;
+      for (const field of Object.keys(productAiUi.suggestions) as ProductAiEditableField[]) {
+        const entry = productAiUi.suggestions[field];
+        if (!entry?.selected || !entry.value) continue;
+        next = applyNewProductAiFieldLocally(next, field, entry.value);
+      }
+      return next;
+    });
+  };
+
+  const discardProductAiSuggestion = (field: ProductAiEditableField) => {
+    setProductAiUi((s) => {
+      const suggestions = { ...s.suggestions };
+      const unavailable = { ...s.unavailable };
+      delete suggestions[field];
+      delete unavailable[field];
+      return { ...s, suggestions, unavailable };
+    });
   };
 
   const draftProductMetadata = async (provider: "gemini" | "openai") => {
@@ -1938,7 +2074,23 @@ export default function AdminPage() {
               </div>
               <div className="modal-field">
                 <label>Category</label>
-                <select value={editProduct.category} onChange={e => setEditProduct({...editProduct,category:e.target.value})}>
+                <select
+                  value={editProduct.category}
+                  onChange={(e) => {
+                    const category = e.target.value;
+                    setEditProduct({ ...editProduct, category });
+                    if (productModal === "new") {
+                      setProductAiFacts((f) =>
+                        f.productKindOverridden
+                          ? f
+                          : {
+                              ...f,
+                              productKind: defaultProductKindFromCategory(category),
+                            }
+                      );
+                    }
+                  }}
+                >
                   <option>Subscription</option><option>Device</option><option>Bundle</option>
                 </select>
               </div>
@@ -2039,6 +2191,329 @@ export default function AdminPage() {
               <label>Features (one per line)</label>
               <textarea rows={3} placeholder={"✅ 1 Year Streaming Access\n✅ 10,000+ Channels\n✅ Free Setup Support"} value={editProduct.features} onChange={e => setEditProduct({...editProduct,features:e.target.value})} style={{resize:"vertical"}} />
             </div>
+
+            {/* PAI-3 — New Product AI Assistant (new modal only) */}
+            {productModal === "new" && can("products.manage") ? (
+              <div
+                className="seo-box"
+                data-testid="new-product-ai-assistant"
+                style={{ marginTop: 8 }}
+              >
+                <div className="seo-box-title">AI Product Assistant</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 12 }}>
+                  Advisory drafting only. Suggestions stay local until you Apply, then Save Product.
+                </div>
+
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
+                  <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="radio"
+                      name="product-ai-provider"
+                      checked={productAiUi.provider === "gemini"}
+                      disabled={productAiUi.status === "loading"}
+                      onChange={() =>
+                        setProductAiUi((s) => ({ ...s, provider: "gemini" as ProductAiProviderChoice }))
+                      }
+                    />
+                    Gemini
+                  </label>
+                  <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="radio"
+                      name="product-ai-provider"
+                      checked={productAiUi.provider === "openai"}
+                      disabled={productAiUi.status === "loading"}
+                      onChange={() =>
+                        setProductAiUi((s) => ({ ...s, provider: "openai" as ProductAiProviderChoice }))
+                      }
+                    />
+                    OpenAI
+                  </label>
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    data-testid="product-ai-generate-all"
+                    disabled={
+                      productAiUi.status === "loading" || !String(editProduct.name || "").trim()
+                    }
+                    onClick={() =>
+                      void draftNewProductFields([...NEW_PRODUCT_AI_GENERATE_ALL_FIELDS])
+                    }
+                  >
+                    Generate All Eligible Fields
+                  </button>
+                </div>
+                {!String(editProduct.name || "").trim() ? (
+                  <div style={{ fontSize: 12, color: "#EA580C", marginBottom: 10 }}>
+                    Enter a basic product name first so AI has an authoritative product identity.
+                  </div>
+                ) : null}
+
+                <details
+                  open={productAiFacts.factsOpen}
+                  onToggle={(e) =>
+                    setProductAiFacts((f) => ({
+                      ...f,
+                      factsOpen: (e.target as HTMLDetailsElement).open,
+                    }))
+                  }
+                  style={{ marginBottom: 14 }}
+                >
+                  <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                    AI factual context (not saved as product fields)
+                  </summary>
+                  <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+                    <div className="modal-field" style={{ marginBottom: 0 }}>
+                      <label>Product kind</label>
+                      <select
+                        value={productAiFacts.productKind}
+                        disabled={productAiUi.status === "loading"}
+                        onChange={(e) =>
+                          setProductAiFacts((f) => ({
+                            ...f,
+                            productKind: e.target.value as ProductKindHint,
+                            productKindOverridden: true,
+                          }))
+                        }
+                      >
+                        <option value="digital_subscription">digital_subscription</option>
+                        <option value="physical">physical</option>
+                        <option value="unknown">unknown</option>
+                      </select>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      <div className="modal-field" style={{ marginBottom: 0 }}>
+                        <label>Duration (optional)</label>
+                        <input
+                          value={productAiFacts.duration}
+                          disabled={productAiUi.status === "loading"}
+                          onChange={(e) =>
+                            setProductAiFacts((f) => ({ ...f, duration: e.target.value }))
+                          }
+                          placeholder="e.g. 12 months"
+                        />
+                      </div>
+                      <div className="modal-field" style={{ marginBottom: 0 }}>
+                        <label>Variant (optional)</label>
+                        <input
+                          value={productAiFacts.variant}
+                          disabled={productAiUi.status === "loading"}
+                          onChange={(e) =>
+                            setProductAiFacts((f) => ({ ...f, variant: e.target.value }))
+                          }
+                          placeholder="e.g. Standard"
+                        />
+                      </div>
+                    </div>
+                    <div className="modal-field" style={{ marginBottom: 0 }}>
+                      <label>Confirmed compatibility (one per line)</label>
+                      <textarea
+                        rows={2}
+                        value={productAiFacts.confirmedCompatibility}
+                        disabled={productAiUi.status === "loading"}
+                        onChange={(e) =>
+                          setProductAiFacts((f) => ({
+                            ...f,
+                            confirmedCompatibility: e.target.value,
+                          }))
+                        }
+                        style={{ resize: "vertical" }}
+                      />
+                    </div>
+                    <div className="modal-field" style={{ marginBottom: 0 }}>
+                      <label>Confirmed features (one per line)</label>
+                      <textarea
+                        rows={2}
+                        value={productAiFacts.confirmedFeatures}
+                        disabled={productAiUi.status === "loading"}
+                        onChange={(e) =>
+                          setProductAiFacts((f) => ({
+                            ...f,
+                            confirmedFeatures: e.target.value,
+                          }))
+                        }
+                        style={{ resize: "vertical" }}
+                      />
+                    </div>
+                    <div className="modal-field" style={{ marginBottom: 0 }}>
+                      <label>Approved claims (one per line)</label>
+                      <textarea
+                        rows={2}
+                        value={productAiFacts.approvedClaims}
+                        disabled={productAiUi.status === "loading"}
+                        onChange={(e) =>
+                          setProductAiFacts((f) => ({
+                            ...f,
+                            approvedClaims: e.target.value,
+                          }))
+                        }
+                        style={{ resize: "vertical" }}
+                      />
+                    </div>
+                  </div>
+                </details>
+
+                <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+                  {NEW_PRODUCT_AI_GENERATE_ALL_FIELDS.map((field) => (
+                    <div
+                      key={field}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 12,
+                      }}
+                    >
+                      <span style={{ opacity: 0.8 }}>{field}</span>
+                      <button
+                        type="button"
+                        className="action-btn btn-edit"
+                        data-testid={`product-ai-generate-${field}`}
+                        disabled={
+                          productAiUi.status === "loading" ||
+                          !String(editProduct.name || "").trim()
+                        }
+                        onClick={() => void draftNewProductFields([field])}
+                      >
+                        Generate
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {productAiUi.status === "loading" ? (
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginBottom: 10 }}>
+                    Drafting with {productAiUi.provider === "gemini" ? "Gemini" : "OpenAI"}…
+                  </div>
+                ) : null}
+                {productAiUi.status === "error" ? (
+                  <div style={{ fontSize: 12, color: "#ff6666", marginBottom: 10 }}>
+                    {productAiUi.error || "Draft failed."}
+                  </div>
+                ) : null}
+
+                {productAiUi.status === "ok" &&
+                (Object.keys(productAiUi.suggestions).length > 0 ||
+                  Object.keys(productAiUi.unavailable).length > 0) ? (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      marginBottom: 8,
+                      padding: "10px 12px",
+                      background: "rgba(255,255,255,0.04)",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+                      <strong>
+                        Suggestions ({productAiUi.provider === "gemini" ? "Gemini" : "OpenAI"})
+                      </strong>
+                      <button
+                        type="button"
+                        className="action-btn btn-view"
+                        data-testid="product-ai-apply-selected"
+                        onClick={applySelectedProductAiSuggestions}
+                      >
+                        Apply selected
+                      </button>
+                    </div>
+                    {(Object.keys(productAiUi.suggestions) as ProductAiEditableField[]).map(
+                      (field) => {
+                        const entry = productAiUi.suggestions[field]!;
+                        return (
+                          <div
+                            key={field}
+                            data-testid={`product-ai-suggestion-${field}`}
+                            style={{
+                              borderTop: "1px solid rgba(255,255,255,0.08)",
+                              paddingTop: 10,
+                              marginTop: 10,
+                            }}
+                          >
+                            <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 600 }}>
+                              <input
+                                type="checkbox"
+                                checked={!!entry.selected}
+                                onChange={(e) =>
+                                  setProductAiUi((s) => ({
+                                    ...s,
+                                    suggestions: {
+                                      ...s.suggestions,
+                                      [field]: {
+                                        ...entry,
+                                        selected: e.target.checked,
+                                      },
+                                    },
+                                  }))
+                                }
+                              />
+                              {field}
+                            </label>
+                            <div style={{ marginTop: 6, opacity: 0.7 }}>
+                              <div>
+                                <strong>Current:</strong>{" "}
+                                {currentEditorPlainPreview(field, editProduct) || "(empty)"}
+                              </div>
+                              <div style={{ marginTop: 4 }}>
+                                <strong>Suggested:</strong> {entry.value}
+                              </div>
+                              {entry.reason ? (
+                                <div style={{ marginTop: 4 }}>
+                                  <strong>Reason:</strong> {entry.reason}
+                                </div>
+                              ) : null}
+                            </div>
+                            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                              <button
+                                type="button"
+                                className="action-btn btn-edit"
+                                onClick={() => applyProductAiSuggestion(field)}
+                              >
+                                Apply
+                              </button>
+                              <button
+                                type="button"
+                                className="action-btn btn-view"
+                                disabled={productAiUi.status === "loading"}
+                                onClick={() => void draftNewProductFields([field])}
+                              >
+                                Regenerate
+                              </button>
+                              <button
+                                type="button"
+                                className="action-btn btn-view"
+                                onClick={() => discardProductAiSuggestion(field)}
+                              >
+                                Discard
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+                    )}
+                    {(Object.keys(productAiUi.unavailable) as ProductAiEditableField[]).map(
+                      (field) => (
+                        <div
+                          key={`unavail-${field}`}
+                          style={{
+                            borderTop: "1px solid rgba(255,255,255,0.08)",
+                            paddingTop: 10,
+                            marginTop: 10,
+                            opacity: 0.75,
+                          }}
+                        >
+                          <strong>{field}</strong> — unavailable
+                          <div style={{ marginTop: 4 }}>
+                            {productAiUi.unavailable[field]?.reason || "Could not draft safely."}
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             {/* SEO Section */}
             <div className="seo-box">
@@ -2163,7 +2638,17 @@ export default function AdminPage() {
             </div>
 
             <div className="modal-actions">
-              <button className="modal-cancel" onClick={() => { setProductMetaAi({ status: "idle" }); setProductModal(null); }}>Cancel</button>
+              <button
+                className="modal-cancel"
+                onClick={() => {
+                  setProductAiUi(createIdleProductAiUi());
+                  setProductAiFacts(createDefaultProductAiFacts("Subscription"));
+                  setProductMetaAi({ status: "idle" });
+                  setProductModal(null);
+                }}
+              >
+                Cancel
+              </button>
               {productModal !== "new" && productModal?.id && can("revisions.view") && (
                 <button
                   type="button"
@@ -2171,6 +2656,7 @@ export default function AdminPage() {
                   onClick={() => {
                     setHistoryFilter({ entityType: "product", entityId: String(productModal.id) });
                     setProductMetaAi({ status: "idle" });
+                    resetProductAiState("Subscription");
                     setProductModal(null);
                     setTab("history");
                   }}
