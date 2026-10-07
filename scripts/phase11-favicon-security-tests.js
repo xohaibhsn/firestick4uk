@@ -132,6 +132,44 @@ function unlinkLocalFaviconIfPresent(filePath) {
   }
 }
 
+/**
+ * Exact-resource Cloudinary destroy for one captured public_id only.
+ * No prefix/folder/bulk deletion. Never logs API credentials.
+ */
+async function destroyExactCloudinaryAsset(publicId) {
+  const id = String(publicId || "").trim();
+  if (!id) return { ok: false, error: "missing publicId" };
+  // Refuse anything that is not a single concrete resource id.
+  if (id.includes("*") || id.includes("?") || id.endsWith("/") || /\s/.test(id)) {
+    return { ok: false, error: "refused unsafe publicId shape" };
+  }
+  if (
+    !process.env.CLOUDINARY_CLOUD_NAME ||
+    !process.env.CLOUDINARY_API_KEY ||
+    !process.env.CLOUDINARY_API_SECRET
+  ) {
+    return { ok: false, error: "cloudinary credentials not configured" };
+  }
+
+  const { v2: cloudinary } = require("cloudinary");
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+
+  const res = await cloudinary.uploader.destroy(id, {
+    resource_type: "image",
+    invalidate: true,
+  });
+  const result = res && res.result != null ? String(res.result) : "";
+  // Documented exact-resource outcomes: deleted ("ok") or already absent ("not found").
+  if (result === "ok" || result === "not found") {
+    return { ok: true, result };
+  }
+  return { ok: false, error: `unexpected destroy result=${result || "empty"}` };
+}
+
 const TINY_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
   "base64"
@@ -323,6 +361,20 @@ async function main() {
       /previousFavicon/.test(selfSrc);
     const cleanupObservable =
       /cleanupFailures/.test(selfSrc) && /console\.error\(\s*"[^\"]*cleanup/.test(selfSrc);
+    const cloudinaryExactDestroy =
+      /destroyExactCloudinaryAsset/.test(selfSrc) &&
+      /createdTestAsset\.provider\s*===\s*"cloudinary"/.test(selfSrc) &&
+      /createdTestAsset\.publicId/.test(selfSrc) &&
+      /uploader\.destroy\(id/.test(selfSrc);
+    // Build banned API names at runtime so this assertion text cannot false-positive itself.
+    const bannedCloudinaryApis = [
+      "delete_resources" + "_by_prefix",
+      "delete_" + "folder",
+      "destroy_" + "by_prefix",
+    ];
+    const noCloudinaryBulk =
+      bannedCloudinaryApis.every((name) => !selfSrc.includes(name)) &&
+      !/\.delete_resources\s*\(/.test(selfSrc);
     mark(
       "S",
       tracksExactId &&
@@ -331,8 +383,10 @@ async function main() {
         noBroadNameLike &&
         localPathGuard &&
         faviconRestore &&
-        cleanupObservable,
-      `track=${tracksExactId} exactDel=${exactRowDelete} noBroadPurpose=${noBroadPurposeDelete} noLike=${noBroadNameLike} pathGuard=${localPathGuard} restore=${faviconRestore} observable=${cleanupObservable}`
+        cleanupObservable &&
+        cloudinaryExactDestroy &&
+        noCloudinaryBulk,
+      `track=${tracksExactId} exactDel=${exactRowDelete} noBroadPurpose=${noBroadPurposeDelete} noLike=${noBroadNameLike} pathGuard=${localPathGuard} restore=${faviconRestore} observable=${cleanupObservable} cld=${cloudinaryExactDestroy} noBulk=${noCloudinaryBulk}`
     );
 
     // Local path helper unit checks (no filesystem writes)
@@ -349,6 +403,25 @@ async function main() {
           outside == null &&
           abs == null,
         `ok=${!!okPath} trav=${trav} outside=${outside} abs=${abs}`
+      );
+    }
+
+    // Cloudinary helper rejects unsafe public_id shapes without provider calls
+    {
+      const missing = await destroyExactCloudinaryAsset("");
+      const star = await destroyExactCloudinaryAsset("firestick4uk/favicon/*");
+      const q = await destroyExactCloudinaryAsset("firestick4uk/favicon/favicon-1?");
+      const folder = await destroyExactCloudinaryAsset("firestick4uk/favicon/");
+      mark(
+        "S3",
+        missing.ok === false &&
+          star.ok === false &&
+          q.ok === false &&
+          folder.ok === false &&
+          /missing publicId|refused unsafe/.test(
+            `${missing.error || ""} ${star.error || ""} ${q.error || ""} ${folder.error || ""}`
+          ),
+        `missing=${missing.error} star=${star.error} q=${q.error} folder=${folder.error}`
       );
     }
   }
@@ -523,8 +596,11 @@ async function main() {
         }
         mark(
           "O",
-          up.status === 200 && mediaOk && !!createdTestAsset?.mediaId,
-          `indexed=${mediaOk} mediaId=${createdTestAsset?.mediaId || "none"} provider=${createdTestAsset?.provider || "?"}`
+          up.status === 200 &&
+            mediaOk &&
+            !!createdTestAsset?.mediaId &&
+            (createdTestAsset.provider !== "cloudinary" || !!createdTestAsset.publicId),
+          `indexed=${mediaOk} mediaId=${createdTestAsset?.mediaId || "none"} provider=${createdTestAsset?.provider || "?"} publicId=${createdTestAsset?.publicId ? "yes" : "no"}`
         );
 
         const afterAudits = await db.query(
@@ -562,6 +638,53 @@ async function main() {
         console.error("[phase11 cleanup] favicon restore failed:", msg);
       }
 
+      // Local provider: exact file under public/uploads/favicon only.
+      try {
+        if (createdTestAsset && createdTestAsset.provider === "local") {
+          const localPath = resolveSafeLocalFaviconPath(createdTestAsset.url);
+          if (!localPath) {
+            cleanupFailures.push(
+              `local_file: refused unsafe path for url=${String(createdTestAsset.url).slice(0, 120)}`
+            );
+            console.error("[phase11 cleanup] local path rejected");
+          } else {
+            const removed = unlinkLocalFaviconIfPresent(localPath);
+            if (!removed.ok) {
+              cleanupFailures.push(`local_file: ${removed.error}`);
+              console.error("[phase11 cleanup] local unlink failed:", removed.error);
+            }
+          }
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        cleanupFailures.push(`local_file: ${msg}`);
+        console.error("[phase11 cleanup] local file step failed:", msg);
+      }
+
+      // Cloudinary provider: exact-resource destroy using captured publicId only.
+      try {
+        if (createdTestAsset && createdTestAsset.provider === "cloudinary") {
+          if (!createdTestAsset.publicId) {
+            cleanupFailures.push("cloudinary: missing captured publicId for current-run asset");
+            console.error("[phase11 cleanup] cloudinary publicId missing — refusing guessed destroy");
+          } else {
+            const destroyed = await destroyExactCloudinaryAsset(createdTestAsset.publicId);
+            if (!destroyed.ok) {
+              cleanupFailures.push(`cloudinary: ${destroyed.error}`);
+              console.error(
+                "[phase11 cleanup] cloudinary destroy failed:",
+                destroyed.error,
+                `public_id=${createdTestAsset.publicId}`
+              );
+            }
+          }
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        cleanupFailures.push(`cloudinary: ${msg}`);
+        console.error("[phase11 cleanup] cloudinary step failed:", msg);
+      }
+
       // Exact current-run media_assets row only (id + original_name + url ownership guards).
       try {
         if (createdTestAsset?.mediaId) {
@@ -587,35 +710,6 @@ async function main() {
         console.error("[phase11 cleanup] media_assets delete failed:", msg);
       }
 
-      // Local provider file only — never touch Cloudinary/production binaries here.
-      try {
-        if (createdTestAsset && createdTestAsset.provider === "local") {
-          const localPath = resolveSafeLocalFaviconPath(createdTestAsset.url);
-          if (!localPath) {
-            cleanupFailures.push(
-              `local_file: refused unsafe path for url=${String(createdTestAsset.url).slice(0, 120)}`
-            );
-            console.error("[phase11 cleanup] local path rejected");
-          } else {
-            const removed = unlinkLocalFaviconIfPresent(localPath);
-            if (!removed.ok) {
-              cleanupFailures.push(`local_file: ${removed.error}`);
-              console.error("[phase11 cleanup] local unlink failed:", removed.error);
-            }
-          }
-        } else if (createdTestAsset && createdTestAsset.provider === "cloudinary") {
-          // No exact-resource destroy helper exists in this repo; DB row cleanup is the hard requirement.
-          console.warn(
-            "[phase11 cleanup] Cloudinary binary not destroyed (no safe project destroy helper); DB row cleaned if present.",
-            `public_id=${createdTestAsset.publicId || "none"}`
-          );
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        cleanupFailures.push(`local_file: ${msg}`);
-        console.error("[phase11 cleanup] local file step failed:", msg);
-      }
-
       try {
         await db.end();
       } catch (err) {
@@ -635,7 +729,7 @@ async function main() {
   const fails = Object.entries(out).filter(([, status]) => status === "FAIL");
   const skips = Object.entries(out).filter(([, status]) => status === "SKIP");
   console.log("\n========== SUMMARY ==========");
-  for (const id of ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "S2", "T"]) {
+  for (const id of ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "S2", "S3", "T"]) {
     console.log(`${out[id] || "MISSING"} ${id}`);
   }
   if (fails.length) {
