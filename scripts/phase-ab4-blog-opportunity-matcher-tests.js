@@ -378,6 +378,270 @@ ok(
   ok("H_tie_lowest_id", r.matchedEntityId === 60);
 }
 
+// ── AB-4A. SAME-TIER SIMILARITY BEFORE STATUS ──────────────────────────────
+// Fixtures are deliberately non-exact on slug/title/focus so they stay tier 4.
+
+const AB4A_TOPIC = "How to speed up your slow Firestick device today";
+const AB4A_LOW_TITLE = "Speed up slow Firestick device"; // ~0.8333
+const AB4A_HIGH_TITLE = "Speed up slow Firestick device today tips"; // ~0.8571
+const AB4A_EQ_A = "alpha beta gamma delta epsilon zeta";
+const AB4A_EQ_B = "alpha beta gamma delta epsilon eta";
+const AB4A_EQ_TOPIC = "alpha beta gamma delta epsilon";
+
+{
+  const lowSim = computeBlogTopicSimilarity(AB4A_TOPIC, AB4A_LOW_TITLE);
+  const highSim = computeBlogTopicSimilarity(AB4A_TOPIC, AB4A_HIGH_TITLE);
+  ok(
+    "AB4A_fixture_tier4_sims",
+    lowSim >= STRONG_TOKEN_SIMILARITY_THRESHOLD &&
+      highSim > lowSim &&
+      normalizeBlogMatchTitle(AB4A_TOPIC) !== normalizeBlogMatchTitle(AB4A_LOW_TITLE) &&
+      normalizeBlogMatchTitle(AB4A_TOPIC) !== normalizeBlogMatchTitle(AB4A_HIGH_TITLE),
+    `low=${lowSim} high=${highSim}`
+  );
+}
+
+{
+  const r = matchBlogOpportunity(
+    { topic: AB4A_TOPIC },
+    [
+      row({
+        id: 201,
+        title: AB4A_LOW_TITLE,
+        slug: "low-pub",
+        status: "published",
+        active: 1,
+        focus_keyword: "",
+      }),
+      row({
+        id: 202,
+        title: AB4A_HIGH_TITLE,
+        slug: "high-draft",
+        status: "draft",
+        active: 1,
+        focus_keyword: "",
+      }),
+    ]
+  );
+  const highSim = computeBlogTopicSimilarity(AB4A_TOPIC, AB4A_HIGH_TITLE);
+  ok(
+    "AB4A_higher_sim_beats_published",
+    r.matchedEntityId === 202 &&
+      r.signals.tokenSimilarity === highSim &&
+      r.disposition === "refresh" &&
+      r.newBlogCandidate === false &&
+      r.match === "STRONG",
+    `id=${r.matchedEntityId} sim=${r.signals.tokenSimilarity}`
+  );
+}
+
+{
+  const r = matchBlogOpportunity(
+    { topic: AB4A_TOPIC },
+    [
+      row({
+        id: 211,
+        title: AB4A_LOW_TITLE,
+        slug: "low-pub-2",
+        status: "published",
+        active: 1,
+        focus_keyword: "",
+      }),
+      row({
+        id: 212,
+        title: AB4A_HIGH_TITLE,
+        slug: "high-inactive",
+        status: "published",
+        active: 0,
+        focus_keyword: "",
+      }),
+    ]
+  );
+  const highSim = computeBlogTopicSimilarity(AB4A_TOPIC, AB4A_HIGH_TITLE);
+  ok(
+    "AB4A_higher_sim_beats_inactive_status_diff",
+    r.matchedEntityId === 212 &&
+      r.signals.tokenSimilarity === highSim &&
+      r.disposition === "historical_recovery" &&
+      r.newBlogCandidate === false,
+    `id=${r.matchedEntityId} disp=${r.disposition}`
+  );
+}
+
+{
+  const eqSimA = computeBlogTopicSimilarity(AB4A_EQ_TOPIC, AB4A_EQ_A);
+  const eqSimB = computeBlogTopicSimilarity(AB4A_EQ_TOPIC, AB4A_EQ_B);
+  ok("AB4A_equal_sim_fixture", eqSimA === eqSimB && eqSimA >= STRONG_TOKEN_SIMILARITY_THRESHOLD);
+
+  const r = matchBlogOpportunity(
+    { topic: AB4A_EQ_TOPIC },
+    [
+      row({
+        id: 221,
+        title: AB4A_EQ_B,
+        slug: "eq-draft",
+        status: "draft",
+        active: 1,
+        focus_keyword: "",
+      }),
+      row({
+        id: 222,
+        title: AB4A_EQ_A,
+        slug: "eq-pub",
+        status: "published",
+        active: 1,
+        focus_keyword: "",
+      }),
+    ]
+  );
+  ok(
+    "AB4A_equal_sim_prefers_published_active",
+    r.matchedEntityId === 222 && r.disposition === "refresh",
+    `id=${r.matchedEntityId}`
+  );
+}
+
+{
+  const r = matchBlogOpportunity(
+    { topic: AB4A_EQ_TOPIC },
+    [
+      row({
+        id: 231,
+        title: AB4A_EQ_A,
+        slug: "eq-inactive-pub",
+        status: "published",
+        active: 0,
+        focus_keyword: "",
+      }),
+      row({
+        id: 232,
+        title: AB4A_EQ_B,
+        slug: "eq-active-draft",
+        status: "draft",
+        active: 1,
+        focus_keyword: "",
+      }),
+    ]
+  );
+  ok(
+    "AB4A_equal_sim_active_draft_beats_inactive",
+    r.matchedEntityId === 232 && r.disposition === "refresh",
+    `id=${r.matchedEntityId}`
+  );
+}
+
+{
+  const r = matchBlogOpportunity(
+    { topic: AB4A_EQ_TOPIC },
+    [
+      row({
+        id: 242,
+        title: AB4A_EQ_A,
+        slug: "eq-high-id",
+        status: "published",
+        active: 1,
+        focus_keyword: "",
+      }),
+      row({
+        id: 241,
+        title: AB4A_EQ_B,
+        slug: "eq-low-id",
+        status: "published",
+        active: 1,
+        focus_keyword: "",
+      }),
+    ]
+  );
+  ok("AB4A_full_tie_lowest_id", r.matchedEntityId === 241);
+}
+
+{
+  const r = matchBlogOpportunity(
+    {
+      topic: AB4A_TOPIC,
+      proposedSlug: "slug-exact-winner",
+    },
+    [
+      row({
+        id: 251,
+        title: AB4A_HIGH_TITLE,
+        slug: "sim-only",
+        status: "published",
+        active: 1,
+        focus_keyword: "",
+      }),
+      row({
+        id: 252,
+        title: "Unrelated Different Words Completely",
+        slug: "slug-exact-winner",
+        status: "draft",
+        active: 1,
+        focus_keyword: "",
+      }),
+    ]
+  );
+  ok(
+    "AB4A_cross_slug_beats_high_sim",
+    r.matchedEntityId === 252 && r.signals.slugExact === true
+  );
+}
+
+{
+  const r = matchBlogOpportunity(
+    { topic: AB4A_TOPIC, focusKeyword: "unique-focus-kw" },
+    [
+      row({
+        id: 261,
+        title: AB4A_HIGH_TITLE,
+        slug: "sim-row",
+        status: "published",
+        active: 1,
+        focus_keyword: "",
+      }),
+      row({
+        id: 262,
+        title: "Completely Different Unrelated Article Title",
+        slug: "focus-row",
+        status: "draft",
+        active: 1,
+        focus_keyword: "unique-focus-kw",
+      }),
+    ]
+  );
+  ok(
+    "AB4A_cross_focus_beats_sim_one",
+    r.matchedEntityId === 262 && r.signals.focusKeywordExact === true
+  );
+}
+
+{
+  const r = matchBlogOpportunity(
+    { topic: "How to Speed Up a Slow Firestick", focusKeyword: "unique-focus-kw-2" },
+    [
+      row({
+        id: 271,
+        title: "Completely Different Unrelated Article Title",
+        slug: "focus-only",
+        status: "published",
+        active: 1,
+        focus_keyword: "unique-focus-kw-2",
+      }),
+      row({
+        id: 272,
+        title: "How to Speed Up a Slow Firestick",
+        slug: "title-exact",
+        status: "draft",
+        active: 1,
+        focus_keyword: "",
+      }),
+    ]
+  );
+  ok(
+    "AB4A_cross_title_beats_focus",
+    r.matchedEntityId === 272 && r.match === "EXACT" && r.signals.titleExact === true
+  );
+}
+
 // ── I. NONE ────────────────────────────────────────────────────────────────
 
 {

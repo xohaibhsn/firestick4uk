@@ -357,16 +357,16 @@ function statusActivityRank(row: ParsedInventoryRow): number {
 /**
  * Deterministic candidate ordering:
  * lower tier wins (slug > title > focus > similarity),
+ * then higher similarity (match strength before lifecycle),
  * then status/activity preference,
- * then higher similarity,
  * then lowest id.
  */
 function isBetterCandidate(a: RankedCandidate, b: RankedCandidate): boolean {
   if (a.tier !== b.tier) return a.tier < b.tier;
+  if (a.similarity !== b.similarity) return a.similarity > b.similarity;
   const sa = statusActivityRank(a.row);
   const sb = statusActivityRank(b.row);
   if (sa !== sb) return sa < sb;
-  if (a.similarity !== b.similarity) return a.similarity > b.similarity;
   return a.row.id < b.row.id;
 }
 
