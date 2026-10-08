@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback, Fragment } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Fragment } from "react";
 import dynamic from "next/dynamic";
 import { toEditorHtml } from "@/lib/contentHtml";
 import AdminContentPanel from "@/components/admin/AdminContentPanel";
@@ -46,6 +46,16 @@ import {
   type ProductImageBriefUiState,
   type ProductReviewUiState,
 } from "@/lib/productAiClient";
+import {
+  buildProductSeoReviewRow,
+  filterAndOrderProductsForSeoReview,
+  productSeoBadgeText,
+  productSeoIssueTooltip,
+  productSeoStatusLabel,
+  summarizeProductSeoReviewRows,
+  type ProductSeoReviewFilter,
+  type ProductSeoReviewRow,
+} from "@/lib/productSeoReviewClient";
 import type { ProductAiEditableField, ProductKindHint } from "@/lib/seoAi";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
@@ -340,6 +350,8 @@ export default function AdminPage() {
   );
   const [productImageBriefUi, setProductImageBriefUi] =
     useState<ProductImageBriefUiState>(createIdleProductImageBriefUi());
+  const [productSeoFilter, setProductSeoFilter] =
+    useState<ProductSeoReviewFilter>("all");
   const [blogMetaAi, setBlogMetaAi] = useState<MetaDraftAiState>({ status: "idle" });
   const [imageUploading, setImageUploading] = useState(false);
   const [mediaPicker, setMediaPicker] = useState<{
@@ -1181,6 +1193,45 @@ export default function AdminPage() {
     else label = "Needs Review";
 
     return { label, missing };
+  };
+
+  const productSeoReviewRows = useMemo(
+    () => products.map((p) => buildProductSeoReviewRow(p)),
+    [products]
+  );
+
+  const productSeoReviewById = useMemo(() => {
+    const map = new Map<number, ProductSeoReviewRow>();
+    for (const row of productSeoReviewRows) map.set(row.productId, row);
+    return map;
+  }, [productSeoReviewRows]);
+
+  const productSeoSummary = useMemo(
+    () => summarizeProductSeoReviewRows(productSeoReviewRows),
+    [productSeoReviewRows]
+  );
+
+  const displayedProducts = useMemo(
+    () =>
+      filterAndOrderProductsForSeoReview(
+        products,
+        productSeoReviewById,
+        productSeoFilter
+      ),
+    [products, productSeoReviewById, productSeoFilter]
+  );
+
+  const productSeoBadgeColors = (status: ProductSeoReviewRow["status"]) => {
+    if (status === "needs-attention") {
+      return { bg: "#FEF2F2", bd: "#FECACA", fg: "#B91C1C" };
+    }
+    if (status === "review") {
+      return { bg: "#FFFBEB", bd: "#FCD34D", fg: "#B45309" };
+    }
+    if (status === "healthy") {
+      return { bg: "#ECFDF5", bd: "#A7F3D0", fg: "#047857" };
+    }
+    return { bg: "#F3F4F6", bd: "#D1D5DB", fg: "#4B5563" };
   };
 
   const loadStaff = () => {
@@ -2489,6 +2540,77 @@ export default function AdminPage() {
               );
             })()}
 
+            {productModal !== "new" && productModal?.id ? (() => {
+              const savedSeo = buildProductSeoReviewRow(productModal);
+              const seoColor = productSeoBadgeColors(savedSeo.status);
+              return (
+                <div
+                  className="seo-box"
+                  data-testid="existing-product-saved-seo-card"
+                  style={{ marginBottom: 14 }}
+                >
+                  <div className="seo-box-title">Deterministic SEO Check</div>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 8 }}>
+                    Saved SEO state — based on the last saved product record, not unsaved editor edits.
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      marginBottom: 8,
+                      fontSize: 12,
+                    }}
+                  >
+                    <span
+                      data-testid="existing-product-saved-seo-status"
+                      style={{
+                        background: seoColor.bg,
+                        border: `1px solid ${seoColor.bd}`,
+                        color: seoColor.fg,
+                        padding: "3px 8px",
+                        borderRadius: 8,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {productSeoStatusLabel(savedSeo.status)}
+                    </span>
+                    <span data-testid="existing-product-saved-seo-count">
+                      Issues: {savedSeo.issueCount}
+                    </span>
+                  </div>
+                  {savedSeo.issues.length ? (
+                    <div style={{ display: "grid", gap: 8, fontSize: 12 }}>
+                      {savedSeo.issues.map((issue) => (
+                        <div
+                          key={issue.id}
+                          data-testid={`existing-product-saved-seo-issue-${issue.id}`}
+                          style={{
+                            borderTop: "1px solid rgba(255,255,255,0.08)",
+                            paddingTop: 8,
+                          }}
+                        >
+                          <div style={{ fontWeight: 600 }}>
+                            {issue.severity}
+                            {issue.field ? ` · ${issue.field}` : ""}
+                          </div>
+                          <div style={{ marginTop: 2 }}>{issue.message}</div>
+                          <div style={{ marginTop: 2, opacity: 0.7 }}>{issue.evidence}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>
+                      {savedSeo.status === "inactive"
+                        ? "Inactive product — outside current public SEO scope."
+                        : "No current deterministic SEO issues."}
+                    </div>
+                  )}
+                </div>
+              );
+            })() : null}
+
             {/* Basic Info */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div className="modal-field">
@@ -2960,6 +3082,12 @@ export default function AdminPage() {
                 <div className="seo-box-title">Review Existing Product</div>
                 <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 12 }}>
                   Advisory review only. Apply updates local editor fields — Save Product is still required to persist.
+                </div>
+                <div
+                  data-testid="existing-product-ai-authoritative-note"
+                  style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginBottom: 12 }}
+                >
+                  Deterministic checks are authoritative. AI review is advisory and can help with wording/content suggestions.
                 </div>
                 <div
                   style={{
@@ -3838,25 +3966,109 @@ export default function AdminPage() {
                   <button type="button" className="action-btn btn-edit" style={{marginLeft:12}} onClick={() => loadProducts()}>Retry</button>
                 </div>
               )}
+
+              {!productsLoading && !productsError && products.length > 0 ? (
+                <div
+                  data-testid="product-seo-review-summary"
+                  style={{
+                    marginBottom: 12,
+                    padding: "10px 12px",
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 10,
+                    fontSize: 12,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 10,
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ fontWeight: 700, opacity: 0.85 }}>Deterministic SEO</span>
+                  <span data-testid="product-seo-count-needs-attention">
+                    Needs attention: {productSeoSummary.needsAttention}
+                  </span>
+                  <span data-testid="product-seo-count-review">
+                    Review: {productSeoSummary.review}
+                  </span>
+                  <span data-testid="product-seo-count-healthy">
+                    Healthy: {productSeoSummary.healthy}
+                  </span>
+                  <span data-testid="product-seo-count-inactive">
+                    Inactive: {productSeoSummary.inactive}
+                  </span>
+                  <span data-testid="product-seo-count-review-queue" style={{ fontWeight: 600 }}>
+                    Review Queue: {productSeoSummary.reviewQueue}
+                  </span>
+                </div>
+              ) : null}
+
+              {!productsLoading && !productsError && products.length > 0 ? (
+                <div
+                  data-testid="product-seo-review-filters"
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    marginBottom: 12,
+                  }}
+                >
+                  {(
+                    [
+                      ["all", "All"],
+                      ["review-queue", "Review Queue"],
+                      ["needs-attention", "Needs attention"],
+                      ["review", "Review"],
+                      ["healthy", "Healthy"],
+                      ["inactive", "Inactive"],
+                    ] as const
+                  ).map(([value, label]) => {
+                    const active = productSeoFilter === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        data-testid={`product-seo-filter-${value}`}
+                        className="action-btn btn-view"
+                        onClick={() => setProductSeoFilter(value)}
+                        style={{
+                          opacity: active ? 1 : 0.7,
+                          borderColor: active ? "rgba(91,33,182,0.55)" : undefined,
+                          background: active ? "rgba(91,33,182,0.12)" : undefined,
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Content</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Content</th><th>SEO</th><th>Actions</th></tr></thead>
                   <tbody>
                     {productsLoading && (
-                      <tr><td colSpan={7} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>Loading products…</td></tr>
+                      <tr><td colSpan={8} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>Loading products…</td></tr>
                     )}
                     {!productsLoading && !productsError && products.length === 0 && (
-                      <tr><td colSpan={7} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No products found{can("products.manage") ? ". Add a product above." : "."}</td></tr>
+                      <tr><td colSpan={8} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No products found{can("products.manage") ? ". Add a product above." : "."}</td></tr>
                     )}
-                    {!productsLoading && products.map(p => {
+                    {!productsLoading && !productsError && products.length > 0 && displayedProducts.length === 0 && (
+                      <tr><td colSpan={8} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No products match this SEO filter.</td></tr>
+                    )}
+                    {!productsLoading && displayedProducts.map(p => {
                       const health = productHealth(p);
                       const badgeColor =
                         health.label === "Complete" ? { bg:"#ECFDF5", bd:"#A7F3D0", fg:"#047857" } :
                         health.label === "Needs Image" ? { bg:"#EFF6FF", bd:"#BFDBFE", fg:"#1D4ED8" } :
                         health.label === "Needs SEO" ? { bg:"#F5F3FF", bd:"#DDD6FE", fg:"#5B21B6" } :
                         { bg:"#FFFBEB", bd:"#FCD34D", fg:"#B45309" };
+                      const seoRow =
+                        productSeoReviewById.get(Number(p.id)) ||
+                        buildProductSeoReviewRow(p);
+                      const seoColor = productSeoBadgeColors(seoRow.status);
                       return (
-                      <tr key={p.id}>
+                      <tr key={p.id} data-testid={`product-row-${p.id}`}>
                         <td><div className="product-thumb">{p.image ? <img src={p.image} alt="" style={{width:36,height:36,objectFit:"cover",borderRadius:6}} /> : (p.emoji || "📦")}</div></td>
                         <td style={{fontWeight:600}}>{p.name}</td>
                         <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{p.category}</span></td>
@@ -3864,6 +4076,15 @@ export default function AdminPage() {
                         <td>{p.stock}</td>
                         <td>
                           <span title={health.missing.length ? `Missing: ${health.missing.join(", ")}` : "All key fields present"} style={{background:badgeColor.bg,border:`1px solid ${badgeColor.bd}`,color:badgeColor.fg,padding:"3px 8px",borderRadius:8,fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{health.label}</span>
+                        </td>
+                        <td>
+                          <span
+                            data-testid={`product-seo-badge-${p.id}`}
+                            title={productSeoIssueTooltip(seoRow)}
+                            style={{background:seoColor.bg,border:`1px solid ${seoColor.bd}`,color:seoColor.fg,padding:"3px 8px",borderRadius:8,fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}
+                          >
+                            {productSeoBadgeText(seoRow)}
+                          </span>
                         </td>
                         <td>
                           {can("products.manage") && (
