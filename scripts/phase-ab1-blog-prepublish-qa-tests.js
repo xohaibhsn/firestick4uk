@@ -403,6 +403,59 @@ ok(
   ).verdict === "PASS"
 );
 ok(
+  "relative_blog_path_allowed",
+  evalQa(
+    baseCandidate({
+      content: bodyParagraphs(1300) + '<a href="/blog/test">x</a>',
+    })
+  ).verdict === "PASS"
+);
+ok(
+  "relative_products_path_allowed",
+  evalQa(
+    baseCandidate({
+      content: bodyParagraphs(1300) + '<a href="/products">x</a>',
+    })
+  ).verdict === "PASS"
+);
+ok(
+  "hold_protocol_relative_evil",
+  hasBlocker(
+    evalQa(
+      baseCandidate({
+        content: bodyParagraphs(1300) + '<a href="//evil.example/path">x</a>',
+      })
+    ),
+    "unsafe-link"
+  )
+);
+ok(
+  "hold_protocol_relative_apex",
+  hasBlocker(
+    evalQa(
+      baseCandidate({
+        content:
+          bodyParagraphs(1300) +
+          '<a href="//firestick4uk.com/blog/test">x</a>',
+      })
+    ),
+    "unsafe-link"
+  )
+);
+ok(
+  "hold_protocol_relative_www",
+  hasBlocker(
+    evalQa(
+      baseCandidate({
+        content:
+          bodyParagraphs(1300) +
+          '<a href="//www.firestick4uk.com/blog/test">x</a>',
+      })
+    ),
+    "unsafe-link"
+  )
+);
+ok(
   "https_apex_internal_allowed",
   evalQa(
     baseCandidate({

@@ -247,6 +247,13 @@ function classifyHref(href: string): { ok: boolean; evidence: string } {
   ) {
     return { ok: false, evidence: `Unsafe href scheme: ${href.slice(0, 64)}` };
   }
+  // Protocol-relative must be rejected before root-relative ("/" also matches "//").
+  if (href.startsWith("//")) {
+    return {
+      ok: false,
+      evidence: "Protocol-relative URLs are not allowed in autonomous content.",
+    };
+  }
   if (href.startsWith("/")) return { ok: true, evidence: "" };
   if (lower.startsWith("mailto:") || lower.startsWith("tel:")) {
     return { ok: true, evidence: "" };
@@ -280,13 +287,6 @@ function classifyHref(href: string): { ok: boolean; evidence: string } {
       };
     }
     return { ok: true, evidence: "" };
-  }
-  // Other schemes / protocol-relative: fail closed for autonomous publish
-  if (href.startsWith("//")) {
-    return {
-      ok: false,
-      evidence: "Protocol-relative URLs are not allowed in autonomous content.",
-    };
   }
   return { ok: false, evidence: `Unsupported href form: ${href.slice(0, 64)}` };
 }
