@@ -9,7 +9,8 @@ export type SeoAiTask =
   | "explain_issue"
   | "draft_metadata"
   | "draft_product_fields"
-  | "review_product";
+  | "review_product"
+  | "image_brief";
 
 export type SeoAiExplainRequest = {
   provider: SeoAiProvider;
@@ -142,6 +143,58 @@ export type SeoAiProductReviewRequest = {
   currentEditorCopy: ProductAiReviewEditorCopy;
 };
 
+/** PAI-5 — image brief slots (text specs only; no image generation). */
+export const IMAGE_BRIEF_SLOTS = [
+  "MAIN_PRODUCT",
+  "DETAIL_SUPPORTING",
+  "OG_SOCIAL",
+] as const;
+export type ImageBriefSlotId = (typeof IMAGE_BRIEF_SLOTS)[number];
+
+export const IMAGE_BRIEF_PROMPT_MAX = 2000;
+export const IMAGE_BRIEF_NEGATIVE_MAX = 1000;
+export const IMAGE_BRIEF_PURPOSE_MAX = 300;
+export const IMAGE_BRIEF_COMPOSITION_MAX = 600;
+export const IMAGE_BRIEF_ALT_MAX = 160;
+export const IMAGE_BRIEF_APPROVED_TEXT_MAX = 120;
+export const IMAGE_BRIEF_TEXT_GUIDANCE_MAX = 400;
+
+export type ImageBriefSlot = {
+  slot: ImageBriefSlotId;
+  use: boolean;
+  purpose: string;
+  width: number;
+  height: number;
+  aspect_ratio: string;
+  format: string;
+  composition: string;
+  prompt: string;
+  negative_prompt: string;
+  approved_text: string;
+  text_guidance: string;
+  alt_text: string;
+};
+
+export type ImageBriefResult = {
+  slots: ImageBriefSlot[];
+};
+
+export type SeoAiImageBriefRequest = {
+  provider: SeoAiProvider;
+  task: "image_brief";
+  productId: number | null;
+  productKind: ProductKindHint;
+  authoritative: ProductAiAuthoritative;
+  currentEditorCopy: ProductAiEditorCopy;
+};
+
+export type ProductAiImageBriefContext = {
+  productId: number | null;
+  productKind: ProductKindHint;
+  authoritative: ProductAiAuthoritative;
+  currentEditorCopy: ProductAiEditorCopy;
+};
+
 export type ProductAiReviewStatus = "ok" | "suggest" | "warning";
 export type ProductAiReviewConfidence = "high" | "medium" | "low";
 
@@ -207,7 +260,8 @@ export type SeoAiRequest =
   | SeoAiExplainRequest
   | SeoAiDraftRequest
   | SeoAiProductFieldsRequest
-  | SeoAiProductReviewRequest;
+  | SeoAiProductReviewRequest
+  | SeoAiImageBriefRequest;
 
 export type SeoAiMetadataDraft = {
   titles: string[];
@@ -359,6 +413,32 @@ const ALLOWED_PRODUCT_REVIEW_REQUEST_KEYS = new Set([
   "productKind",
   "currentEditorCopy",
 ]);
+const ALLOWED_IMAGE_BRIEF_REQUEST_KEYS = new Set([
+  "provider",
+  "task",
+  "productId",
+  "productKind",
+  "authoritative",
+  "currentEditorCopy",
+]);
+const IMAGE_BRIEF_SLOT_SET = new Set<string>(IMAGE_BRIEF_SLOTS);
+const IMAGE_BRIEF_MAIN_FORMATS = new Set(["webp", "jpg"]);
+const IMAGE_BRIEF_OG_FORMATS = new Set(["jpg", "png"]);
+const IMAGE_BRIEF_SLOT_KEYS = [
+  "slot",
+  "use",
+  "purpose",
+  "width",
+  "height",
+  "aspect_ratio",
+  "format",
+  "composition",
+  "prompt",
+  "negative_prompt",
+  "approved_text",
+  "text_guidance",
+  "alt_text",
+] as const;
 const ALLOWED_REVIEW_EDITOR_COPY_KEYS = new Set([
   "short_description",
   "full_description",
@@ -606,6 +686,7 @@ export function parseSeoAiRequest(
   | { ok: true; request: SeoAiDraftRequest }
   | { ok: true; request: SeoAiProductFieldsRequest }
   | { ok: true; request: SeoAiProductReviewRequest }
+  | { ok: true; request: SeoAiImageBriefRequest }
   | { ok: false; code: "invalid_request"; message: string } {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return {
@@ -634,12 +715,15 @@ export function parseSeoAiRequest(
   if (task === "review_product") {
     return parseReviewProductRequest(body);
   }
+  if (task === "image_brief") {
+    return parseImageBriefRequest(body);
+  }
   if (task !== "draft_metadata") {
     return {
       ok: false,
       code: "invalid_request",
       message:
-        "task must be explain_issue, draft_metadata, draft_product_fields, or review_product.",
+        "task must be explain_issue, draft_metadata, draft_product_fields, review_product, or image_brief.",
     };
   }
   for (const key of Object.keys(obj)) {
@@ -2332,6 +2416,512 @@ export function parseProductReviewJsonText(
       ok: false,
       code: "malformed_provider_output",
       message: "The AI provider returned an unusable product review.",
+    };
+  }
+}
+
+/* ─── PAI-5 Product Image Brief ─────────────────────────────────────────── */
+
+export function parseImageBriefRequest(
+  body: unknown
+):
+  | { ok: true; request: SeoAiImageBriefRequest }
+  | { ok: false; code: "invalid_request"; message: string } {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "Request body must be a JSON object.",
+    };
+  }
+  const obj = body as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (!ALLOWED_IMAGE_BRIEF_REQUEST_KEYS.has(key)) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "Request contains unsupported fields.",
+      };
+    }
+  }
+
+  const provider = obj.provider;
+  if (provider !== "gemini" && provider !== "openai") {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "provider must be gemini or openai.",
+    };
+  }
+  if (obj.task !== "image_brief") {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "task must be image_brief.",
+    };
+  }
+
+  let productId: number | null = null;
+  if (obj.productId === null || obj.productId === undefined) {
+    productId = null;
+  } else if (typeof obj.productId === "number") {
+    if (!Number.isSafeInteger(obj.productId) || obj.productId <= 0) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "productId is invalid.",
+      };
+    }
+    productId = obj.productId;
+  } else if (typeof obj.productId === "string") {
+    const normalized = normalizeEntityId(obj.productId);
+    if (!normalized) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "productId is invalid.",
+      };
+    }
+    productId = Number(normalized);
+  } else {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "productId is invalid.",
+    };
+  }
+
+  const productKind = obj.productKind;
+  if (
+    typeof productKind !== "string" ||
+    !PRODUCT_KIND_HINTS.has(productKind as ProductKindHint)
+  ) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "productKind is invalid.",
+    };
+  }
+
+  const authParsed = parseProductAiAuthoritative(obj.authoritative, productId);
+  if (!authParsed.ok) return authParsed;
+
+  const copyParsed = parseProductAiEditorCopy(obj.currentEditorCopy);
+  if (!copyParsed.ok) return copyParsed;
+
+  return {
+    ok: true,
+    request: {
+      provider,
+      task: "image_brief",
+      productId,
+      productKind: productKind as ProductKindHint,
+      authoritative: authParsed.authoritative,
+      currentEditorCopy: copyParsed.currentEditorCopy,
+    },
+  };
+}
+
+export function buildImageBriefSystemInstruction(
+  context: ProductAiImageBriefContext
+): string {
+  return [
+    "You are the Firestick4UK CMS product image brief generator.",
+    "Return structured image-generation briefs only. Do NOT generate images or URLs.",
+    "Ground every brief only in verified/supplied product facts from the context.",
+    "Never invent discounts, sale percentages, free trials, channel counts, ratings,",
+    "reviews, award badges, guarantees, uptime percentages, unsupported compatibility,",
+    "unsupported device models/accessories, shipping promises, physical dimensions,",
+    "stock quantities, fake UI screenshots, or third-party trademarks/logos.",
+    "Do not include Netflix, Disney+, Sky, Premier League, Amazon, or similar logos.",
+    "No fake certification seals, #1/Best/5-star/Limited Offer badges, or watermarks.",
+    "Return exactly three slots: MAIN_PRODUCT, DETAIL_SUPPORTING, OG_SOCIAL — once each.",
+    "MAIN_PRODUCT use must be true; dimensions exactly 1200x1200; aspect_ratio 1:1; format webp or jpg.",
+    "DETAIL_SUPPORTING may use false when a second visual adds no value; if use=true same 1200x1200 1:1 webp|jpg.",
+    "When DETAIL_SUPPORTING use is false, still return all fields with empty strings for text fields",
+    "and keep width 1200, height 1200, aspect_ratio 1:1, format webp.",
+    "OG_SOCIAL use must be true; dimensions exactly 1200x630; aspect_ratio 1.91:1; format jpg or png.",
+    "approved_text must be an empty string unless exact overlay text is already supplied/approved.",
+    "Prefer visuals without embedded text; text_guidance should say add exact text later in a design tool if needed.",
+    "alt_text must be concise and factual for used slots; empty string when use is false.",
+    "Prompts must be ready to copy into ChatGPT/Gemini image tools — clean commercial UK ecommerce style.",
+    "For digital_subscription products: avoid depicting thousands of channels or copyrighted logos;",
+    "prefer premium streaming-device environment or elegant abstract entertainment visuals without implying Amazon affiliation.",
+    productKindGuardText(context.productKind),
+    "Plain text only — no HTML, markdown fences, or scripts.",
+    "Return only the required normalized structured JSON.",
+  ].join(" ");
+}
+
+export function buildImageBriefUserPrompt(
+  context: ProductAiImageBriefContext
+): string {
+  return [
+    "Product image brief context (compact JSON):",
+    JSON.stringify({
+      productId: context.productId,
+      productKind: context.productKind,
+      authoritative: {
+        brand: context.authoritative.brand || "Firestick4UK",
+        canonicalName: context.authoritative.canonicalName,
+        category: context.authoritative.category,
+        priceGbp: context.authoritative.priceGbp,
+        duration: context.authoritative.duration,
+        variant: context.authoritative.variant,
+        confirmedCompatibility: context.authoritative.confirmedCompatibility,
+        confirmedFeatures: context.authoritative.confirmedFeatures,
+        approvedClaims: context.authoritative.approvedClaims,
+        hasImage: Boolean(context.authoritative.imageUrl),
+        hasOgImage: Boolean(context.authoritative.ogImageUrl),
+      },
+      currentEditorCopy: context.currentEditorCopy,
+      slots: IMAGE_BRIEF_SLOTS,
+    }),
+    "Return exactly one brief entry per slot in IMAGE_BRIEF_SLOTS order.",
+  ].join("\n");
+}
+
+function imageBriefSlotPropertySchema(): Record<string, unknown> {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: [...IMAGE_BRIEF_SLOT_KEYS],
+    properties: {
+      slot: { type: "string", enum: [...IMAGE_BRIEF_SLOTS] },
+      use: { type: "boolean" },
+      purpose: { type: "string" },
+      width: { type: "integer" },
+      height: { type: "integer" },
+      aspect_ratio: { type: "string" },
+      format: { type: "string" },
+      composition: { type: "string" },
+      prompt: { type: "string" },
+      negative_prompt: { type: "string" },
+      approved_text: { type: "string" },
+      text_guidance: { type: "string" },
+      alt_text: { type: "string" },
+    },
+  };
+}
+
+export function buildImageBriefJsonSchema(): Record<string, unknown> {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["slots"],
+    properties: {
+      slots: {
+        type: "array",
+        minItems: 3,
+        maxItems: 3,
+        items: imageBriefSlotPropertySchema(),
+      },
+    },
+  };
+}
+
+function validateImageBriefBoundedText(
+  value: unknown,
+  field: string,
+  max: number,
+  allowEmpty: boolean
+):
+  | { ok: true; value: string }
+  | { ok: false; code: "malformed_provider_output"; message: string } {
+  if (typeof value !== "string") {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: `The AI provider returned an unusable image brief (${field}).`,
+    };
+  }
+  const trimmed = value.trim();
+  if (!allowEmpty && !trimmed) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: `The AI provider returned an unusable image brief (${field}).`,
+    };
+  }
+  if (trimmed.length > max || looksLikeHtmlOrScript(trimmed)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: `The AI provider returned an unusable image brief (${field}).`,
+    };
+  }
+  return { ok: true, value: trimmed };
+}
+
+function validateOneImageBriefSlot(
+  raw: unknown,
+  expectedSlot: ImageBriefSlotId
+):
+  | { ok: true; slot: ImageBriefSlot }
+  | { ok: false; code: "malformed_provider_output"; message: string } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable image brief.",
+    };
+  }
+  const obj = raw as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (!(IMAGE_BRIEF_SLOT_KEYS as readonly string[]).includes(key)) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned an unusable image brief.",
+      };
+    }
+  }
+  for (const key of IMAGE_BRIEF_SLOT_KEYS) {
+    if (!(key in obj)) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned an unusable image brief.",
+      };
+    }
+  }
+
+  if (obj.slot !== expectedSlot || !IMAGE_BRIEF_SLOT_SET.has(String(obj.slot))) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable image brief (slot).",
+    };
+  }
+  if (typeof obj.use !== "boolean") {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable image brief (use).",
+    };
+  }
+
+  if (expectedSlot === "MAIN_PRODUCT" && obj.use !== true) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "MAIN_PRODUCT use must be true.",
+    };
+  }
+  if (expectedSlot === "OG_SOCIAL" && obj.use !== true) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "OG_SOCIAL use must be true.",
+    };
+  }
+
+  const width = obj.width;
+  const height = obj.height;
+  if (
+    typeof width !== "number" ||
+    typeof height !== "number" ||
+    !Number.isInteger(width) ||
+    !Number.isInteger(height)
+  ) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable image brief (dimensions).",
+    };
+  }
+
+  if (expectedSlot === "OG_SOCIAL") {
+    if (width !== 1200 || height !== 630) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "OG_SOCIAL must be exactly 1200x630.",
+      };
+    }
+  } else if (width !== 1200 || height !== 1200) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: `${expectedSlot} must be exactly 1200x1200.`,
+    };
+  }
+
+  const aspect = String(obj.aspect_ratio || "").trim();
+  const format = String(obj.format || "").trim().toLowerCase();
+  if (expectedSlot === "OG_SOCIAL") {
+    if (aspect !== "1.91:1") {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "OG_SOCIAL aspect_ratio must be 1.91:1.",
+      };
+    }
+    if (!IMAGE_BRIEF_OG_FORMATS.has(format)) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "OG_SOCIAL format must be jpg or png.",
+      };
+    }
+  } else {
+    if (aspect !== "1:1") {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: `${expectedSlot} aspect_ratio must be 1:1.`,
+      };
+    }
+    if (!IMAGE_BRIEF_MAIN_FORMATS.has(format)) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: `${expectedSlot} format must be webp or jpg.`,
+      };
+    }
+  }
+
+  const allowEmptyText = obj.use === false;
+  const purpose = validateImageBriefBoundedText(
+    obj.purpose,
+    "purpose",
+    IMAGE_BRIEF_PURPOSE_MAX,
+    allowEmptyText
+  );
+  if (!purpose.ok) return purpose;
+  const composition = validateImageBriefBoundedText(
+    obj.composition,
+    "composition",
+    IMAGE_BRIEF_COMPOSITION_MAX,
+    allowEmptyText
+  );
+  if (!composition.ok) return composition;
+  const prompt = validateImageBriefBoundedText(
+    obj.prompt,
+    "prompt",
+    IMAGE_BRIEF_PROMPT_MAX,
+    allowEmptyText
+  );
+  if (!prompt.ok) return prompt;
+  const negative = validateImageBriefBoundedText(
+    obj.negative_prompt,
+    "negative_prompt",
+    IMAGE_BRIEF_NEGATIVE_MAX,
+    true
+  );
+  if (!negative.ok) return negative;
+  const approved = validateImageBriefBoundedText(
+    obj.approved_text,
+    "approved_text",
+    IMAGE_BRIEF_APPROVED_TEXT_MAX,
+    true
+  );
+  if (!approved.ok) return approved;
+  const guidance = validateImageBriefBoundedText(
+    obj.text_guidance,
+    "text_guidance",
+    IMAGE_BRIEF_TEXT_GUIDANCE_MAX,
+    allowEmptyText
+  );
+  if (!guidance.ok) return guidance;
+  const alt = validateImageBriefBoundedText(
+    obj.alt_text,
+    "alt_text",
+    IMAGE_BRIEF_ALT_MAX,
+    allowEmptyText
+  );
+  if (!alt.ok) return alt;
+
+  return {
+    ok: true,
+    slot: {
+      slot: expectedSlot,
+      use: obj.use,
+      purpose: purpose.value,
+      width,
+      height,
+      aspect_ratio: aspect,
+      format,
+      composition: composition.value,
+      prompt: prompt.value,
+      negative_prompt: negative.value,
+      approved_text: approved.value,
+      text_guidance: guidance.value,
+      alt_text: alt.value,
+    },
+  };
+}
+
+export function validateImageBrief(
+  raw: unknown
+):
+  | { ok: true; result: ImageBriefResult }
+  | { ok: false; code: "malformed_provider_output"; message: string } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable image brief.",
+    };
+  }
+  const obj = raw as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (key !== "slots") {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned an unusable image brief.",
+      };
+    }
+  }
+  if (!Array.isArray(obj.slots) || obj.slots.length !== 3) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable image brief (slots).",
+    };
+  }
+
+  const slots: ImageBriefSlot[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < IMAGE_BRIEF_SLOTS.length; i++) {
+    const expected = IMAGE_BRIEF_SLOTS[i];
+    const parsed = validateOneImageBriefSlot(obj.slots[i], expected);
+    if (!parsed.ok) return parsed;
+    if (seen.has(parsed.slot.slot)) {
+      return {
+        ok: false,
+        code: "malformed_provider_output",
+        message: "The AI provider returned duplicate image brief slots.",
+      };
+    }
+    seen.add(parsed.slot.slot);
+    slots.push(parsed.slot);
+  }
+
+  return { ok: true, result: { slots } };
+}
+
+export function parseImageBriefJsonText(
+  text: string
+):
+  | { ok: true; result: ImageBriefResult }
+  | { ok: false; code: "malformed_provider_output"; message: string } {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable image brief.",
+    };
+  }
+  try {
+    return validateImageBrief(JSON.parse(raw));
+  } catch {
+    return {
+      ok: false,
+      code: "malformed_provider_output",
+      message: "The AI provider returned an unusable image brief.",
     };
   }
 }

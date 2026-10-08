@@ -27,17 +27,23 @@ import {
   applyNewProductAiFieldLocally,
   buildExistingProductReviewRequest,
   buildNewProductDraftRequest,
+  buildProductImageBriefRequest,
+  copyTextToClipboard,
   createDefaultProductAiFacts,
   createIdleProductAiUi,
+  createIdleProductImageBriefUi,
   createIdleProductReviewUi,
   currentEditorPlainPreview,
   defaultProductKindFromCategory,
+  formatImageBriefClipboard,
   isReviewFieldApplyable,
+  mapImageBriefSlotsToUi,
   mapProductReviewToUi,
   mapProviderSuggestionsToUi,
   type ProductAiFactsState,
   type ProductAiProviderChoice,
   type ProductAiUiState,
+  type ProductImageBriefUiState,
   type ProductReviewUiState,
 } from "@/lib/productAiClient";
 import type { ProductAiEditableField, ProductKindHint } from "@/lib/seoAi";
@@ -332,6 +338,8 @@ export default function AdminPage() {
   const [productReviewUi, setProductReviewUi] = useState<ProductReviewUiState>(
     createIdleProductReviewUi()
   );
+  const [productImageBriefUi, setProductImageBriefUi] =
+    useState<ProductImageBriefUiState>(createIdleProductImageBriefUi());
   const [blogMetaAi, setBlogMetaAi] = useState<MetaDraftAiState>({ status: "idle" });
   const [imageUploading, setImageUploading] = useState(false);
   const [mediaPicker, setMediaPicker] = useState<{
@@ -1605,6 +1613,7 @@ export default function AdminPage() {
       setProductMetaAi({ status: "idle" });
       setProductAiUi(createIdleProductAiUi());
       setProductReviewUi(createIdleProductReviewUi());
+      setProductImageBriefUi(createIdleProductImageBriefUi());
       setProductAiFacts(createDefaultProductAiFacts("Subscription"));
       setProductModal(null);
       setProductMsg(`✅ Product saved${formatSeoGuardBannerClient(res.seo_guard)}`);
@@ -1621,6 +1630,7 @@ export default function AdminPage() {
     setProductMetaAi({ status: "idle" });
     setProductAiUi(createIdleProductAiUi());
     setProductReviewUi(createIdleProductReviewUi());
+    setProductImageBriefUi(createIdleProductImageBriefUi());
     setProductAiFacts(createDefaultProductAiFacts(category));
   };
 
@@ -1867,6 +1877,111 @@ export default function AdminPage() {
     }));
   };
 
+  const generateProductImageBriefs = async (
+    provider: ProductAiProviderChoice
+  ) => {
+    if (!can("products.manage")) return;
+    if (productImageBriefUi.status === "loading") return;
+
+    const productId =
+      productModal !== "new" && productModal?.id
+        ? Number(productModal.id)
+        : null;
+
+    const built = buildProductImageBriefRequest({
+      provider,
+      productId,
+      editProduct,
+      facts: productAiFacts,
+    });
+    if (!built.ok) {
+      setProductImageBriefUi((s) => ({
+        ...s,
+        status: "error",
+        provider,
+        error: built.message,
+        productId,
+        slots: [],
+      }));
+      return;
+    }
+
+    setProductImageBriefUi({
+      status: "loading",
+      provider,
+      error: "",
+      productId,
+      slots: [],
+    });
+
+    try {
+      const res = await fetch("/api/admin-seo-ai", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(built.body),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok) {
+        const code = String(json?.code || "");
+        const message =
+          code === "provider_not_configured" || res.status === 503
+            ? "Selected AI provider is not configured yet."
+            : code === "provider_timeout"
+              ? "AI provider timed out. Try again."
+              : code === "rate_limited"
+                ? "AI rate limit reached. Wait a moment and try again."
+                : code === "malformed_provider_output"
+                  ? "AI returned an unusable image brief. Try again."
+                  : String(json?.message || json?.error || `HTTP ${res.status}`);
+        setProductImageBriefUi({
+          status: "error",
+          provider,
+          error: message,
+          productId,
+          slots: [],
+        });
+        return;
+      }
+      setProductImageBriefUi({
+        status: "ok",
+        provider: (json.provider === "openai" ? "openai" : "gemini") as ProductAiProviderChoice,
+        error: "",
+        productId:
+          json.productId == null || json.productId === ""
+            ? null
+            : Number(json.productId) || productId,
+        slots: mapImageBriefSlotsToUi(json.slots),
+      });
+    } catch {
+      setProductImageBriefUi({
+        status: "error",
+        provider,
+        error: "Image brief request failed.",
+        productId,
+        slots: [],
+      });
+    }
+  };
+
+  const openProductImageLibraryForSlot = (
+    slot: "MAIN_PRODUCT" | "OG_SOCIAL"
+  ) => {
+    if (slot === "MAIN_PRODUCT") {
+      setMediaPicker({
+        purposes: ["products"],
+        title: "Choose Product Image",
+        onSelect: (asset) => setEditProduct((p) => ({ ...p, image: asset.url })),
+      });
+      return;
+    }
+    setMediaPicker({
+      purposes: ["products"],
+      title: "Choose Product OG Image",
+      onSelect: (asset) => setEditProduct((p) => ({ ...p, og_image: asset.url })),
+    });
+  };
+
   const draftProductMetadata = async (provider: "gemini" | "openai") => {
     if (productModal === "new" || !productModal || !productModal.id) return;
     const entityId = Number(productModal.id);
@@ -1973,6 +2088,205 @@ export default function AdminPage() {
       : chatLeads.filter((lead) => new Date(lead.created_at).getTime() >= leadWindowStart).length;
 
   const statusClass = (s: string) => `status-badge status-${s}`;
+
+  const imageBriefSlotTitle = (slot: string) => {
+    if (slot === "MAIN_PRODUCT") return "Main Product";
+    if (slot === "DETAIL_SUPPORTING") return "Supporting Detail";
+    if (slot === "OG_SOCIAL") return "OG / Social";
+    return slot;
+  };
+
+  const renderProductImageBriefPanel = (
+    providerSource: ProductAiProviderChoice
+  ) => (
+    <div
+      data-testid="product-image-brief-panel"
+      style={{
+        marginTop: 14,
+        paddingTop: 12,
+        borderTop: "1px solid rgba(255,255,255,0.08)",
+      }}
+    >
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+        Image Briefs
+      </div>
+      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 10 }}>
+        Text-only prompts for external image tools. No images are generated here.
+        Generate externally, then use the existing Media Library controls to upload/select.
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
+        <button
+          type="button"
+          className="action-btn btn-view"
+          data-testid="product-image-brief-generate"
+          disabled={
+            productImageBriefUi.status === "loading" ||
+            !String(editProduct.name || "").trim()
+          }
+          onClick={() => void generateProductImageBriefs(providerSource)}
+        >
+          Generate Image Briefs
+        </button>
+      </div>
+      {productImageBriefUi.status === "loading" ? (
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginBottom: 10 }}>
+          Generating image briefs with{" "}
+          {productImageBriefUi.provider === "gemini" ? "Gemini" : "OpenAI"}…
+        </div>
+      ) : null}
+      {productImageBriefUi.status === "error" ? (
+        <div
+          style={{ fontSize: 12, color: "#ff6666", marginBottom: 10 }}
+          data-testid="product-image-brief-error"
+        >
+          {productImageBriefUi.error || "Image brief failed."}
+        </div>
+      ) : null}
+      {productImageBriefUi.status === "ok" && productImageBriefUi.slots.length ? (
+        <div style={{ display: "grid", gap: 12 }} data-testid="product-image-brief-slots">
+          {productImageBriefUi.slots.map((slot) => (
+            <div
+              key={slot.slot}
+              data-testid={`product-image-brief-slot-${slot.slot}`}
+              style={{
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 10,
+                padding: 12,
+                background: "rgba(255,255,255,0.03)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  marginBottom: 8,
+                }}
+              >
+                <strong>{imageBriefSlotTitle(slot.slot)}</strong>
+                <span style={{ opacity: 0.7 }}>
+                  {slot.use ? "Use" : "Skip"} · {slot.width}×{slot.height} ·{" "}
+                  {slot.aspect_ratio} · {slot.format}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.8, display: "grid", gap: 6 }}>
+                <div>
+                  <em>Purpose:</em> {slot.purpose || "(none)"}
+                </div>
+                <div>
+                  <em>Composition:</em> {slot.composition || "(none)"}
+                </div>
+                <div>
+                  <em>Image Prompt:</em>
+                  <pre
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      margin: "4px 0 0",
+                      fontFamily: "inherit",
+                      fontSize: 12,
+                      opacity: 0.95,
+                    }}
+                  >
+                    {slot.prompt || "(empty)"}
+                  </pre>
+                </div>
+                <div>
+                  <em>Negative Prompt:</em>
+                  <pre
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      margin: "4px 0 0",
+                      fontFamily: "inherit",
+                      fontSize: 12,
+                      opacity: 0.95,
+                    }}
+                  >
+                    {slot.negative_prompt || "(empty)"}
+                  </pre>
+                </div>
+                <div>
+                  <em>Approved Text:</em> {slot.approved_text || "(none)"}
+                </div>
+                <div>
+                  <em>Text Guidance:</em> {slot.text_guidance || "(none)"}
+                </div>
+                <div>
+                  <em>Alt Suggestion:</em> {slot.alt_text || "(none)"}
+                </div>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  marginTop: 10,
+                }}
+              >
+                <button
+                  type="button"
+                  className="action-btn btn-edit"
+                  data-testid={`product-image-brief-copy-prompt-${slot.slot}`}
+                  disabled={!slot.prompt}
+                  onClick={() => void copyTextToClipboard(slot.prompt)}
+                >
+                  Copy Prompt
+                </button>
+                <button
+                  type="button"
+                  className="action-btn btn-view"
+                  data-testid={`product-image-brief-copy-negative-${slot.slot}`}
+                  disabled={!slot.negative_prompt}
+                  onClick={() => void copyTextToClipboard(slot.negative_prompt)}
+                >
+                  Copy Negative Prompt
+                </button>
+                <button
+                  type="button"
+                  className="action-btn btn-view"
+                  data-testid={`product-image-brief-copy-alt-${slot.slot}`}
+                  disabled={!slot.alt_text}
+                  onClick={() => void copyTextToClipboard(slot.alt_text)}
+                >
+                  Copy Alt Text
+                </button>
+                <button
+                  type="button"
+                  className="action-btn btn-view"
+                  data-testid={`product-image-brief-copy-full-${slot.slot}`}
+                  onClick={() =>
+                    void copyTextToClipboard(formatImageBriefClipboard(slot))
+                  }
+                >
+                  Copy Full Brief
+                </button>
+                {slot.use && slot.slot === "MAIN_PRODUCT" ? (
+                  <button
+                    type="button"
+                    className="action-btn btn-edit"
+                    data-testid="product-image-brief-open-main-library"
+                    onClick={() => openProductImageLibraryForSlot("MAIN_PRODUCT")}
+                  >
+                    Open Product Image Library
+                  </button>
+                ) : null}
+                {slot.use && slot.slot === "OG_SOCIAL" ? (
+                  <button
+                    type="button"
+                    className="action-btn btn-edit"
+                    data-testid="product-image-brief-open-og-library"
+                    onClick={() => openProductImageLibraryForSlot("OG_SOCIAL")}
+                  >
+                    Open OG Image Library
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 
   if (authChecking) {
     return (
@@ -2629,6 +2943,8 @@ export default function AdminPage() {
                     )}
                   </div>
                 ) : null}
+
+                {renderProductImageBriefPanel(productAiUi.provider)}
               </div>
             ) : null}
 
@@ -2801,6 +3117,8 @@ export default function AdminPage() {
                     })}
                   </div>
                 ) : null}
+
+                {renderProductImageBriefPanel(productReviewUi.provider)}
               </div>
             ) : null}
 
@@ -2931,6 +3249,8 @@ export default function AdminPage() {
                 className="modal-cancel"
                 onClick={() => {
                   setProductAiUi(createIdleProductAiUi());
+                  setProductReviewUi(createIdleProductReviewUi());
+                  setProductImageBriefUi(createIdleProductImageBriefUi());
                   setProductAiFacts(createDefaultProductAiFacts("Subscription"));
                   setProductMetaAi({ status: "idle" });
                   setProductModal(null);

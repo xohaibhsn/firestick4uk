@@ -1,16 +1,19 @@
 /**
- * Client-safe helpers for PAI-3 New Product AI drafting UI
- * and PAI-4 Existing Product AI review Apply.
- * No DB. No CMS writes. No provider calls.
+ * Client-safe helpers for PAI-3 New Product AI drafting UI,
+ * PAI-4 Existing Product AI review Apply, and PAI-5 image briefs.
+ * No DB. No CMS writes. No provider calls. No image generation.
  */
 
 import { escapeHtml } from "@/lib/contentHtml";
 import {
+  IMAGE_BRIEF_SLOTS,
   PRODUCT_AI_EXISTING_EDITABLE_FIELDS,
   PRODUCT_AI_FIELD_MAX,
   PRODUCT_AI_NEW_EDITABLE_FIELDS,
   PRODUCT_AI_REVIEW_FIELDS,
   normalizeProductAiSlug,
+  type ImageBriefSlot,
+  type ImageBriefSlotId,
   type ProductAiEditableField,
   type ProductAiExistingEditableField,
   type ProductAiNewEditableField,
@@ -663,3 +666,218 @@ export function reviewContractIncludesNameAsReviewOnly(): boolean {
 }
 
 export type { ProductAiExistingEditableField, ProductAiReviewField };
+
+/* ─── PAI-5 Image Brief UI helpers ──────────────────────────────────────── */
+
+export type ProductImageBriefUiState = {
+  status: "idle" | "loading" | "ok" | "error";
+  provider: ProductAiProviderChoice;
+  error: string;
+  productId: number | null;
+  slots: ImageBriefSlot[];
+};
+
+export function createIdleProductImageBriefUi(
+  provider: ProductAiProviderChoice = "gemini"
+): ProductImageBriefUiState {
+  return {
+    status: "idle",
+    provider,
+    error: "",
+    productId: null,
+    slots: [],
+  };
+}
+
+export type BuildImageBriefRequestInput = {
+  provider: ProductAiProviderChoice;
+  productId: number | null;
+  editProduct: {
+    name: string;
+    slug: string;
+    category: string;
+    price: string;
+    stock: string;
+    image: string;
+    short_description: string;
+    full_description: string;
+    features: string;
+    seo_title: string;
+    meta_description: string;
+    focus_keyword: string;
+    og_image: string;
+  };
+  facts: ProductAiFactsState;
+};
+
+export type BuildImageBriefRequestResult =
+  | {
+      ok: true;
+      body: {
+        provider: ProductAiProviderChoice;
+        task: "image_brief";
+        productId: number | null;
+        productKind: ProductKindHint;
+        authoritative: Record<string, unknown>;
+        currentEditorCopy: Record<string, string>;
+      };
+    }
+  | { ok: false; message: string };
+
+export function buildProductImageBriefRequest(
+  input: BuildImageBriefRequestInput
+): BuildImageBriefRequestResult {
+  const name = String(input.editProduct.name || "").trim();
+  if (!name) {
+    return {
+      ok: false,
+      message:
+        "Enter a basic product name first so AI has an authoritative product identity.",
+    };
+  }
+
+  let productId: number | null = null;
+  if (input.productId != null) {
+    const id = Number(input.productId);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return { ok: false, message: "productId is invalid." };
+    }
+    productId = id;
+  }
+
+  const category = String(input.editProduct.category || "").trim();
+  const slugNorm = normalizeProductAiSlug(input.editProduct.slug || "");
+  const priceGbp = parseStrictPriceGbp(input.editProduct.price);
+  const stockLabel = String(input.editProduct.stock || "").trim();
+  const imageUrl = String(input.editProduct.image || "").trim() || null;
+  const ogImageUrl = String(input.editProduct.og_image || "").trim() || null;
+
+  const compatibility = parseLinesList(input.facts.confirmedCompatibility);
+  const features = parseLinesList(input.facts.confirmedFeatures);
+  const claims = parseLinesList(input.facts.approvedClaims);
+  const duration = String(input.facts.duration || "").trim();
+  const variant = String(input.facts.variant || "").trim();
+
+  const authoritative: Record<string, unknown> = {
+    productKind: input.facts.productKind,
+    brand: "Firestick4UK",
+    canonicalName: name,
+    productId,
+    active: true,
+  };
+  if (
+    category === "Subscription" ||
+    category === "Device" ||
+    category === "Bundle"
+  ) {
+    authoritative.category = category;
+  }
+  if (priceGbp !== undefined) authoritative.priceGbp = priceGbp;
+  if (stockLabel) authoritative.stockLabel = stockLabel;
+  authoritative.slug = slugNorm || null;
+  if (duration) authoritative.duration = duration;
+  if (variant) authoritative.variant = variant;
+  if (compatibility.length) authoritative.confirmedCompatibility = compatibility;
+  if (features.length) authoritative.confirmedFeatures = features;
+  if (claims.length) authoritative.approvedClaims = claims;
+  authoritative.imageUrl = imageUrl;
+  authoritative.ogImageUrl = ogImageUrl;
+
+  const shortPlain = tipTapHtmlToPlainContext(
+    input.editProduct.short_description,
+    PRODUCT_AI_FIELD_MAX.short_description
+  );
+  const fullPlain = tipTapHtmlToPlainContext(
+    input.editProduct.full_description,
+    PRODUCT_AI_FIELD_MAX.full_description
+  );
+
+  const currentEditorCopy: Record<string, string> = {};
+  if (name) currentEditorCopy.name = name;
+  if (slugNorm) currentEditorCopy.slug = slugNorm;
+  if (shortPlain) currentEditorCopy.short_description = shortPlain;
+  if (fullPlain) currentEditorCopy.full_description = fullPlain;
+  const feat = String(input.editProduct.features || "").trim();
+  if (feat) {
+    currentEditorCopy.features = feat.slice(0, PRODUCT_AI_FIELD_MAX.features);
+  }
+  const seo = String(input.editProduct.seo_title || "").trim();
+  if (seo) {
+    currentEditorCopy.seo_title = seo.slice(0, PRODUCT_AI_FIELD_MAX.seo_title);
+  }
+  const meta = String(input.editProduct.meta_description || "").trim();
+  if (meta) {
+    currentEditorCopy.meta_description = meta.slice(
+      0,
+      PRODUCT_AI_FIELD_MAX.meta_description
+    );
+  }
+  const kw = String(input.editProduct.focus_keyword || "").trim();
+  if (kw) {
+    currentEditorCopy.focus_keyword = kw.slice(
+      0,
+      PRODUCT_AI_FIELD_MAX.focus_keyword
+    );
+  }
+
+  return {
+    ok: true,
+    body: {
+      provider: input.provider,
+      task: "image_brief" as const,
+      productId,
+      productKind: input.facts.productKind,
+      authoritative,
+      currentEditorCopy,
+    },
+  };
+}
+
+export function mapImageBriefSlotsToUi(
+  slots: ImageBriefSlot[] | null | undefined
+): ImageBriefSlot[] {
+  const list = Array.isArray(slots) ? slots : [];
+  const bySlot = new Map<string, ImageBriefSlot>();
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const id = String(item.slot || "") as ImageBriefSlotId;
+    if (!(IMAGE_BRIEF_SLOTS as readonly string[]).includes(id)) continue;
+    if (bySlot.has(id)) continue;
+    bySlot.set(id, item);
+  }
+  return IMAGE_BRIEF_SLOTS.map((id) => bySlot.get(id)).filter(
+    Boolean
+  ) as ImageBriefSlot[];
+}
+
+export function formatImageBriefClipboard(slot: ImageBriefSlot): string {
+  return [
+    `Slot: ${slot.slot}`,
+    `Use: ${slot.use ? "yes" : "no"}`,
+    `Purpose: ${slot.purpose}`,
+    `Size: ${slot.width}×${slot.height} (${slot.aspect_ratio})`,
+    `Format: ${slot.format}`,
+    `Composition: ${slot.composition}`,
+    `Prompt: ${slot.prompt}`,
+    `Negative prompt: ${slot.negative_prompt}`,
+    `Approved text: ${slot.approved_text || "(none)"}`,
+    `Text guidance: ${slot.text_guidance}`,
+    `Alt text: ${slot.alt_text}`,
+  ].join("\n");
+}
+
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+  const value = String(text || "");
+  if (!value) return false;
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+  return false;
+}
+
+export type { ImageBriefSlot, ImageBriefSlotId };

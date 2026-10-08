@@ -18,6 +18,9 @@ import {
   SEO_AI_PROVIDER_TIMEOUT_MS,
   PRODUCT_AI_FIELD_MAX,
   PRODUCT_AI_REVIEW_FIELDS,
+  buildImageBriefJsonSchema,
+  buildImageBriefSystemInstruction,
+  buildImageBriefUserPrompt,
   buildProductFieldsJsonSchema,
   buildProductFieldsSystemInstruction,
   buildProductFieldsUserPrompt,
@@ -33,17 +36,21 @@ import {
   htmlToPlainTextBounded,
   mergeProductAuthoritativeWithDb,
   parseExplanationJsonText,
+  parseImageBriefJsonText,
   parseIssueId,
   parseMetadataJsonText,
   parseProductFieldsJsonText,
   parseProductReviewJsonText,
+  type ImageBriefResult,
   type ProductAiDraftContext,
+  type ProductAiImageBriefContext,
   type ProductAiReviewContext,
   type ProductAiReviewField,
   type ProductAiReviewItem,
   type ProductAiSuggestions,
   type SeoAiDraftUnsaved,
   type SeoAiExplanation,
+  type SeoAiImageBriefRequest,
   type SeoAiMetadataDraft,
   type SeoAiMetadataDraftContext,
   type SeoAiProductFieldsRequest,
@@ -1231,6 +1238,203 @@ export async function dispatchProductReview(
 
 /** Exported for tests — review fields contract. */
 export const PRODUCT_REVIEW_FIELD_LIST = PRODUCT_AI_REVIEW_FIELDS;
+
+/**
+ * Build image-brief context. For saved products, DB truth wins for identity/C-class fields.
+ * SELECT-only. Never writes. Never generates images.
+ */
+export function buildImageBriefContext(
+  request: SeoAiImageBriefRequest,
+  dbRow?: ProductFieldsAuthorityRow | null
+): ProductAiImageBriefContext {
+  const authoritative =
+    request.productId != null && dbRow
+      ? mergeProductAuthoritativeWithDb(request.authoritative, dbRow)
+      : {
+          ...request.authoritative,
+          productId: request.productId,
+          brand: request.authoritative.brand || "Firestick4UK",
+        };
+  return {
+    productId: request.productId,
+    productKind: request.productKind,
+    authoritative,
+    currentEditorCopy: request.currentEditorCopy,
+  };
+}
+
+export type ImageBriefProviderCallFn = (
+  context: ProductAiImageBriefContext
+) => Promise<{ ok: true; result: ImageBriefResult } | SeoAiFailure>;
+
+export async function callOpenAiImageBrief(
+  context: ProductAiImageBriefContext
+): Promise<{ ok: true; result: ImageBriefResult } | SeoAiFailure> {
+  const cfg = getProviderEnvConfig("openai");
+  if (!cfg.configured) {
+    return fail(
+      503,
+      "provider_not_configured",
+      "Selected AI provider is not configured."
+    );
+  }
+
+  const client = new OpenAI({
+    apiKey: cfg.apiKey,
+    maxRetries: 0,
+    timeout: SEO_AI_PROVIDER_TIMEOUT_MS,
+  });
+
+  try {
+    const response = await client.responses.create({
+      model: cfg.model,
+      store: false,
+      instructions: buildImageBriefSystemInstruction(context),
+      input: buildImageBriefUserPrompt(context),
+      text: {
+        format: {
+          type: "json_schema",
+          name: "product_ai_image_brief",
+          strict: true,
+          schema: buildImageBriefJsonSchema() as unknown as {
+            [key: string]: unknown;
+          },
+        },
+      },
+    });
+
+    const text =
+      typeof response.output_text === "string" ? response.output_text : "";
+    const parsed = parseImageBriefJsonText(text);
+    if (!parsed.ok) {
+      console.error("[seo-ai] openai malformed image brief output");
+      return fail(
+        502,
+        "malformed_provider_output",
+        "The AI provider returned an unusable image brief."
+      );
+    }
+    return { ok: true, result: parsed.result };
+  } catch (err) {
+    const status =
+      err && typeof err === "object" && "status" in err
+        ? Number((err as { status?: unknown }).status)
+        : NaN;
+    if (Number.isFinite(status) && status > 0) {
+      console.error(`[seo-ai] openai upstream failed: status ${status}`);
+      if (status === 408 || status === 504) {
+        return fail(
+          503,
+          "provider_timeout",
+          "The selected AI provider timed out. Please try again shortly."
+        );
+      }
+      return fail(
+        503,
+        "provider_upstream",
+        "The selected AI provider is temporarily unavailable."
+      );
+    }
+    return mapAbortOrTimeout(err, "openai");
+  }
+}
+
+export async function callGeminiImageBrief(
+  context: ProductAiImageBriefContext
+): Promise<{ ok: true; result: ImageBriefResult } | SeoAiFailure> {
+  const cfg = getProviderEnvConfig("gemini");
+  if (!cfg.configured) {
+    return fail(
+      503,
+      "provider_not_configured",
+      "Selected AI provider is not configured."
+    );
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    SEO_AI_PROVIDER_TIMEOUT_MS
+  );
+
+  try {
+    const res = await fetch(GEMINI_INTERACTIONS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": cfg.apiKey,
+        "Api-Revision": "2026-05-20",
+      },
+      body: JSON.stringify({
+        model: cfg.model,
+        input: buildImageBriefUserPrompt(context),
+        system_instruction: buildImageBriefSystemInstruction(context),
+        store: false,
+        response_format: {
+          type: "text",
+          mime_type: "application/json",
+          schema: buildImageBriefJsonSchema(),
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      console.error(`[seo-ai] gemini upstream failed: status ${res.status}`);
+      if (res.status === 408 || res.status === 504) {
+        return fail(
+          503,
+          "provider_timeout",
+          "The selected AI provider timed out. Please try again shortly."
+        );
+      }
+      return fail(
+        503,
+        "provider_upstream",
+        "The selected AI provider is temporarily unavailable."
+      );
+    }
+
+    const body = await res.json().catch(() => null);
+    const text = extractGeminiInteractionText(body);
+    const parsed = parseImageBriefJsonText(text);
+    if (!parsed.ok) {
+      console.error("[seo-ai] gemini malformed image brief output");
+      return fail(
+        502,
+        "malformed_provider_output",
+        "The AI provider returned an unusable image brief."
+      );
+    }
+    return { ok: true, result: parsed.result };
+  } catch (err) {
+    return mapAbortOrTimeout(err, "gemini");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Exactly one provider call for image briefs. No fallback. No retry. No image API.
+ */
+export async function dispatchImageBrief(
+  provider: SeoAiProvider,
+  context: ProductAiImageBriefContext,
+  deps?: {
+    callOpenAI?: ImageBriefProviderCallFn;
+    callGemini?: ImageBriefProviderCallFn;
+  }
+): Promise<{ ok: true; result: ImageBriefResult } | SeoAiFailure> {
+  if (provider === "openai") {
+    const call = deps?.callOpenAI || callOpenAiImageBrief;
+    return call(context);
+  }
+  if (provider === "gemini") {
+    const call = deps?.callGemini || callGeminiImageBrief;
+    return call(context);
+  }
+  return fail(400, "invalid_request", "provider must be gemini or openai.");
+}
 
 export async function explainDeterministicIssue(input: {
   provider: SeoAiProvider;
