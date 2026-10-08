@@ -126,7 +126,7 @@ function bodyParagraphs(minChars) {
   return html;
 }
 
-function makeStore(seedRows = []) {
+function makeStore(seedRows = [], options = {}) {
   let nextId = 1;
   const rows = seedRows.map((r) => {
     const id = r.id != null ? Number(r.id) : nextId++;
@@ -138,24 +138,57 @@ function makeStore(seedRows = []) {
     inserts: 0,
     updates: 0,
     selects: 0,
+    lockedSelects: 0,
     revisions: 0,
     audits: [],
     sitemap: 0,
     seoGuards: 0,
     qaCalls: 0,
+    begins: 0,
+    commits: 0,
+    rollbacks: 0,
+    releases: 0,
+    order: [],
     sql: [],
+    qaCandidates: [],
+    revisionSnapshots: [],
+    lastUpdateParams: null,
   };
+
+  let inTx = false;
+  let updateFailOnce = false;
+  let revisionFailOnce = false;
+
+  function note(event) {
+    calls.order.push(event);
+  }
 
   async function query(sql, params = []) {
     const s = String(sql).replace(/\s+/g, " ").trim();
-    calls.sql.push({ sql: s, params });
-    if (/^SELECT \* FROM blog_posts WHERE id = \? LIMIT 1$/i.test(s)) {
-      calls.selects += 1;
+    calls.sql.push({ sql: s, params, inTx });
+    const isLocked =
+      /^SELECT \* FROM blog_posts WHERE id = \? LIMIT 1 FOR UPDATE$/i.test(s);
+    if (
+      isLocked ||
+      /^SELECT \* FROM blog_posts WHERE id = \? LIMIT 1$/i.test(s)
+    ) {
+      if (isLocked) {
+        if (!inTx) throw new Error("FOR UPDATE outside transaction");
+        calls.lockedSelects += 1;
+        note("locked_select");
+        if (typeof options.onBeforeLockedSelect === "function") {
+          options.onBeforeLockedSelect(rows, params);
+        }
+      } else {
+        calls.selects += 1;
+        note("unlocked_select");
+      }
       const id = Number(params[0]);
-      return [rows.filter((r) => r.id === id), []];
+      return [rows.filter((r) => r.id === id).map((r) => ({ ...r })), []];
     }
     if (/^SELECT id, status FROM blog_posts WHERE id = \? LIMIT 1$/i.test(s)) {
       calls.selects += 1;
+      note("status_precheck_select");
       const id = Number(params[0]);
       return [
         rows
@@ -186,6 +219,7 @@ function makeStore(seedRows = []) {
       )
     ) {
       calls.selects += 1;
+      note("inventory_select");
       return [
         rows.map((r) => ({
           id: r.id,
@@ -199,6 +233,7 @@ function makeStore(seedRows = []) {
     }
     if (/^INSERT INTO blog_posts/i.test(s)) {
       calls.inserts += 1;
+      note("insert");
       const id = nextId++;
       const row = {
         id,
@@ -224,7 +259,15 @@ function makeStore(seedRows = []) {
       return [{ insertId: id }, []];
     }
     if (/^UPDATE blog_posts SET/i.test(s)) {
+      if (updateFailOnce) {
+        updateFailOnce = false;
+        const err = new Error("simulated update failure");
+        err.code = "ER_LOCK_WAIT_TIMEOUT";
+        throw err;
+      }
       calls.updates += 1;
+      note("update");
+      calls.lastUpdateParams = params.slice();
       const id = Number(params[params.length - 1]);
       const row = rows.find((r) => r.id === id);
       if (!row) return [{ affectedRows: 0 }, []];
@@ -253,10 +296,26 @@ function makeStore(seedRows = []) {
 
   async function getConnection() {
     return {
-      beginTransaction: async () => {},
-      commit: async () => {},
-      rollback: async () => {},
-      release: () => {},
+      beginTransaction: async () => {
+        inTx = true;
+        calls.begins += 1;
+        note("begin");
+        if (typeof options.onBegin === "function") options.onBegin(rows);
+      },
+      commit: async () => {
+        inTx = false;
+        calls.commits += 1;
+        note("commit");
+      },
+      rollback: async () => {
+        inTx = false;
+        calls.rollbacks += 1;
+        note("rollback");
+      },
+      release: () => {
+        calls.releases += 1;
+        note("release");
+      },
       query,
     };
   }
@@ -266,17 +325,26 @@ function makeStore(seedRows = []) {
       query,
       getConnection,
       recordAdminAudit: async (input) => {
+        note("audit");
         calls.audits.push(input);
       },
-      recordContentRevision: async () => {
+      recordContentRevision: async (input) => {
+        note("revision");
         calls.revisions += 1;
+        calls.revisionSnapshots.push(input.snapshot);
+        if (revisionFailOnce) {
+          revisionFailOnce = false;
+          throw new Error("simulated revision failure");
+        }
         return 1;
       },
       snapshotBlog: (row) => ({ ...row }),
       invalidateSitemapCache: () => {
+        note("sitemap");
         calls.sitemap += 1;
       },
       runPostSaveSeoGuard: async (args) => {
+        note("guard");
         calls.seoGuards += 1;
         return {
           status: "checked",
@@ -296,13 +364,48 @@ function makeStore(seedRows = []) {
       }),
       evaluateAutonomousBlogPrePublish: (input) => {
         calls.qaCalls += 1;
+        note("qa");
+        calls.qaCandidates.push({
+          title: input.candidate.title,
+          content: input.candidate.content,
+          statusHint: input.candidate.publicationIntent,
+        });
+        if (typeof options.onDuringQa === "function") {
+          options.onDuringQa(rows, input);
+        }
         return evaluateAutonomousBlogPrePublish(input);
       },
       ...overrides,
     };
   }
 
-  return { rows, calls, query, getConnection, deps };
+  return {
+    rows,
+    calls,
+    query,
+    getConnection,
+    deps,
+    failNextUpdate: () => {
+      updateFailOnce = true;
+    },
+    failNextRevision: () => {
+      revisionFailOnce = true;
+    },
+  };
+}
+
+function assertTxOrder(name, order, sequence) {
+  let last = -1;
+  let okAll = true;
+  for (const ev of sequence) {
+    const idx = order.indexOf(ev, last + 1);
+    if (idx < 0 || idx <= last) {
+      okAll = false;
+      break;
+    }
+    last = idx;
+  }
+  ok(name, okAll, order.join(">"));
 }
 
 console.log("\nAB-2 Blog Persistence Adapter\n");
@@ -1093,9 +1196,384 @@ async function runAsync() {
         res.qa.verdict === "HOLD" &&
         store.calls.updates === 0
     );
+    assertTxOrder("AW_hold_tx_order", store.calls.order, [
+      "begin",
+      "locked_select",
+      "qa",
+      "rollback",
+      "release",
+    ]);
+    ok(
+      "AX_hold_no_post_commit_side_effects",
+      store.calls.audits.length === 0 &&
+        store.calls.sitemap === 0 &&
+        store.calls.seoGuards === 0 &&
+        store.calls.revisions === 0
+    );
   }
 
-  console.log(`\nAB-2 results: ${passed} passed, ${failed} failed\n`);
+  // ── AB-2A CONCURRENCY / TOCTOU ─────────────────────────────────────────────
+
+  ok(
+    "BA_no_autonomous_status_precheck_outside_tx",
+    !/SELECT id, status FROM blog_posts WHERE id = \? LIMIT 1/.test(
+      svcSrc.replace(/\s+/g, " ")
+    ) ||
+      !/updateAutonomousBlogDraft[\s\S]*SELECT id, status/.test(svcSrc)
+  );
+  ok(
+    "BB_locked_select_constant_present",
+    /FOR UPDATE/.test(svcSrc) && /requiredCurrentStatus/.test(svcSrc)
+  );
+
+  {
+    // A — draft update race: row becomes published before locked read
+    const store = makeStore(
+      [
+        {
+          id: 60,
+          title: "Race Draft",
+          slug: "race-draft",
+          status: "draft",
+          excerpt: "e",
+          content: "c",
+          featured_image: "",
+          meta_title: "",
+          meta_description: "",
+          focus_keyword: "",
+          canonical_url: "https://firestick4uk.com/blog/race-draft",
+          faqs: null,
+          featured: 0,
+          category: "Guides",
+          emoji: "📝",
+          badge: "guide",
+          badgeText: "Guide",
+          active: 1,
+        },
+      ],
+      {
+        onBeforeLockedSelect: (rows) => {
+          const row = rows.find((r) => r.id === 60);
+          if (row) row.status = "published";
+        },
+      }
+    );
+    let err = null;
+    try {
+      await updateAutonomousBlogDraft({
+        actor,
+        id: 60,
+        patch: { excerpt: "hijack" },
+        deps: store.deps(),
+      });
+    } catch (e) {
+      err = e;
+    }
+    ok(
+      "BC_draft_update_race_not_draft",
+      err &&
+        err.code === "not_draft" &&
+        store.calls.updates === 0 &&
+        store.calls.revisions === 0 &&
+        store.calls.audits.length === 0 &&
+        store.calls.sitemap === 0 &&
+        store.calls.seoGuards === 0
+    );
+    ok(
+      "BD_draft_update_no_status_precheck_select",
+      !store.calls.order.includes("status_precheck_select")
+    );
+    assertTxOrder("BE_draft_update_race_tx", store.calls.order, [
+      "begin",
+      "locked_select",
+      "rollback",
+      "release",
+    ]);
+  }
+
+  {
+    // B — publish content race: mutate store during QA after lock; publish must keep locked A
+    const versionA = readyDraft({
+      id: 70,
+      content: bodyParagraphs(1300) + "<p>VERSION_A_LOCKED</p>",
+      title: "How to Speed Up a Slow Firestick Autonomously",
+    });
+    const store = makeStore([versionA], {
+      onDuringQa: (rows) => {
+        const row = rows.find((r) => r.id === 70);
+        if (row) {
+          row.content = bodyParagraphs(1300) + "<p>VERSION_B_INTRUDER</p>";
+          row.title = "INTRUDER TITLE SHOULD NOT PUBLISH";
+        }
+      },
+    });
+    const res = await publishAutonomousBlogDraft({
+      actor,
+      id: 70,
+      evidenceState: "ready",
+      mediaState: { featuredImageReady: true },
+      deps: store.deps(),
+    });
+    const qaContent = store.calls.qaCandidates[0] && store.calls.qaCandidates[0].content;
+    const snap =
+      store.calls.revisionSnapshots[0] && store.calls.revisionSnapshots[0].content;
+    const updatedContent =
+      store.calls.lastUpdateParams && store.calls.lastUpdateParams[3];
+    ok(
+      "BF_publish_qa_sees_locked_A",
+      res.outcome === "PUBLISHED" &&
+        String(qaContent || "").includes("VERSION_A_LOCKED")
+    );
+    ok(
+      "BG_publish_writes_same_A_not_B",
+      String(updatedContent || "").includes("VERSION_A_LOCKED") &&
+        !String(updatedContent || "").includes("VERSION_B_INTRUDER") &&
+        store.rows[0].title === versionA.title &&
+        store.rows[0].status === "published"
+    );
+    ok(
+      "BH_revision_snapshot_is_locked_pre_state",
+      String(snap || "").includes("VERSION_A_LOCKED")
+    );
+    assertTxOrder("BI_publish_pass_order", store.calls.order, [
+      "begin",
+      "locked_select",
+      "qa",
+      "revision",
+      "update",
+      "commit",
+      "release",
+      "audit",
+      "sitemap",
+      "guard",
+    ]);
+    ok(
+      "BJ_qa_before_update_after_lock",
+      store.calls.order.indexOf("locked_select") < store.calls.order.indexOf("qa") &&
+        store.calls.order.indexOf("qa") < store.calls.order.indexOf("update")
+    );
+  }
+
+  {
+    // C — status race: published cannot be autonomously draft-edited
+    const store = makeStore([
+      readyDraft({
+        id: 80,
+        status: "published",
+        slug: "already-published-race",
+      }),
+    ]);
+    let err = null;
+    try {
+      await updateAutonomousBlogDraft({
+        actor,
+        id: 80,
+        patch: { excerpt: "nope" },
+        deps: store.deps(),
+      });
+    } catch (e) {
+      err = e;
+    }
+    ok(
+      "BK_status_race_published_not_editable",
+      err && err.code === "not_draft" && store.calls.updates === 0
+    );
+  }
+
+  {
+    // E — PASS side effects once
+    const store = makeStore([readyDraft({ id: 90 })]);
+    const res = await publishAutonomousBlogDraft({
+      actor,
+      id: 90,
+      evidenceState: "ready",
+      mediaState: { featuredImageReady: true },
+      deps: store.deps(),
+    });
+    ok(
+      "BL_pass_single_revision_audit_sitemap_guard",
+      res.outcome === "PUBLISHED" &&
+        store.calls.revisions === 1 &&
+        store.calls.audits.length === 1 &&
+        store.calls.sitemap === 1 &&
+        store.calls.seoGuards === 1 &&
+        res.changed_fields.includes("status") &&
+        !res.changed_fields.includes("content")
+    );
+  }
+
+  {
+    // F — no-op lock then commit, zero mutation side effects
+    const store = makeStore([
+      {
+        id: 100,
+        title: "Noop",
+        slug: "noop-lock",
+        status: "draft",
+        excerpt: "ex",
+        content: "body",
+        featured_image: "",
+        meta_title: "",
+        meta_description: "",
+        focus_keyword: "",
+        canonical_url: "https://firestick4uk.com/blog/noop-lock",
+        faqs: null,
+        featured: 0,
+        category: "Guides",
+        emoji: "📝",
+        badge: "guide",
+        badgeText: "Guide",
+        active: 1,
+      },
+    ]);
+    const res = await updateBlogPost({
+      actor,
+      id: 100,
+      patch: { id: 100 },
+      source: "manual_cms",
+      deps: store.deps(),
+    });
+    ok(
+      "BM_noop_locked_then_commit",
+      res.changed_fields.length === 0 &&
+        store.calls.updates === 0 &&
+        store.calls.revisions === 0 &&
+        store.calls.audits.length === 0 &&
+        store.calls.sitemap === 0
+    );
+    assertTxOrder("BN_noop_tx_order", store.calls.order, [
+      "begin",
+      "locked_select",
+      "commit",
+      "release",
+    ]);
+  }
+
+  {
+    // G — manual update uses locked row
+    const store = makeStore([
+      {
+        id: 110,
+        title: "Manual Lock",
+        slug: "manual-lock",
+        status: "draft",
+        excerpt: "old",
+        content: "c",
+        featured_image: "",
+        meta_title: "",
+        meta_description: "",
+        focus_keyword: "",
+        canonical_url: "https://firestick4uk.com/blog/manual-lock",
+        faqs: null,
+        featured: 0,
+        category: "Guides",
+        emoji: "📝",
+        badge: "guide",
+        badgeText: "Guide",
+        active: 1,
+      },
+    ]);
+    const res = await updateBlogPost({
+      actor,
+      id: 110,
+      patch: { excerpt: "new" },
+      source: "manual_cms",
+      deps: store.deps(),
+    });
+    ok(
+      "BO_manual_update_locked",
+      res.changed_fields.includes("excerpt") && store.rows[0].excerpt === "new"
+    );
+    assertTxOrder("BP_manual_update_order", store.calls.order, [
+      "begin",
+      "locked_select",
+      "revision",
+      "update",
+      "commit",
+      "release",
+      "audit",
+      "sitemap",
+      "guard",
+    ]);
+  }
+
+  {
+    // H — UPDATE failure rolls back; no post-commit effects
+    const store = makeStore([readyDraft({ id: 120 })]);
+    store.failNextUpdate();
+    let err = null;
+    try {
+      await publishAutonomousBlogDraft({
+        actor,
+        id: 120,
+        evidenceState: "ready",
+        mediaState: { featuredImageReady: true },
+        deps: store.deps(),
+      });
+    } catch (e) {
+      err = e;
+    }
+    ok(
+      "BQ_update_failure_rolls_back",
+      !!err &&
+        store.calls.rollbacks >= 1 &&
+        store.calls.commits === 0 &&
+        store.calls.audits.length === 0 &&
+        store.calls.sitemap === 0 &&
+        store.calls.seoGuards === 0 &&
+        store.rows[0].status === "draft"
+    );
+  }
+
+  {
+    // H2 — revision failure rolls back
+    const store = makeStore([
+      {
+        id: 130,
+        title: "Rev Fail",
+        slug: "rev-fail",
+        status: "draft",
+        excerpt: "a",
+        content: "b",
+        featured_image: "",
+        meta_title: "",
+        meta_description: "",
+        focus_keyword: "",
+        canonical_url: "https://firestick4uk.com/blog/rev-fail",
+        faqs: null,
+        featured: 0,
+        category: "Guides",
+        emoji: "📝",
+        badge: "guide",
+        badgeText: "Guide",
+        active: 1,
+      },
+    ]);
+    store.failNextRevision();
+    let err = null;
+    try {
+      await updateBlogPost({
+        actor,
+        id: 130,
+        patch: { excerpt: "changed" },
+        source: "manual_cms",
+        deps: store.deps(),
+      });
+    } catch (e) {
+      err = e;
+    }
+    ok(
+      "BR_revision_failure_no_post_commit",
+      !!err &&
+        store.calls.updates === 0 &&
+        store.calls.audits.length === 0 &&
+        store.calls.sitemap === 0 &&
+        store.calls.seoGuards === 0 &&
+        store.rows[0].excerpt === "a"
+    );
+  }
+
+  console.log(`\nAB-2/AB-2A results: ${passed} passed, ${failed} failed\n`);
   if (failed > 0) process.exit(1);
 }
 
