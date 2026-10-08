@@ -42,6 +42,7 @@ function loadTsModule(rel) {
 const sidhu = read("app/sidhu/page.tsx");
 const productsApi = read("pages/api/admin-products.ts");
 const blogApi = read("pages/api/blog.ts");
+const blogPersistence = read("lib/blogPersistenceServer.ts");
 const legacy = read("lib/productLegacyRedirects.ts");
 const helperSrc = read("lib/blogSeoSafety.ts");
 
@@ -209,27 +210,31 @@ ok(
 // --- BLOG API ---
 ok(
   "blog_api_uses_helper",
-  /blogSeoSafety/.test(blogApi) &&
-    /normalizeBlogCanonicalInput/.test(blogApi) &&
-    /resolveBlogCanonicalForPut/.test(blogApi)
+  /blogSeoSafety/.test(blogPersistence) &&
+    /normalizeBlogCanonicalInput/.test(blogPersistence) &&
+    /resolveBlogCanonicalForPut/.test(blogPersistence) &&
+    /createBlogPost|updateBlogPost/.test(blogApi)
 );
 ok(
   "blog_published_slug_rename_rejected",
-  /currentWasPublishedPublic/.test(blogApi) &&
-    /BLOG_PUBLISHED_SLUG_PROTECTED_MESSAGE/.test(blogApi) &&
-    /status\(409\)/.test(blogApi)
+  /currentWasPublishedPublic/.test(blogPersistence) &&
+    /BLOG_PUBLISHED_SLUG_PROTECTED_MESSAGE/.test(blogPersistence) &&
+    (/published_slug_protected/.test(blogPersistence) ||
+      /status\(409\)/.test(blogApi))
 );
 ok(
   "blog_post_requires_slug",
-  /Title and slug are required/.test(blogApi)
+  /Title and slug are required/.test(blogPersistence)
 );
 ok(
   "blog_post_validates_canonical",
-  /normalizeBlogCanonicalInput\(canonical_url, finalSlug\)/.test(blogApi)
+  /normalizeBlogCanonicalInput\(/.test(blogPersistence) &&
+    /finalSlug/.test(blogPersistence)
 );
 ok(
   "blog_put_hasOwn_canonical",
-  /bodyHasCanonical = hasOwn\(body, 'canonical_url'\)/.test(blogApi)
+  /bodyHasCanonical/.test(blogPersistence) &&
+    /hasOwn\(patch,\s*["']canonical_url["']\)/.test(blogPersistence)
 );
 ok(
   "messages_exported",

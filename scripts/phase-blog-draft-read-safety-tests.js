@@ -25,6 +25,7 @@ function read(rel) {
 }
 
 const blogApi = read("pages/api/blog.ts");
+const blogPersistence = read("lib/blogPersistenceServer.ts");
 const publicBlog = read("lib/publicBlogServer.ts");
 const blogPage = read("app/blog/page.tsx");
 const articlePage = read("app/blog/[slug]/page.tsx");
@@ -167,22 +168,25 @@ ok(
 );
 ok(
   "AB_published_slug_protection_untouched",
-  /BLOG_PUBLISHED_SLUG_PROTECTED_MESSAGE/.test(blogApi) &&
-    /currentWasPublishedPublic/.test(blogApi)
+  /BLOG_PUBLISHED_SLUG_PROTECTED_MESSAGE/.test(blogPersistence) &&
+    /currentWasPublishedPublic/.test(blogPersistence) &&
+    /createBlogPost|updateBlogPost/.test(blogApi)
 );
 ok(
   "AC_canonical_helpers_untouched",
-  /normalizeBlogCanonicalInput/.test(blogApi) &&
-    /resolveBlogCanonicalForPut/.test(blogApi)
+  /normalizeBlogCanonicalInput/.test(blogPersistence) &&
+    /resolveBlogCanonicalForPut/.test(blogPersistence)
 );
 ok(
   "AD_post_save_guard_untouched",
-  /runPostSaveSeoGuard/.test(blogApi) &&
-    /shouldRunPostSaveSeoGuard/.test(blogApi)
+  /runPostSaveSeoGuard/.test(blogPersistence) &&
+    /shouldRunPostSaveSeoGuard/.test(blogPersistence)
 );
 ok(
-  "AE_post_status_default_untouched",
-  /status\s*\|\|\s*['"]published['"]/.test(blogApi)
+  "AE_post_status_explicit_required",
+  !/status\s*\|\|\s*['"]published['"]/.test(blogApi) &&
+    !/status\s*\|\|\s*['"]published['"]/.test(blogPersistence) &&
+    /requireExplicitBlogStatus/.test(blogApi)
 );
 
 console.log(`\n${passed} passed, ${failed} failed`);

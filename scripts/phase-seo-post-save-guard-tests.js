@@ -79,6 +79,7 @@ function loadTsModule(rel, stubs = {}) {
 
 const productsApi = read("pages/api/admin-products.ts");
 const blogApi = read("pages/api/blog.ts");
+const blogPersistence = read("lib/blogPersistenceServer.ts");
 const guardSrc = read("lib/postSaveSeoGuard.ts");
 const memoryServer = read("lib/seoIssueMemoryServer.ts");
 const sidhu = read("app/sidhu/page.tsx");
@@ -100,7 +101,7 @@ function assertCall(api, label, opNeedle) {
 }
 
 assertCall(productsApi, "A_product_create_calls_guard", "create");
-assertCall(blogApi, "B_blog_create_calls_guard", "create");
+assertCall(blogPersistence, "B_blog_create_calls_guard", "create");
 assertCall(productsApi, "C_product_update_calls_guard", "update");
 
 {
@@ -260,7 +261,8 @@ ok(
   );
   ok(
     "X_blog_create_returns_id",
-    /success:\s*true,\s*id:\s*result\.insertId,\s*seo_guard/.test(blogApi)
+    /success:\s*true,\s*id:\s*insertId,\s*seo_guard/.test(blogPersistence) &&
+      /createBlogPost/.test(blogApi)
   );
   ok(
     "Y_product_update_returns_slug_changed_fields",
@@ -271,7 +273,8 @@ ok(
   );
   ok(
     "Z_blog_update_returns_changed_fields",
-    /changed_fields:\s*changedFields[\s\S]*seo_guard/.test(blogApi)
+    /changed_fields:\s*changedFields[\s\S]*seo_guard/.test(blogPersistence) &&
+      /updateBlogPost/.test(blogApi)
   );
 
   ok(
@@ -312,7 +315,7 @@ ok(
   );
   ok(
     "AI_blog_published_slug_protection",
-    /BLOG_PUBLISHED_SLUG_PROTECTED_MESSAGE/.test(blogApi)
+    /BLOG_PUBLISHED_SLUG_PROTECTED_MESSAGE/.test(blogPersistence)
   );
   ok(
     "AJ_no_extra_automatic_audit_for_guard",

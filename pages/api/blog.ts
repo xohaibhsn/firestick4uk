@@ -4,44 +4,14 @@ import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
 import { recordContentRevision, snapshotBlog } from '../../lib/contentRevisions';
 import { invalidateSitemapCache } from '../../lib/hostingerResourceInvalidation';
+import { runPostSaveSeoGuard } from '../../lib/postSaveSeoGuard';
 import {
-  BLOG_PUBLISHED_SLUG_PROTECTED_MESSAGE,
-  normalizeBlogCanonicalInput,
-  normalizeBlogSlug,
-  resolveBlogCanonicalForPut,
-} from '../../lib/blogSeoSafety';
-import {
-  runPostSaveSeoGuard,
-  shouldRunPostSaveSeoGuard,
-} from '../../lib/postSaveSeoGuard';
-
-function valuesEqual(a: unknown, b: unknown): boolean {
-  const na = a === null || a === undefined ? '' : String(a);
-  const nb = b === null || b === undefined ? '' : String(b);
-  return na === nb;
-}
-
-function hasOwn(body: Record<string, unknown>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(body, key);
-}
-
-function normalizeFaqs(value: unknown): string | null {
-  if (value == null || value === '') return null;
-  if (typeof value === 'string') return value;
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return null;
-  }
-}
-
-function toBlogSlug(value: unknown): string {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
+  BlogPersistenceError,
+  createBlogPost,
+  requireExplicitBlogStatus,
+  requireSuppliedBlogStatus,
+  updateBlogPost,
+} from '../../lib/blogPersistenceServer';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -76,55 +46,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
-      const body = req.body || {};
-      const {
-        title,
-        slug,
-        excerpt,
-        content,
-        category,
-        emoji,
-        badge,
-        badgeText,
-        featured_image,
-        meta_title,
-        meta_description,
-        focus_keyword,
-        status,
-        featured,
-        canonical_url,
-        faqs,
-      } = body;
-      const finalSlug = toBlogSlug(slug) || toBlogSlug(title);
-      if (!String(title || '').trim() || !finalSlug) {
-        return res.status(400).json({ error: 'Title and slug are required' });
+      if (!admin) return;
+      const body = (req.body || {}) as Record<string, unknown>;
+      let mode;
+      try {
+        mode = requireExplicitBlogStatus(body.status);
+      } catch (err) {
+        if (err instanceof BlogPersistenceError) {
+          return res.status(err.status).json({ error: err.message, code: err.code });
+        }
+        throw err;
       }
-      const canon = normalizeBlogCanonicalInput(canonical_url, finalSlug);
-      if (!canon.ok) {
-        return res.status(400).json({ error: canon.error });
-      }
-      const [result]: any = await pool.query(
-        'INSERT INTO blog_posts (title, slug, excerpt, content, category, emoji, badge, badgeText, featured_image, meta_title, meta_description, focus_keyword, status, featured, canonical_url, faqs, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
-        [title, finalSlug, excerpt || '', content || '', category || 'Guides', emoji || '📝', badge || 'guide', badgeText || 'Guide', featured_image || '', meta_title || '', meta_description || '', focus_keyword || '', status || 'published', featured ? 1 : 0, canon.canonical, faqs ? JSON.stringify(faqs) : null]
-      );
-      if (admin) {
-        const { ip } = getRequestMeta(req);
-        await recordAdminAudit({
+      const { ip } = getRequestMeta(req);
+      try {
+        const result = await createBlogPost({
           actor: admin,
-          action: 'blog.created',
-          entityType: 'blog',
-          entityId: result.insertId,
-          summary: `Created blog post ${title || result.insertId}`,
+          input: body,
+          mode,
+          source: 'manual_cms',
           ip,
         });
+        return res.status(200).json(result);
+      } catch (err) {
+        if (err instanceof BlogPersistenceError) {
+          return res.status(err.status).json({ error: err.message, code: err.code });
+        }
+        throw err;
       }
-      invalidateSitemapCache();
-      const seo_guard = await runPostSaveSeoGuard({
-        entityType: 'blog',
-        entityId: result.insertId,
-        operation: 'create',
-      });
-      return res.status(200).json({ success: true, id: result.insertId, seo_guard });
     }
 
     if (req.method === 'PUT') {
@@ -135,175 +83,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Valid blog id is required' });
       }
 
-      const [existingRows]: any = await pool.query('SELECT * FROM blog_posts WHERE id = ? LIMIT 1', [id]);
-      const current = Array.isArray(existingRows) && existingRows[0] ? existingRows[0] : null;
-      if (!current) return res.status(404).json({ error: 'Blog post not found' });
-
-      const oldSlug = normalizeBlogSlug(current.slug);
-      const requestedSlugRaw = hasOwn(body, 'slug') ? body.slug : current.slug;
-      const finalSlug = toBlogSlug(requestedSlugRaw) || oldSlug;
-      if (!finalSlug) {
-        return res.status(400).json({ error: 'Slug cannot be empty' });
-      }
-
-      const currentWasPublishedPublic =
-        String(current.status || '') === 'published' && Number(current.active) === 1;
-      if (currentWasPublishedPublic && finalSlug !== oldSlug) {
-        return res.status(409).json({ error: BLOG_PUBLISHED_SLUG_PROTECTED_MESSAGE });
-      }
-
-      const bodyHasCanonical = hasOwn(body, 'canonical_url');
-      const slugChanged = finalSlug !== oldSlug;
-      const canon = resolveBlogCanonicalForPut({
-        bodyHasCanonical,
-        suppliedCanonical: bodyHasCanonical ? String(body.canonical_url ?? '') : undefined,
-        currentCanonical: current.canonical_url,
-        oldSlug,
-        finalSlug,
-        slugChanged,
-      });
-      if (!canon.ok) {
-        return res.status(400).json({ error: canon.error });
-      }
-
-      const next = {
-        title: body.title ?? current.title,
-        slug: finalSlug,
-        excerpt: body.excerpt ?? current.excerpt ?? '',
-        content: body.content ?? current.content ?? '',
-        category: body.category ?? current.category ?? 'Guides',
-        emoji: body.emoji ?? current.emoji ?? '📝',
-        badge: body.badge ?? current.badge ?? 'guide',
-        badgeText: body.badgeText ?? current.badgeText ?? 'Guide',
-        featured_image: body.featured_image ?? current.featured_image ?? '',
-        meta_title: body.meta_title ?? current.meta_title ?? '',
-        meta_description: body.meta_description ?? current.meta_description ?? '',
-        focus_keyword: body.focus_keyword ?? current.focus_keyword ?? '',
-        status: body.status ?? current.status ?? 'published',
-        featured: body.featured != null ? (body.featured ? 1 : 0) : (current.featured ? 1 : 0),
-        canonical_url: canon.canonical,
-        faqs: normalizeFaqs(body.faqs !== undefined ? body.faqs : current.faqs),
-      };
-
-      const changedFields: string[] = [];
-      const track = (key: string, a: unknown, b: unknown) => {
-        if (!valuesEqual(a, b)) changedFields.push(key);
-      };
-      track('title', next.title, current.title);
-      track('slug', next.slug, current.slug);
-      track('excerpt', next.excerpt, current.excerpt);
-      track('content', next.content, current.content);
-      track('category', next.category, current.category);
-      track('emoji', next.emoji, current.emoji);
-      track('badge', next.badge, current.badge);
-      track('badgeText', next.badgeText, current.badgeText);
-      track('featured_image', next.featured_image, current.featured_image);
-      track('meta_title', next.meta_title, current.meta_title);
-      track('meta_description', next.meta_description, current.meta_description);
-      track('focus_keyword', next.focus_keyword, current.focus_keyword);
-      track('status', next.status, current.status);
-      track('featured', next.featured, current.featured);
-      track('canonical_url', next.canonical_url, current.canonical_url);
-      track('faqs', next.faqs, typeof current.faqs === 'string' ? current.faqs : normalizeFaqs(current.faqs));
-
-      if (changedFields.length === 0) {
-        const skip = shouldRunPostSaveSeoGuard({
-          entityType: 'blog',
-          operation: 'update',
-          changedFields,
-        });
-        return res.status(200).json({
-          success: true,
-          changed_fields: [],
-          seo_guard: {
-            status: 'skipped' as const,
-            entity_type: 'blog' as const,
-            entity_id: String(id),
-            operation: 'update' as const,
-            issue_count: 0,
-            needs_attention: 0,
-            review: 0,
-            issues: [],
-            memory_synced: false,
-            skip_reason: skip.skip_reason || 'noop_update',
-          },
-        });
-      }
-
-      const conn = await pool.getConnection();
-      try {
-        await conn.beginTransaction();
-        await recordContentRevision(
-          {
-            entityType: 'blog',
-            entityId: id,
-            entityLabel: String(current.title || ''),
-            revisionAction: 'update',
-            snapshot: snapshotBlog(current),
-            changedFields,
-            actor: admin,
-          },
-          conn
-        );
-        await conn.query(
-          'UPDATE blog_posts SET title=?, slug=?, excerpt=?, content=?, category=?, emoji=?, badge=?, badgeText=?, featured_image=?, meta_title=?, meta_description=?, focus_keyword=?, status=?, featured=?, canonical_url=?, faqs=? WHERE id=?',
-          [
-            next.title,
-            next.slug || '',
-            next.excerpt,
-            next.content,
-            next.category,
-            next.emoji,
-            next.badge,
-            next.badgeText,
-            next.featured_image,
-            next.meta_title,
-            next.meta_description,
-            next.focus_keyword,
-            next.status,
-            next.featured,
-            next.canonical_url,
-            next.faqs,
-            id,
-          ]
-        );
-        await conn.commit();
-      } catch (txErr: any) {
+      let mode: 'draft' | 'publish' | undefined;
+      if (Object.prototype.hasOwnProperty.call(body, 'status')) {
         try {
-          await conn.rollback();
-        } catch {
-          /* ignore */
+          mode = requireSuppliedBlogStatus(body.status);
+        } catch (err) {
+          if (err instanceof BlogPersistenceError) {
+            return res.status(err.status).json({ error: err.message, code: err.code });
+          }
+          throw err;
         }
-        if (txErr?.code === 'REVISION_TOO_LARGE') {
-          return res.status(400).json({ error: txErr.message });
-        }
-        throw txErr;
-      } finally {
-        conn.release();
       }
 
       const { ip } = getRequestMeta(req);
-      await recordAdminAudit({
-        actor: admin,
-        action: 'blog.updated',
-        entityType: 'blog',
-        entityId: id,
-        summary: `Updated blog post ${next.title || id}`,
-        metadata: { changed_fields: changedFields },
-        ip,
-      });
-      invalidateSitemapCache();
-      const seo_guard = await runPostSaveSeoGuard({
-        entityType: 'blog',
-        entityId: id,
-        operation: 'update',
-        changedFields,
-      });
-      return res.status(200).json({
-        success: true,
-        changed_fields: changedFields,
-        seo_guard,
-      });
+      try {
+        const result = await updateBlogPost({
+          actor: admin,
+          id,
+          patch: body,
+          mode,
+          source: 'manual_cms',
+          ip,
+        });
+        return res.status(200).json(result);
+      } catch (err) {
+        if (err instanceof BlogPersistenceError) {
+          return res.status(err.status).json({ error: err.message, code: err.code });
+        }
+        throw err;
+      }
     }
 
     if (req.method === 'DELETE') {
