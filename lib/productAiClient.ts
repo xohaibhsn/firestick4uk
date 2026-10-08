@@ -783,13 +783,18 @@ export function buildProductImageBriefRequest(
   authoritative.imageUrl = imageUrl;
   authoritative.ogImageUrl = ogImageUrl;
 
+  // Image briefs need compact context only — keep well under provider timeout.
+  const IMAGE_BRIEF_SHORT_MAX = 500;
+  const IMAGE_BRIEF_FULL_MAX = 900;
+  const IMAGE_BRIEF_FEATURES_MAX = 400;
+
   const shortPlain = tipTapHtmlToPlainContext(
     input.editProduct.short_description,
-    PRODUCT_AI_FIELD_MAX.short_description
+    IMAGE_BRIEF_SHORT_MAX
   );
   const fullPlain = tipTapHtmlToPlainContext(
     input.editProduct.full_description,
-    PRODUCT_AI_FIELD_MAX.full_description
+    IMAGE_BRIEF_FULL_MAX
   );
 
   const currentEditorCopy: Record<string, string> = {};
@@ -799,7 +804,7 @@ export function buildProductImageBriefRequest(
   if (fullPlain) currentEditorCopy.full_description = fullPlain;
   const feat = String(input.editProduct.features || "").trim();
   if (feat) {
-    currentEditorCopy.features = feat.slice(0, PRODUCT_AI_FIELD_MAX.features);
+    currentEditorCopy.features = feat.slice(0, IMAGE_BRIEF_FEATURES_MAX);
   }
   const seo = String(input.editProduct.seo_title || "").trim();
   if (seo) {

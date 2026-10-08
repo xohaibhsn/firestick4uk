@@ -1243,6 +1243,30 @@ export const PRODUCT_REVIEW_FIELD_LIST = PRODUCT_AI_REVIEW_FIELDS;
  * Build image-brief context. For saved products, DB truth wins for identity/C-class fields.
  * SELECT-only. Never writes. Never generates images.
  */
+const IMAGE_BRIEF_EDITOR_BOUNDS: Record<string, number> = {
+  name: 120,
+  slug: 120,
+  short_description: 500,
+  full_description: 900,
+  features: 400,
+  seo_title: 70,
+  meta_description: 180,
+  focus_keyword: 80,
+};
+
+function compactImageBriefEditorCopy(
+  copy: Record<string, string>
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(copy || {})) {
+    const value = String(raw || "").trim();
+    if (!value) continue;
+    const max = IMAGE_BRIEF_EDITOR_BOUNDS[key] ?? 400;
+    out[key] = value.length > max ? value.slice(0, max) : value;
+  }
+  return out;
+}
+
 export function buildImageBriefContext(
   request: SeoAiImageBriefRequest,
   dbRow?: ProductFieldsAuthorityRow | null
@@ -1259,7 +1283,7 @@ export function buildImageBriefContext(
     productId: request.productId,
     productKind: request.productKind,
     authoritative,
-    currentEditorCopy: request.currentEditorCopy,
+    currentEditorCopy: compactImageBriefEditorCopy(request.currentEditorCopy),
   };
 }
 

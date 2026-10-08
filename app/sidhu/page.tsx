@@ -1925,15 +1925,17 @@ export default function AdminPage() {
       if (!res.ok || !json?.ok) {
         const code = String(json?.code || "");
         const message =
-          code === "provider_not_configured" || res.status === 503
+          code === "provider_not_configured"
             ? "Selected AI provider is not configured yet."
             : code === "provider_timeout"
               ? "AI provider timed out. Try again."
-              : code === "rate_limited"
-                ? "AI rate limit reached. Wait a moment and try again."
-                : code === "malformed_provider_output"
-                  ? "AI returned an unusable image brief. Try again."
-                  : String(json?.message || json?.error || `HTTP ${res.status}`);
+              : code === "provider_upstream"
+                ? "AI provider is temporarily unavailable. Try again."
+                : code === "rate_limited"
+                  ? "AI rate limit reached. Wait a moment and try again."
+                  : code === "malformed_provider_output"
+                    ? "AI returned an unusable image brief. Try again."
+                    : String(json?.message || json?.error || `HTTP ${res.status}`);
         setProductImageBriefUi({
           status: "error",
           provider,
