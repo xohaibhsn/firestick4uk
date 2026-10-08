@@ -53,6 +53,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'GET') {
       const { slug, id } = req.query;
+
+      // Public: published + active slug lookup only (no admin session).
       if (slug) {
         const [rows]: any = await pool.query(
           'SELECT * FROM blog_posts WHERE slug = ? AND status = "published" AND active = 1 LIMIT 1',
@@ -60,6 +62,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
         return res.status(200).json(rows[0] || null);
       }
+
+      // CMS list / id: require blog.manage (read-safe; no CSRF mutate).
+      admin = await requireAdminPermission(req, res, 'blog.manage', { mutate: false });
+      if (!admin) return;
+
       if (id) {
         const [rows]: any = await pool.query('SELECT * FROM blog_posts WHERE id = ? LIMIT 1', [id]);
         return res.status(200).json(rows[0] || null);
