@@ -2007,7 +2007,7 @@ export function buildReviewProductSystemInstruction(
     `Review these fields only: ${PRODUCT_AI_REVIEW_FIELDS.join(", ")}.`,
     `Reason max ${PRODUCT_AI_REASON_MAX} characters.`,
     "status must be ok, suggest, or warning.",
-    "confidence if present must be high, medium, or low.",
+    "confidence must be high, medium, or low.",
     "Return only the required normalized structured JSON.",
     "No persona or roleplay.",
   ].join(" ");
@@ -2044,7 +2044,14 @@ export function buildReviewProductJsonSchema(): Record<string, unknown> {
   const itemSchema = {
     type: "object",
     additionalProperties: false,
-    required: ["field", "current", "suggested", "reason", "status"],
+    required: [
+      "field",
+      "current",
+      "suggested",
+      "reason",
+      "status",
+      "confidence",
+    ],
     properties: {
       field: { type: "string", enum: [...PRODUCT_AI_REVIEW_FIELDS] },
       current: { type: "string" },

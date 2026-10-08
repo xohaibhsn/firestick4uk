@@ -73,10 +73,42 @@ const {
   parseProductReviewJsonText,
   buildReviewProductSystemInstruction,
   buildReviewProductJsonSchema,
+  buildProductFieldsJsonSchema,
+  SEO_AI_EXPLANATION_JSON_SCHEMA,
+  SEO_AI_METADATA_JSON_SCHEMA,
   PRODUCT_AI_REVIEW_FIELDS,
   PRODUCT_AI_EXISTING_EDITABLE_FIELDS,
   PRODUCT_AI_REASON_MAX,
 } = loadTsModule("lib/seoAi.ts");
+
+/** OpenAI strict Structured Outputs: every object `properties` key must be in `required`. */
+function assertStrictPropertiesRequired(schema, path = "$") {
+  if (!schema || typeof schema !== "object") return [];
+  const issues = [];
+  if (schema.type === "object" && schema.properties) {
+    const props = Object.keys(schema.properties);
+    const required = Array.isArray(schema.required) ? schema.required : [];
+    for (const key of props) {
+      if (!required.includes(key)) {
+        issues.push(`${path}.properties.${key} missing from required`);
+      }
+    }
+    for (const key of props) {
+      issues.push(
+        ...assertStrictPropertiesRequired(
+          schema.properties[key],
+          `${path}.properties.${key}`
+        )
+      );
+    }
+  }
+  if (schema.type === "array" && schema.items) {
+    issues.push(
+      ...assertStrictPropertiesRequired(schema.items, `${path}.items`)
+    );
+  }
+  return issues;
+}
 
 const {
   EXISTING_PRODUCT_AI_APPLY_FIELDS,
@@ -763,6 +795,44 @@ async function runServerTests() {
       !JSON.stringify(schema.properties.review.items.properties.field.enum).includes(
         '"slug"'
       )
+  );
+
+  const itemSchema = schema.properties.review.items;
+  const itemRequired = itemSchema.required || [];
+  const itemProps = Object.keys(itemSchema.properties || {});
+  ok(
+    "S_review_item_all_props_required",
+    itemProps.every((k) => itemRequired.includes(k)) &&
+      itemRequired.includes("confidence") &&
+      itemSchema.additionalProperties === false &&
+      itemRequired.includes("suggested") &&
+      itemSchema.properties.suggested.type.includes("null") &&
+      !itemProps.includes("slug") &&
+      !itemProps.includes("price") &&
+      !itemProps.includes("category") &&
+      !itemProps.includes("stock") &&
+      !itemProps.includes("id")
+  );
+  ok(
+    "S_prompt_confidence_required_wording",
+    /confidence must be high, medium, or low/.test(prompt) &&
+      !/confidence if present/.test(prompt)
+  );
+
+  const fieldsSchema = buildProductFieldsJsonSchema([
+    "seo_title",
+    "meta_description",
+  ]);
+  const strictIssues = [
+    ...assertStrictPropertiesRequired(SEO_AI_EXPLANATION_JSON_SCHEMA, "explanation"),
+    ...assertStrictPropertiesRequired(SEO_AI_METADATA_JSON_SCHEMA, "metadata"),
+    ...assertStrictPropertiesRequired(fieldsSchema, "product_fields"),
+    ...assertStrictPropertiesRequired(schema, "product_review"),
+  ];
+  ok(
+    "S_openai_strict_all_schemas_properties_required",
+    strictIssues.length === 0,
+    strictIssues.join("; ")
   );
 
   // Provider isolation — OpenAI only
