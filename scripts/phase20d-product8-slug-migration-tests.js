@@ -105,7 +105,7 @@ fail(
 
 fail(
   "K_sitemap_db_slug_driven",
-  /getCachedSitemapDynamicData/.test(sitemap) &&
+  /getSitemapDynamicDataSafe/.test(sitemap) &&
     /\$\{baseUrl\}\/products\/\$\{p\.slug\}/.test(sitemap) &&
     /SELECT\s+slug\s*,\s*created_at[\s\S]*FROM\s+products[\s\S]*WHERE\s+active\s*=\s*1/i.test(
       sitemapData

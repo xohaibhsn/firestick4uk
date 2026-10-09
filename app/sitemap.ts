@@ -1,5 +1,8 @@
 import type { MetadataRoute } from "next";
-import { getCachedSitemapDynamicData } from "@/lib/sitemapDataServer";
+import {
+  getSitemapDynamicDataSafe,
+  parseFactualLastModified,
+} from "@/lib/sitemapDataServer";
 
 /**
  * Keep force-dynamic so Hostinger build never permanently caches an empty
@@ -11,7 +14,8 @@ export const revalidate = 0;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://firestick4uk.com";
-  const data = await getCachedSitemapDynamicData();
+  // Outer fail-safe: cache/runtime throws must not 500 the whole sitemap.
+  const data = await getSitemapDynamicDataSafe();
 
   // Static/marketing URLs: omit lastModified — no reliable change timestamp;
   // never use request-time new Date() (false "always changed" signal).
@@ -33,19 +37,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/refund-policy`, changeFrequency: "yearly", priority: 0.3 },
   ];
 
-  const productPages: MetadataRoute.Sitemap = data.products.map((p) => ({
-    url: `${baseUrl}/products/${p.slug}`,
-    ...(p.lastModified ? { lastModified: new Date(p.lastModified) } : {}),
-    changeFrequency: "weekly" as const,
-    priority: 0.8,
-  }));
+  const productPages: MetadataRoute.Sitemap = data.products.map((p) => {
+    const lastModified = parseFactualLastModified(p.lastModified);
+    return {
+      url: `${baseUrl}/products/${p.slug}`,
+      ...(lastModified ? { lastModified } : {}),
+      changeFrequency: "weekly" as const,
+      priority: 0.8,
+    };
+  });
 
-  const blogPages: MetadataRoute.Sitemap = data.posts.map((p) => ({
-    url: `${baseUrl}/blog/${p.slug}`,
-    ...(p.lastModified ? { lastModified: new Date(p.lastModified) } : {}),
-    changeFrequency: "weekly" as const,
-    priority: 0.7,
-  }));
+  const blogPages: MetadataRoute.Sitemap = data.posts.map((p) => {
+    const lastModified = parseFactualLastModified(p.lastModified);
+    return {
+      url: `${baseUrl}/blog/${p.slug}`,
+      ...(lastModified ? { lastModified } : {}),
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    };
+  });
 
   return [...staticPages, ...productPages, ...blogPages];
 }
