@@ -1,6 +1,7 @@
 /**
  * Authenticated SEO AI assistance (AI-1A explain, AI-1B draft metadata,
- * PAI-2 product fields, PAI-4 existing product review, PAI-5 image brief).
+ * PAI-2 product fields, PAI-4 existing product review, PAI-5 image brief,
+ * AB-7B grounded blog research).
  * POST only via exactly one selected provider.
  * No CMS writes. No Issue Memory. No Berlin coupling. No image generation APIs.
  */
@@ -17,6 +18,7 @@ import {
   buildMetadataDraftContext,
   buildProductFieldsDraftContext,
   buildProductReviewContext,
+  dispatchBlogResearch,
   dispatchImageBrief,
   dispatchProductFieldsDraft,
   dispatchProductReview,
@@ -28,6 +30,10 @@ import {
   loadProductFieldsAuthorityRow,
   verifyDeterministicIssue,
 } from "@/lib/seoAiServer";
+
+function canWriteResearchResponse(res: NextApiResponse): boolean {
+  return !res.writableEnded && !res.destroyed;
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -65,6 +71,108 @@ export default async function handler(
   }
 
   const role = admin.role as AdminRoleName;
+
+  if (parsed.request.task === "research_blog_evidence") {
+    if (!hasAdminPermission(role, "blog.manage")) {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "You do not have permission for this action.",
+      });
+    }
+
+    const request = parsed.request;
+    const cfg = getProviderEnvConfig(request.provider);
+    if (!cfg.configured) {
+      return res.status(503).json({
+        ok: false,
+        code: "provider_not_configured",
+        message: "Selected AI provider is not configured.",
+      });
+    }
+
+    const clientController = new AbortController();
+    const onClose = () => {
+      if (!res.writableEnded) {
+        clientController.abort();
+      }
+    };
+
+    // Attach before post-check so a disconnect in the gap cannot be missed.
+    res.once("close", onClose);
+
+    try {
+      if (
+        req.destroyed ||
+        res.destroyed ||
+        res.writableEnded ||
+        clientController.signal.aborted
+      ) {
+        if (canWriteResearchResponse(res)) {
+          return res.status(499).json({
+            ok: false,
+            code: "request_aborted",
+            message: "The request was cancelled.",
+          });
+        }
+        console.info(
+          `[seo-ai] provider=${request.provider} task=research_blog_evidence duration_ms=0 outcome=aborted`
+        );
+        return;
+      }
+
+      const result = await dispatchBlogResearch(
+        request.provider,
+        {
+          opportunityId: request.opportunityId,
+          topic: request.topic,
+          intent: request.intent,
+        },
+        undefined,
+        { signal: clientController.signal }
+      );
+
+      if (!result.ok) {
+        if (result.code === "research_busy") {
+          if (!canWriteResearchResponse(res)) return;
+          res.setHeader("Retry-After", "15");
+          return res.status(429).json({
+            ok: false,
+            code: "research_busy",
+            message: result.message,
+          });
+        }
+        if (result.code === "request_aborted") {
+          if (!canWriteResearchResponse(res)) {
+            console.info(
+              `[seo-ai] provider=${request.provider} task=research_blog_evidence duration_ms=0 outcome=aborted`
+            );
+            return;
+          }
+          return res.status(499).json({
+            ok: false,
+            code: "request_aborted",
+            message: "The request was cancelled.",
+          });
+        }
+        if (!canWriteResearchResponse(res)) return;
+        return res.status(result.status).json({
+          ok: false,
+          code: result.code,
+          message: result.message,
+        });
+      }
+
+      if (!canWriteResearchResponse(res)) return;
+      return res.status(200).json({
+        ok: true,
+        provider: request.provider,
+        task: "research_blog_evidence",
+        evidence: result.evidence,
+      });
+    } finally {
+      res.removeListener("close", onClose);
+    }
+  }
 
   if (parsed.request.task === "explain_issue") {
     const canProducts = hasAdminPermission(role, "products.view");
