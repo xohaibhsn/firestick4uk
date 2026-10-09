@@ -33,7 +33,7 @@ const rootLayout = read("app/layout.tsx");
 const legacy = exists("lib/productLegacyRedirects.ts")
   ? read("lib/productLegacyRedirects.ts")
   : "";
-const sitemap = read("app/sitemap.xml/route.ts");
+const sitemap = read("app/sitemap.ts");
 
 fail(
   "H1_page_reuses_getPublicActiveProducts",

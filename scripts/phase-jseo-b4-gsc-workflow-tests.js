@@ -51,7 +51,7 @@ const blogNormSrc = /normalizeBlogDiagnosticRow/.test(api)
 const perms = read("lib/adminPermissions.ts");
 const productPage = read("app/products/[slug]/page.tsx");
 const blogPage = read("app/blog/[slug]/page.tsx");
-const sitemap = read("app/sitemap.xml/route.ts");
+const sitemap = read("app/sitemap.ts");
 const robots = read("public/robots.txt");
 
 const ORIGIN = "https://firestick4uk.com";

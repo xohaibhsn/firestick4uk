@@ -523,12 +523,10 @@ ok(
 );
 ok("AF_no_scheduler", !/schedulerEligible|scheduleBlog|cron/i.test(evidenceSource));
 ok("AF_no_time_random", !/Date\.now|new\s+Date\s*\(|Math\.random/.test(evidenceSource));
-// AB-7B intentionally adds the provider/API wiring that the original phase
-// boundary prohibited; keep the forward boundary at the opportunity engine.
 ok(
-  "AF_only_authorized_ab7b_runtime_wiring",
-  read("pages/api/admin-seo-ai.ts").includes("research_blog_evidence") &&
-    read("lib/seoAiServer.ts").includes("blogResearchEvidence") &&
+  "AF_not_wired_to_runtime",
+  !read("pages/api/admin-seo-ai.ts").includes("blogResearchEvidence") &&
+    !read("lib/seoAiServer.ts").includes("blogResearchEvidence") &&
     !read("lib/blogOpportunityEngine.ts").includes("blogResearchEvidence")
 );
 

@@ -29,7 +29,7 @@ function exists(rel) {
 
 const nextConfig = read("next.config.ts");
 const favicon = read("pages/api/favicon.ts");
-const sitemap = read("app/sitemap.xml/route.ts");
+const sitemap = read("app/sitemap.ts");
 const provider = read("components/SiteContentProvider.tsx");
 const blogSlug = read("app/blog/[slug]/page.tsx");
 const db = read("lib/db.ts");

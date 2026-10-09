@@ -33,8 +33,7 @@ const successPage = read("app/cart/success/page.tsx");
 const adminPage = read("app/admin/page.tsx");
 const sidhuLayout = read("app/sidhu/layout.tsx");
 const sidhuPage = read("app/sidhu/page.tsx");
-const sitemap = read("app/sitemap.xml/route.ts");
-const sitemapXmlLib = read("lib/sitemapXml.ts");
+const sitemap = read("app/sitemap.ts");
 const sitemapData = read("lib/sitemapDataServer.ts");
 const robots = read("public/robots.txt");
 const nextConfig = read("next.config.ts");
@@ -143,18 +142,16 @@ ok(
 // --- SITEMAP ---
 ok(
   "sitemap_cart_removed",
-  !/\/cart["'`]/.test(sitemapXmlLib) &&
-    !/firestick4uk\.com\/cart/.test(sitemapXmlLib)
+  !/\/cart["'`]/.test(sitemap) &&
+    !/firestick4uk\.com\/cart/.test(sitemap)
 );
 ok(
   "sitemap_order_tracking_retained",
-  /\/order-tracking/.test(sitemapXmlLib)
+  /\/order-tracking/.test(sitemap)
 );
 ok(
   "sitemap_h5_architecture_retained",
-  /getSitemapDynamicDataSafe/.test(sitemap) &&
-    /getCachedSitemapDynamicData/.test(sitemapData) &&
-    /export async function GET\(/.test(sitemap) &&
+  /getCachedSitemapDynamicData/.test(sitemap) &&
     /export const dynamic = ["']force-dynamic["']/.test(sitemap) &&
     /export const revalidate = 0/.test(sitemap) &&
     /SITEMAP_CACHE_TTL_SECONDS\s*=\s*300/.test(sitemapData) &&
@@ -162,10 +159,9 @@ ok(
 );
 ok(
   "sitemap_products_blog_subscription_retained",
-  /buildSitemapEntries/.test(sitemap) &&
-    /data\.products/.test(sitemapXmlLib) &&
-    /data\.posts/.test(sitemapXmlLib) &&
-    /subscriptionUrl/.test(sitemapXmlLib)
+  /data\.products/.test(sitemap) &&
+    /data\.posts/.test(sitemap) &&
+    /data\.subscriptionUrl/.test(sitemap)
 );
 
 // --- ROBOTS ---

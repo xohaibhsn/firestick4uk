@@ -1,7 +1,6 @@
 /**
  * Authenticated SEO AI assistance (AI-1A explain, AI-1B draft metadata,
- * PAI-2 product fields, PAI-4 existing product review, PAI-5 image brief,
- * AB-7B grounded blog research).
+ * PAI-2 product fields, PAI-4 existing product review, PAI-5 image brief).
  * POST only via exactly one selected provider.
  * No CMS writes. No Issue Memory. No Berlin coupling. No image generation APIs.
  */
@@ -19,7 +18,6 @@ import {
   buildProductFieldsDraftContext,
   buildProductReviewContext,
   dispatchImageBrief,
-  dispatchBlogResearch,
   dispatchProductFieldsDraft,
   dispatchProductReview,
   dispatchSeoAiDraft,
@@ -67,45 +65,6 @@ export default async function handler(
   }
 
   const role = admin.role as AdminRoleName;
-
-  if (parsed.request.task === "research_blog_evidence") {
-    if (!hasAdminPermission(role, "blog.manage")) {
-      return res.status(403).json({
-        error: "Forbidden",
-        message: "You do not have permission for this action.",
-      });
-    }
-
-    const request = parsed.request;
-    const cfg = getProviderEnvConfig(request.provider);
-    if (!cfg.configured) {
-      return res.status(503).json({
-        ok: false,
-        code: "provider_not_configured",
-        message: "Selected AI provider is not configured.",
-      });
-    }
-
-    const result = await dispatchBlogResearch(request.provider, {
-      opportunityId: request.opportunityId,
-      topic: request.topic,
-      intent: request.intent,
-    });
-    if (!result.ok) {
-      return res.status(result.status).json({
-        ok: false,
-        code: result.code,
-        message: result.message,
-      });
-    }
-
-    return res.status(200).json({
-      ok: true,
-      provider: request.provider,
-      task: "research_blog_evidence",
-      evidence: result.evidence,
-    });
-  }
 
   if (parsed.request.task === "explain_issue") {
     const canProducts = hasAdminPermission(role, "products.view");

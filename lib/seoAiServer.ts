@@ -13,16 +13,12 @@ import {
   type ProductDbRow,
 } from "@/lib/seoDiagnosticRows";
 import {
-  BLOG_RESEARCH_PROVIDER_JSON_SCHEMA,
-  BLOG_RESEARCH_PROVIDER_TIMEOUT_MS,
   SEO_AI_EXPLANATION_JSON_SCHEMA,
   SEO_AI_METADATA_JSON_SCHEMA,
   SEO_AI_PROVIDER_TIMEOUT_MS,
   PRODUCT_AI_FIELD_MAX,
   PRODUCT_AI_REVIEW_FIELDS,
   buildImageBriefJsonSchema,
-  buildBlogResearchSystemInstruction,
-  buildBlogResearchUserPrompt,
   buildImageBriefSystemInstruction,
   buildImageBriefUserPrompt,
   buildProductFieldsJsonSchema,
@@ -40,7 +36,6 @@ import {
   htmlToPlainTextBounded,
   mergeProductAuthoritativeWithDb,
   parseExplanationJsonText,
-  parseBlogResearchProviderJsonText,
   parseImageBriefJsonText,
   parseIssueId,
   parseMetadataJsonText,
@@ -64,12 +59,6 @@ import {
   type SeoAiPublicErrorCode,
   type SeoAiVerifiedIssueContext,
 } from "@/lib/seoAi";
-import {
-  validateBlogResearchEvidence,
-  type BlogResearchEvidenceResult,
-  type BlogResearchGrounding,
-  type BlogResearchSubject,
-} from "@/lib/blogResearchEvidence";
 
 export type SeoAiFailure = {
   ok: false;
@@ -157,12 +146,6 @@ export type ProviderCallFn = (
 export type DraftProviderCallFn = (
   context: SeoAiMetadataDraftContext
 ) => Promise<{ ok: true; draft: SeoAiMetadataDraft } | SeoAiFailure>;
-
-export type BlogResearchProviderCallFn = (
-  subject: BlogResearchSubject
-) => Promise<
-  { ok: true; evidence: BlogResearchEvidenceResult } | SeoAiFailure
->;
 
 const GEMINI_INTERACTIONS_URL =
   "https://generativelanguage.googleapis.com/v1beta/interactions";
@@ -468,345 +451,6 @@ function mapAbortOrTimeout(err: unknown, label: string): SeoAiFailure {
     "provider_upstream",
     "The selected AI provider is temporarily unavailable."
   );
-}
-
-type GroundingExtraction =
-  | { ok: true; grounding: BlogResearchGrounding }
-  | {
-      ok: false;
-      reason: "missing_search_call" | "missing_grounding_urls";
-    };
-
-function appendUniqueString(target: string[], seen: Set<string>, value: unknown) {
-  if (typeof value !== "string") return;
-  const normalized = value.trim();
-  if (!normalized || seen.has(normalized)) return;
-  seen.add(normalized);
-  target.push(normalized);
-}
-
-function collectUrlCitationAnnotations(
-  content: unknown,
-  urls: string[],
-  seenUrls: Set<string>
-) {
-  if (!Array.isArray(content)) return;
-  for (const rawPart of content) {
-    if (!rawPart || typeof rawPart !== "object") continue;
-    const part = rawPart as Record<string, unknown>;
-    const annotations = part.annotations;
-    if (!Array.isArray(annotations)) continue;
-    for (const rawAnnotation of annotations) {
-      if (!rawAnnotation || typeof rawAnnotation !== "object") continue;
-      const annotation = rawAnnotation as Record<string, unknown>;
-      if (annotation.type !== "url_citation") continue;
-      appendUniqueString(urls, seenUrls, annotation.url);
-      appendUniqueString(urls, seenUrls, annotation.uri);
-    }
-  }
-}
-
-/** Extract only provider-owned OpenAI search metadata, never URLs from model JSON. */
-export function extractOpenAiBlogResearchGrounding(
-  body: unknown
-): GroundingExtraction {
-  if (!body || typeof body !== "object") {
-    return { ok: false, reason: "missing_search_call" };
-  }
-  const output = (body as Record<string, unknown>).output;
-  if (!Array.isArray(output)) {
-    return { ok: false, reason: "missing_search_call" };
-  }
-
-  let sawSearchCall = false;
-  const groundedUrls: string[] = [];
-  const searchQueries: string[] = [];
-  const seenUrls = new Set<string>();
-  const seenQueries = new Set<string>();
-
-  for (const rawItem of output) {
-    if (!rawItem || typeof rawItem !== "object") continue;
-    const item = rawItem as Record<string, unknown>;
-    if (item.type === "web_search_call") {
-      const action = item.action;
-      if (!action || typeof action !== "object") continue;
-      const search = action as Record<string, unknown>;
-      if (search.type !== "search") continue;
-      sawSearchCall = true;
-      appendUniqueString(searchQueries, seenQueries, search.query);
-      if (Array.isArray(search.queries)) {
-        for (const query of search.queries) {
-          appendUniqueString(searchQueries, seenQueries, query);
-        }
-      }
-      if (Array.isArray(search.sources)) {
-        for (const rawSource of search.sources) {
-          if (!rawSource || typeof rawSource !== "object") continue;
-          appendUniqueString(
-            groundedUrls,
-            seenUrls,
-            (rawSource as Record<string, unknown>).url
-          );
-        }
-      }
-    }
-    if (item.type === "message") {
-      collectUrlCitationAnnotations(item.content, groundedUrls, seenUrls);
-    }
-  }
-
-  if (!sawSearchCall) return { ok: false, reason: "missing_search_call" };
-  if (groundedUrls.length === 0) {
-    return { ok: false, reason: "missing_grounding_urls" };
-  }
-  return { ok: true, grounding: { groundedUrls, searchQueries } };
-}
-
-/** Extract only provider-owned Gemini Search annotations, never model JSON URLs. */
-export function extractGeminiBlogResearchGrounding(
-  body: unknown
-): GroundingExtraction {
-  if (!body || typeof body !== "object") {
-    return { ok: false, reason: "missing_search_call" };
-  }
-  const steps = (body as Record<string, unknown>).steps;
-  if (!Array.isArray(steps)) {
-    return { ok: false, reason: "missing_search_call" };
-  }
-
-  let sawSearchCall = false;
-  const groundedUrls: string[] = [];
-  const searchQueries: string[] = [];
-  const seenUrls = new Set<string>();
-  const seenQueries = new Set<string>();
-
-  for (const rawStep of steps) {
-    if (!rawStep || typeof rawStep !== "object") continue;
-    const step = rawStep as Record<string, unknown>;
-    if (step.type === "google_search_call") {
-      sawSearchCall = true;
-      const args = step.arguments;
-      if (args && typeof args === "object") {
-        const queries = (args as Record<string, unknown>).queries;
-        if (Array.isArray(queries)) {
-          for (const query of queries) {
-            appendUniqueString(searchQueries, seenQueries, query);
-          }
-        }
-      }
-    }
-    if (step.type === "model_output") {
-      collectUrlCitationAnnotations(step.content, groundedUrls, seenUrls);
-    }
-  }
-
-  if (!sawSearchCall) return { ok: false, reason: "missing_search_call" };
-  if (groundedUrls.length === 0) {
-    return { ok: false, reason: "missing_grounding_urls" };
-  }
-  return { ok: true, grounding: { groundedUrls, searchQueries } };
-}
-
-function malformedResearchGrounding(): SeoAiFailure {
-  return fail(
-    502,
-    "malformed_provider_output",
-    "The AI provider returned research without usable grounding metadata."
-  );
-}
-
-export async function callOpenAiBlogResearch(
-  subject: BlogResearchSubject
-): Promise<{ ok: true; evidence: BlogResearchEvidenceResult } | SeoAiFailure> {
-  const cfg = getProviderEnvConfig("openai");
-  if (!cfg.configured) {
-    return fail(
-      503,
-      "provider_not_configured",
-      "Selected AI provider is not configured."
-    );
-  }
-
-  const client = new OpenAI({
-    apiKey: cfg.apiKey,
-    maxRetries: 0,
-    timeout: BLOG_RESEARCH_PROVIDER_TIMEOUT_MS,
-  });
-
-  try {
-    const response = await client.responses.create({
-      model: cfg.model,
-      store: false,
-      instructions: buildBlogResearchSystemInstruction(),
-      input: buildBlogResearchUserPrompt(subject),
-      tools: [
-        {
-          type: "web_search",
-          external_web_access: true,
-          search_context_size: "medium",
-        },
-      ],
-      tool_choice: "required",
-      include: ["web_search_call.action.sources"],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "blog_research_evidence",
-          strict: true,
-          schema: BLOG_RESEARCH_PROVIDER_JSON_SCHEMA as unknown as {
-            [key: string]: unknown;
-          },
-        },
-      },
-    });
-
-    const grounding = extractOpenAiBlogResearchGrounding(response);
-    if (!grounding.ok) {
-      console.error(`[seo-ai] openai research ${grounding.reason}`);
-      return malformedResearchGrounding();
-    }
-    const parsed = parseBlogResearchProviderJsonText(
-      typeof response.output_text === "string" ? response.output_text : ""
-    );
-    if (!parsed.ok) {
-      console.error("[seo-ai] openai malformed research output");
-      return fail(502, parsed.code, parsed.message);
-    }
-    return {
-      ok: true,
-      evidence: validateBlogResearchEvidence(
-        subject,
-        parsed.output,
-        grounding.grounding
-      ),
-    };
-  } catch (err) {
-    const status =
-      err && typeof err === "object" && "status" in err
-        ? Number((err as { status?: unknown }).status)
-        : NaN;
-    if (Number.isFinite(status) && status > 0) {
-      console.error(`[seo-ai] openai research upstream failed: status ${status}`);
-      if (status === 408 || status === 504) {
-        return fail(
-          503,
-          "provider_timeout",
-          "The selected AI provider timed out. Please try again shortly."
-        );
-      }
-      return fail(
-        503,
-        "provider_upstream",
-        "The selected AI provider is temporarily unavailable."
-      );
-    }
-    return mapAbortOrTimeout(err, "openai research");
-  }
-}
-
-export async function callGeminiBlogResearch(
-  subject: BlogResearchSubject
-): Promise<{ ok: true; evidence: BlogResearchEvidenceResult } | SeoAiFailure> {
-  const cfg = getProviderEnvConfig("gemini");
-  if (!cfg.configured) {
-    return fail(
-      503,
-      "provider_not_configured",
-      "Selected AI provider is not configured."
-    );
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(
-    () => controller.abort(),
-    BLOG_RESEARCH_PROVIDER_TIMEOUT_MS
-  );
-
-  try {
-    const res = await fetch(GEMINI_INTERACTIONS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": cfg.apiKey,
-        "Api-Revision": "2026-05-20",
-      },
-      body: JSON.stringify({
-        model: cfg.model,
-        input: buildBlogResearchUserPrompt(subject),
-        system_instruction: buildBlogResearchSystemInstruction(),
-        tools: [{ type: "google_search" }],
-        store: false,
-        response_format: {
-          type: "text",
-          mime_type: "application/json",
-          schema: BLOG_RESEARCH_PROVIDER_JSON_SCHEMA,
-        },
-      }),
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      console.error(`[seo-ai] gemini research upstream failed: status ${res.status}`);
-      if (res.status === 408 || res.status === 504) {
-        return fail(
-          503,
-          "provider_timeout",
-          "The selected AI provider timed out. Please try again shortly."
-        );
-      }
-      return fail(
-        503,
-        "provider_upstream",
-        "The selected AI provider is temporarily unavailable."
-      );
-    }
-
-    const body = await res.json().catch(() => null);
-    const grounding = extractGeminiBlogResearchGrounding(body);
-    if (!grounding.ok) {
-      console.error(`[seo-ai] gemini research ${grounding.reason}`);
-      return malformedResearchGrounding();
-    }
-    const parsed = parseBlogResearchProviderJsonText(
-      extractGeminiInteractionText(body)
-    );
-    if (!parsed.ok) {
-      console.error("[seo-ai] gemini malformed research output");
-      return fail(502, parsed.code, parsed.message);
-    }
-    return {
-      ok: true,
-      evidence: validateBlogResearchEvidence(
-        subject,
-        parsed.output,
-        grounding.grounding
-      ),
-    };
-  } catch (err) {
-    return mapAbortOrTimeout(err, "gemini research");
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/** Exactly one grounded-search provider call. No fallback and no retry. */
-export async function dispatchBlogResearch(
-  provider: SeoAiProvider,
-  subject: BlogResearchSubject,
-  deps?: {
-    callOpenAI?: BlogResearchProviderCallFn;
-    callGemini?: BlogResearchProviderCallFn;
-  }
-): Promise<{ ok: true; evidence: BlogResearchEvidenceResult } | SeoAiFailure> {
-  if (provider === "openai") {
-    const call = deps?.callOpenAI || callOpenAiBlogResearch;
-    return call(subject);
-  }
-  if (provider === "gemini") {
-    const call = deps?.callGemini || callGeminiBlogResearch;
-    return call(subject);
-  }
-  return fail(400, "invalid_request", "provider must be gemini or openai.");
 }
 
 export async function callOpenAiExplain(

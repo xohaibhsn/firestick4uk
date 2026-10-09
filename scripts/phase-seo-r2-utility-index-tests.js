@@ -38,12 +38,10 @@ const a1Layout = read("app/A1iptvDownload/layout.tsx");
 const a1Page = read("app/A1iptvDownload/page.tsx");
 const g5Layout = read("app/5GNextDownload/layout.tsx");
 const g5Page = read("app/5GNextDownload/page.tsx");
-const sitemap = read("app/sitemap.xml/route.ts");
-const sitemapXmlLib = read("lib/sitemapXml.ts");
+const sitemap = read("app/sitemap.ts");
 const sitemapData = read("lib/sitemapDataServer.ts");
 const robots = read("public/robots.txt");
 const orderTracking = read("app/order-tracking/layout.tsx");
-const sitemapSurface = sitemap + "\n" + sitemapXmlLib;
 
 // --- A1 ---
 ok("a1_layout_exists", exists("app/A1iptvDownload/layout.tsx"));
@@ -90,23 +88,21 @@ ok("player_api_absent", !exists("pages/api/player"));
 // --- SITEMAP ---
 ok(
   "sitemap_utilities_absent",
-  !/A1iptvDownload/.test(sitemapSurface) &&
-    !/5GNextDownload/.test(sitemapSurface) &&
-    !/\/player["'`]/.test(sitemapSurface) &&
-    !/\/erp["'`]/.test(sitemapSurface)
+  !/A1iptvDownload/.test(sitemap) &&
+    !/5GNextDownload/.test(sitemap) &&
+    !/\/player["'`]/.test(sitemap) &&
+    !/\/erp["'`]/.test(sitemap)
 );
-ok("sitemap_order_tracking_retained", /\/order-tracking/.test(sitemapXmlLib));
+ok("sitemap_order_tracking_retained", /\/order-tracking/.test(sitemap));
 ok(
   "sitemap_h5_architecture_unchanged",
-  /getSitemapDynamicDataSafe/.test(sitemap) &&
-    /getCachedSitemapDynamicData/.test(sitemapData) &&
-    /export async function GET\(/.test(sitemap) &&
+  /getCachedSitemapDynamicData/.test(sitemap) &&
     /export const dynamic = ["']force-dynamic["']/.test(sitemap) &&
     /SITEMAP_CACHE_TTL_SECONDS\s*=\s*300/.test(sitemapData) &&
     /unstable_cache/.test(sitemapData) &&
-    /data\.products/.test(sitemapXmlLib) &&
-    /data\.posts/.test(sitemapXmlLib) &&
-    /subscriptionUrl/.test(sitemapXmlLib)
+    /data\.products/.test(sitemap) &&
+    /data\.posts/.test(sitemap) &&
+    /data\.subscriptionUrl/.test(sitemap)
 );
 
 // --- ROBOTS ---

@@ -31,7 +31,7 @@ ok("bridge_route_exists", fs.existsSync(path.join(ROOT, routeRel)));
 ok("bridge_lib_exists", fs.existsSync(path.join(ROOT, libRel)));
 
 const src = read(routeRel) + "\n" + read(libRel);
-const sitemap = read("app/sitemap.xml/route.ts") + "\n" + read("lib/sitemapXml.ts");
+const sitemap = read("app/sitemap.ts");
 
 ok("contains_onedrive_destination", src.includes(ONEDRIVE));
 ok(
