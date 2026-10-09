@@ -26,8 +26,10 @@ function exists(rel) {
   return fs.existsSync(path.join(ROOT, rel));
 }
 
-const sitemap = read("app/sitemap.ts");
+const sitemap = read("app/sitemap.xml/route.ts");
+const sitemapXml = read("lib/sitemapXml.ts");
 const sitemapData = read("lib/sitemapDataServer.ts");
+ok("sitemap_metadata_route_removed", !exists("app/sitemap.ts"));
 const faviconApi = read("pages/api/favicon.ts");
 const faviconLib = read("lib/faviconUrlServer.ts");
 const invalidation = read("lib/hostingerResourceInvalidation.ts");
@@ -54,6 +56,13 @@ ok(
     /unstable_cache/.test(sitemapData)
 );
 ok(
+  "sitemap_explicit_route_handler",
+  /export async function GET\(/.test(sitemap) &&
+    /serializeSitemapXml/.test(sitemap) &&
+    /staticSitemapXml/.test(sitemap) &&
+    /NextResponse/.test(sitemap)
+);
+ok(
   "sitemap_outer_failsafe_around_cache",
   /getSitemapDynamicDataSafe/.test(sitemapData) &&
     /resolveSitemapDynamicDataWithFallback/.test(sitemapData) &&
@@ -62,9 +71,9 @@ ok(
 );
 ok(
   "sitemap_safe_lastmod_helper",
-  /parseFactualLastModified/.test(sitemap) &&
+  /parseFactualLastModified/.test(sitemapXml) &&
     /parseFactualLastModified/.test(sitemapData) &&
-    !/new Date\(p\.lastModified\)/.test(sitemap)
+    /Number\.isNaN\(item\.lastModified\.getTime\(\)\)/.test(sitemapXml)
 );
 ok(
   "sitemap_cache_ttl_only_no_tag",
@@ -81,12 +90,15 @@ ok(
 ok(
   "sitemap_no_request_time_now_lastmod",
   !/lastModified:\s*now/.test(sitemap) &&
-    !/const now = new Date\(\)/.test(sitemap)
+    !/const now = new Date\(\)/.test(sitemap) &&
+    !/Date\.now\s*\(/.test(sitemapXml) &&
+    !/new Date\(\)/.test(sitemapXml)
 );
 ok(
   "sitemap_static_pages_omit_lastModified",
-  /url: baseUrl,\s*changeFrequency/.test(sitemap) &&
-    !/url: baseUrl,[\s\S]{0,80}lastModified/.test(sitemap)
+  /buildStaticSitemapEntries/.test(sitemapXml) &&
+    /changeFrequency:\s*["']daily["']/.test(sitemapXml) &&
+    !/url: BASE_URL,[\s\S]{0,80}lastModified/.test(sitemapXml)
 );
 ok(
   "sitemap_products_authoritative_slugs",
