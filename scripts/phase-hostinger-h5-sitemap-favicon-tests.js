@@ -35,6 +35,7 @@ const layout = read("app/layout.tsx");
 const nextConfig = read("next.config.ts");
 const adminProducts = read("pages/api/admin-products.ts");
 const blogApi = read("pages/api/blog.ts");
+const blogPersistence = read("lib/blogPersistenceServer.ts");
 const siteContent = read("pages/api/site-content.ts");
 const uploadFavicon = read("pages/api/upload-favicon.ts");
 const provider = read("components/SiteContentProvider.tsx");
@@ -48,8 +49,16 @@ ok("sitemap_keeps_force_dynamic", /export const dynamic = ["']force-dynamic["']/
 ok("sitemap_keeps_revalidate_0", /export const revalidate = 0/.test(sitemap));
 ok(
   "sitemap_uses_cached_data_helper",
-  /getCachedSitemapDynamicData/.test(sitemap) &&
+  /getSitemapDynamicDataSafe/.test(sitemap) &&
+    /getCachedSitemapDynamicData/.test(sitemapData) &&
     /unstable_cache/.test(sitemapData)
+);
+ok(
+  "sitemap_fail_closed_safe_wrapper",
+  /getSitemapDynamicDataSafe/.test(sitemapData) &&
+    /resolveSitemapDynamicDataWithFallback/.test(sitemapData) &&
+    /parseFactualLastModified/.test(sitemapData) &&
+    /parseFactualLastModified/.test(sitemap)
 );
 ok(
   "sitemap_cache_ttl_only_no_tag",
@@ -107,10 +116,62 @@ ok(
   /invalidateSitemapCache/.test(adminProducts) &&
     (adminProducts.match(/invalidateSitemapCache\(\)/g) || []).length >= 3
 );
+// Blog sitemap invalidation ownership (AB-2 persistence adapter):
+// POST/PUT delegate to lib/blogPersistenceServer.ts; DELETE remains in the route.
+const blogCreateFn =
+  (blogPersistence.match(
+    /export async function createBlogPost[\s\S]*?(?=export async function updateBlogPost)/
+  ) || [""])[0];
+const blogUpdateFn =
+  (blogPersistence.match(
+    /export async function updateBlogPost[\s\S]*?(?=export async function createAutonomousBlogDraft)/
+  ) || [""])[0];
+const blogDeleteBlock =
+  (blogApi.match(/if \(req\.method === ['"]DELETE['"]\) \{[\s\S]*?(?=return res\.status\(405\))/) || [
+    "",
+  ])[0];
+
 ok(
-  "blog_api_invalidates_sitemap",
-  /invalidateSitemapCache/.test(blogApi) &&
-    (blogApi.match(/invalidateSitemapCache\(\)/g) || []).length >= 3
+  "blog_post_delegates_createBlogPost",
+  /req\.method === ['"]POST['"]/.test(blogApi) &&
+    /await createBlogPost\(/.test(blogApi) &&
+    !/INSERT INTO blog_posts/.test(blogApi)
+);
+ok(
+  "blog_put_delegates_updateBlogPost",
+  /req\.method === ['"]PUT['"]/.test(blogApi) &&
+    /await updateBlogPost\(/.test(blogApi) &&
+    !/UPDATE blog_posts SET/.test(blogApi)
+);
+ok(
+  "blog_persistence_create_invalidates_sitemap",
+  /deps\.invalidateSitemapCache\(\)/.test(blogCreateFn) &&
+    /INSERT INTO blog_posts[\s\S]*deps\.invalidateSitemapCache\(\)/.test(blogCreateFn)
+);
+ok(
+  "blog_persistence_update_noop_skips_sitemap_invalidate",
+  /built\.changedFields\.length === 0/.test(blogUpdateFn) &&
+    /changed_fields:\s*\[\]/.test(blogUpdateFn) &&
+    !/built\.changedFields\.length === 0[\s\S]{0,400}invalidateSitemapCache/.test(
+      blogUpdateFn
+    )
+);
+ok(
+  "blog_persistence_update_real_write_invalidates_sitemap",
+  /wrote = true/.test(blogUpdateFn) &&
+    /wrote = true[\s\S]*deps\.invalidateSitemapCache\(\)/.test(blogUpdateFn)
+);
+ok(
+  "blog_delete_route_invalidates_sitemap",
+  /invalidateSitemapCache\(\)/.test(blogDeleteBlock) &&
+    (blogApi.match(/invalidateSitemapCache\(\)/g) || []).length === 1
+);
+ok(
+  "blog_mutation_paths_no_revalidateTag_revalidatePath",
+  !/revalidateTag\s*\(/.test(blogApi) &&
+    !/revalidatePath\s*\(/.test(blogApi) &&
+    !/revalidateTag\s*\(/.test(blogPersistence) &&
+    !/revalidatePath\s*\(/.test(blogPersistence)
 );
 ok(
   "site_content_sitemap_only_slug_keys",

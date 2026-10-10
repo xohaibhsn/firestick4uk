@@ -1,5 +1,9 @@
 import type { MetadataRoute } from "next";
-import { getCachedSitemapDynamicData } from "@/lib/sitemapDataServer";
+import {
+  emptySitemapDynamicData,
+  getSitemapDynamicDataSafe,
+  parseFactualLastModified,
+} from "@/lib/sitemapDataServer";
 
 /**
  * Keep force-dynamic so Hostinger build never permanently caches an empty
@@ -9,17 +13,17 @@ import { getCachedSitemapDynamicData } from "@/lib/sitemapDataServer";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = "https://firestick4uk.com";
-  const data = await getCachedSitemapDynamicData();
-
+function buildStaticPages(
+  baseUrl: string,
+  subscriptionUrl: string
+): MetadataRoute.Sitemap {
   // Static/marketing URLs: omit lastModified — no reliable change timestamp;
   // never use request-time new Date() (false "always changed" signal).
-  const staticPages: MetadataRoute.Sitemap = [
+  return [
     { url: baseUrl, changeFrequency: "daily", priority: 1.0 },
     { url: `${baseUrl}/products`, changeFrequency: "daily", priority: 0.9 },
     {
-      url: data.subscriptionUrl,
+      url: subscriptionUrl,
       changeFrequency: "weekly",
       priority: 0.9,
     },
@@ -32,20 +36,41 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/privacy-policy`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${baseUrl}/refund-policy`, changeFrequency: "yearly", priority: 0.3 },
   ];
+}
 
-  const productPages: MetadataRoute.Sitemap = data.products.map((p) => ({
-    url: `${baseUrl}/products/${p.slug}`,
-    ...(p.lastModified ? { lastModified: new Date(p.lastModified) } : {}),
-    changeFrequency: "weekly" as const,
-    priority: 0.8,
-  }));
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const baseUrl = "https://firestick4uk.com";
 
-  const blogPages: MetadataRoute.Sitemap = data.posts.map((p) => ({
-    url: `${baseUrl}/blog/${p.slug}`,
-    ...(p.lastModified ? { lastModified: new Date(p.lastModified) } : {}),
-    changeFrequency: "weekly" as const,
-    priority: 0.7,
-  }));
+  // Outer fail-safe: cache/runtime/serialization prep must not 500 the route.
+  // Next metadata sitemap has no try/catch around handler + resolveRouteData.
+  try {
+    const data = await getSitemapDynamicDataSafe();
 
-  return [...staticPages, ...productPages, ...blogPages];
+    const staticPages = buildStaticPages(baseUrl, data.subscriptionUrl);
+
+    const productPages: MetadataRoute.Sitemap = data.products.map((p) => {
+      const lastModified = parseFactualLastModified(p.lastModified);
+      return {
+        url: `${baseUrl}/products/${p.slug}`,
+        ...(lastModified ? { lastModified } : {}),
+        changeFrequency: "weekly" as const,
+        priority: 0.8,
+      };
+    });
+
+    const blogPages: MetadataRoute.Sitemap = data.posts.map((p) => {
+      const lastModified = parseFactualLastModified(p.lastModified);
+      return {
+        url: `${baseUrl}/blog/${p.slug}`,
+        ...(lastModified ? { lastModified } : {}),
+        changeFrequency: "weekly" as const,
+        priority: 0.7,
+      };
+    });
+
+    return [...staticPages, ...productPages, ...blogPages];
+  } catch {
+    const fallback = emptySitemapDynamicData();
+    return buildStaticPages(baseUrl, fallback.subscriptionUrl);
+  }
 }

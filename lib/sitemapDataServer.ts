@@ -15,6 +15,16 @@ export type SitemapDynamicData = {
   posts: Array<{ slug: string; lastModified: string | null }>;
 };
 
+const DEFAULT_SUBSCRIPTION_URL = "https://firestick4uk.com/iptv-subscriptions-uk";
+
+export function emptySitemapDynamicData(): SitemapDynamicData {
+  return {
+    subscriptionUrl: DEFAULT_SUBSCRIPTION_URL,
+    products: [],
+    posts: [],
+  };
+}
+
 function normalizeSlug(raw: unknown): string {
   return String(raw || "")
     .trim()
@@ -23,16 +33,49 @@ function normalizeSlug(raw: unknown): string {
 }
 
 /** Prefer factual created_at; never invent request-time dates. */
-function factualTimestamp(value: unknown): string | null {
+export function factualTimestamp(value: unknown): string | null {
   if (value == null || value === "") return null;
   const d = value instanceof Date ? value : new Date(String(value));
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();
 }
 
-async function loadSitemapDynamicData(): Promise<SitemapDynamicData> {
-  const baseUrl = "https://firestick4uk.com";
-  let subscriptionUrl = `${baseUrl}/iptv-subscriptions-uk`;
+/**
+ * Convert a cached ISO timestamp into a Date safe for Next sitemap XML
+ * serialization. Invalid values must not become Invalid Date objects —
+ * Next resolveRouteData calls toISOString() on Date lastModified and throws
+ * RangeError (uncaught → HTTP 500).
+ */
+export function parseFactualLastModified(iso: string | null): Date | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d;
+}
+
+/**
+ * Fail-closed dynamic-data resolution used by the sitemap route.
+ * Primary may throw outside DB catches (e.g. unstable_cache incrementalCache
+ * invariant). Secondary is the uncached loader. Final fallback is static-only.
+ */
+export async function resolveSitemapDynamicDataWithFallback(
+  primary: () => Promise<SitemapDynamicData>,
+  secondary: () => Promise<SitemapDynamicData>,
+  fallback: () => SitemapDynamicData = emptySitemapDynamicData
+): Promise<SitemapDynamicData> {
+  try {
+    return await primary();
+  } catch {
+    try {
+      return await secondary();
+    } catch {
+      return fallback();
+    }
+  }
+}
+
+export async function loadSitemapDynamicData(): Promise<SitemapDynamicData> {
+  let subscriptionUrl = DEFAULT_SUBSCRIPTION_URL;
 
   try {
     const route = await getSubscriptionSlugConfig();
@@ -89,11 +132,20 @@ async function loadSitemapDynamicData(): Promise<SitemapDynamicData> {
 /**
  * Cached DB-backed sitemap payload. Route stays force-dynamic so build never
  * permanently bakes an empty product/blog list; this only memoizes DB work.
+ * Cache key v2 busts any prior corrupt/incompatible entries.
  */
 export const getCachedSitemapDynamicData = unstable_cache(
   loadSitemapDynamicData,
-  ["sitemap-dynamic-data-v1"],
+  ["sitemap-dynamic-data-v2"],
   {
     revalidate: SITEMAP_CACHE_TTL_SECONDS,
   }
 );
+
+/** Prefer cache; never let cache/runtime invariants take the sitemap down. */
+export async function getSitemapDynamicDataSafe(): Promise<SitemapDynamicData> {
+  return resolveSitemapDynamicDataWithFallback(
+    () => getCachedSitemapDynamicData(),
+    () => loadSitemapDynamicData()
+  );
+}
