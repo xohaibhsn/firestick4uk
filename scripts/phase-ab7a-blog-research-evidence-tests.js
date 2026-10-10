@@ -523,15 +523,10 @@ ok(
 );
 ok("AF_no_scheduler", !/schedulerEligible|scheduleBlog|cron/i.test(evidenceSource));
 ok("AF_no_time_random", !/Date\.now|new\s+Date\s*\(|Math\.random/.test(evidenceSource));
-// AB-7B wires the AB-7A validator into research adapters only.
-// Keep AB-7A semantics pure: opportunity engine and API route must not import it.
 ok(
   "AF_not_wired_to_runtime",
-  read("lib/seoAiServer.ts").includes("validateBlogResearchEvidence") &&
-    /callOpenAiBlogResearch[\s\S]*validateBlogResearchEvidence/.test(
-      read("lib/seoAiServer.ts")
-    ) &&
-    !read("pages/api/admin-seo-ai.ts").includes("blogResearchEvidence") &&
+  !read("pages/api/admin-seo-ai.ts").includes("blogResearchEvidence") &&
+    !read("lib/seoAiServer.ts").includes("blogResearchEvidence") &&
     !read("lib/blogOpportunityEngine.ts").includes("blogResearchEvidence")
 );
 
