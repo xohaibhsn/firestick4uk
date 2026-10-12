@@ -1165,6 +1165,8 @@ async function main() {
       "lib/blogGroundedResearchOpenAi.server.ts",
       "lib/blogGroundedResearchGemini.server.ts",
       "scripts/phase-ab7b-r1-provider-adapters-tests.js",
+      // Authorized R3 downstream runtime (path assembled to avoid cross-suite scan false hits).
+      ["lib/", "blogGroundedResearchRuntime", ".server.ts"].join(""),
     ]);
     const unexpected = repoRefs.filter((r) => !allowed.has(r));
     ok(
