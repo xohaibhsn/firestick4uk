@@ -548,7 +548,9 @@ async function main() {
     res.body = null;
     res.writableEnded = false;
     res.destroyed = false;
+    res.writeCount = 0;
     res.status = (code) => {
+      res.writeCount += 1;
       res.statusCode = code;
       return res;
     };
@@ -556,6 +558,7 @@ async function main() {
       res.headers[k] = v;
     };
     res.json = (body) => {
+      res.writeCount += 1;
       res.body = body;
       res.writableEnded = true;
       return res;
@@ -568,6 +571,7 @@ async function main() {
     req.method = method;
     req.body = body;
     req.headers = {};
+    req.aborted = false;
     return req;
   }
 
@@ -973,6 +977,171 @@ async function main() {
       "API_client_abort_result",
       res.statusCode === 499 &&
         res.body?.code === "request_aborted" &&
+        req.listenerCount("aborted") === 0 &&
+        res.listenerCount("close") === 0
+    );
+  }
+
+  // ---------- R3B PRE-EXISTING DISCONNECT ----------
+  {
+    let runtimeCalls = 0;
+    const expected = createBlogGroundedResearchFailure("request_aborted");
+    const handler = loadRoute({
+      "@/lib/adminAuth": {
+        requireAdminPermission: async () => ({ sessionId: 1 }),
+      },
+      "@/lib/rateLimit": {
+        RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
+      },
+      "@/lib/blogGroundedResearchRuntime.server": {
+        runBlogGroundedResearchRuntime: async () => {
+          runtimeCalls += 1;
+          return {
+            ok: true,
+            provider: "openai",
+            evidence: makeReadyEvidence("ready"),
+          };
+        },
+      },
+    }).default;
+    const req = createMockReq("POST", validBody);
+    req.aborted = true;
+    const res = createMockRes();
+    await handler(req, res);
+    ok(
+      "API_pre_aborted_no_runtime",
+      runtimeCalls === 0 &&
+        res.statusCode === 499 &&
+        res.body?.code === "request_aborted" &&
+        res.body?.message === expected.message &&
+        deepEqual(res.body, {
+          ok: false,
+          code: expected.code,
+          message: expected.message,
+        }) &&
+        req.listenerCount("aborted") === 0 &&
+        res.listenerCount("close") === 0
+    );
+  }
+
+  {
+    let runtimeCalls = 0;
+    const handler = loadRoute({
+      "@/lib/adminAuth": {
+        requireAdminPermission: async () => ({ sessionId: 1 }),
+      },
+      "@/lib/rateLimit": {
+        RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
+      },
+      "@/lib/blogGroundedResearchRuntime.server": {
+        runBlogGroundedResearchRuntime: async () => {
+          runtimeCalls += 1;
+          return {
+            ok: true,
+            provider: "openai",
+            evidence: makeReadyEvidence("ready"),
+          };
+        },
+      },
+    }).default;
+    const req = createMockReq("POST", validBody);
+    const res = createMockRes();
+    res.destroyed = true;
+    let threw = false;
+    try {
+      await handler(req, res);
+    } catch {
+      threw = true;
+    }
+    ok(
+      "API_pre_destroyed_no_runtime",
+      runtimeCalls === 0 &&
+        res.writeCount === 0 &&
+        res.body === null &&
+        threw === false &&
+        req.listenerCount("aborted") === 0 &&
+        res.listenerCount("close") === 0
+    );
+  }
+
+  {
+    let runtimeCalls = 0;
+    const handler = loadRoute({
+      "@/lib/adminAuth": {
+        requireAdminPermission: async () => ({ sessionId: 1 }),
+      },
+      "@/lib/rateLimit": {
+        RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
+      },
+      "@/lib/blogGroundedResearchRuntime.server": {
+        runBlogGroundedResearchRuntime: async () => {
+          runtimeCalls += 1;
+          return {
+            ok: true,
+            provider: "openai",
+            evidence: makeReadyEvidence("ready"),
+          };
+        },
+      },
+    }).default;
+    const req = createMockReq("POST", validBody);
+    const res = createMockRes();
+    ok(
+      "API_normal_not_pre_disconnected",
+      req.aborted !== true && res.destroyed !== true
+    );
+    await handler(req, res);
+    ok(
+      "API_normal_still_invokes_runtime",
+      runtimeCalls === 1 &&
+        res.statusCode === 200 &&
+        res.body?.ok === true &&
+        res.body?.evidence?.evidenceState === "ready"
+    );
+  }
+
+  {
+    let observedSignal;
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const handler = loadRoute({
+      "@/lib/adminAuth": {
+        requireAdminPermission: async () => ({ sessionId: 1 }),
+      },
+      "@/lib/rateLimit": {
+        RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
+      },
+      "@/lib/blogGroundedResearchRuntime.server": {
+        runBlogGroundedResearchRuntime: async (_request, options) => {
+          observedSignal = options?.signal;
+          await gate;
+          if (options?.signal?.aborted) {
+            return createBlogGroundedResearchFailure("request_aborted");
+          }
+          return {
+            ok: true,
+            provider: "openai",
+            evidence: makeReadyEvidence("ready"),
+          };
+        },
+      },
+    }).default;
+    const req = createMockReq("POST", validBody);
+    const res = createMockRes();
+    const done = handler(req, res);
+    await new Promise((r) => setImmediate(r));
+    // Simulate premature response close: destroy first, then emit close.
+    res.destroyed = true;
+    res.emit("close");
+    ok("API_res_close_signal", observedSignal?.aborted === true);
+    release();
+    await done;
+    ok(
+      "API_res_close_no_write_cleaned",
+      res.writeCount === 0 &&
+        res.body === null &&
         req.listenerCount("aborted") === 0 &&
         res.listenerCount("close") === 0
     );

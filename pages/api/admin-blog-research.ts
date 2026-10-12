@@ -82,10 +82,27 @@ export default async function handler(
     }
   };
 
+  // Attach first so post-registration disconnects are observed, then reconcile
+  // any disconnect that already happened before listeners existed (no replay).
   req.on("aborted", onReqAborted);
   res.on("close", onResClose);
 
+  if (req.aborted === true || (res as { destroyed?: boolean }).destroyed === true) {
+    abortFromClient();
+  }
+
   try {
+    if (controller.signal.aborted) {
+      settled = true;
+      const failure = createBlogGroundedResearchFailure("request_aborted");
+      safeJson(res, failure.status, {
+        ok: false,
+        code: failure.code,
+        message: failure.message,
+      });
+      return;
+    }
+
     const result = await runBlogGroundedResearchRuntime(parsed.value, {
       signal: controller.signal,
     });
