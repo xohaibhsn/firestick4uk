@@ -746,6 +746,10 @@ async function main() {
       fetchCalls[0].init.redirect === "error"
     );
     ok(
+      "M_thinking_level_low",
+      body.generation_config?.thinking_level === "low"
+    );
+    ok(
       "M_api_key_not_in_url",
       !String(fetchCalls[0].url).includes("key=") &&
         !String(fetchCalls[0].url).includes("test-gemini-key")
@@ -1235,6 +1239,12 @@ async function main() {
       /redirect:\s*["']error["']/.test(geminiSrc) &&
         /x-goog-api-key/.test(geminiSrc) &&
         !/searchParams\.set\(\s*["']key["']/.test(geminiSrc)
+    );
+    ok(
+      "I_gemini_thinking_level_low",
+      /generation_config\s*:\s*\{[\s\S]*?thinking_level\s*:\s*["']low["']/.test(
+        geminiSrc
+      )
     );
   }
   ok(

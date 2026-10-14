@@ -145,6 +145,11 @@ export async function callGeminiGroundedResearch(
         system_instruction: buildBlogGroundedResearchSystemPrompt(),
         tools: [{ type: "google_search" }],
         store: false,
+        // gemini-3.8-flash defaults to medium thinking; low reduces latency for
+        // search+structured grounded research within the shared 45s budget.
+        generation_config: {
+          thinking_level: "low",
+        },
         response_format: {
           type: "text",
           mime_type: "application/json",
