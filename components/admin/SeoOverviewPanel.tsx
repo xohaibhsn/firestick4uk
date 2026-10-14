@@ -14,6 +14,13 @@ import {
   buildSeoDailyWorkQueue,
   type SeoDailyWorkQueueItem,
 } from "@/lib/seoDailyWorkQueue";
+import {
+  buildSeoPlanningPreview,
+  createSeoPlanningHoldDefault,
+  MAX_INTENT_CHARS,
+  MAX_TOPIC_CHARS,
+  type SeoPlanningPreviewResult,
+} from "@/lib/seoPlanningReadiness";
 
 type VerificationRow = {
   url: string;
@@ -182,6 +189,23 @@ export default function SeoOverviewPanel({
   const [explainByIssue, setExplainByIssue] = useState<
     Record<string, IssueExplainState>
   >({});
+  const [planningTopic, setPlanningTopic] = useState("");
+  const [planningIntent, setPlanningIntent] = useState("");
+  const [planningPreview, setPlanningPreview] =
+    useState<SeoPlanningPreviewResult>(() => createSeoPlanningHoldDefault());
+  const [planningInlineError, setPlanningInlineError] = useState("");
+
+  const clearPlanningPreview = useCallback(() => {
+    setPlanningTopic("");
+    setPlanningIntent("");
+    setPlanningInlineError("");
+    setPlanningPreview(createSeoPlanningHoldDefault());
+  }, []);
+
+  const invalidatePlanningPreview = useCallback(() => {
+    setPlanningInlineError("");
+    setPlanningPreview(createSeoPlanningHoldDefault());
+  }, []);
 
   const explainIssue = async (
     issueId: string,
@@ -266,6 +290,7 @@ export default function SeoOverviewPanel({
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    invalidatePlanningPreview();
     try {
       const res = await fetch("/api/admin-seo-overview", {
         credentials: "include",
@@ -286,13 +311,14 @@ export default function SeoOverviewPanel({
     } finally {
       setLoading(false);
     }
-  }, [getRoleHeaders, loadMemory]);
+  }, [getRoleHeaders, loadMemory, invalidatePlanningPreview]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       setError("");
+      invalidatePlanningPreview();
       try {
         const res = await fetch("/api/admin-seo-overview", {
           credentials: "include",
@@ -419,6 +445,33 @@ export default function SeoOverviewPanel({
     const el = document.getElementById(id);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const runPlanningCoverageCheck = () => {
+    setPlanningInlineError("");
+    if (!data) {
+      setPlanningPreview(
+        createSeoPlanningHoldDefault()
+      );
+      setPlanningInlineError(
+        "SEO overview data is not loaded yet. Refresh the overview, then check coverage again."
+      );
+      return;
+    }
+    const perms = data.permissions;
+    const preview = buildSeoPlanningPreview({
+      topic: planningTopic,
+      intent: planningIntent.trim() ? planningIntent : undefined,
+      blog: perms?.blog ? data.blog : undefined,
+      permissions: {
+        blog: !!perms?.blog,
+        blogManage: !!perms?.blogManage,
+      },
+    });
+    setPlanningPreview(preview);
+    if (preview.status === "hold" && preview.holdCode === "INVALID_TOPIC") {
+      setPlanningInlineError(preview.message);
     }
   };
 
@@ -700,6 +753,224 @@ export default function SeoOverviewPanel({
           )}
         </div>
       )}
+
+      <div
+        className="section-card"
+        style={{ marginBottom: 20 }}
+        id="seo-blog-planning-readiness"
+      >
+        <div style={{ fontWeight: 700, marginBottom: 6 }}>
+          Blog Planning &amp; Evidence Readiness
+        </div>
+        <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
+          Manual topic coverage preview using existing Blog inventory (AB-4) and
+          evidence-gated decisioning (AB-3). Read-only — no AI research, no CMS
+          writes, and no publish recommendation.
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            alignItems: "center",
+            marginBottom: 10,
+          }}
+        >
+          <span style={badgeStyle("Review")}>
+            Planning status: {planningPreview.planningDecision}
+          </span>
+          <span style={badgeStyle("Review")}>
+            Research evidence: {planningPreview.evidenceLabel}
+          </span>
+        </div>
+
+        <div style={{ fontSize: 13, color: "#374151", marginBottom: 12 }}>
+          {planningPreview.message}
+        </div>
+
+        <div style={{ marginBottom: 10 }}>
+          <label
+            htmlFor="seo-planning-topic"
+            style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}
+          >
+            Proposed Blog Topic
+          </label>
+          <input
+            id="seo-planning-topic"
+            type="text"
+            value={planningTopic}
+            maxLength={MAX_TOPIC_CHARS}
+            onChange={(e) => {
+              setPlanningTopic(e.target.value);
+              setPlanningInlineError("");
+            }}
+            placeholder="Enter a research topic to check existing Blog coverage"
+            style={{
+              width: "100%",
+              maxWidth: 560,
+              padding: "8px 10px",
+              border: "1px solid #D1D5DB",
+              borderRadius: 6,
+              fontSize: 13,
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label
+            htmlFor="seo-planning-intent"
+            style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}
+          >
+            Intent (optional)
+          </label>
+          <input
+            id="seo-planning-intent"
+            type="text"
+            value={planningIntent}
+            maxLength={MAX_INTENT_CHARS}
+            onChange={(e) => {
+              setPlanningIntent(e.target.value);
+              setPlanningInlineError("");
+            }}
+            placeholder="Optional planning intent"
+            style={{
+              width: "100%",
+              maxWidth: 560,
+              padding: "8px 10px",
+              border: "1px solid #D1D5DB",
+              borderRadius: 6,
+              fontSize: 13,
+            }}
+          />
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          <button
+            type="button"
+            className="action-btn btn-edit"
+            disabled={loading || !data}
+            onClick={() => runPlanningCoverageCheck()}
+          >
+            Check Existing Blog Coverage
+          </button>
+          <button
+            type="button"
+            className="action-btn btn-view"
+            onClick={() => clearPlanningPreview()}
+          >
+            Clear
+          </button>
+          {planningPreview.canOpenBlog && can("blog.manage") ? (
+            <button
+              type="button"
+              className="action-btn btn-edit"
+              onClick={() => onNavigate("blog")}
+            >
+              Open Blog
+            </button>
+          ) : null}
+        </div>
+
+        {planningInlineError ? (
+          <div style={{ fontSize: 12, color: "#991B1B", marginBottom: 10 }}>
+            {planningInlineError}
+          </div>
+        ) : null}
+
+        {!data && !loading ? (
+          <div style={{ fontSize: 12, color: "#991B1B", marginBottom: 10 }}>
+            Overview data unavailable. Refresh SEO Overview before checking
+            coverage.
+          </div>
+        ) : null}
+
+        {planningPreview.status === "preview" && planningPreview.match ? (
+          <div
+            style={{
+              borderTop: "1px solid #E5E7EB",
+              paddingTop: 12,
+              fontSize: 13,
+              color: "#374151",
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>
+              Existing-content review
+            </div>
+            {planningPreview.match.kind === "NONE" ? (
+              <div style={{ marginBottom: 8 }}>
+                Match classification: NONE — no matching Blog detected in the
+                available inventory. This does not approve creating a new
+                article.
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: 4 }}>
+                  Potential existing Blog match
+                </div>
+                <div style={{ marginBottom: 4 }}>
+                  Match classification: {planningPreview.match.kind}
+                </div>
+                {planningPreview.match.title ? (
+                  <div style={{ marginBottom: 4 }}>
+                    Existing title: {planningPreview.match.title}
+                  </div>
+                ) : null}
+                {planningPreview.match.status ? (
+                  <div style={{ marginBottom: 4 }}>
+                    Existing status: {planningPreview.match.status}
+                  </div>
+                ) : null}
+                {planningPreview.match.url ? (
+                  <div style={{ marginBottom: 4, wordBreak: "break-all" }}>
+                    On-site URL:{" "}
+                    <a
+                      href={planningPreview.match.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {planningPreview.match.url}
+                    </a>
+                  </div>
+                ) : null}
+              </>
+            )}
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+              {planningPreview.match.heuristicNote}
+            </div>
+            <div style={{ fontSize: 12, marginBottom: 4 }}>
+              AB-4 reason codes:{" "}
+              {planningPreview.ab4ReasonCodes.length
+                ? planningPreview.ab4ReasonCodes.join(", ")
+                : "—"}
+            </div>
+            <div style={{ fontSize: 12, marginBottom: 4 }}>
+              AB-3 reason codes:{" "}
+              {planningPreview.ab3ReasonCodes.length
+                ? planningPreview.ab3ReasonCodes.join(", ")
+                : "—"}
+            </div>
+            <div style={{ fontSize: 12, marginBottom: 4 }}>
+              Planning decision: HOLD (action{" "}
+              {planningPreview.decision?.action || "DO_NOTHING"}; scheduler
+              eligible: false)
+            </div>
+            {planningPreview.decision?.explanation ? (
+              <div style={{ fontSize: 12, color: "#666" }}>
+                {planningPreview.decision.explanation}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {planningPreview.status === "hold" &&
+        planningPreview.holdCode &&
+        planningPreview.holdCode !== "NO_TOPIC" ? (
+          <div style={{ fontSize: 12, color: "#666", borderTop: "1px solid #E5E7EB", paddingTop: 10 }}>
+            Hold code: {planningPreview.holdCode}
+          </div>
+        ) : null}
+      </div>
 
       {data?.diagnostics && (
         <div
