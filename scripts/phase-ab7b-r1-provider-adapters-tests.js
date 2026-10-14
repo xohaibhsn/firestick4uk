@@ -742,8 +742,43 @@ async function main() {
       fetchCalls[0].init.headers["x-goog-api-key"] === "test-gemini-key"
     );
     ok(
+      "M_redirect_error",
+      fetchCalls[0].init.redirect === "error"
+    );
+    ok(
+      "M_api_key_not_in_url",
+      !String(fetchCalls[0].url).includes("key=") &&
+        !String(fetchCalls[0].url).includes("test-gemini-key")
+    );
+    ok(
       "M_api_key_not_logged_in_result",
       !JSON.stringify(result).includes("test-gemini-key")
+    );
+  }
+  {
+    const fetchCalls = [];
+    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
+      deps: {
+        fetchImpl: async (url, init) => {
+          fetchCalls.push({ url: String(url), init });
+          const err = new TypeError(
+            "Failed to fetch: redirect mode is set to error"
+          );
+          throw err;
+        },
+      },
+    });
+    ok(
+      "M_redirect_reject_sanitized",
+      result.ok === false &&
+        result.code === "provider_upstream" &&
+        !JSON.stringify(result).includes("test-gemini-key") &&
+        !String(result.message || "").toLowerCase().includes("redirect")
+    );
+    ok("M_redirect_reject_one_call", fetchCalls.length === 1);
+    ok(
+      "M_redirect_reject_no_retry",
+      fetchCalls.length === 1 && fetchCalls[0].init.redirect === "error"
     );
   }
   {
@@ -1194,6 +1229,12 @@ async function main() {
       /setTimeout\s*\(/.test(geminiSrc) &&
         /clearTimeout\s*\(/.test(geminiSrc) &&
         /function\s+createResearchAbortBundle/.test(geminiSrc)
+    );
+    ok(
+      "I_gemini_redirect_error",
+      /redirect:\s*["']error["']/.test(geminiSrc) &&
+        /x-goog-api-key/.test(geminiSrc) &&
+        !/searchParams\.set\(\s*["']key["']/.test(geminiSrc)
     );
   }
   ok(

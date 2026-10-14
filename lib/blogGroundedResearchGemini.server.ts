@@ -151,6 +151,7 @@ export async function callGeminiGroundedResearch(
           schema: BLOG_GROUNDED_RESEARCH_PROVIDER_JSON_SCHEMA,
         },
       }),
+      redirect: "error",
       signal: abort.signal,
     });
 

@@ -590,7 +590,7 @@ async function main() {
       "@/lib/adminAuth": {
         requireAdminPermission: async () => {
           authCalls += 1;
-          return { sessionId: 1 };
+          return { sessionId: 1, role: "super_admin" };
         },
       },
       "@/lib/rateLimit": {
@@ -674,13 +674,115 @@ async function main() {
     ok("API_rbac_403", res.statusCode === 403 && runtimeCalls === 0);
   }
 
+  // ---------- CANARY SUPER_ADMIN-ONLY (route-local) ----------
+  async function assertCanaryRoleDenied(roleLabel, adminIdentity) {
+    let rlCalls = 0;
+    let runtimeCalls = 0;
+    let parseTriggered = false;
+    const handler = loadRoute({
+      "@/lib/adminAuth": {
+        requireAdminPermission: async (_req, _res, permission) => {
+          ok(
+            `API_canary_${roleLabel}_still_checks_blog_manage`,
+            permission === "blog.manage"
+          );
+          return adminIdentity;
+        },
+      },
+      "@/lib/rateLimit": {
+        RL_SEO_AI: () => {
+          rlCalls += 1;
+          return { allowed: true, remaining: 9, retryAfterSec: 1 };
+        },
+      },
+      "@/lib/blogGroundedResearchRuntime.server": {
+        runBlogGroundedResearchRuntime: async () => {
+          runtimeCalls += 1;
+          return { ok: true, provider: "openai", evidence: makeReadyEvidence() };
+        },
+      },
+      "@/lib/blogGroundedResearchContracts": {
+        BLOG_GROUNDED_RESEARCH_TASK,
+        createBlogGroundedResearchFailure,
+        parseBlogGroundedResearchRequest: (raw) => {
+          parseTriggered = true;
+          return parseBlogGroundedResearchRequest(raw);
+        },
+      },
+    }).default;
+    const res = createMockRes();
+    await handler(createMockReq("POST", validBody), res);
+    ok(
+      `API_canary_${roleLabel}_403`,
+      res.statusCode === 403 &&
+        res.body?.error === "Forbidden" &&
+        res.body?.message === "You do not have permission for this action." &&
+        rlCalls === 0 &&
+        runtimeCalls === 0 &&
+        parseTriggered === false
+    );
+  }
+
+  await assertCanaryRoleDenied("manager", {
+    sessionId: 2,
+    role: "manager",
+  });
+  await assertCanaryRoleDenied("writer", {
+    sessionId: 3,
+    role: "writer",
+  });
+  await assertCanaryRoleDenied("unknown_role", {
+    sessionId: 4,
+    role: "viewer",
+  });
+  await assertCanaryRoleDenied("missing_role", {
+    sessionId: 5,
+  });
+
+  {
+    let rlCalls = 0;
+    let runtimeCalls = 0;
+    const handler = loadRoute({
+      "@/lib/adminAuth": {
+        requireAdminPermission: async () => ({
+          sessionId: 9,
+          role: "super_admin",
+        }),
+      },
+      "@/lib/rateLimit": {
+        RL_SEO_AI: () => {
+          rlCalls += 1;
+          return { allowed: true, remaining: 9, retryAfterSec: 1 };
+        },
+      },
+      "@/lib/blogGroundedResearchRuntime.server": {
+        runBlogGroundedResearchRuntime: async () => {
+          runtimeCalls += 1;
+          return { ok: true, provider: "openai", evidence: makeReadyEvidence() };
+        },
+      },
+    }).default;
+    const res = createMockRes();
+    await handler(createMockReq("POST", validBody), res);
+    ok(
+      "API_canary_super_admin_reaches_runtime",
+      res.statusCode === 200 &&
+        res.body?.ok === true &&
+        rlCalls === 1 &&
+        runtimeCalls === 1
+    );
+  }
+
   // ---------- INVALID REQUEST ----------
   {
     let rlCalls = 0;
     let runtimeCalls = 0;
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 42 }),
+        requireAdminPermission: async () => ({
+          sessionId: 42,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => {
@@ -712,7 +814,10 @@ async function main() {
     let rlKey = null;
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 77 }),
+        requireAdminPermission: async () => ({
+          sessionId: 77,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: (sessionId) => {
@@ -743,7 +848,10 @@ async function main() {
   {
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 1 }),
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
@@ -771,7 +879,10 @@ async function main() {
   {
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 1 }),
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
@@ -802,7 +913,10 @@ async function main() {
   {
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 1 }),
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
@@ -834,7 +948,10 @@ async function main() {
     const expected = createBlogGroundedResearchFailure(code);
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 1 }),
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
@@ -860,7 +977,10 @@ async function main() {
   {
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 1 }),
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
@@ -891,7 +1011,10 @@ async function main() {
   {
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 1 }),
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
@@ -913,7 +1036,10 @@ async function main() {
   {
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 1 }),
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
@@ -945,7 +1071,10 @@ async function main() {
     });
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 1 }),
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
@@ -988,7 +1117,10 @@ async function main() {
     const expected = createBlogGroundedResearchFailure("request_aborted");
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 1 }),
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
@@ -1028,7 +1160,10 @@ async function main() {
     let runtimeCalls = 0;
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 1 }),
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
@@ -1068,7 +1203,10 @@ async function main() {
     let runtimeCalls = 0;
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 1 }),
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
@@ -1108,7 +1246,10 @@ async function main() {
     });
     const handler = loadRoute({
       "@/lib/adminAuth": {
-        requireAdminPermission: async () => ({ sessionId: 1 }),
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
       },
       "@/lib/rateLimit": {
         RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
@@ -1205,6 +1346,17 @@ async function main() {
     "I_route_uses_requireAdminPermission",
     /requireAdminPermission\s*\(/.test(routeSrc) &&
       /["']blog\.manage["']/.test(routeSrc)
+  );
+  ok(
+    "I_route_canary_super_admin_only",
+    /admin\.role\s*!==\s*["']super_admin["']/.test(routeSrc) &&
+      /You do not have permission for this action\./.test(routeSrc) &&
+      routeSrc.indexOf("requireAdminPermission") <
+        routeSrc.indexOf('admin.role !== "super_admin"') &&
+      routeSrc.indexOf('admin.role !== "super_admin"') <
+        routeSrc.indexOf("parseBlogGroundedResearchRequest(req.body)") &&
+      routeSrc.indexOf('admin.role !== "super_admin"') <
+        routeSrc.indexOf("RL_SEO_AI(admin.sessionId)")
   );
   ok(
     "I_route_uses_RL_SEO_AI",

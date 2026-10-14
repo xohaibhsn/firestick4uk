@@ -2,6 +2,7 @@
  * AB-7B R3 — Dedicated authenticated grounded Blog research route.
  *
  * POST only. blog.manage via requireAdminPermission. Shares RL_SEO_AI.
+ * Initial canary: route-local super_admin-only after blog.manage (global RBAC unchanged).
  * Does not import seoAi / seoAiServer. No CMS/DB writes. No UI.
  */
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -41,6 +42,15 @@ export default async function handler(
 
   const admin = await requireAdminPermission(req, res, "blog.manage");
   if (!admin) return;
+
+  // Temporary AB-7B canary: only super_admin may invoke grounded research.
+  // Keeps blog.manage for managers/writers elsewhere; do not widen global RBAC.
+  if (admin.role !== "super_admin") {
+    return res.status(403).json({
+      error: "Forbidden",
+      message: "You do not have permission for this action.",
+    });
+  }
 
   const parsed = parseBlogGroundedResearchRequest(req.body);
   if (!parsed.ok) {
