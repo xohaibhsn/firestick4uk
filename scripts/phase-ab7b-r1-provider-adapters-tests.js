@@ -20,6 +20,67 @@ function ok(name, condition, detail = "") {
   }
 }
 
+async function withCapturedWarn(fn) {
+  const lines = [];
+  const original = console.warn;
+  console.warn = (...args) => {
+    lines.push(args.map(String).join(" "));
+  };
+  try {
+    const result = await fn();
+    return { result, lines };
+  } finally {
+    console.warn = original;
+  }
+}
+
+function geminiDiagEvents(lines) {
+  return lines.filter((line) =>
+    String(line).includes("event: gemini_grounding_failure")
+  );
+}
+
+function parseGeminiDiag(line) {
+  const text = String(line);
+  const reason = (
+    text.match(
+      /\breason: (missing_search_call|missing_grounding_urls|bounds_exceeded)\b/
+    ) || []
+  )[1];
+  if (!reason) return null;
+  return {
+    reason,
+    searchCallCount: Number(
+      (text.match(/\bsearchCallCount: (\d+)\b/) || [])[1]
+    ),
+    citationAnnotationCount: Number(
+      (text.match(/\bcitationAnnotationCount: (\d+)\b/) || [])[1]
+    ),
+    acceptedGroundedUrlCount: Number(
+      (text.match(/\bacceptedGroundedUrlCount: (\d+)\b/) || [])[1]
+    ),
+  };
+}
+
+function geminiDiagLooksPrivate(line) {
+  const text = String(line);
+  const forbidden = [
+    URL_A,
+    URL_B,
+    MODEL_ONLY_URL,
+    "test-gemini-key",
+    "BEGIN_UNTRUSTED",
+    "https://",
+    "http://",
+    SUBJECT.topic,
+    SUBJECT.opportunityId,
+    "stack",
+    "Authorization",
+    "x-goog-api-key",
+  ];
+  return !forbidden.some((token) => text.includes(token));
+}
+
 function read(rel) {
   return fs.readFileSync(path.join(ROOT, rel), "utf8");
 }
@@ -704,19 +765,25 @@ async function main() {
   console.log("--- GEMINI ADAPTER ---");
   {
     const fetchCalls = [];
-    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      deps: {
-        fetchImpl: async (url, init) => {
-          fetchCalls.push({ url: String(url), init });
-          return mockGeminiHttpResponse(geminiBody());
+    const { result, lines } = await withCapturedWarn(async () =>
+      callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
+        deps: {
+          fetchImpl: async (url, init) => {
+            fetchCalls.push({ url: String(url), init });
+            return mockGeminiHttpResponse(geminiBody());
+          },
         },
-      },
-    });
+      })
+    );
     ok(
       "M_success_packet",
       result.ok === true &&
         result.packet.provider === "gemini" &&
         result.packet.grounding.groundedUrls.includes(URL_A)
+    );
+    ok(
+      "M_success_no_grounding_diag",
+      geminiDiagEvents(lines).length === 0
     );
     ok("M_fetch_count_1", fetchCalls.length === 1);
     ok("M_method_post", fetchCalls[0].init.method === "POST");
@@ -891,53 +958,187 @@ async function main() {
     );
   }
   {
-    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      deps: {
-        fetchImpl: async () =>
-          mockGeminiHttpResponse({
-            steps: [
-              {
-                type: "model_output",
-                content: [
-                  {
-                    type: "text",
-                    text: JSON.stringify(validOutput()),
-                    annotations: [{ type: "url_citation", url: URL_A }],
-                  },
-                ],
-              },
-            ],
-          }),
-      },
-    });
+    const { result, lines } = await withCapturedWarn(async () =>
+      callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
+        deps: {
+          fetchImpl: async () =>
+            mockGeminiHttpResponse({
+              steps: [
+                {
+                  type: "model_output",
+                  content: [
+                    {
+                      type: "text",
+                      text: JSON.stringify(validOutput()),
+                      annotations: [{ type: "url_citation", url: URL_A }],
+                    },
+                  ],
+                },
+              ],
+            }),
+        },
+      })
+    );
+    const events = geminiDiagEvents(lines);
+    const diag = events.length === 1 ? parseGeminiDiag(events[0]) : null;
     ok(
       "M_search_missing_grounding",
       result.ok === false && result.code === "grounding_unavailable"
     );
+    ok(
+      "M_search_missing_diag_reason",
+      diag &&
+        diag.reason === "missing_search_call" &&
+        diag.searchCallCount === 0 &&
+        Number.isFinite(diag.citationAnnotationCount) &&
+        Number.isFinite(diag.acceptedGroundedUrlCount)
+    );
+    ok(
+      "M_search_missing_diag_single",
+      events.length === 1 && geminiDiagLooksPrivate(events[0])
+    );
   }
   {
-    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      deps: {
-        fetchImpl: async () =>
-          mockGeminiHttpResponse({
-            steps: [
-              {
-                type: "google_search_call",
-                arguments: { queries: ["q"] },
-              },
-              {
-                type: "model_output",
-                content: [
-                  { type: "text", text: JSON.stringify(validOutput()) },
-                ],
-              },
-            ],
-          }),
-      },
-    });
+    const { result, lines } = await withCapturedWarn(async () =>
+      callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
+        deps: {
+          fetchImpl: async () =>
+            mockGeminiHttpResponse({
+              steps: [
+                {
+                  type: "google_search_call",
+                  arguments: { queries: ["q"] },
+                },
+                {
+                  type: "model_output",
+                  content: [
+                    { type: "text", text: JSON.stringify(validOutput()) },
+                  ],
+                },
+              ],
+            }),
+        },
+      })
+    );
+    const events = geminiDiagEvents(lines);
+    const diag = events.length === 1 ? parseGeminiDiag(events[0]) : null;
     ok(
       "M_citation_urls_missing",
       result.ok === false && result.code === "grounding_unavailable"
+    );
+    ok(
+      "M_citation_missing_diag_reason",
+      diag &&
+        diag.reason === "missing_grounding_urls" &&
+        diag.searchCallCount === 1 &&
+        diag.citationAnnotationCount === 0 &&
+        diag.acceptedGroundedUrlCount === 0
+    );
+    ok(
+      "M_citation_missing_diag_private",
+      events.length === 1 && geminiDiagLooksPrivate(events[0])
+    );
+  }
+  {
+    const queries = [];
+    for (let i = 0; i < MAX_BLOG_RESEARCH_SEARCH_QUERIES + 1; i += 1) {
+      queries.push(`query-${i}`);
+    }
+    const { result, lines } = await withCapturedWarn(async () =>
+      callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
+        deps: {
+          fetchImpl: async () =>
+            mockGeminiHttpResponse({
+              steps: [
+                {
+                  type: "google_search_call",
+                  arguments: { queries },
+                },
+                {
+                  type: "model_output",
+                  content: [
+                    {
+                      type: "text",
+                      text: JSON.stringify(validOutput()),
+                      annotations: [{ type: "url_citation", url: URL_A }],
+                    },
+                  ],
+                },
+              ],
+            }),
+        },
+      })
+    );
+    const events = geminiDiagEvents(lines);
+    const diag = events.length === 1 ? parseGeminiDiag(events[0]) : null;
+    ok(
+      "M_bounds_exceeded_public",
+      result.ok === false && result.code === "malformed_provider_output"
+    );
+    ok(
+      "M_bounds_exceeded_diag_reason",
+      diag &&
+        diag.reason === "bounds_exceeded" &&
+        diag.searchCallCount === 1 &&
+        diag.acceptedGroundedUrlCount === 1
+    );
+    ok(
+      "M_bounds_exceeded_diag_private",
+      events.length === 1 && geminiDiagLooksPrivate(events[0])
+    );
+  }
+  {
+    const originalWarn = console.warn;
+    console.warn = () => {
+      throw new Error("diag-boom");
+    };
+    let result;
+    try {
+      result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
+        deps: {
+          fetchImpl: async () =>
+            mockGeminiHttpResponse({
+              steps: [
+                {
+                  type: "google_search_call",
+                  arguments: { queries: ["q"] },
+                },
+                {
+                  type: "model_output",
+                  content: [
+                    { type: "text", text: JSON.stringify(validOutput()) },
+                  ],
+                },
+              ],
+            }),
+        },
+      });
+    } finally {
+      console.warn = originalWarn;
+    }
+    ok(
+      "M_diag_log_failure_isolated",
+      result.ok === false &&
+        result.code === "grounding_unavailable" &&
+        !JSON.stringify(result).includes("diag-boom")
+    );
+  }
+  {
+    const extracted = extractGeminiGroundedResearchGrounding({
+      steps: [{ type: "model_output", content: [] }],
+    });
+    ok(
+      "M_extract_missing_search_diag",
+      extracted.ok === false &&
+        extracted.reason === "missing_search_call" &&
+        extracted.diagnostics.searchCallCount === 0
+    );
+    const noSteps = extractGeminiGroundedResearchGrounding({});
+    ok(
+      "M_extract_no_steps_diag",
+      noSteps.ok === false &&
+        noSteps.reason === "missing_search_call" &&
+        noSteps.diagnostics.searchCallCount === 0
     );
   }
   {

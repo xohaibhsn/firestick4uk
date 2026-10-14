@@ -25,8 +25,52 @@ import {
   parseBlogGroundedResearchProviderJsonEnvelope,
   readBoundedGeminiResearchResponseJson,
   type BlogGroundedResearchProviderConfig,
+  type GeminiGroundingFailureDiagnostics,
+  type GroundingExtractionFailureReason,
 } from "@/lib/blogGroundedResearchProviderCommon.server";
 import type { BlogResearchSubject } from "@/lib/blogResearchEvidence";
+
+const GEMINI_GROUNDING_FAILURE_REASONS = new Set<GroundingExtractionFailureReason>([
+  "missing_search_call",
+  "missing_grounding_urls",
+  "bounds_exceeded",
+]);
+
+/**
+ * Failure-only, sanitized diagnostic. Never logs provider payloads, URLs,
+ * queries, prompts, or credentials. Logging errors must not affect API outcome.
+ */
+function emitGeminiGroundingFailureDiagnostic(
+  reason: GroundingExtractionFailureReason,
+  diagnostics: GeminiGroundingFailureDiagnostics
+): void {
+  try {
+    if (!GEMINI_GROUNDING_FAILURE_REASONS.has(reason)) return;
+    const searchCallCount = Number(diagnostics.searchCallCount);
+    const citationAnnotationCount = Number(diagnostics.citationAnnotationCount);
+    const acceptedGroundedUrlCount = Number(
+      diagnostics.acceptedGroundedUrlCount
+    );
+    if (
+      !Number.isFinite(searchCallCount) ||
+      !Number.isFinite(citationAnnotationCount) ||
+      !Number.isFinite(acceptedGroundedUrlCount)
+    ) {
+      return;
+    }
+    console.warn(
+      [
+        "event: gemini_grounding_failure",
+        `reason: ${reason}`,
+        `searchCallCount: ${searchCallCount}`,
+        `citationAnnotationCount: ${citationAnnotationCount}`,
+        `acceptedGroundedUrlCount: ${acceptedGroundedUrlCount}`,
+      ].join(" ")
+    );
+  } catch {
+    // Diagnostic emission must never change the API outcome.
+  }
+}
 
 export { BLOG_GROUNDED_RESEARCH_GEMINI_INTERACTIONS_URL };
 
@@ -175,6 +219,10 @@ export async function callGeminiGroundedResearch(
     const body = bounded.value;
     const grounding = extractGeminiGroundedResearchGrounding(body);
     if (!grounding.ok) {
+      emitGeminiGroundingFailureDiagnostic(
+        grounding.reason,
+        grounding.diagnostics
+      );
       return mapGroundingExtractionFailure(grounding.reason);
     }
 

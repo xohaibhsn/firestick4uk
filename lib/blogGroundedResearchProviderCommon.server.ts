@@ -120,6 +120,36 @@ export type GroundingExtractionResult =
   | { ok: true; grounding: BlogResearchGrounding }
   | { ok: false; reason: GroundingExtractionFailureReason };
 
+/** Bounded, non-sensitive counters for Gemini grounding-failure diagnostics only. */
+export type GeminiGroundingFailureDiagnostics = {
+  searchCallCount: number;
+  citationAnnotationCount: number;
+  acceptedGroundedUrlCount: number;
+};
+
+export type GeminiGroundingExtractionResult =
+  | { ok: true; grounding: BlogResearchGrounding }
+  | {
+      ok: false;
+      reason: GroundingExtractionFailureReason;
+      diagnostics: GeminiGroundingFailureDiagnostics;
+    };
+
+const GEMINI_GROUNDING_DIAG_COUNT_CAP = 64;
+
+function boundGeminiGroundingDiagCount(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.min(Math.floor(value), GEMINI_GROUNDING_DIAG_COUNT_CAP);
+}
+
+function emptyGeminiGroundingFailureDiagnostics(): GeminiGroundingFailureDiagnostics {
+  return {
+    searchCallCount: 0,
+    citationAnnotationCount: 0,
+    acceptedGroundedUrlCount: 0,
+  };
+}
+
 export type ProviderJsonEnvelopeParseResult =
   | { ok: true; providerOutput: BlogResearchProviderOutput }
   | BlogGroundedResearchFailure;
@@ -246,7 +276,8 @@ function appendUniqueBounded(
 
 function collectUrlCitationAnnotations(
   content: unknown,
-  urls: BoundedCollector
+  urls: BoundedCollector,
+  citationAnnotationCount?: { value: number }
 ): void {
   if (!Array.isArray(content)) return;
   for (const rawPart of content) {
@@ -258,6 +289,9 @@ function collectUrlCitationAnnotations(
       if (!rawAnnotation || typeof rawAnnotation !== "object") continue;
       const annotation = rawAnnotation as Record<string, unknown>;
       if (annotation.type !== "url_citation") continue;
+      if (citationAnnotationCount) {
+        citationAnnotationCount.value += 1;
+      }
       appendUniqueBounded(
         urls,
         annotation.url,
@@ -352,19 +386,29 @@ export function extractOpenAiGroundedResearchGrounding(
 /**
  * Provider-owned Gemini grounding only (google_search_call + url_citation).
  * Never reads model JSON sources[].url.
+ * Failure results include bounded diagnostic counts for server-side logging only.
  */
 export function extractGeminiGroundedResearchGrounding(
   body: unknown
-): GroundingExtractionResult {
+): GeminiGroundingExtractionResult {
   if (!body || typeof body !== "object") {
-    return { ok: false, reason: "missing_search_call" };
+    return {
+      ok: false,
+      reason: "missing_search_call",
+      diagnostics: emptyGeminiGroundingFailureDiagnostics(),
+    };
   }
   const steps = (body as Record<string, unknown>).steps;
   if (!Array.isArray(steps)) {
-    return { ok: false, reason: "missing_search_call" };
+    return {
+      ok: false,
+      reason: "missing_search_call",
+      diagnostics: emptyGeminiGroundingFailureDiagnostics(),
+    };
   }
 
-  let sawSearchCall = false;
+  let searchCallCount = 0;
+  const citationAnnotationCount = { value: 0 };
   const urls = createBoundedCollector();
   const queries = createBoundedCollector();
 
@@ -372,7 +416,7 @@ export function extractGeminiGroundedResearchGrounding(
     if (!rawStep || typeof rawStep !== "object") continue;
     const step = rawStep as Record<string, unknown>;
     if (step.type === "google_search_call") {
-      sawSearchCall = true;
+      searchCallCount += 1;
       const args = step.arguments;
       if (args && typeof args === "object") {
         const argQueries = (args as Record<string, unknown>).queries;
@@ -389,16 +433,30 @@ export function extractGeminiGroundedResearchGrounding(
       }
     }
     if (step.type === "model_output") {
-      collectUrlCitationAnnotations(step.content, urls);
+      collectUrlCitationAnnotations(
+        step.content,
+        urls,
+        citationAnnotationCount
+      );
     }
   }
 
+  const diagnostics: GeminiGroundingFailureDiagnostics = {
+    searchCallCount: boundGeminiGroundingDiagCount(searchCallCount),
+    citationAnnotationCount: boundGeminiGroundingDiagCount(
+      citationAnnotationCount.value
+    ),
+    acceptedGroundedUrlCount: boundGeminiGroundingDiagCount(urls.values.length),
+  };
+
   if (urls.overflow || queries.overflow) {
-    return { ok: false, reason: "bounds_exceeded" };
+    return { ok: false, reason: "bounds_exceeded", diagnostics };
   }
-  if (!sawSearchCall) return { ok: false, reason: "missing_search_call" };
+  if (searchCallCount === 0) {
+    return { ok: false, reason: "missing_search_call", diagnostics };
+  }
   if (urls.values.length === 0) {
-    return { ok: false, reason: "missing_grounding_urls" };
+    return { ok: false, reason: "missing_grounding_urls", diagnostics };
   }
   const grounding: BlogResearchGrounding = { groundedUrls: urls.values };
   if (queries.values.length > 0) {
