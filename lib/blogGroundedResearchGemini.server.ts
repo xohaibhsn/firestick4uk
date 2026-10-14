@@ -14,7 +14,6 @@ import {
 } from "@/lib/blogGroundedResearchContracts";
 import {
   BLOG_GROUNDED_RESEARCH_GEMINI_INTERACTIONS_URL,
-  BLOG_GROUNDED_RESEARCH_PROVIDER_JSON_SCHEMA,
   buildBlogGroundedResearchSystemPrompt,
   buildBlogGroundedResearchUserPrompt,
   extractGeminiGroundedResearchGrounding,
@@ -194,10 +193,14 @@ export async function callGeminiGroundedResearch(
         generation_config: {
           thinking_level: "low",
         },
+        // Keep JSON mime type for structured evidence text, but omit JSON Schema.
+        // Live diagnostics showed google_search runs with schema constrained output
+        // while url_citation annotations are absent (citationAnnotationCount: 0).
+        // Official grounded examples attach citations on free-form text blocks;
+        // AB-7A + envelope parsing still enforce the evidence shape after parse.
         response_format: {
           type: "text",
           mime_type: "application/json",
-          schema: BLOG_GROUNDED_RESEARCH_PROVIDER_JSON_SCHEMA,
         },
       }),
       redirect: "error",

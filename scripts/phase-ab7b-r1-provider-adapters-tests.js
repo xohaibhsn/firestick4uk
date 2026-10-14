@@ -801,7 +801,14 @@ async function main() {
       "M_structured_response_format",
       body.response_format?.type === "text" &&
         body.response_format?.mime_type === "application/json" &&
-        body.response_format?.schema?.properties?.sources
+        body.response_format?.schema == null &&
+        !Object.prototype.hasOwnProperty.call(body.response_format, "schema")
+    );
+    ok(
+      "M_shared_json_schema_constant_intact",
+      BLOG_GROUNDED_RESEARCH_PROVIDER_JSON_SCHEMA?.type === "object" &&
+        !!BLOG_GROUNDED_RESEARCH_PROVIDER_JSON_SCHEMA?.properties?.sources &&
+        !!BLOG_GROUNDED_RESEARCH_PROVIDER_JSON_SCHEMA?.properties?.claims
     );
     ok("M_store_false", body.store === false);
     ok(
