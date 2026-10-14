@@ -4,11 +4,16 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type CSSProperties,
 } from "react";
 import type { AdminRoleName, SidhuTab } from "@/lib/adminPermissions";
 import { hasAdminPermission } from "@/lib/adminPermissions";
+import {
+  buildSeoDailyWorkQueue,
+  type SeoDailyWorkQueueItem,
+} from "@/lib/seoDailyWorkQueue";
 
 type VerificationRow = {
   url: string;
@@ -394,6 +399,122 @@ export default function SeoOverviewPanel({
   const showGscBlock =
     migrations.length > 0 || coreContent.length > 0 || accountChecks.length > 0;
 
+  const dailyQueue = useMemo(() => {
+    if (!data) return null;
+    const perms = data.permissions;
+    return buildSeoDailyWorkQueue({
+      issues: data.diagnostics?.issues ?? [],
+      verificationQueue: data.verificationQueue ?? [],
+      permissions: {
+        products: !!perms?.products,
+        blog: !!perms?.blog,
+        productsManage: !!perms?.productsManage,
+        blogManage: !!perms?.blogManage,
+      },
+    });
+  }, [data]);
+
+  const scrollToSection = (id: string) => {
+    if (typeof document === "undefined") return;
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const renderDailyQueueItem = (item: SeoDailyWorkQueueItem) => (
+    <li
+      key={item.key}
+      style={{
+        borderTop: "1px solid #E5E7EB",
+        padding: "12px 0",
+        listStyle: "none",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 6,
+          alignItems: "center",
+          marginBottom: 6,
+        }}
+      >
+        <span
+          style={badgeStyle(
+            item.priority === 1 ? "Needs attention" : "Review"
+          )}
+        >
+          {item.priorityLabel}
+        </span>
+        <span style={badgeStyle(item.isManualGsc ? "Redirect" : "OK")}>
+          {item.source}
+        </span>
+        {item.isManualGsc ? (
+          <span style={badgeStyle("Review")}>Manual GSC only</span>
+        ) : null}
+      </div>
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
+        {item.entityLabel}
+      </div>
+      <div style={{ fontSize: 12, color: "#374151", marginBottom: 4 }}>
+        {item.reason}
+      </div>
+      <div style={{ fontSize: 12, color: "#166534", marginBottom: 8 }}>
+        Next: {item.nextAction}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {item.canEdit && item.navigateTab ? (
+          <button
+            type="button"
+            className="action-btn btn-edit"
+            onClick={() => onNavigate(item.navigateTab!)}
+          >
+            {item.navigateTab === "products" ? "Open Products" : "Open Blog"}
+          </button>
+        ) : null}
+        {!item.canEdit && !item.isManualGsc ? (
+          <button
+            type="button"
+            className="action-btn btn-view"
+            onClick={() => scrollToSection("seo-diagnostics")}
+          >
+            View diagnostics
+          </button>
+        ) : null}
+        {item.isManualGsc ? (
+          <button
+            type="button"
+            className="action-btn btn-view"
+            onClick={() => scrollToSection("seo-gsc-verification")}
+          >
+            View GSC checklist
+          </button>
+        ) : null}
+        {item.publicUrl ? (
+          <>
+            <a
+              className="action-btn btn-view"
+              href={item.publicUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: "none", display: "inline-block" }}
+            >
+              Open URL
+            </a>
+            <button
+              type="button"
+              className="action-btn btn-view"
+              onClick={() => void copyUrl(item.publicUrl!)}
+            >
+              {copiedUrl === item.publicUrl ? "Copied" : "Copy URL"}
+            </button>
+          </>
+        ) : null}
+      </div>
+    </li>
+  );
+
   const renderQueueTable = (items: VerificationRow[]) => (
     <div style={{ overflowX: "auto" }}>
       <table className="data-table" style={{ width: "100%", minWidth: 720 }}>
@@ -523,8 +644,69 @@ export default function SeoOverviewPanel({
         <div className="section-card">Loading SEO overview…</div>
       )}
 
+      {data && dailyQueue && (
+        <div
+          className="section-card"
+          style={{ marginBottom: 20 }}
+          id="seo-daily-work-queue"
+        >
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              marginBottom: 6,
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>SEO Daily Work Queue</div>
+            <button
+              type="button"
+              className="action-btn btn-view"
+              onClick={() =>
+                scrollToSection(
+                  data.diagnostics ? "seo-diagnostics" : "seo-gsc-verification"
+                )
+              }
+            >
+              View all details
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
+            Suggested priorities from currently authorized CMS diagnostics and
+            curated GSC verification URLs. Not a task assignment system and not
+            live Search Console status. Opening this page does not write to the
+            CMS or issue memory.
+          </div>
+          {dailyQueue.totalEligible === 0 ? (
+            <div style={{ fontSize: 13, color: "#374151" }}>
+              No eligible daily SEO tasks from the current authorized overview
+              data.
+            </div>
+          ) : (
+            <>
+              <ol style={{ margin: 0, padding: 0 }}>
+                {dailyQueue.items.map((item) => renderDailyQueueItem(item))}
+              </ol>
+              {dailyQueue.truncated ? (
+                <div style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
+                  Showing {dailyQueue.items.length} of {dailyQueue.totalEligible}{" "}
+                  suggested items. Use &quot;View all details&quot; for the full
+                  diagnostics and GSC checklists.
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      )}
+
       {data?.diagnostics && (
-        <div className="section-card" style={{ marginBottom: 20 }}>
+        <div
+          className="section-card"
+          style={{ marginBottom: 20 }}
+          id="seo-diagnostics"
+        >
           <div
             style={{
               display: "flex",
@@ -1156,7 +1338,11 @@ export default function SeoOverviewPanel({
       )}
 
       {showGscBlock && (
-        <div className="section-card" style={{ marginBottom: 20 }}>
+        <div
+          className="section-card"
+          style={{ marginBottom: 20 }}
+          id="seo-gsc-verification"
+        >
           <div style={{ fontWeight: 700, marginBottom: 8 }}>
             Google Search Console Verification
           </div>
