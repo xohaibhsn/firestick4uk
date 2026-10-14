@@ -786,7 +786,12 @@ export default function SeoOverviewPanel({
         </div>
 
         <div style={{ fontSize: 13, color: "#374151", marginBottom: 12 }}>
-          {planningPreview.message}
+          {planningPreview.status === "hold" &&
+          planningPreview.holdCode === "NO_TOPIC" &&
+          (planningTopic.trim().length > 0 ||
+            planningIntent.trim().length > 0)
+            ? "Planning inputs changed. Select Check Existing Blog Coverage to review the current topic. No AI research has been performed."
+            : planningPreview.message}
         </div>
 
         <div style={{ marginBottom: 10 }}>
@@ -803,7 +808,7 @@ export default function SeoOverviewPanel({
             maxLength={MAX_TOPIC_CHARS}
             onChange={(e) => {
               setPlanningTopic(e.target.value);
-              setPlanningInlineError("");
+              invalidatePlanningPreview();
             }}
             placeholder="Enter a research topic to check existing Blog coverage"
             style={{
@@ -831,7 +836,7 @@ export default function SeoOverviewPanel({
             maxLength={MAX_INTENT_CHARS}
             onChange={(e) => {
               setPlanningIntent(e.target.value);
-              setPlanningInlineError("");
+              invalidatePlanningPreview();
             }}
             placeholder="Optional planning intent"
             style={{

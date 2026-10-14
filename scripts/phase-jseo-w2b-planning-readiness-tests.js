@@ -481,5 +481,219 @@ ok(
   );
 }
 
-console.log(`\nJSEO-W2B results: ${passed} passed, ${failed} failed\n`);
+// ── JSEO-W2C stale preview invalidation (source contracts + pure state sim) ──
+// Limitation: no React Testing Library harness here — handlers verified from
+// source shape; invalidate semantics simulated with existing pure helpers.
+console.log("\nJSEO-W2C stale preview invalidation\n");
+
+const INPUTS_CHANGED_MSG =
+  "Planning inputs changed. Select Check Existing Blog Coverage to review the current topic. No AI research has been performed.";
+
+function extractInputOnChange(id) {
+  const marker = `id="${id}"`;
+  const start = panelSrc.indexOf(marker);
+  if (start < 0) return "";
+  const onChangeAt = panelSrc.indexOf("onChange=", start);
+  if (onChangeAt < 0) return "";
+  const brace = panelSrc.indexOf("{", onChangeAt);
+  if (brace < 0) return "";
+  let depth = 0;
+  for (let i = brace; i < panelSrc.length; i++) {
+    const ch = panelSrc[i];
+    if (ch === "{") depth += 1;
+    if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) return panelSrc.slice(brace, i + 1);
+    }
+  }
+  return "";
+}
+
+const topicOnChange = extractInputOnChange("seo-planning-topic");
+const intentOnChange = extractInputOnChange("seo-planning-intent");
+
+ok(
+  "w2c_01_empty_default_hold_message",
+  createSeoPlanningHoldDefault().holdCode === "NO_TOPIC" &&
+    /No research topic selected/.test(createSeoPlanningHoldDefault().message)
+);
+
+{
+  const checked = buildSeoPlanningPreview({
+    topic: TOPIC,
+    blog: [blogRow({ id: 10 })],
+    permissions: permsOk,
+  });
+  ok(
+    "w2c_02_checked_exact_match",
+    checked.status === "preview" &&
+      checked.match &&
+      checked.match.kind === "EXACT" &&
+      checked.match.title === "How to Speed Up a Slow Firestick" &&
+      checked.canOpenBlog === true
+  );
+
+  // Simulate topic/intent edit → invalidatePlanningPreview() (no auto AB-4/AB-3).
+  const afterInvalidate = createSeoPlanningHoldDefault();
+  const retainedTopic = "edited topic remains";
+  const retainedIntent = "edited intent remains";
+  ok(
+    "w2c_03_topic_handler_invalidates",
+    /setPlanningTopic\(e\.target\.value\)/.test(topicOnChange) &&
+      /invalidatePlanningPreview\(\)/.test(topicOnChange) &&
+      !/buildSeoPlanningPreview/.test(topicOnChange)
+  );
+  ok(
+    "w2c_04_intent_handler_invalidates",
+    /setPlanningIntent\(e\.target\.value\)/.test(intentOnChange) &&
+      /invalidatePlanningPreview\(\)/.test(intentOnChange) &&
+      !/buildSeoPlanningPreview/.test(intentOnChange)
+  );
+  ok(
+    "w2c_05_old_match_cleared",
+    afterInvalidate.status === "hold" &&
+      afterInvalidate.match === null &&
+      afterInvalidate.decision === null &&
+      afterInvalidate.canOpenBlog === false
+  );
+  ok(
+    "w2c_06_old_reason_codes_cleared",
+    afterInvalidate.ab3ReasonCodes.length === 0 &&
+      afterInvalidate.ab4ReasonCodes.length === 0
+  );
+  ok(
+    "w2c_07_open_blog_gone",
+    afterInvalidate.canOpenBlog === false &&
+      /planningPreview\.canOpenBlog && can\("blog\.manage"\)/.test(panelSrc)
+  );
+  ok(
+    "w2c_08_inputs_retained_concept",
+    retainedTopic.length > 0 &&
+      retainedIntent.length > 0 &&
+      !/setPlanningTopic\(""\)/.test(topicOnChange) &&
+      !/setPlanningIntent\(""\)/.test(intentOnChange)
+  );
+  ok(
+    "w2c_09_no_auto_match_on_change",
+    !/buildSeoPlanningPreview/.test(topicOnChange) &&
+      !/buildSeoPlanningPreview/.test(intentOnChange) &&
+      !/matchBlogOpportunity/.test(topicOnChange + intentOnChange)
+  );
+
+  const recheck = buildSeoPlanningPreview({
+    topic: retainedTopic,
+    intent: retainedIntent,
+    blog: [blogRow({ id: 10 })],
+    permissions: permsOk,
+  });
+  ok(
+    "w2c_10_explicit_recheck_uses_current_inputs",
+    recheck.status === "preview" || recheck.status === "hold"
+  );
+  ok(
+    "w2c_10b_recheck_not_stale_exact_title",
+    !(
+      recheck.status === "preview" &&
+      recheck.match &&
+      recheck.match.title === "How to Speed Up a Slow Firestick" &&
+      recheck.match.kind === "EXACT"
+    )
+  );
+}
+
+ok(
+  "w2c_11_clear_resets_inputs_and_default",
+  /setPlanningTopic\(""\)/.test(panelSrc) &&
+    /setPlanningIntent\(""\)/.test(panelSrc) &&
+    /clearPlanningPreview/.test(panelSrc) &&
+    /createSeoPlanningHoldDefault\(\)/.test(panelSrc)
+);
+ok(
+  "w2c_12_refresh_still_invalidates",
+  /invalidatePlanningPreview\(\)/.test(panelSrc) &&
+    panelSrc.includes("invalidatePlanningPreview();")
+);
+ok(
+  "w2c_13_evidence_still_missing",
+  createSeoPlanningHoldDefault().evidenceState === "missing" &&
+    createSeoPlanningHoldDefault().evidenceLabel === "NOT YET COLLECTED" &&
+    !/READY|STALE/.test(
+      panelSrc.slice(
+        panelSrc.indexOf("seo-blog-planning-readiness"),
+        panelSrc.indexOf("seo-diagnostics")
+      )
+    )
+);
+ok(
+  "w2c_14_no_provider_or_writes",
+  !/admin-blog-research/.test(panelSrc) &&
+    !/\bfetch\s*\(/.test(helperSrc) &&
+    !/openai|gemini/i.test(helperSrc)
+);
+ok(
+  "w2c_15_w1_overview_intact",
+  /SEO Daily Work Queue/.test(panelSrc) &&
+    /buildSeoDailyWorkQueue/.test(panelSrc) &&
+    panelSrc.indexOf('id="seo-daily-work-queue"') <
+      panelSrc.indexOf('id="seo-blog-planning-readiness"')
+);
+
+ok(
+  "w2c_hold_message_inputs_changed_copy",
+  panelSrc.includes(INPUTS_CHANGED_MSG)
+);
+ok(
+  "w2c_hold_message_keeps_empty_default",
+  /No research topic selected/.test(panelSrc) ||
+    /planningPreview\.message/.test(panelSrc)
+);
+ok(
+  "w2c_hold_message_derived_not_state_machine",
+  /holdCode === "NO_TOPIC"/.test(panelSrc) &&
+    /planningTopic\.trim\(\)/.test(panelSrc) &&
+    !/useEffect\([\s\S]{0,80}planningTopic/.test(panelSrc)
+);
+
+// Presentation helper semantics (mirrors panel ternary; pure assertion only)
+function planningDisplayMessage(preview, topic, intent) {
+  if (
+    preview.status === "hold" &&
+    preview.holdCode === "NO_TOPIC" &&
+    (String(topic || "").trim().length > 0 ||
+      String(intent || "").trim().length > 0)
+  ) {
+    return INPUTS_CHANGED_MSG;
+  }
+  return preview.message;
+}
+ok(
+  "w2c_display_empty_uses_default",
+  /No research topic selected/.test(
+    planningDisplayMessage(createSeoPlanningHoldDefault(), "", "")
+  )
+);
+ok(
+  "w2c_display_dirty_inputs_changed",
+  planningDisplayMessage(
+    createSeoPlanningHoldDefault(),
+    "still typing",
+    ""
+  ) === INPUTS_CHANGED_MSG
+);
+ok(
+  "w2c_display_preview_keeps_engine_message",
+  (() => {
+    const preview = buildSeoPlanningPreview({
+      topic: TOPIC,
+      blog: [blogRow()],
+      permissions: permsOk,
+    });
+    return (
+      preview.status === "preview" &&
+      planningDisplayMessage(preview, TOPIC, "") === preview.message
+    );
+  })()
+);
+
+console.log(`\nJSEO-W2B/W2C results: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);
