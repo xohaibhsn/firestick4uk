@@ -183,27 +183,8 @@ async function main() {
     ok("R_openai_packet_immutable", deepEqual(packet, packetSnap));
   }
 
-  {
-    const packet = makeReadyPacket("gemini");
-    const { calls, providerCall } = makeProviderCall(async () => ({
-      ok: true,
-      packet,
-    }));
-    const result = await runBlogGroundedResearchValidation(
-      makeRequest({ provider: "gemini" }),
-      providerCall
-    );
-    ok(
-      "R_gemini_ready",
-      result.ok === true &&
-        result.provider === "gemini" &&
-        result.evidence.ok === true &&
-        result.evidence.evidenceState === "ready" &&
-        calls.length === 1
-    );
-  }
-
   // ---------- PROVIDER IDENTITY MISMATCH ----------
+  // Foreign provider labels (including retired "gemini") must not validate as READY.
   {
     const { calls, providerCall } = makeProviderCall(async () => ({
       ok: true,
@@ -214,28 +195,11 @@ async function main() {
       providerCall
     );
     ok(
-      "R_openai_gemini_mismatch",
+      "R_openai_foreign_provider_mismatch",
       result.ok === false &&
         result.code === "malformed_provider_output" &&
         calls.length === 1 &&
         !("evidence" in result && result.evidence && result.evidence.ok === true)
-    );
-  }
-
-  {
-    const { calls, providerCall } = makeProviderCall(async () => ({
-      ok: true,
-      packet: makeReadyPacket("openai"),
-    }));
-    const result = await runBlogGroundedResearchValidation(
-      makeRequest({ provider: "gemini" }),
-      providerCall
-    );
-    ok(
-      "R_gemini_openai_mismatch",
-      result.ok === false &&
-        result.code === "malformed_provider_output" &&
-        calls.length === 1
     );
   }
 

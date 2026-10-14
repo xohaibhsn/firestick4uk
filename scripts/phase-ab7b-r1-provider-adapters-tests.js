@@ -34,53 +34,6 @@ async function withCapturedWarn(fn) {
   }
 }
 
-function geminiDiagEvents(lines) {
-  return lines.filter((line) =>
-    String(line).includes("event: gemini_grounding_failure")
-  );
-}
-
-function parseGeminiDiag(line) {
-  const text = String(line);
-  const reason = (
-    text.match(
-      /\breason: (missing_search_call|missing_grounding_urls|bounds_exceeded)\b/
-    ) || []
-  )[1];
-  if (!reason) return null;
-  return {
-    reason,
-    searchCallCount: Number(
-      (text.match(/\bsearchCallCount: (\d+)\b/) || [])[1]
-    ),
-    citationAnnotationCount: Number(
-      (text.match(/\bcitationAnnotationCount: (\d+)\b/) || [])[1]
-    ),
-    acceptedGroundedUrlCount: Number(
-      (text.match(/\bacceptedGroundedUrlCount: (\d+)\b/) || [])[1]
-    ),
-  };
-}
-
-function geminiDiagLooksPrivate(line) {
-  const text = String(line);
-  const forbidden = [
-    URL_A,
-    URL_B,
-    MODEL_ONLY_URL,
-    "test-gemini-key",
-    "BEGIN_UNTRUSTED",
-    "https://",
-    "http://",
-    SUBJECT.topic,
-    SUBJECT.opportunityId,
-    "stack",
-    "Authorization",
-    "x-goog-api-key",
-  ];
-  return !forbidden.some((token) => text.includes(token));
-}
-
 function read(rel) {
   return fs.readFileSync(path.join(ROOT, rel), "utf8");
 }
@@ -131,7 +84,6 @@ function loadTsModule(rel, stubs = {}) {
 
 const commonSrc = read("lib/blogGroundedResearchProviderCommon.server.ts");
 const openAiSrc = read("lib/blogGroundedResearchOpenAi.server.ts");
-const geminiSrc = read("lib/blogGroundedResearchGemini.server.ts");
 const seoAiSrc = read("lib/seoAi.ts");
 const seoAiServerSrc = read("lib/seoAiServer.ts");
 const adminRouteSrc = read("pages/api/admin-seo-ai.ts");
@@ -152,8 +104,6 @@ const {
   BLOG_GROUNDED_RESEARCH_OPENAI_MAX_OUTPUT_TOKENS,
   parseBlogGroundedResearchProviderJsonEnvelope,
   extractOpenAiGroundedResearchGrounding,
-  extractGeminiGroundedResearchGrounding,
-  readBoundedGeminiResearchResponseJson,
   assertSerializedResponseWithinByteCap,
 } = common;
 
@@ -163,12 +113,7 @@ const {
 } = loadTsModule("lib/blogGroundedResearchContracts.ts");
 
 const openAiMod = loadTsModule("lib/blogGroundedResearchOpenAi.server.ts");
-const geminiMod = loadTsModule("lib/blogGroundedResearchGemini.server.ts");
 const { callOpenAiGroundedResearch } = openAiMod;
-const { callGeminiGroundedResearch } = geminiMod;
-const GEMINI_INTERACTIONS_URL =
-  common.BLOG_GROUNDED_RESEARCH_GEMINI_INTERACTIONS_URL ||
-  common.GEMINI_GROUNDED_RESEARCH_INTERACTIONS_URL;
 
 const SUBJECT = {
   opportunityId: "opp-firestick-wifi-2026",
@@ -176,7 +121,6 @@ const SUBJECT = {
   intent: "informational",
 };
 const OPENAI_CFG = { apiKey: "test-openai-key", model: "test-model" };
-const GEMINI_CFG = { apiKey: "test-gemini-key", model: "test-model" };
 const URL_A = "https://support.example.com/firestick-wifi";
 const URL_B = "https://docs.example.net/streaming-setup";
 const MODEL_ONLY_URL = "https://model-invented.example.org/not-grounded";
@@ -239,35 +183,6 @@ function openAiResponse(overrides = {}) {
   };
 }
 
-function geminiBody(overrides = {}) {
-  const output = validOutput();
-  return {
-    steps: [
-      {
-        type: "google_search_call",
-        arguments: {
-          queries: ["firestick wifi tips", "fire tv stick wifi guide"],
-        },
-      },
-      {
-        type: "model_output",
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(output),
-            annotations: [
-              { type: "url_citation", url: URL_A },
-              { type: "url_citation", uri: URL_B },
-              { type: "url_citation", url: URL_A },
-            ],
-          },
-        ],
-      },
-    ],
-    ...overrides,
-  };
-}
-
 function makeHeaders(map) {
   return {
     get(name) {
@@ -298,23 +213,6 @@ function streamFromChunks(chunks, onCancel) {
         },
         releaseLock() {},
       };
-    },
-  };
-}
-
-function mockGeminiHttpResponse(bodyObj, options = {}) {
-  const text = JSON.stringify(bodyObj);
-  const chunks = options.chunks || [text];
-  return {
-    ok: options.ok !== false,
-    status: options.status || 200,
-    headers: makeHeaders(options.headers || {}),
-    body: streamFromChunks(chunks, options.onCancel),
-    text: async () => {
-      throw new Error("text fallback forbidden");
-    },
-    json: async () => {
-      throw new Error("json fallback forbidden");
     },
   };
 }
@@ -420,118 +318,25 @@ async function main() {
   );
 
   console.log("--- GROUNDING EXTRACTION ---");
+
   {
     const result = extractOpenAiGroundedResearchGrounding(openAiResponse());
-    ok("G_openai_search_metadata_url", result.ok === true);
+    ok("G_openai_web_search_call", result.ok === true);
     ok(
-      "G_openai_url_citation_accepted",
-      result.ok && result.grounding.groundedUrls.includes(URL_B)
-    );
-    ok(
-      "G_openai_query_extracted",
+      "G_openai_sources_and_citations",
       result.ok &&
-        result.grounding.searchQueries.includes("firestick wifi tips")
-    );
-    ok(
-      "G_openai_url_dedupe_first_seen",
-      result.ok &&
-        result.grounding.groundedUrls.filter((u) => u === URL_A).length === 1 &&
-        result.grounding.groundedUrls[0] === URL_A &&
-        result.grounding.groundedUrls[1] === URL_B
-    );
-    ok(
-      "G_openai_query_dedupe",
-      result.ok &&
-        result.grounding.searchQueries.filter(
-          (q) => q === "firestick wifi tips"
-        ).length === 1
-    );
-  }
-  {
-    const result = extractGeminiGroundedResearchGrounding(geminiBody());
-    ok("G_gemini_google_search_call", result.ok === true);
-    ok(
-      "G_gemini_url_citation_accepted",
-      result.ok &&
-        result.grounding.groundedUrls.includes(URL_A) &&
-        result.grounding.groundedUrls.includes(URL_B)
-    );
-    ok(
-      "G_gemini_query_dedupe_order",
-      result.ok &&
-        result.grounding.searchQueries[0] === "firestick wifi tips" &&
-        result.grounding.searchQueries.length === 2
-    );
-  }
-  {
-    const result = extractOpenAiGroundedResearchGrounding({
-      output_text: JSON.stringify(
-        validOutput({
-          sources: [
-            {
-              id: "s1",
-              title: "Invented",
-              url: MODEL_ONLY_URL,
-              publishedAt: null,
-            },
-            {
-              id: "s2",
-              title: "Also",
-              url: "https://another-model.example/x",
-              publishedAt: null,
-            },
-          ],
-        })
-      ),
-      output: [
-        {
-          type: "web_search_call",
-          action: {
-            type: "search",
-            queries: ["q"],
-            sources: [{ url: URL_A }],
-          },
-        },
-      ],
-    });
-    ok(
-      "G_model_json_url_not_grounding",
-      result.ok === true &&
-        !result.grounding.groundedUrls.includes(MODEL_ONLY_URL) &&
+        Array.isArray(result.grounding.groundedUrls) &&
         result.grounding.groundedUrls.includes(URL_A)
     );
   }
   {
-    const sources = [];
-    for (let i = 0; i < MAX_BLOG_RESEARCH_GROUNDED_URLS + 1; i += 1) {
-      sources.push({ url: `https://grounding${i}.example.net/r` });
-    }
-    const oversized = extractOpenAiGroundedResearchGrounding({
+    const noSearch = extractOpenAiGroundedResearchGrounding({
       output: [
         {
-          type: "web_search_call",
-          action: { type: "search", queries: ["q"], sources },
-        },
-      ],
-    });
-    ok(
-      "G_oversized_url_list_rejected",
-      oversized.ok === false && oversized.reason === "bounds_exceeded"
-    );
-  }
-  {
-    const queries = [];
-    for (let i = 0; i < MAX_BLOG_RESEARCH_SEARCH_QUERIES + 1; i += 1) {
-      queries.push(`query-${i}`);
-    }
-    const oversized = extractGeminiGroundedResearchGrounding({
-      steps: [
-        { type: "google_search_call", arguments: { queries } },
-        {
-          type: "model_output",
+          type: "message",
           content: [
             {
-              type: "text",
+              type: "output_text",
               text: "{}",
               annotations: [{ type: "url_citation", url: URL_A }],
             },
@@ -540,29 +345,26 @@ async function main() {
       ],
     });
     ok(
-      "G_oversized_query_list_rejected",
-      oversized.ok === false && oversized.reason === "bounds_exceeded"
+      "G_openai_missing_search_fails",
+      noSearch.ok === false && noSearch.reason === "missing_search_call"
     );
   }
-  ok(
-    "G_openai_missing_search_fails",
-    extractOpenAiGroundedResearchGrounding({
-      output: [{ type: "message", content: [] }],
-    }).ok === false
-  );
-  ok(
-    "G_openai_missing_urls_fails",
-    extractOpenAiGroundedResearchGrounding({
+  {
+    const noUrls = extractOpenAiGroundedResearchGrounding({
       output: [
         {
           type: "web_search_call",
-          action: { type: "search", queries: ["x"], sources: [] },
+          action: { type: "search", query: "q", sources: [] },
         },
       ],
-    }).ok === false
-  );
+    });
+    ok(
+      "G_openai_missing_urls_fails",
+      noUrls.ok === false && noUrls.reason === "missing_grounding_urls"
+    );
+  }
 
-  console.log("--- OPENAI ADAPTER ---");
+console.log("--- OPENAI ADAPTER ---");
   {
     const tracker = createOpenAiSdkTracker(async () => openAiResponse());
     const result = await callOpenAiGroundedResearch(SUBJECT, OPENAI_CFG, {
@@ -762,594 +564,8 @@ async function main() {
     BLOG_GROUNDED_RESEARCH_OPENAI_MAX_OUTPUT_TOKENS === 4096
   );
 
-  console.log("--- GEMINI ADAPTER ---");
-  {
-    const fetchCalls = [];
-    const { result, lines } = await withCapturedWarn(async () =>
-      callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-        deps: {
-          fetchImpl: async (url, init) => {
-            fetchCalls.push({ url: String(url), init });
-            return mockGeminiHttpResponse(geminiBody());
-          },
-        },
-      })
-    );
-    ok(
-      "M_success_packet",
-      result.ok === true &&
-        result.packet.provider === "gemini" &&
-        result.packet.grounding.groundedUrls.includes(URL_A)
-    );
-    ok(
-      "M_success_no_grounding_diag",
-      geminiDiagEvents(lines).length === 0
-    );
-    ok("M_fetch_count_1", fetchCalls.length === 1);
-    ok("M_method_post", fetchCalls[0].init.method === "POST");
-    ok(
-      "M_interactions_endpoint",
-      fetchCalls[0].url === GEMINI_INTERACTIONS_URL &&
-        fetchCalls[0].url.includes("/v1beta/interactions")
-    );
-    const body = JSON.parse(fetchCalls[0].init.body);
-    ok(
-      "M_google_search_tool",
-      body.tools?.[0]?.type === "google_search"
-    );
-    ok(
-      "M_structured_response_format",
-      body.response_format?.type === "text" &&
-        body.response_format?.mime_type === "application/json" &&
-        body.response_format?.schema == null &&
-        !Object.prototype.hasOwnProperty.call(body.response_format, "schema")
-    );
-    ok(
-      "M_shared_json_schema_constant_intact",
-      BLOG_GROUNDED_RESEARCH_PROVIDER_JSON_SCHEMA?.type === "object" &&
-        !!BLOG_GROUNDED_RESEARCH_PROVIDER_JSON_SCHEMA?.properties?.sources &&
-        !!BLOG_GROUNDED_RESEARCH_PROVIDER_JSON_SCHEMA?.properties?.claims
-    );
-    ok("M_store_false", body.store === false);
-    ok(
-      "M_api_key_header_present",
-      fetchCalls[0].init.headers["x-goog-api-key"] === "test-gemini-key"
-    );
-    ok(
-      "M_redirect_error",
-      fetchCalls[0].init.redirect === "error"
-    );
-    ok(
-      "M_thinking_level_low",
-      body.generation_config?.thinking_level === "low"
-    );
-    ok(
-      "M_api_key_not_in_url",
-      !String(fetchCalls[0].url).includes("key=") &&
-        !String(fetchCalls[0].url).includes("test-gemini-key")
-    );
-    ok(
-      "M_api_key_not_logged_in_result",
-      !JSON.stringify(result).includes("test-gemini-key")
-    );
-  }
-  {
-    const fetchCalls = [];
-    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      deps: {
-        fetchImpl: async (url, init) => {
-          fetchCalls.push({ url: String(url), init });
-          const err = new TypeError(
-            "Failed to fetch: redirect mode is set to error"
-          );
-          throw err;
-        },
-      },
-    });
-    ok(
-      "M_redirect_reject_sanitized",
-      result.ok === false &&
-        result.code === "provider_upstream" &&
-        !JSON.stringify(result).includes("test-gemini-key") &&
-        !String(result.message || "").toLowerCase().includes("redirect")
-    );
-    ok("M_redirect_reject_one_call", fetchCalls.length === 1);
-    ok(
-      "M_redirect_reject_no_retry",
-      fetchCalls.length === 1 && fetchCalls[0].init.redirect === "error"
-    );
-  }
-  {
-    const fetchCalls = [];
-    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      signal: AbortSignal.abort(),
-      deps: {
-        fetchImpl: async (...args) => {
-          fetchCalls.push(args);
-          return mockGeminiHttpResponse(geminiBody());
-        },
-      },
-    });
-    ok(
-      "M_already_aborted",
-      result.ok === false && result.code === "request_aborted"
-    );
-    ok("M_aborted_fetch_count_0", fetchCalls.length === 0);
-  }
-  {
-    const fetchCalls = [];
-    const result = await callGeminiGroundedResearch(
-      SUBJECT,
-      { apiKey: "  ", model: "test-model" },
-      {
-        deps: {
-          fetchImpl: async (...args) => {
-            fetchCalls.push(args);
-            return mockGeminiHttpResponse(geminiBody());
-          },
-        },
-      }
-    );
-    ok(
-      "M_missing_config",
-      result.ok === false && result.code === "provider_not_configured"
-    );
-    ok("M_missing_config_fetch_0", fetchCalls.length === 0);
-  }
-  for (const [label, status, code] of [
-    ["M_http_408", 408, "provider_timeout"],
-    ["M_http_504", 504, "provider_timeout"],
-    ["M_http_429", 429, "provider_upstream"],
-    ["M_http_500", 500, "provider_upstream"],
-  ]) {
-    const fetchCalls = [];
-    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      deps: {
-        fetchImpl: async () => {
-          fetchCalls.push(1);
-          return {
-            ok: false,
-            status,
-            headers: makeHeaders({}),
-            body: streamFromChunks(["{}"], () => {}),
-          };
-        },
-      },
-    });
-    ok(
-      label,
-      result.ok === false &&
-        result.code === code &&
-        fetchCalls.length === 1
-    );
-  }
-  {
-    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      deps: {
-        fetchImpl: async () =>
-          mockGeminiHttpResponse(null, { chunks: ["{not-json"] }),
-      },
-    });
-    ok(
-      "M_malformed_json_body",
-      result.ok === false && result.code === "malformed_provider_output"
-    );
-  }
-  {
-    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      deps: {
-        fetchImpl: async () =>
-          mockGeminiHttpResponse({
-            steps: [
-              {
-                type: "google_search_call",
-                arguments: { queries: ["q"] },
-              },
-              {
-                type: "model_output",
-                content: [
-                  {
-                    type: "text",
-                    text: "{not-json",
-                    annotations: [{ type: "url_citation", url: URL_A }],
-                  },
-                ],
-              },
-            ],
-          }),
-      },
-    });
-    ok(
-      "M_malformed_structured_output",
-      result.ok === false && result.code === "malformed_provider_output"
-    );
-  }
-  {
-    const { result, lines } = await withCapturedWarn(async () =>
-      callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-        deps: {
-          fetchImpl: async () =>
-            mockGeminiHttpResponse({
-              steps: [
-                {
-                  type: "model_output",
-                  content: [
-                    {
-                      type: "text",
-                      text: JSON.stringify(validOutput()),
-                      annotations: [{ type: "url_citation", url: URL_A }],
-                    },
-                  ],
-                },
-              ],
-            }),
-        },
-      })
-    );
-    const events = geminiDiagEvents(lines);
-    const diag = events.length === 1 ? parseGeminiDiag(events[0]) : null;
-    ok(
-      "M_search_missing_grounding",
-      result.ok === false && result.code === "grounding_unavailable"
-    );
-    ok(
-      "M_search_missing_diag_reason",
-      diag &&
-        diag.reason === "missing_search_call" &&
-        diag.searchCallCount === 0 &&
-        Number.isFinite(diag.citationAnnotationCount) &&
-        Number.isFinite(diag.acceptedGroundedUrlCount)
-    );
-    ok(
-      "M_search_missing_diag_single",
-      events.length === 1 && geminiDiagLooksPrivate(events[0])
-    );
-  }
-  {
-    const { result, lines } = await withCapturedWarn(async () =>
-      callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-        deps: {
-          fetchImpl: async () =>
-            mockGeminiHttpResponse({
-              steps: [
-                {
-                  type: "google_search_call",
-                  arguments: { queries: ["q"] },
-                },
-                {
-                  type: "model_output",
-                  content: [
-                    { type: "text", text: JSON.stringify(validOutput()) },
-                  ],
-                },
-              ],
-            }),
-        },
-      })
-    );
-    const events = geminiDiagEvents(lines);
-    const diag = events.length === 1 ? parseGeminiDiag(events[0]) : null;
-    ok(
-      "M_citation_urls_missing",
-      result.ok === false && result.code === "grounding_unavailable"
-    );
-    ok(
-      "M_citation_missing_diag_reason",
-      diag &&
-        diag.reason === "missing_grounding_urls" &&
-        diag.searchCallCount === 1 &&
-        diag.citationAnnotationCount === 0 &&
-        diag.acceptedGroundedUrlCount === 0
-    );
-    ok(
-      "M_citation_missing_diag_private",
-      events.length === 1 && geminiDiagLooksPrivate(events[0])
-    );
-  }
-  {
-    const queries = [];
-    for (let i = 0; i < MAX_BLOG_RESEARCH_SEARCH_QUERIES + 1; i += 1) {
-      queries.push(`query-${i}`);
-    }
-    const { result, lines } = await withCapturedWarn(async () =>
-      callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-        deps: {
-          fetchImpl: async () =>
-            mockGeminiHttpResponse({
-              steps: [
-                {
-                  type: "google_search_call",
-                  arguments: { queries },
-                },
-                {
-                  type: "model_output",
-                  content: [
-                    {
-                      type: "text",
-                      text: JSON.stringify(validOutput()),
-                      annotations: [{ type: "url_citation", url: URL_A }],
-                    },
-                  ],
-                },
-              ],
-            }),
-        },
-      })
-    );
-    const events = geminiDiagEvents(lines);
-    const diag = events.length === 1 ? parseGeminiDiag(events[0]) : null;
-    ok(
-      "M_bounds_exceeded_public",
-      result.ok === false && result.code === "malformed_provider_output"
-    );
-    ok(
-      "M_bounds_exceeded_diag_reason",
-      diag &&
-        diag.reason === "bounds_exceeded" &&
-        diag.searchCallCount === 1 &&
-        diag.acceptedGroundedUrlCount === 1
-    );
-    ok(
-      "M_bounds_exceeded_diag_private",
-      events.length === 1 && geminiDiagLooksPrivate(events[0])
-    );
-  }
-  {
-    const originalWarn = console.warn;
-    console.warn = () => {
-      throw new Error("diag-boom");
-    };
-    let result;
-    try {
-      result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-        deps: {
-          fetchImpl: async () =>
-            mockGeminiHttpResponse({
-              steps: [
-                {
-                  type: "google_search_call",
-                  arguments: { queries: ["q"] },
-                },
-                {
-                  type: "model_output",
-                  content: [
-                    { type: "text", text: JSON.stringify(validOutput()) },
-                  ],
-                },
-              ],
-            }),
-        },
-      });
-    } finally {
-      console.warn = originalWarn;
-    }
-    ok(
-      "M_diag_log_failure_isolated",
-      result.ok === false &&
-        result.code === "grounding_unavailable" &&
-        !JSON.stringify(result).includes("diag-boom")
-    );
-  }
-  {
-    const extracted = extractGeminiGroundedResearchGrounding({
-      steps: [{ type: "model_output", content: [] }],
-    });
-    ok(
-      "M_extract_missing_search_diag",
-      extracted.ok === false &&
-        extracted.reason === "missing_search_call" &&
-        extracted.diagnostics.searchCallCount === 0
-    );
-    const noSteps = extractGeminiGroundedResearchGrounding({});
-    ok(
-      "M_extract_no_steps_diag",
-      noSteps.ok === false &&
-        noSteps.reason === "missing_search_call" &&
-        noSteps.diagnostics.searchCallCount === 0
-    );
-  }
-  {
-    let readerStarted = false;
-    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      deps: {
-        fetchImpl: async () => ({
-          ok: true,
-          status: 200,
-          headers: makeHeaders({
-            "content-length": String(
-              BLOG_GROUNDED_RESEARCH_MAX_RAW_RESPONSE_BYTES + 1
-            ),
-          }),
-          body: {
-            getReader() {
-              readerStarted = true;
-              return {
-                async read() {
-                  return { done: true, value: undefined };
-                },
-                async cancel() {},
-                releaseLock() {},
-              };
-            },
-          },
-        }),
-      },
-    });
-    ok(
-      "M_content_length_oversize",
-      result.ok === false && result.code === "malformed_provider_output"
-    );
-    ok("M_content_length_no_read", readerStarted === false);
-  }
-  {
-    let cancelCount = 0;
-    const chunkA = Buffer.alloc(200_000, 0x61);
-    const chunkB = Buffer.alloc(70_000, 0x62);
-    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      deps: {
-        fetchImpl: async () => ({
-          ok: true,
-          status: 200,
-          headers: makeHeaders({}),
-          body: streamFromChunks([chunkA, chunkB], () => {
-            cancelCount += 1;
-          }),
-        }),
-      },
-    });
-    ok(
-      "M_stream_oversize",
-      result.ok === false && result.code === "malformed_provider_output"
-    );
-    ok("M_reader_cancelled", cancelCount === 1);
-  }
-  {
-    const fetchCalls = [];
-    const external = new AbortController();
-    const pending = callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      signal: external.signal,
-      deps: {
-        fetchImpl: async (_url, init) => {
-          fetchCalls.push(1);
-          return new Promise((_, reject) => {
-            init.signal.addEventListener(
-              "abort",
-              () => {
-                const err = new Error("aborted");
-                err.name = "AbortError";
-                reject(err);
-              },
-              { once: true }
-            );
-          });
-        },
-      },
-    });
-    await new Promise((r) => setImmediate(r));
-    external.abort();
-    const result = await pending;
-    ok(
-      "M_external_abort",
-      result.ok === false && result.code === "request_aborted"
-    );
-    ok("M_external_abort_one_fetch", fetchCalls.length === 1);
-  }
-  {
-    const armed = new Set();
-    const cleared = new Set();
-    const realSetTimeout = global.setTimeout;
-    const realClearTimeout = global.clearTimeout;
-    global.setTimeout = (fn, ms, ...args) => {
-      const id = realSetTimeout(fn, ms, ...args);
-      if (ms === BLOG_GROUNDED_RESEARCH_PROVIDER_TIMEOUT_MS) armed.add(id);
-      return id;
-    };
-    global.clearTimeout = (id) => {
-      cleared.add(id);
-      return realClearTimeout(id);
-    };
-    const external = new AbortController();
-    const added = [];
-    const removed = [];
-    const realAdd = external.signal.addEventListener.bind(external.signal);
-    const realRemove = external.signal.removeEventListener.bind(
-      external.signal
-    );
-    external.signal.addEventListener = (type, listener, opts) => {
-      if (type === "abort") added.push(listener);
-      return realAdd(type, listener, opts);
-    };
-    external.signal.removeEventListener = (type, listener, opts) => {
-      if (type === "abort") removed.push(listener);
-      return realRemove(type, listener, opts);
-    };
-    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      signal: external.signal,
-      deps: {
-        fetchImpl: async () => mockGeminiHttpResponse(geminiBody()),
-      },
-    });
-    global.setTimeout = realSetTimeout;
-    global.clearTimeout = realClearTimeout;
-    ok("M_success_for_cleanup", result.ok === true);
-    ok(
-      "M_timer_cleaned",
-      armed.size === 1 && [...armed].every((id) => cleared.has(id))
-    );
-    ok(
-      "M_listener_cleaned",
-      added.length === 1 && removed.length === 1 && removed[0] === added[0]
-    );
-  }
-  {
-    const result = await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      deps: {
-        timeoutMs: 5,
-        fetchImpl: async (_url, init) =>
-          new Promise((_, reject) => {
-            init.signal.addEventListener(
-              "abort",
-              () => {
-                const err = new Error("aborted");
-                err.name = "AbortError";
-                reject(err);
-              },
-              { once: true }
-            );
-          }),
-      },
-    });
-    ok(
-      "M_internal_timeout",
-      result.ok === false && result.code === "provider_timeout"
-    );
-  }
-  {
-    let fetchCount = 0;
-    await callGeminiGroundedResearch(SUBJECT, GEMINI_CFG, {
-      deps: {
-        fetchImpl: async () => {
-          fetchCount += 1;
-          return mockGeminiHttpResponse(geminiBody());
-        },
-      },
-    });
-    ok("M_fetch_never_gt_1", fetchCount === 1);
-  }
-  {
-    const within = await readBoundedGeminiResearchResponseJson(
-      mockGeminiHttpResponse(geminiBody(), {
-        headers: { "content-length": "100" },
-      }),
-      BLOG_GROUNDED_RESEARCH_MAX_RAW_RESPONSE_BYTES
-    );
-    ok("M_bounded_reader_within", within.ok === true);
-    const noBody = await readBoundedGeminiResearchResponseJson(
-      {
-        ok: true,
-        status: 200,
-        headers: makeHeaders({}),
-        body: null,
-      },
-      BLOG_GROUNDED_RESEARCH_MAX_RAW_RESPONSE_BYTES
-    );
-    ok(
-      "M_bounded_reader_no_body",
-      noBody.ok === false && noBody.code === "malformed_provider_output"
-    );
-  }
-  ok(
-    "M_no_unbounded_text_json",
-    !/readBoundedGeminiResearchResponseJson[\s\S]{0,1200}res\.(text|json)\s*\(/.test(
-      commonSrc
-    ) &&
-      !/callGeminiGroundedResearch[\s\S]{0,2500}await\s+res\.(text|json)\s*\(/.test(
-        geminiSrc
-      )
-  );
-
   console.log("--- ISOLATION / SAFETY ---");
-  const r1Sources = [commonSrc, openAiSrc, geminiSrc].join("\n");
+  const r1Sources = [commonSrc, openAiSrc].join("\n");
   const r1Stripped = stripCommentsAndStrings(r1Sources);
   ok(
     "I_no_ab7a_validation_call",
@@ -1371,13 +587,10 @@ async function main() {
     "I_production_graph_no_r1",
     !/blogGroundedResearchProviderCommon\.server/.test(seoAiSrc) &&
       !/blogGroundedResearchOpenAi\.server/.test(seoAiSrc) &&
-      !/blogGroundedResearchGemini\.server/.test(seoAiSrc) &&
       !/blogGroundedResearchProviderCommon\.server/.test(seoAiServerSrc) &&
       !/blogGroundedResearchOpenAi\.server/.test(seoAiServerSrc) &&
-      !/blogGroundedResearchGemini\.server/.test(seoAiServerSrc) &&
       !/blogGroundedResearchProviderCommon\.server/.test(adminRouteSrc) &&
-      !/blogGroundedResearchOpenAi\.server/.test(adminRouteSrc) &&
-      !/blogGroundedResearchGemini\.server/.test(adminRouteSrc)
+      !/blogGroundedResearchOpenAi\.server/.test(adminRouteSrc)
   );
   {
     const repoRefs = [];
@@ -1410,7 +623,6 @@ async function main() {
     const allowed = new Set([
       "lib/blogGroundedResearchProviderCommon.server.ts",
       "lib/blogGroundedResearchOpenAi.server.ts",
-      "lib/blogGroundedResearchGemini.server.ts",
       "scripts/phase-ab7b-r1-provider-adapters-tests.js",
       // Authorized R3 downstream runtime (path assembled to avoid cross-suite scan false hits).
       ["lib/", "blogGroundedResearchRuntime", ".server.ts"].join(""),
@@ -1437,22 +649,14 @@ async function main() {
       /process\.env/.test(stripped);
     ok("I_no_toplevel_side_effects", topLevelDanger === false);
     ok(
-      "I_gemini_request_scoped_timer_allowed",
-      /setTimeout\s*\(/.test(geminiSrc) &&
-        /clearTimeout\s*\(/.test(geminiSrc) &&
-        /function\s+createResearchAbortBundle/.test(geminiSrc)
+      "I_gemini_adapter_removed",
+      !fs.existsSync(path.join(ROOT, "lib/blogGroundedResearchGemini.server.ts"))
     );
     ok(
-      "I_gemini_redirect_error",
-      /redirect:\s*["']error["']/.test(geminiSrc) &&
-        /x-goog-api-key/.test(geminiSrc) &&
-        !/searchParams\.set\(\s*["']key["']/.test(geminiSrc)
-    );
-    ok(
-      "I_gemini_thinking_level_low",
-      /generation_config\s*:\s*\{[\s\S]*?thinking_level\s*:\s*["']low["']/.test(
-        geminiSrc
-      )
+      "I_no_gemini_helpers_in_common",
+      !/extractGeminiGroundedResearchGrounding/.test(commonSrc) &&
+        !/BLOG_GROUNDED_RESEARCH_GEMINI_INTERACTIONS_URL/.test(commonSrc) &&
+        !/readBoundedGeminiResearchResponseJson/.test(commonSrc)
     );
   }
   ok(

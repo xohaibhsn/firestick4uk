@@ -173,7 +173,6 @@ async function main() {
   {
     const { runBlogGroundedResearchRuntime } = loadFreshRuntime();
     let openaiLoads = 0;
-    let geminiLoads = 0;
     const result = await runBlogGroundedResearchRuntime(makeRequest(), {
       deps: {
         env: {
@@ -189,18 +188,13 @@ async function main() {
             }),
           };
         },
-        loadGeminiAdapter: async () => {
-          geminiLoads += 1;
-          throw new Error("should not load gemini");
-        },
       },
     });
     ok(
       "R_openai_configured",
       result.ok === true &&
         result.evidence.evidenceState === "ready" &&
-        openaiLoads === 1 &&
-        geminiLoads === 0
+        openaiLoads === 1
     );
     ok(
       "R_openai_no_secret_leak",
@@ -209,45 +203,14 @@ async function main() {
   }
 
   {
-    const { runBlogGroundedResearchRuntime } = loadFreshRuntime();
-    let openaiLoads = 0;
-    let geminiLoads = 0;
-    const result = await runBlogGroundedResearchRuntime(
-      makeRequest({ provider: "gemini" }),
-      {
-        deps: {
-          env: {
-            GEMINI_API_KEY: "gem-key",
-            GEMINI_SEO_MODEL: "gemini-test",
-          },
-          loadOpenAiAdapter: async () => {
-            openaiLoads += 1;
-            throw new Error("should not load openai");
-          },
-          loadGeminiAdapter: async () => {
-            geminiLoads += 1;
-            return {
-              callGeminiGroundedResearch: async (_s, _c, options) => {
-                ok(
-                  "R_gemini_no_timeoutMs",
-                  options == null ||
-                    (typeof options === "object" &&
-                      !Object.prototype.hasOwnProperty.call(options, "timeoutMs") &&
-                      !Object.prototype.hasOwnProperty.call(options, "deps"))
-                );
-                return { ok: true, packet: makeReadyPacket("gemini") };
-              },
-            };
-          },
-        },
-      }
+    const parsed = parseBlogGroundedResearchRequest(
+      makeRequest({ provider: "gemini" })
     );
     ok(
-      "R_gemini_configured",
-      result.ok === true &&
-        result.provider === "gemini" &&
-        openaiLoads === 0 &&
-        geminiLoads === 1
+      "R_gemini_retired_invalid_request",
+      parsed.ok === false &&
+        parsed.code === "invalid_request" &&
+        parsed.status === 400
     );
   }
 
@@ -255,23 +218,15 @@ async function main() {
     ["openai_missing_key", { OPENAI_SEO_MODEL: "m" }],
     ["openai_missing_model", { OPENAI_API_KEY: "k" }],
     ["openai_whitespace", { OPENAI_API_KEY: "  ", OPENAI_SEO_MODEL: "  " }],
-    ["gemini_missing_key", { GEMINI_SEO_MODEL: "m" }],
-    ["gemini_missing_model", { GEMINI_API_KEY: "k" }],
-    ["gemini_whitespace", { GEMINI_API_KEY: "\t", GEMINI_SEO_MODEL: "\n" }],
   ]) {
-    const provider = name.startsWith("gemini") ? "gemini" : "openai";
     const { runBlogGroundedResearchRuntime } = loadFreshRuntime();
     let loads = 0;
     const result = await runBlogGroundedResearchRuntime(
-      makeRequest({ provider }),
+      makeRequest({ provider: "openai" }),
       {
         deps: {
           env,
           loadOpenAiAdapter: async () => {
-            loads += 1;
-            throw new Error("no");
-          },
-          loadGeminiAdapter: async () => {
             loads += 1;
             throw new Error("no");
           },
@@ -294,9 +249,7 @@ async function main() {
   {
     const { runBlogGroundedResearchRuntime } = loadFreshRuntime();
     let openaiLoads = 0;
-    let geminiLoads = 0;
     let openaiCalls = 0;
-    let geminiCalls = 0;
     await runBlogGroundedResearchRuntime(makeRequest({ provider: "openai" }), {
       deps: {
         env: { OPENAI_API_KEY: "k", OPENAI_SEO_MODEL: "m" },
@@ -309,61 +262,18 @@ async function main() {
             },
           };
         },
-        loadGeminiAdapter: async () => {
-          geminiLoads += 1;
-          return {
-            callGeminiGroundedResearch: async () => {
-              geminiCalls += 1;
-              return { ok: true, packet: makeReadyPacket("gemini") };
-            },
-          };
-        },
       },
     });
-    ok(
-      "R_select_openai_only",
-      openaiLoads === 1 &&
-        geminiLoads === 0 &&
-        openaiCalls === 1 &&
-        geminiCalls === 0
-    );
+    ok("R_select_openai_only", openaiLoads === 1 && openaiCalls === 1);
   }
 
   {
-    const { runBlogGroundedResearchRuntime } = loadFreshRuntime();
-    let openaiLoads = 0;
-    let geminiLoads = 0;
-    let openaiCalls = 0;
-    let geminiCalls = 0;
-    await runBlogGroundedResearchRuntime(makeRequest({ provider: "gemini" }), {
-      deps: {
-        env: { GEMINI_API_KEY: "k", GEMINI_SEO_MODEL: "m" },
-        loadOpenAiAdapter: async () => {
-          openaiLoads += 1;
-          return {
-            callOpenAiGroundedResearch: async () => {
-              openaiCalls += 1;
-              return { ok: true, packet: makeReadyPacket("openai") };
-            },
-          };
-        },
-        loadGeminiAdapter: async () => {
-          geminiLoads += 1;
-          return {
-            callGeminiGroundedResearch: async () => {
-              geminiCalls += 1;
-              return { ok: true, packet: makeReadyPacket("gemini") };
-            },
-          };
-        },
-      },
-    });
+    const parsed = parseBlogGroundedResearchRequest(
+      makeRequest({ provider: "gemini" })
+    );
     ok(
-      "R_select_gemini_only",
-      openaiLoads === 0 &&
-        geminiLoads === 1 &&
-        openaiCalls === 0 &&
-        geminiCalls === 1
+      "R_select_gemini_retired",
+      parsed.ok === false && parsed.code === "invalid_request"
     );
   }
 
@@ -382,9 +292,6 @@ async function main() {
             return { ok: true, packet: makeReadyPacket("openai") };
           },
         }),
-        loadGeminiAdapter: async () => {
-          throw new Error("no");
-        },
       },
     });
     ok("R_signal_identity", received === controller.signal);
@@ -890,14 +797,14 @@ async function main() {
       "@/lib/blogGroundedResearchRuntime.server": {
         runBlogGroundedResearchRuntime: async () => ({
           ok: true,
-          provider: "gemini",
+          provider: "openai",
           evidence: makeReadyEvidence("missing"),
         }),
       },
     }).default;
     const res = createMockRes();
     await handler(
-      createMockReq("POST", makeRequest({ provider: "gemini" })),
+      createMockReq("POST", makeRequest({ provider: "openai" })),
       res
     );
     ok(
@@ -906,6 +813,39 @@ async function main() {
         res.body?.ok === true &&
         res.body?.evidence?.evidenceState === "missing" &&
         res.body?.evidence?.reasonCodes?.includes("UNGROUNDED_SOURCE")
+    );
+  }
+
+  {
+    let runtimeHits = 0;
+    const handler = loadRoute({
+      "@/lib/adminAuth": {
+        requireAdminPermission: async () => ({
+          sessionId: 1,
+          role: "super_admin",
+        }),
+      },
+      "@/lib/rateLimit": {
+        RL_SEO_AI: () => ({ allowed: true, remaining: 9, retryAfterSec: 1 }),
+      },
+      "@/lib/blogGroundedResearchRuntime.server": {
+        runBlogGroundedResearchRuntime: async () => {
+          runtimeHits += 1;
+          throw new Error("retired gemini must not reach runtime");
+        },
+      },
+    }).default;
+    const res = createMockRes();
+    await handler(
+      createMockReq("POST", makeRequest({ provider: "gemini" })),
+      res
+    );
+    ok(
+      "API_gemini_invalid_request",
+      res.statusCode === 400 &&
+        res.body?.ok === false &&
+        res.body?.code === "invalid_request" &&
+        runtimeHits === 0
     );
   }
 
@@ -1313,10 +1253,10 @@ async function main() {
     )
   );
   ok(
-    "I_runtime_dynamic_gemini",
-    /import\(\s*["']@\/lib\/blogGroundedResearchGemini\.server["']\s*\)/.test(
+    "I_runtime_no_dynamic_gemini",
+    !/import\(\s*["']@\/lib\/blogGroundedResearchGemini\.server["']\s*\)/.test(
       runtimeSrc
-    )
+    ) && !/blogGroundedResearchGemini/.test(runtimeSrc)
   );
   ok(
     "I_runtime_no_seoAi",

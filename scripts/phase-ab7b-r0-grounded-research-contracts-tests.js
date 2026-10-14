@@ -98,9 +98,11 @@ console.log("--- REQUEST PARSER ---");
   ok("R_caller_immutable", deepEqual(input, snapshot));
 }
 ok(
-  "R_gemini_valid",
+  "R_gemini_rejected",
   parseBlogGroundedResearchRequest(validRequest({ provider: "gemini" })).ok ===
-    true
+    false &&
+    parseBlogGroundedResearchRequest(validRequest({ provider: "gemini" }))
+      .code === "invalid_request"
 );
 ok(
   "R_auto_rejected",
@@ -227,7 +229,7 @@ ok(
 );
 ok(
   "R_providers_exact",
-  deepEqual([...BLOG_GROUNDED_RESEARCH_PROVIDERS], ["openai", "gemini"])
+  deepEqual([...BLOG_GROUNDED_RESEARCH_PROVIDERS], ["openai"])
 );
 ok(
   "R_task_exact",

@@ -36,13 +36,6 @@ import {
 /** OpenAI Responses generated-output bound — not a full HTTP transport byte cap. */
 export const BLOG_GROUNDED_RESEARCH_OPENAI_MAX_OUTPUT_TOKENS = 4096;
 
-export const BLOG_GROUNDED_RESEARCH_GEMINI_INTERACTIONS_URL =
-  "https://generativelanguage.googleapis.com/v1beta/interactions";
-
-/** @deprecated alias — prefer BLOG_GROUNDED_RESEARCH_GEMINI_INTERACTIONS_URL */
-export const GEMINI_GROUNDED_RESEARCH_INTERACTIONS_URL =
-  BLOG_GROUNDED_RESEARCH_GEMINI_INTERACTIONS_URL;
-
 export const BLOG_GROUNDED_RESEARCH_PROVIDER_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -119,36 +112,6 @@ export type GroundingExtractionFailureReason =
 export type GroundingExtractionResult =
   | { ok: true; grounding: BlogResearchGrounding }
   | { ok: false; reason: GroundingExtractionFailureReason };
-
-/** Bounded, non-sensitive counters for Gemini grounding-failure diagnostics only. */
-export type GeminiGroundingFailureDiagnostics = {
-  searchCallCount: number;
-  citationAnnotationCount: number;
-  acceptedGroundedUrlCount: number;
-};
-
-export type GeminiGroundingExtractionResult =
-  | { ok: true; grounding: BlogResearchGrounding }
-  | {
-      ok: false;
-      reason: GroundingExtractionFailureReason;
-      diagnostics: GeminiGroundingFailureDiagnostics;
-    };
-
-const GEMINI_GROUNDING_DIAG_COUNT_CAP = 64;
-
-function boundGeminiGroundingDiagCount(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) return 0;
-  return Math.min(Math.floor(value), GEMINI_GROUNDING_DIAG_COUNT_CAP);
-}
-
-function emptyGeminiGroundingFailureDiagnostics(): GeminiGroundingFailureDiagnostics {
-  return {
-    searchCallCount: 0,
-    citationAnnotationCount: 0,
-    acceptedGroundedUrlCount: 0,
-  };
-}
 
 export type ProviderJsonEnvelopeParseResult =
   | { ok: true; providerOutput: BlogResearchProviderOutput }
@@ -276,8 +239,7 @@ function appendUniqueBounded(
 
 function collectUrlCitationAnnotations(
   content: unknown,
-  urls: BoundedCollector,
-  citationAnnotationCount?: { value: number }
+  urls: BoundedCollector
 ): void {
   if (!Array.isArray(content)) return;
   for (const rawPart of content) {
@@ -289,9 +251,6 @@ function collectUrlCitationAnnotations(
       if (!rawAnnotation || typeof rawAnnotation !== "object") continue;
       const annotation = rawAnnotation as Record<string, unknown>;
       if (annotation.type !== "url_citation") continue;
-      if (citationAnnotationCount) {
-        citationAnnotationCount.value += 1;
-      }
       appendUniqueBounded(
         urls,
         annotation.url,
@@ -381,192 +340,6 @@ export function extractOpenAiGroundedResearchGrounding(
     grounding.searchQueries = queries.values;
   }
   return { ok: true, grounding };
-}
-
-/**
- * Provider-owned Gemini grounding only (google_search_call + url_citation).
- * Never reads model JSON sources[].url.
- * Failure results include bounded diagnostic counts for server-side logging only.
- */
-export function extractGeminiGroundedResearchGrounding(
-  body: unknown
-): GeminiGroundingExtractionResult {
-  if (!body || typeof body !== "object") {
-    return {
-      ok: false,
-      reason: "missing_search_call",
-      diagnostics: emptyGeminiGroundingFailureDiagnostics(),
-    };
-  }
-  const steps = (body as Record<string, unknown>).steps;
-  if (!Array.isArray(steps)) {
-    return {
-      ok: false,
-      reason: "missing_search_call",
-      diagnostics: emptyGeminiGroundingFailureDiagnostics(),
-    };
-  }
-
-  let searchCallCount = 0;
-  const citationAnnotationCount = { value: 0 };
-  const urls = createBoundedCollector();
-  const queries = createBoundedCollector();
-
-  for (const rawStep of steps) {
-    if (!rawStep || typeof rawStep !== "object") continue;
-    const step = rawStep as Record<string, unknown>;
-    if (step.type === "google_search_call") {
-      searchCallCount += 1;
-      const args = step.arguments;
-      if (args && typeof args === "object") {
-        const argQueries = (args as Record<string, unknown>).queries;
-        if (Array.isArray(argQueries)) {
-          for (const query of argQueries) {
-            appendUniqueBounded(
-              queries,
-              query,
-              MAX_BLOG_RESEARCH_SEARCH_QUERIES,
-              MAX_BLOG_RESEARCH_SEARCH_QUERY_CHARS
-            );
-          }
-        }
-      }
-    }
-    if (step.type === "model_output") {
-      collectUrlCitationAnnotations(
-        step.content,
-        urls,
-        citationAnnotationCount
-      );
-    }
-  }
-
-  const diagnostics: GeminiGroundingFailureDiagnostics = {
-    searchCallCount: boundGeminiGroundingDiagCount(searchCallCount),
-    citationAnnotationCount: boundGeminiGroundingDiagCount(
-      citationAnnotationCount.value
-    ),
-    acceptedGroundedUrlCount: boundGeminiGroundingDiagCount(urls.values.length),
-  };
-
-  if (urls.overflow || queries.overflow) {
-    return { ok: false, reason: "bounds_exceeded", diagnostics };
-  }
-  if (searchCallCount === 0) {
-    return { ok: false, reason: "missing_search_call", diagnostics };
-  }
-  if (urls.values.length === 0) {
-    return { ok: false, reason: "missing_grounding_urls", diagnostics };
-  }
-  const grounding: BlogResearchGrounding = { groundedUrls: urls.values };
-  if (queries.values.length > 0) {
-    grounding.searchQueries = queries.values;
-  }
-  return { ok: true, grounding };
-}
-
-export function extractGeminiInteractionText(body: unknown): string {
-  if (!body || typeof body !== "object") return "";
-  const root = body as Record<string, unknown>;
-  const steps = root.steps;
-  if (!Array.isArray(steps)) return "";
-  const parts: string[] = [];
-  for (const step of steps) {
-    if (!step || typeof step !== "object") continue;
-    const s = step as Record<string, unknown>;
-    if (s.type !== "model_output") continue;
-    const content = s.content;
-    if (!Array.isArray(content)) continue;
-    for (const part of content) {
-      if (!part || typeof part !== "object") continue;
-      const p = part as Record<string, unknown>;
-      if (p.type === "text" && typeof p.text === "string") {
-        parts.push(p.text);
-      }
-    }
-  }
-  return parts.join("\n").trim();
-}
-
-/**
- * True byte-bounded Gemini REST body read. Fail closed without unbounded
- * res.text()/res.json().
- */
-export async function readBoundedGeminiResearchResponseJson(
-  res: Response,
-  maxBytes: number = BLOG_GROUNDED_RESEARCH_MAX_RAW_RESPONSE_BYTES
-): Promise<{ ok: true; value: unknown } | BlogGroundedResearchFailure> {
-  const contentLengthHeader = res.headers.get("content-length");
-  if (contentLengthHeader != null && contentLengthHeader !== "") {
-    const contentLength = Number(contentLengthHeader);
-    if (
-      Number.isFinite(contentLength) &&
-      Number.isInteger(contentLength) &&
-      contentLength >= 0 &&
-      contentLength > maxBytes
-    ) {
-      return createBlogGroundedResearchFailure("malformed_provider_output");
-    }
-  }
-
-  const body = res.body;
-  if (!body || typeof body.getReader !== "function") {
-    return createBlogGroundedResearchFailure("malformed_provider_output");
-  }
-
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-  let oversized = false;
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      totalBytes += value.byteLength;
-      if (totalBytes > maxBytes) {
-        oversized = true;
-        try {
-          await reader.cancel();
-        } catch {
-          /* cancellation failure must not mask oversize failure */
-        }
-        break;
-      }
-      chunks.push(value);
-    }
-  } finally {
-    try {
-      reader.releaseLock();
-    } catch {
-      /* ignore release races after cancel */
-    }
-  }
-
-  if (oversized) {
-    return createBlogGroundedResearchFailure("malformed_provider_output");
-  }
-
-  const bytes = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-
-  let text: string;
-  try {
-    text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-  } catch {
-    return createBlogGroundedResearchFailure("malformed_provider_output");
-  }
-
-  try {
-    return { ok: true, value: JSON.parse(text) as unknown };
-  } catch {
-    return createBlogGroundedResearchFailure("malformed_provider_output");
-  }
 }
 
 /** Post-materialization serialized envelope size check (OpenAI SDK path). */

@@ -1,9 +1,9 @@
 /**
  * AB-7B R3 — Isolated grounded-research runtime (server-only).
  *
- * Resolves existing provider env names, enforces max-one-in-flight per Node
- * process, dynamically loads ONLY the selected R1 adapter, and delegates to
- * R2 validation. No route/auth/rate-limit/DB/CMS/timer/AbortController.
+ * OpenAI-only. Resolves existing OPENAI_* env names, enforces max-one-in-flight
+ * per Node process, dynamically loads ONLY the OpenAI R1 adapter, and
+ * delegates to R2 validation. No route/auth/rate-limit/DB/CMS/timer/AbortController.
  *
  * Concurrency is process-local (one boolean slot). Not account-global.
  */
@@ -11,7 +11,6 @@
 import {
   createBlogGroundedResearchFailure,
   type BlogGroundedResearchFailure,
-  type BlogGroundedResearchProvider,
   type BlogGroundedResearchProviderPacket,
   type BlogGroundedResearchRequest,
 } from "@/lib/blogGroundedResearchContracts";
@@ -36,15 +35,10 @@ type OpenAiAdapterModule = {
   callOpenAiGroundedResearch: ProviderAdapterFn;
 };
 
-type GeminiAdapterModule = {
-  callGeminiGroundedResearch: ProviderAdapterFn;
-};
-
 export type BlogGroundedResearchRuntimeDeps = {
   /** Test seam: plain env map. Production defaults to process.env. */
   env?: Record<string, string | undefined>;
   loadOpenAiAdapter?: () => Promise<OpenAiAdapterModule>;
-  loadGeminiAdapter?: () => Promise<GeminiAdapterModule>;
 };
 
 /** Per Node process — max one grounded-research invocation in flight. */
@@ -58,18 +52,11 @@ function readEnv(
   return typeof raw === "string" ? raw.trim() : "";
 }
 
-function resolveProviderConfig(
-  provider: BlogGroundedResearchProvider,
+function resolveOpenAiConfig(
   env: Record<string, string | undefined>
 ): ProviderConfig | null {
-  if (provider === "openai") {
-    const apiKey = readEnv(env, "OPENAI_API_KEY");
-    const model = readEnv(env, "OPENAI_SEO_MODEL");
-    if (!apiKey || !model) return null;
-    return { apiKey, model };
-  }
-  const apiKey = readEnv(env, "GEMINI_API_KEY");
-  const model = readEnv(env, "GEMINI_SEO_MODEL");
+  const apiKey = readEnv(env, "OPENAI_API_KEY");
+  const model = readEnv(env, "OPENAI_SEO_MODEL");
   if (!apiKey || !model) return null;
   return { apiKey, model };
 }
@@ -78,13 +65,9 @@ async function defaultLoadOpenAiAdapter(): Promise<OpenAiAdapterModule> {
   return import("@/lib/blogGroundedResearchOpenAi.server");
 }
 
-async function defaultLoadGeminiAdapter(): Promise<GeminiAdapterModule> {
-  return import("@/lib/blogGroundedResearchGemini.server");
-}
-
 /**
- * Execute one grounded-research request through the selected provider adapter
- * and R2/AB-7A validation. Never selects a fallback provider.
+ * Execute one grounded-research request through the OpenAI adapter and
+ * R2/AB-7A validation. Never selects a fallback provider.
  */
 export async function runBlogGroundedResearchRuntime(
   request: BlogGroundedResearchRequest,
@@ -101,7 +84,7 @@ export async function runBlogGroundedResearchRuntime(
   try {
     const deps = options?.deps;
     const env = deps?.env ?? (process.env as Record<string, string | undefined>);
-    const config = resolveProviderConfig(request.provider, env);
+    const config = resolveOpenAiConfig(env);
     if (!config) {
       return createBlogGroundedResearchFailure("provider_not_configured");
     }
@@ -119,18 +102,10 @@ export async function runBlogGroundedResearchRuntime(
     >;
 
     try {
-      if (request.provider === "openai") {
-        const load = deps?.loadOpenAiAdapter ?? defaultLoadOpenAiAdapter;
-        const mod = await load();
-        providerCall = (subject, callOpts) =>
-          mod.callOpenAiGroundedResearch(subject, config, callOpts);
-      } else {
-        const load = deps?.loadGeminiAdapter ?? defaultLoadGeminiAdapter;
-        const mod = await load();
-        // Pass signal only — never expose R1 Gemini timeoutMs test seam.
-        providerCall = (subject, callOpts) =>
-          mod.callGeminiGroundedResearch(subject, config, callOpts);
-      }
+      const load = deps?.loadOpenAiAdapter ?? defaultLoadOpenAiAdapter;
+      const mod = await load();
+      providerCall = (subject, callOpts) =>
+        mod.callOpenAiGroundedResearch(subject, config, callOpts);
     } catch {
       return createBlogGroundedResearchFailure("provider_upstream");
     }

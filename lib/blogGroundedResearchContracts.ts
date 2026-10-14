@@ -20,7 +20,7 @@ import type {
   BlogResearchProviderOutput,
 } from "@/lib/blogResearchEvidence";
 
-export const BLOG_GROUNDED_RESEARCH_PROVIDERS = ["openai", "gemini"] as const;
+export const BLOG_GROUNDED_RESEARCH_PROVIDERS = ["openai"] as const;
 
 export type BlogGroundedResearchProvider =
   (typeof BLOG_GROUNDED_RESEARCH_PROVIDERS)[number];
