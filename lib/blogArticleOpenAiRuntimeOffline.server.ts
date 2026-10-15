@@ -1,11 +1,19 @@
 /**
- * AB-8C2 — Offline article OpenAI runtime safety (server-only).
+ * AB-8C2 / AB-8C2A — Offline article OpenAI runtime safety (server-only).
  *
- * Process-local concurrency, timeout, abort, cost-budget gate, and
- * injected-mock-only execution. No live SDK, no env credential fallback,
+ * Process-local concurrency, caller-facing timeout/abort race, cost-budget gate,
+ * and injected-mock-only execution. No live SDK, no env credential fallback,
  * no route/DB/CMS/bridge imports, no retries, no provider fallback.
  *
- * Cancellation does not guarantee zero provider billing for a future live call.
+ * Caller-facing settlement is independent of provider cooperation: a configured
+ * deadline or explicit abort resolves the caller promptly while requesting
+ * cancellation. The process-local busy reservation is released only when the
+ * underlying provider promise actually settles. A provider that never settles
+ * may leave the slot unavailable until process restart — an explicit fail-closed
+ * limitation safer than overlapping billable calls.
+ *
+ * Cancellation / timeout does not forcibly terminate an arbitrary JavaScript
+ * promise and does not guarantee zero future provider billing.
  */
 
 import {
@@ -40,9 +48,36 @@ export type BlogArticleOpenAiOfflineRuntimeDeps = {
 /** Per Node process — max one offline article-generation mock in flight. */
 let articleProviderInFlight = false;
 
-/** Test seam: clear the process-local busy flag between offline suites. */
+/**
+ * Monotonic reservation id. Late settlement of an abandoned underlying promise
+ * must not clear a newer invocation's busy slot (including after test reset).
+ */
+let busyReservationGeneration = 0;
+
+/**
+ * Test seam: clear the process-local busy flag between offline suites.
+ * Invalidates any pending late-release callbacks from prior invocations.
+ * Not a production bypass for an active underlying invocation. Suites that
+ * leave a permanently unsettled mock must use an isolated module instance.
+ */
 export function __resetBlogArticleOpenAiOfflineRuntimeForTests(): void {
+  busyReservationGeneration += 1;
   articleProviderInFlight = false;
+}
+
+function acquireBusyReservation(): number {
+  articleProviderInFlight = true;
+  busyReservationGeneration += 1;
+  return busyReservationGeneration;
+}
+
+function releaseBusyReservation(generation: number): void {
+  if (
+    generation === busyReservationGeneration &&
+    articleProviderInFlight
+  ) {
+    articleProviderInFlight = false;
+  }
 }
 
 function rejectLiveCredentialMismatch(
@@ -80,123 +115,160 @@ export async function runBlogArticleOpenAiRuntimeOffline(
     return createBlogArticleOpenAiFailure("provider_busy");
   }
 
-  articleProviderInFlight = true;
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  let abortListener: (() => void) | null = null;
-  let localController: AbortController | null = null;
+  const reservation = acquireBusyReservation();
+  let underlyingStarted = false;
 
   try {
     const configResult = validateBlogArticleOpenAiOfflineConfig(configRaw);
-    if (!configResult.ok) return configResult;
+    if (!configResult.ok) {
+      releaseBusyReservation(reservation);
+      return configResult;
+    }
     const config = configResult.value;
 
     if (BLOG_ARTICLE_OPENAI_MAX_PROVIDER_ATTEMPTS !== 1) {
+      releaseBusyReservation(reservation);
       return createBlogArticleOpenAiFailure("invalid_request");
     }
 
     const deps = options?.deps;
     const fake = deps?.fakeResponsesCreate;
     if (typeof fake !== "function") {
+      releaseBusyReservation(reservation);
       return createBlogArticleOpenAiFailure("provider_not_configured");
     }
 
     const mismatch = rejectLiveCredentialMismatch(config, deps?.env);
-    if (mismatch) return mismatch;
+    if (mismatch) {
+      releaseBusyReservation(reservation);
+      return mismatch;
+    }
 
     const budget = assertBlogArticleOpenAiBudgetGate(config);
-    if (!budget.ok) return budget;
+    if (!budget.ok) {
+      releaseBusyReservation(reservation);
+      return budget;
+    }
 
     const externalSignal = options?.signal;
     if (externalSignal?.aborted) {
+      releaseBusyReservation(reservation);
       return createBlogArticleOpenAiFailure("request_aborted");
     }
 
-    localController = new AbortController();
+    const localController = new AbortController();
     const timeoutMs = config.timeoutMs ?? 90_000;
-
-    const onExternalAbort = () => {
-      try {
-        localController?.abort();
-      } catch {
-        // ignore
-      }
-    };
-
-    if (externalSignal) {
-      abortListener = onExternalAbort;
-      externalSignal.addEventListener("abort", onExternalAbort, {
-        once: true,
-      });
-    }
-
-    timeoutId = setTimeout(() => {
-      try {
-        localController?.abort();
-      } catch {
-        // ignore
-      }
-    }, timeoutMs);
-
     const combinedSignal = localController.signal;
-    let timedOut = false;
-    const markTimeout = () => {
-      timedOut = true;
-    };
-    const timeoutAbortListener = () => {
-      // Distinguish timeout abort from external abort after the fact.
-      if (!externalSignal?.aborted) markTimeout();
-    };
-    combinedSignal.addEventListener("abort", timeoutAbortListener, {
-      once: true,
-    });
 
-    try {
-      const result = await callBlogArticleOpenAiProviderOffline(
-        evidence,
-        config,
-        {
-          signal: combinedSignal,
-          deps: { fakeResponsesCreate: fake },
-          budgetAlreadyChecked: true,
-          preflightCostUsd: budget.estimate.estimatedCostUsd,
-        }
-      );
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let abortListener: (() => void) | null = null;
 
-      if (combinedSignal.aborted) {
-        if (externalSignal?.aborted) {
-          return createBlogArticleOpenAiFailure("request_aborted");
-        }
-        if (timedOut) {
-          return createBlogArticleOpenAiFailure("provider_timeout");
-        }
-        return createBlogArticleOpenAiFailure("request_aborted");
+    const cleanupDeadlineResources = () => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
       }
-
-      return result;
-    } catch (err) {
-      if (combinedSignal.aborted) {
-        if (externalSignal?.aborted) {
-          return createBlogArticleOpenAiFailure("request_aborted");
-        }
-        return createBlogArticleOpenAiFailure(
-          timedOut ? "provider_timeout" : "request_aborted"
-        );
+      if (abortListener && externalSignal) {
+        externalSignal.removeEventListener("abort", abortListener);
+        abortListener = null;
       }
-      void err;
-      return createBlogArticleOpenAiFailure("provider_upstream");
-    } finally {
-      combinedSignal.removeEventListener("abort", timeoutAbortListener);
+    };
+
+    let callerSettled = false;
+    let settleCaller: (result: BlogArticleOpenAiProviderResult) => void =
+      () => {};
+
+    // Register timeout/abort listeners BEFORE invoking the provider so a
+    // synchronous abort inside the mock cannot race past listener setup.
+    const callerResultPromise = new Promise<BlogArticleOpenAiProviderResult>(
+      (resolve) => {
+        settleCaller = (result: BlogArticleOpenAiProviderResult) => {
+          if (callerSettled) return;
+          callerSettled = true;
+          cleanupDeadlineResources();
+          resolve(result);
+        };
+
+        timeoutId = setTimeout(() => {
+          try {
+            localController.abort();
+          } catch {
+            // ignore
+          }
+          settleCaller(createBlogArticleOpenAiFailure("provider_timeout"));
+        }, timeoutMs);
+
+        if (externalSignal) {
+          abortListener = () => {
+            try {
+              localController.abort();
+            } catch {
+              // ignore
+            }
+            settleCaller(createBlogArticleOpenAiFailure("request_aborted"));
+          };
+          externalSignal.addEventListener("abort", abortListener, {
+            once: true,
+          });
+        }
+      }
+    );
+
+    // TOCTOU: abort may have fired between the pre-check and listener attach.
+    if (externalSignal?.aborted) {
+      try {
+        localController.abort();
+      } catch {
+        // ignore
+      }
+      settleCaller(createBlogArticleOpenAiFailure("request_aborted"));
+      releaseBusyReservation(reservation);
+      return callerResultPromise;
     }
-  } finally {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-      timeoutId = null;
+
+    underlyingStarted = true;
+
+    const providerPromise = callBlogArticleOpenAiProviderOffline(
+      evidence,
+      config,
+      {
+        signal: combinedSignal,
+        deps: { fakeResponsesCreate: fake },
+        budgetAlreadyChecked: true,
+        preflightCostUsd: budget.estimate.estimatedCostUsd,
+      }
+    );
+
+    // Keep the busy reservation until the underlying promise settles, even if
+    // the caller already timed out or aborted. Swallow late rejections.
+    // Release is generation-scoped so a late settle cannot clear a newer slot.
+    void providerPromise.then(
+      (result) => {
+        if (!callerSettled) {
+          settleCaller(result);
+        }
+        releaseBusyReservation(reservation);
+      },
+      (err) => {
+        if (!callerSettled) {
+          void err;
+          if (externalSignal?.aborted) {
+            settleCaller(createBlogArticleOpenAiFailure("request_aborted"));
+          } else if (combinedSignal.aborted) {
+            settleCaller(createBlogArticleOpenAiFailure("provider_timeout"));
+          } else {
+            settleCaller(createBlogArticleOpenAiFailure("provider_upstream"));
+          }
+        }
+        releaseBusyReservation(reservation);
+      }
+    );
+
+    return callerResultPromise;
+  } catch {
+    if (!underlyingStarted) {
+      releaseBusyReservation(reservation);
     }
-    if (abortListener && options?.signal) {
-      options.signal.removeEventListener("abort", abortListener);
-      abortListener = null;
-    }
-    localController = null;
-    articleProviderInFlight = false;
+    return createBlogArticleOpenAiFailure("provider_upstream");
   }
 }

@@ -727,6 +727,149 @@ async function runLifecycle() {
     }
   );
   ok("C20_upstream_mapped", upstream.code === "provider_upstream");
+
+  // AB-8C2A — strict response model identity
+  ok(
+    "C21_correct_model_accepted",
+    interpretBlogArticleOpenAiMockResponse(
+      makeCompletedResponse(makeModelOutput()),
+      config,
+      evidence
+    ).ok === true
+  );
+
+  ok(
+    "C22_missing_model_rejected",
+    interpretBlogArticleOpenAiMockResponse(
+      (() => {
+        const body = makeCompletedResponse(makeModelOutput());
+        delete body.model;
+        return body;
+      })(),
+      config,
+      evidence
+    ).code === "unsupported_model"
+  );
+
+  ok(
+    "C23_null_model_rejected",
+    interpretBlogArticleOpenAiMockResponse(
+      { ...makeCompletedResponse(makeModelOutput()), model: null },
+      config,
+      evidence
+    ).code === "unsupported_model"
+  );
+
+  ok(
+    "C24_empty_model_rejected",
+    interpretBlogArticleOpenAiMockResponse(
+      { ...makeCompletedResponse(makeModelOutput()), model: "" },
+      config,
+      evidence
+    ).code === "unsupported_model"
+  );
+
+  ok(
+    "C25_whitespace_model_rejected",
+    interpretBlogArticleOpenAiMockResponse(
+      { ...makeCompletedResponse(makeModelOutput()), model: "   " },
+      config,
+      evidence
+    ).code === "unsupported_model"
+  );
+
+  ok(
+    "C26_numeric_model_rejected",
+    interpretBlogArticleOpenAiMockResponse(
+      { ...makeCompletedResponse(makeModelOutput()), model: 12345 },
+      config,
+      evidence
+    ).code === "unsupported_model"
+  );
+
+  ok(
+    "C27_object_model_rejected",
+    interpretBlogArticleOpenAiMockResponse(
+      { ...makeCompletedResponse(makeModelOutput()), model: { id: config.model } },
+      config,
+      evidence
+    ).code === "unsupported_model"
+  );
+
+  ok(
+    "C28_array_model_rejected",
+    interpretBlogArticleOpenAiMockResponse(
+      { ...makeCompletedResponse(makeModelOutput()), model: [config.model] },
+      config,
+      evidence
+    ).code === "unsupported_model"
+  );
+
+  ok(
+    "C29_wrong_model_rejected",
+    interpretBlogArticleOpenAiMockResponse(
+      {
+        ...makeCompletedResponse(makeModelOutput()),
+        model: "totally-different-model",
+      },
+      config,
+      evidence
+    ).code === "unsupported_model"
+  );
+
+  ok(
+    "C30_unapproved_alias_rejected",
+    interpretBlogArticleOpenAiMockResponse(
+      {
+        ...makeCompletedResponse(makeModelOutput()),
+        model: config.model + "-snapshot-alias",
+      },
+      config,
+      evidence
+    ).code === "unsupported_model"
+  );
+
+  ok(
+    "C31_refusal_still_rejected_with_model",
+    interpretBlogArticleOpenAiMockResponse(
+      {
+        status: "completed",
+        model: config.model,
+        refusal: "I cannot generate that article.",
+        output_text: "",
+        usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+      },
+      config,
+      evidence
+    ).code === "provider_refusal"
+  );
+
+  ok(
+    "C32_incomplete_still_rejected_without_model_check_bypass",
+    interpretBlogArticleOpenAiMockResponse(
+      { status: "incomplete", incomplete_details: { reason: "content_filter" } },
+      config,
+      evidence
+    ).code === "provider_incomplete"
+  );
+
+  ok(
+    "C33_correct_model_valid_output_usage_accepted",
+    (() => {
+      const accepted = interpretBlogArticleOpenAiMockResponse(
+        makeCompletedResponse(makeModelOutput()),
+        config,
+        evidence,
+        { preflightCostUsd: 0.01 }
+      );
+      return (
+        accepted.ok === true &&
+        accepted.model === config.model &&
+        accepted.usage.inputTokens === 1500 &&
+        accepted.status === "PROVIDER_OUTPUT_ACCEPTED"
+      );
+    })()
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -868,8 +1011,7 @@ async function runRuntime() {
   );
   ok(
     "D06_timeout_returns_failure",
-    timeoutResult.code === "provider_timeout" ||
-      timeoutResult.code === "request_aborted"
+    timeoutResult.code === "provider_timeout"
   );
 
   runtime.__resetBlogArticleOpenAiOfflineRuntimeForTests();
@@ -1248,13 +1390,397 @@ function runIsolation() {
     });
 }
 
+// ---------------------------------------------------------------------------
+// H. AB-8C2A — non-cooperative timeout & busy-slot lifecycle
+// ---------------------------------------------------------------------------
+function makeAbortableSignal() {
+  const controller = new (require("events").EventEmitter)();
+  controller.aborted = false;
+  controller.addEventListener = function (type, fn) {
+    this.on(type, fn);
+  };
+  controller.removeEventListener = function (type, fn) {
+    this.off(type, fn);
+  };
+  controller.abort = function () {
+    if (this.aborted) return;
+    this.aborted = true;
+    this.emit("abort");
+  };
+  return controller;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function runHardeningAb8c2a() {
+  console.log("\nAB-8C2A Safety Hardening\n");
+
+  const evidence = makeEvidence();
+
+  // H01 — cooperative mock abort still returns provider_timeout
+  {
+    const runtime = loadFreshRuntime();
+    runtime.__resetBlogArticleOpenAiOfflineRuntimeForTests();
+    const result = await runtime.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      makeConfig({ timeoutMs: 40 }),
+      {
+        deps: {
+          fakeResponsesCreate: async (_body, opts) => {
+            await new Promise((resolve, reject) => {
+              const t = setTimeout(resolve, 400);
+              if (opts && opts.signal) {
+                opts.signal.addEventListener(
+                  "abort",
+                  () => {
+                    clearTimeout(t);
+                    const err = new Error("aborted");
+                    err.name = "AbortError";
+                    reject(err);
+                  },
+                  { once: true }
+                );
+              }
+            });
+            return makeCompletedResponse(makeModelOutput());
+          },
+        },
+      }
+    );
+    ok("H01_cooperative_timeout_provider_timeout", result.code === "provider_timeout");
+  }
+
+  // H02–H06 — non-cooperative mock ignores AbortSignal, late resolve discarded,
+  // busy while unresolved, then free after settle.
+  {
+    const runtime = loadFreshRuntime();
+    runtime.__resetBlogArticleOpenAiOfflineRuntimeForTests();
+    let invocations = 0;
+    let lateResolve;
+    const lateGate = new Promise((resolve) => {
+      lateResolve = resolve;
+    });
+    let lateAcceptedAsSuccess = false;
+
+    const shortConfig = makeConfig({ timeoutMs: 40 });
+    const startedAt = Date.now();
+    const firstPromise = runtime.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      shortConfig,
+      {
+        deps: {
+          fakeResponsesCreate: async (_body, opts) => {
+            invocations += 1;
+            // Intentionally ignore opts.signal — non-cooperative.
+            void opts;
+            await lateGate;
+            return makeCompletedResponse(makeModelOutput());
+          },
+        },
+      }
+    );
+
+    const firstResult = await firstPromise;
+    const elapsed = Date.now() - startedAt;
+    ok(
+      "H02_noncooperative_caller_timeout_before_late_resolve",
+      firstResult.code === "provider_timeout" && elapsed < 300
+    );
+    ok(
+      "H03_noncooperative_exactly_one_invocation",
+      invocations === 1
+    );
+
+    // While underlying work is still open, a second call must be busy.
+    const busyWhileOpen = await runtime.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      makeConfig({ timeoutMs: 2_000 }),
+      {
+        deps: {
+          fakeResponsesCreate: async () => {
+            invocations += 1;
+            return makeCompletedResponse(makeModelOutput());
+          },
+        },
+      }
+    );
+    ok(
+      "H04_busy_while_underlying_unresolved",
+      busyWhileOpen.code === "provider_busy" && invocations === 1
+    );
+
+    // Release the delayed provider; late success must not overwrite the caller.
+    lateResolve();
+    await delay(30);
+
+    // After underlying settlement, a new invocation may proceed.
+    const afterSettle = await runtime.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      makeConfig({ timeoutMs: 2_000 }),
+      {
+        deps: {
+          fakeResponsesCreate: async () => {
+            invocations += 1;
+            return makeCompletedResponse(makeModelOutput());
+          },
+        },
+      }
+    );
+    ok(
+      "H05_late_resolution_discarded_caller_remains_timeout",
+      firstResult.code === "provider_timeout" && lateAcceptedAsSuccess === false
+    );
+    ok(
+      "H06_after_underlying_settle_new_invocation_proceeds",
+      afterSettle.ok === true && invocations === 2
+    );
+  }
+
+  // H07–H08 — never-settling mock: caller settles; slot remains reserved.
+  // Isolated runtime instance — do not reset away an in-flight lifecycle bug.
+  {
+    const isolated = loadFreshRuntime();
+    let neverCalls = 0;
+    const neverConfig = makeConfig({ timeoutMs: 40 });
+    const neverResult = await isolated.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      neverConfig,
+      {
+        deps: {
+          fakeResponsesCreate: () => {
+            neverCalls += 1;
+            // Permanently pending — ignore abort and never settle.
+            return new Promise(() => {});
+          },
+        },
+      }
+    );
+    ok(
+      "H07_never_settling_caller_receives_timeout",
+      neverResult.code === "provider_timeout" && neverCalls === 1
+    );
+
+    const stillBusy = await isolated.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      makeConfig({ timeoutMs: 2_000 }),
+      {
+        deps: {
+          fakeResponsesCreate: async () => {
+            neverCalls += 1;
+            return makeCompletedResponse(makeModelOutput());
+          },
+        },
+      }
+    );
+    ok(
+      "H08_never_settling_keeps_inflight_reservation",
+      stillBusy.code === "provider_busy" && neverCalls === 1
+    );
+  }
+
+  // H09 — explicit external abort with non-cooperative mock
+  {
+    const runtime = loadFreshRuntime();
+    runtime.__resetBlogArticleOpenAiOfflineRuntimeForTests();
+    const signal = makeAbortableSignal();
+    let calls = 0;
+    const abortPromise = runtime.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      makeConfig({ timeoutMs: 5_000 }),
+      {
+        signal,
+        deps: {
+          fakeResponsesCreate: async () => {
+            calls += 1;
+            await delay(20);
+            signal.abort();
+            // Non-cooperative: still resolve later.
+            await delay(200);
+            return makeCompletedResponse(makeModelOutput());
+          },
+        },
+      }
+    );
+    const abortResult = await abortPromise;
+    ok(
+      "H09_external_abort_noncooperative_request_aborted",
+      abortResult.code === "request_aborted" && calls === 1
+    );
+    // Allow late resolve to settle reservation without unhandled rejection.
+    await delay(250);
+  }
+
+  // H10 — late provider rejection must not become an unhandled rejection
+  {
+    const runtime = loadFreshRuntime();
+    runtime.__resetBlogArticleOpenAiOfflineRuntimeForTests();
+    let unhandled = 0;
+    const onUnhandled = () => {
+      unhandled += 1;
+    };
+    process.on("unhandledRejection", onUnhandled);
+
+    let rejectLate;
+    const lateRejectGate = new Promise((_, reject) => {
+      rejectLate = reject;
+    });
+
+    const result = await runtime.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      makeConfig({ timeoutMs: 40 }),
+      {
+        deps: {
+          fakeResponsesCreate: async () => {
+            await lateRejectGate;
+            return makeCompletedResponse(makeModelOutput());
+          },
+        },
+      }
+    );
+    ok("H10a_timeout_before_late_reject", result.code === "provider_timeout");
+
+    const err = new Error("late-provider-reject");
+    err.status = 500;
+    rejectLate(err);
+    await delay(40);
+    process.removeListener("unhandledRejection", onUnhandled);
+    ok("H10b_late_reject_no_unhandled_rejection", unhandled === 0);
+
+    // Reservation should clear after late reject settles the underlying promise.
+    const next = await runtime.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      makeConfig({ timeoutMs: 2_000 }),
+      {
+        deps: {
+          fakeResponsesCreate: async () =>
+            makeCompletedResponse(makeModelOutput()),
+        },
+      }
+    );
+    ok("H10c_slot_released_after_late_reject", next.ok === true);
+  }
+
+  // H11 — normal completion before deadline succeeds
+  {
+    const runtime = loadFreshRuntime();
+    runtime.__resetBlogArticleOpenAiOfflineRuntimeForTests();
+    const result = await runtime.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      makeConfig({ timeoutMs: 2_000 }),
+      {
+        deps: {
+          fakeResponsesCreate: async () =>
+            makeCompletedResponse(makeModelOutput()),
+        },
+      }
+    );
+    ok(
+      "H11_success_before_deadline",
+      result.ok === true && result.status === "PROVIDER_OUTPUT_ACCEPTED"
+    );
+  }
+
+  // H12 — concurrency guard does not release another invocation's reservation
+  {
+    const runtime = loadFreshRuntime();
+    runtime.__resetBlogArticleOpenAiOfflineRuntimeForTests();
+    let releaseA;
+    const gateA = new Promise((resolve) => {
+      releaseA = resolve;
+    });
+    let calls = 0;
+
+    const a = runtime.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      makeConfig({ timeoutMs: 5_000 }),
+      {
+        deps: {
+          fakeResponsesCreate: async () => {
+            calls += 1;
+            await gateA;
+            return makeCompletedResponse(makeModelOutput());
+          },
+        },
+      }
+    );
+    await delay(15);
+
+    const b = await runtime.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      makeConfig({ timeoutMs: 5_000 }),
+      {
+        deps: {
+          fakeResponsesCreate: async () => {
+            calls += 1;
+            return makeCompletedResponse(makeModelOutput());
+          },
+        },
+      }
+    );
+    ok("H12a_second_call_busy_while_first_open", b.code === "provider_busy");
+
+    // Timeout a third short call path must not clear A's reservation via reset.
+    // (No reset used — busy must still hold.)
+    const c = await runtime.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      makeConfig({ timeoutMs: 40 }),
+      {
+        deps: {
+          fakeResponsesCreate: async () => {
+            calls += 1;
+            return makeCompletedResponse(makeModelOutput());
+          },
+        },
+      }
+    );
+    ok("H12b_third_call_still_busy", c.code === "provider_busy" && calls === 1);
+
+    releaseA();
+    const aResult = await a;
+    ok("H12c_first_completes_alone", aResult.ok === true && calls === 1);
+  }
+
+  // H13 — no retry / no second provider invocation on timeout
+  {
+    const runtime = loadFreshRuntime();
+    runtime.__resetBlogArticleOpenAiOfflineRuntimeForTests();
+    let calls = 0;
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const result = await runtime.runBlogArticleOpenAiRuntimeOffline(
+      evidence,
+      makeConfig({ timeoutMs: 40 }),
+      {
+        deps: {
+          fakeResponsesCreate: async () => {
+            calls += 1;
+            await gate;
+            return makeCompletedResponse(makeModelOutput());
+          },
+        },
+      }
+    );
+    ok(
+      "H13_timeout_no_retry_single_invocation",
+      result.code === "provider_timeout" && calls === 1
+    );
+    release();
+    await delay(30);
+  }
+}
+
 (async () => {
   await runLifecycle();
   await runRuntime();
   await runCostInvocationBlock();
   await runIsolation();
+  await runHardeningAb8c2a();
 
-  console.log(`\nAB-8C2 results: ${passed} passed, ${failed} failed\n`);
+  console.log(`\nAB-8C2/AB-8C2A results: ${passed} passed, ${failed} failed\n`);
   if (failed > 0) process.exit(1);
 })().catch((err) => {
   console.error("AB-8C2 suite crashed:", err);

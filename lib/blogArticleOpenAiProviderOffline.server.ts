@@ -200,11 +200,15 @@ export function interpretBlogArticleOpenAiMockResponse(
     return createBlogArticleOpenAiFailure("provider_refusal");
   }
 
-  if (
-    typeof body.model === "string" &&
-    body.model.trim() &&
-    body.model.trim() !== config.model
-  ) {
+  // Strict response model identity — fail closed. Acceptance requires a
+  // nonempty string that exactly matches the configured model. Missing, null,
+  // blank, non-string, alias, or mismatched identities are rejected. Never
+  // fabricate a default or fall back to the request model field.
+  if (typeof body.model !== "string") {
+    return createBlogArticleOpenAiFailure("unsupported_model");
+  }
+  const responseModel = body.model.trim();
+  if (!responseModel || responseModel !== config.model) {
     return createBlogArticleOpenAiFailure("unsupported_model");
   }
 
