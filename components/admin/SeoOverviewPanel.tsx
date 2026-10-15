@@ -23,13 +23,19 @@ import {
   type SeoPlanningPreviewResult,
 } from "@/lib/seoPlanningReadiness";
 import {
+  buildSeoEditorialResearchBrief,
   buildSeoPlanningResearchRequestBody,
   canRunSeoPlanningResearch,
+  createDefaultSeoEditorialChecklist,
   createIdleSeoPlanningResearchState,
   createLoadingSeoPlanningResearchState,
   createSupersededSeoPlanningResearchState,
   interpretSeoPlanningResearchResponse,
+  SEO_EDITORIAL_CHECKLIST_ITEM_IDS,
+  SEO_EDITORIAL_CHECKLIST_UI_LABELS,
   seoPlanningResearchEvidenceLabel,
+  type SeoEditorialChecklistItemId,
+  type SeoEditorialChecklistState,
   type SeoPlanningResearchUiState,
 } from "@/lib/seoPlanningResearchUi";
 
@@ -209,10 +215,29 @@ export default function SeoOverviewPanel({
     createIdleSeoPlanningResearchState()
   );
   const [researchInFlight, setResearchInFlight] = useState(false);
+  const [editorialChecklist, setEditorialChecklist] =
+    useState<SeoEditorialChecklistState>(() =>
+      createDefaultSeoEditorialChecklist()
+    );
+  const [briefCopyFeedback, setBriefCopyFeedback] = useState<
+    "" | "copied" | "failed" | "unavailable"
+  >("");
   const researchGenRef = useRef(0);
   const researchRequestSeqRef = useRef(0);
   const researchAbortRef = useRef<AbortController | null>(null);
   const researchInFlightRef = useRef(false);
+  const researchUiRef = useRef(researchUi);
+  const briefCopyGenRef = useRef(0);
+
+  useEffect(() => {
+    researchUiRef.current = researchUi;
+  }, [researchUi]);
+
+  const resetEditorialHandoffUi = useCallback(() => {
+    briefCopyGenRef.current += 1;
+    setEditorialChecklist(createDefaultSeoEditorialChecklist());
+    setBriefCopyFeedback("");
+  }, []);
 
   const invalidateResearchUi = useCallback((opts?: { superseded?: boolean }) => {
     researchGenRef.current += 1;
@@ -220,12 +245,13 @@ export default function SeoOverviewPanel({
       researchAbortRef.current.abort();
       researchAbortRef.current = null;
     }
+    resetEditorialHandoffUi();
     setResearchUi(
       opts?.superseded
         ? createSupersededSeoPlanningResearchState()
         : createIdleSeoPlanningResearchState()
     );
-  }, []);
+  }, [resetEditorialHandoffUi]);
 
   const clearPlanningPreview = useCallback(() => {
     setPlanningTopic("");
@@ -425,21 +451,28 @@ export default function SeoOverviewPanel({
     .filter((m) => m.status === "resolved")
     .slice(0, 10);
 
+  const writeClipboardText = async (text: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "absolute";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    if (!ok) {
+      throw new Error("clipboard_copy_failed");
+    }
+  };
+
   const copyUrl = async (url: string) => {
     try {
-      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url);
-      } else {
-        const ta = document.createElement("textarea");
-        ta.value = url;
-        ta.setAttribute("readonly", "");
-        ta.style.position = "absolute";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
+      await writeClipboardText(url);
       setCopiedUrl(url);
       window.setTimeout(() => {
         setCopiedUrl((prev) => (prev === url ? "" : prev));
@@ -447,6 +480,58 @@ export default function SeoOverviewPanel({
     } catch {
       setCopiedUrl("");
     }
+  };
+
+  const toggleEditorialChecklistItem = (id: SeoEditorialChecklistItemId) => {
+    setEditorialChecklist((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+    setBriefCopyFeedback("");
+  };
+
+  const copyResearchBrief = () => {
+    if (role !== "super_admin") return;
+    if (researchUi.status !== "ready" || !researchUi.subject) return;
+
+    const built = buildSeoEditorialResearchBrief({
+      researchUi,
+      checklist: editorialChecklist,
+      planningPreview,
+    });
+    if (!built.ok) {
+      setBriefCopyFeedback("unavailable");
+      return;
+    }
+
+    const snapshotBrief = built.brief;
+    const snapshotSubject = researchUi.subject;
+    const copyGen = ++briefCopyGenRef.current;
+
+    void (async () => {
+      try {
+        await writeClipboardText(snapshotBrief);
+        if (copyGen !== briefCopyGenRef.current) return;
+        const current = researchUiRef.current;
+        if (
+          current.status !== "ready" ||
+          !current.subject ||
+          current.subject.opportunityId !== snapshotSubject.opportunityId ||
+          current.subject.topic !== snapshotSubject.topic ||
+          current.subject.intent !== snapshotSubject.intent
+        ) {
+          return;
+        }
+        setBriefCopyFeedback("copied");
+        window.setTimeout(() => {
+          if (copyGen !== briefCopyGenRef.current) return;
+          setBriefCopyFeedback((prev) => (prev === "copied" ? "" : prev));
+        }, 2000);
+      } catch {
+        if (copyGen !== briefCopyGenRef.current) return;
+        setBriefCopyFeedback("failed");
+      }
+    })();
   };
 
   const migrations = (data?.verificationQueue || []).filter(
@@ -571,6 +656,7 @@ export default function SeoOverviewPanel({
     const controller = new AbortController();
     researchAbortRef.current = controller;
     const subject = built.subject;
+    resetEditorialHandoffUi();
     setResearchUi(createLoadingSeoPlanningResearchState(subject));
 
     void (async () => {
@@ -634,6 +720,7 @@ export default function SeoOverviewPanel({
     return () => {
       researchGenRef.current += 1;
       researchRequestSeqRef.current += 1;
+      briefCopyGenRef.current += 1;
       if (researchAbortRef.current) {
         researchAbortRef.current.abort();
         researchAbortRef.current = null;
@@ -1068,6 +1155,21 @@ export default function SeoOverviewPanel({
           ) : null}
         </div>
 
+        {researchUi.status === "ready" ? (
+          <div
+            style={{
+              fontSize: 12,
+              color: "#92400E",
+              marginBottom: 10,
+              maxWidth: 640,
+            }}
+          >
+            Copy the research brief before opening Blog. Leaving this SEO panel
+            discards the temporary research result. Opening Blog does not create
+            or save a draft.
+          </div>
+        ) : null}
+
         {planningInlineError ? (
           <div style={{ fontSize: 12, color: "#991B1B", marginBottom: 10 }}>
             {planningInlineError}
@@ -1266,9 +1368,83 @@ export default function SeoOverviewPanel({
                   </ul>
                 </>
               ) : null}
+
+              <div style={{ fontWeight: 600, marginBottom: 6, marginTop: 4 }}>
+                Manual Editorial Review
+              </div>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+                Operator checklist for this browser session only. Checking items
+                does not approve publishing. Planning remains HOLD.
+              </div>
+              <ul
+                style={{
+                  listStyle: "none",
+                  margin: "0 0 10px",
+                  padding: 0,
+                }}
+              >
+                {SEO_EDITORIAL_CHECKLIST_ITEM_IDS.map((id) => (
+                  <li key={id} style={{ marginBottom: 6, fontSize: 12 }}>
+                    <label
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "flex-start",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={editorialChecklist[id]}
+                        onChange={() => toggleEditorialChecklistItem(id)}
+                        style={{ marginTop: 2 }}
+                      />
+                      <span>{SEO_EDITORIAL_CHECKLIST_UI_LABELS[id]}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+
+              {role === "super_admin" ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    alignItems: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="action-btn btn-edit"
+                    onClick={() => copyResearchBrief()}
+                  >
+                    Copy Research Brief
+                  </button>
+                  {briefCopyFeedback === "copied" ? (
+                    <span style={{ fontSize: 12, color: "#166534" }}>
+                      Research brief copied.
+                    </span>
+                  ) : null}
+                  {briefCopyFeedback === "failed" ? (
+                    <span style={{ fontSize: 12, color: "#991B1B" }}>
+                      Clipboard copy failed. Research was not cleared. Try
+                      again manually.
+                    </span>
+                  ) : null}
+                  {briefCopyFeedback === "unavailable" ? (
+                    <span style={{ fontSize: 12, color: "#991B1B" }}>
+                      Research brief unavailable for the current result.
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div style={{ fontSize: 12, color: "#666" }}>
                 Human editorial review is still required. No CMS write, Blog
-                draft, or publish action was performed.
+                draft, or publish action was performed. Copied briefs are not
+                saved in the CMS.
               </div>
             </>
           ) : null}
