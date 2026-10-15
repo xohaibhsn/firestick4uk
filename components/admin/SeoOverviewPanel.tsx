@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
 } from "react";
@@ -21,6 +22,16 @@ import {
   MAX_TOPIC_CHARS,
   type SeoPlanningPreviewResult,
 } from "@/lib/seoPlanningReadiness";
+import {
+  buildSeoPlanningResearchRequestBody,
+  canRunSeoPlanningResearch,
+  createIdleSeoPlanningResearchState,
+  createLoadingSeoPlanningResearchState,
+  createSupersededSeoPlanningResearchState,
+  interpretSeoPlanningResearchResponse,
+  seoPlanningResearchEvidenceLabel,
+  type SeoPlanningResearchUiState,
+} from "@/lib/seoPlanningResearchUi";
 
 type VerificationRow = {
   url: string;
@@ -194,18 +205,43 @@ export default function SeoOverviewPanel({
   const [planningPreview, setPlanningPreview] =
     useState<SeoPlanningPreviewResult>(() => createSeoPlanningHoldDefault());
   const [planningInlineError, setPlanningInlineError] = useState("");
+  const [researchUi, setResearchUi] = useState<SeoPlanningResearchUiState>(() =>
+    createIdleSeoPlanningResearchState()
+  );
+  const [researchInFlight, setResearchInFlight] = useState(false);
+  const researchGenRef = useRef(0);
+  const researchRequestSeqRef = useRef(0);
+  const researchAbortRef = useRef<AbortController | null>(null);
+  const researchInFlightRef = useRef(false);
+
+  const invalidateResearchUi = useCallback((opts?: { superseded?: boolean }) => {
+    researchGenRef.current += 1;
+    if (researchAbortRef.current) {
+      researchAbortRef.current.abort();
+      researchAbortRef.current = null;
+    }
+    setResearchUi(
+      opts?.superseded
+        ? createSupersededSeoPlanningResearchState()
+        : createIdleSeoPlanningResearchState()
+    );
+  }, []);
 
   const clearPlanningPreview = useCallback(() => {
     setPlanningTopic("");
     setPlanningIntent("");
     setPlanningInlineError("");
     setPlanningPreview(createSeoPlanningHoldDefault());
-  }, []);
+    invalidateResearchUi();
+  }, [invalidateResearchUi]);
 
   const invalidatePlanningPreview = useCallback(() => {
     setPlanningInlineError("");
     setPlanningPreview(createSeoPlanningHoldDefault());
-  }, []);
+    invalidateResearchUi({
+      superseded: researchInFlightRef.current,
+    });
+  }, [invalidateResearchUi]);
 
   const explainIssue = async (
     issueId: string,
@@ -450,6 +486,7 @@ export default function SeoOverviewPanel({
 
   const runPlanningCoverageCheck = () => {
     setPlanningInlineError("");
+    invalidateResearchUi({ superseded: researchInFlightRef.current });
     if (!data) {
       setPlanningPreview(
         createSeoPlanningHoldDefault()
@@ -474,6 +511,136 @@ export default function SeoOverviewPanel({
       setPlanningInlineError(preview.message);
     }
   };
+
+  const researchEligible = canRunSeoPlanningResearch({
+    role,
+    blogPermission: !!data?.permissions?.blog,
+    blogManagePermission: !!data?.permissions?.blogManage,
+    overviewAvailable: !!data,
+    preview: planningPreview,
+    topic: planningTopic,
+    intent: planningIntent.trim() ? planningIntent : undefined,
+    researchInFlight,
+  });
+
+  const runOpenAiPlanningResearch = () => {
+    if (researchInFlightRef.current) return;
+    if (
+      !canRunSeoPlanningResearch({
+        role,
+        blogPermission: !!data?.permissions?.blog,
+        blogManagePermission: !!data?.permissions?.blogManage,
+        overviewAvailable: !!data,
+        preview: planningPreview,
+        topic: planningTopic,
+        intent: planningIntent.trim() ? planningIntent : undefined,
+        researchInFlight: false,
+      })
+    ) {
+      return;
+    }
+
+    const built = buildSeoPlanningResearchRequestBody({
+      topic: planningTopic,
+      intent: planningIntent.trim() ? planningIntent : undefined,
+    });
+    if (!built.ok) {
+      setResearchUi({
+        status: "error",
+        message: built.message,
+        subject: null,
+        summary: null,
+        sources: [],
+        claims: [],
+        unknowns: [],
+        searchQueries: [],
+        reasonCodes: [],
+        httpStatus: null,
+        errorCode: "invalid_request",
+      });
+      return;
+    }
+
+    researchInFlightRef.current = true;
+    setResearchInFlight(true);
+    const requestSeq = ++researchRequestSeqRef.current;
+    const gen = ++researchGenRef.current;
+    if (researchAbortRef.current) {
+      researchAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    researchAbortRef.current = controller;
+    const subject = built.subject;
+    setResearchUi(createLoadingSeoPlanningResearchState(subject));
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/admin-blog-research", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            ...getRoleHeaders(),
+          },
+          body: JSON.stringify(built.body),
+          signal: controller.signal,
+        });
+        const json = await res.json().catch(() => null);
+        if (gen !== researchGenRef.current) return;
+        setResearchUi(
+          interpretSeoPlanningResearchResponse({
+            httpStatus: res.status,
+            json,
+            expectedSubject: subject,
+            aborted: false,
+          })
+        );
+      } catch (err) {
+        const aborted =
+          (err instanceof DOMException && err.name === "AbortError") ||
+          (err instanceof Error && err.name === "AbortError");
+        if (gen !== researchGenRef.current) return;
+        if (aborted) {
+          setResearchUi(createSupersededSeoPlanningResearchState());
+          return;
+        }
+        setResearchUi({
+          status: "error",
+          message:
+            "Grounded research request failed before a usable response was received. No automatic retry was performed.",
+          subject,
+          summary: null,
+          sources: [],
+          claims: [],
+          unknowns: [],
+          searchQueries: [],
+          reasonCodes: [],
+          httpStatus: null,
+          errorCode: "provider_upstream",
+        });
+      } finally {
+        if (researchAbortRef.current === controller) {
+          researchAbortRef.current = null;
+        }
+        if (requestSeq === researchRequestSeqRef.current) {
+          researchInFlightRef.current = false;
+          setResearchInFlight(false);
+        }
+      }
+    })();
+  };
+
+  useEffect(() => {
+    return () => {
+      researchGenRef.current += 1;
+      researchRequestSeqRef.current += 1;
+      if (researchAbortRef.current) {
+        researchAbortRef.current.abort();
+        researchAbortRef.current = null;
+      }
+      researchInFlightRef.current = false;
+    };
+  }, []);
 
   const renderDailyQueueItem = (item: SeoDailyWorkQueueItem) => (
     <li
@@ -764,8 +931,9 @@ export default function SeoOverviewPanel({
         </div>
         <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
           Manual topic coverage preview using existing Blog inventory (AB-4) and
-          evidence-gated decisioning (AB-3). Read-only — no AI research, no CMS
-          writes, and no publish recommendation.
+          evidence-gated decisioning (AB-3). OpenAI grounded research runs only
+          on an explicit click. Results stay in this browser session — no CMS
+          writes and no publish recommendation.
         </div>
 
         <div
@@ -780,8 +948,21 @@ export default function SeoOverviewPanel({
           <span style={badgeStyle("Review")}>
             Planning status: {planningPreview.planningDecision}
           </span>
-          <span style={badgeStyle("Review")}>
-            Research evidence: {planningPreview.evidenceLabel}
+          <span
+            style={badgeStyle(
+              researchUi.status === "ready"
+                ? "OK"
+                : researchUi.status === "missing" ||
+                    researchUi.status === "error"
+                  ? "Needs attention"
+                  : "Review"
+            )}
+          >
+            Research evidence:{" "}
+            {seoPlanningResearchEvidenceLabel(
+              researchUi,
+              planningPreview.evidenceLabel
+            )}
           </span>
         </div>
 
@@ -866,6 +1047,16 @@ export default function SeoOverviewPanel({
           >
             Clear
           </button>
+          {role === "super_admin" && can("blog.manage") ? (
+            <button
+              type="button"
+              className="action-btn btn-edit"
+              disabled={!researchEligible || researchInFlight}
+              onClick={() => runOpenAiPlanningResearch()}
+            >
+              {researchInFlight ? "Researching…" : "Research with OpenAI"}
+            </button>
+          ) : null}
           {planningPreview.canOpenBlog && can("blog.manage") ? (
             <button
               type="button"
@@ -950,7 +1141,11 @@ export default function SeoOverviewPanel({
                 : "—"}
             </div>
             <div style={{ fontSize: 12, marginBottom: 4 }}>
-              AB-3 reason codes:{" "}
+              AB-3 reason codes
+              {researchUi.status === "ready" || researchUi.status === "missing"
+                ? " (pre-research snapshot)"
+                : ""}
+              :{" "}
               {planningPreview.ab3ReasonCodes.length
                 ? planningPreview.ab3ReasonCodes.join(", ")
                 : "—"}
@@ -958,7 +1153,8 @@ export default function SeoOverviewPanel({
             <div style={{ fontSize: 12, marginBottom: 4 }}>
               Planning decision: HOLD (action{" "}
               {planningPreview.decision?.action || "DO_NOTHING"}; scheduler
-              eligible: false)
+              eligible: false). READY research does not approve NEW_BLOG or
+              publishing.
             </div>
             {planningPreview.decision?.explanation ? (
               <div style={{ fontSize: 12, color: "#666" }}>
@@ -967,6 +1163,138 @@ export default function SeoOverviewPanel({
             ) : null}
           </div>
         ) : null}
+
+        <div
+          style={{
+            borderTop: "1px solid #E5E7EB",
+            paddingTop: 12,
+            marginTop: 12,
+            fontSize: 13,
+            color: "#374151",
+          }}
+          id="seo-planning-openai-research"
+        >
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>
+            OpenAI grounded research (ephemeral)
+          </div>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+            {researchUi.message}
+          </div>
+          {researchUi.status === "ready" && researchUi.subject ? (
+            <>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>
+                Provider: OpenAI · Evidence: READY
+              </div>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>
+                Topic: {researchUi.subject.topic}
+              </div>
+              {researchUi.subject.intent ? (
+                <div style={{ fontSize: 12, marginBottom: 4 }}>
+                  Intent: {researchUi.subject.intent}
+                </div>
+              ) : null}
+              <div style={{ fontSize: 12, marginBottom: 4 }}>
+                Reason codes: {researchUi.reasonCodes.join(", ") || "—"}
+              </div>
+              <div style={{ fontSize: 12, marginBottom: 8 }}>
+                Summary: {researchUi.summary}
+              </div>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Sources</div>
+              <ul style={{ margin: "0 0 10px", paddingLeft: 18 }}>
+                {researchUi.sources.map((source) => (
+                  <li key={source.id} style={{ marginBottom: 6, fontSize: 12 }}>
+                    <div>
+                      [{source.id}] {source.title}
+                    </div>
+                    <div style={{ wordBreak: "break-all" }}>
+                      {source.linkable ? (
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {source.url}
+                        </a>
+                      ) : (
+                        source.url
+                      )}
+                    </div>
+                    {source.publishedAt ? (
+                      <div style={{ color: "#666" }}>
+                        Published: {source.publishedAt}
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Claims</div>
+              <ul style={{ margin: "0 0 10px", paddingLeft: 18 }}>
+                {researchUi.claims.map((claim, idx) => (
+                  <li key={`claim-${idx}`} style={{ marginBottom: 6, fontSize: 12 }}>
+                    <div>{claim.claim}</div>
+                    <div style={{ color: "#666" }}>
+                      Sources: {claim.sourceIds.join(", ") || "—"}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {researchUi.unknowns.length ? (
+                <>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                    Unknowns
+                  </div>
+                  <ul style={{ margin: "0 0 10px", paddingLeft: 18 }}>
+                    {researchUi.unknowns.map((item, idx) => (
+                      <li key={`unk-${idx}`} style={{ fontSize: 12 }}>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              {researchUi.searchQueries.length ? (
+                <>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                    Search queries
+                  </div>
+                  <ul style={{ margin: "0 0 10px", paddingLeft: 18 }}>
+                    {researchUi.searchQueries.map((item, idx) => (
+                      <li key={`q-${idx}`} style={{ fontSize: 12 }}>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              <div style={{ fontSize: 12, color: "#666" }}>
+                Human editorial review is still required. No CMS write, Blog
+                draft, or publish action was performed.
+              </div>
+            </>
+          ) : null}
+          {researchUi.status === "missing" ? (
+            <div style={{ fontSize: 12 }}>
+              Evidence reason codes:{" "}
+              {researchUi.reasonCodes.length
+                ? researchUi.reasonCodes.join(", ")
+                : "—"}
+            </div>
+          ) : null}
+          {researchUi.status === "error" && researchUi.errorCode ? (
+            <div style={{ fontSize: 12, color: "#991B1B" }}>
+              Error code: {researchUi.errorCode}
+              {researchUi.httpStatus != null
+                ? ` (HTTP ${researchUi.httpStatus})`
+                : ""}
+            </div>
+          ) : null}
+          {role !== "super_admin" ? (
+            <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
+              OpenAI grounded research is limited to the master super_admin
+              session.
+            </div>
+          ) : null}
+        </div>
 
         {planningPreview.status === "hold" &&
         planningPreview.holdCode &&

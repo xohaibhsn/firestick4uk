@@ -1386,6 +1386,13 @@ async function main() {
       "lib/blogGroundedResearchRuntime.server.ts",
       "pages/api/admin-blog-research.ts",
       "scripts/phase-ab7b-r3-grounded-research-route-tests.js",
+      // JSEO-W3 — explicit human-triggered OpenAI research in SEO planning UI
+      "components/admin/SeoOverviewPanel.tsx",
+      "lib/seoPlanningResearchUi.ts",
+      "scripts/phase-jseo-w3-openai-research-ui-tests.js",
+      // Existing JSEO regression suites that assert route presence/isolation
+      "scripts/phase-jseo-w1-daily-work-queue-tests.js",
+      "scripts/phase-jseo-w2b-planning-readiness-tests.js",
     ]);
     const unexpected = repoRefs.filter((r) => !allowed.has(r));
     ok(

@@ -398,10 +398,18 @@ ok(
     !/INSERT|UPDATE|mysql|createPool/i.test(helperSrc)
 );
 ok(
-  "15_panel_planning_no_research_post",
+  "15_panel_planning_coverage_check_intact",
   /buildSeoPlanningPreview/.test(panelSrc) &&
-    !/admin-blog-research/.test(panelSrc) &&
-    /Check Existing Blog Coverage/.test(panelSrc)
+    /Check Existing Blog Coverage/.test(panelSrc) &&
+    // JSEO-W3 may add an explicit Research with OpenAI POST; W2B path itself
+    // must still be pure coverage evaluation (helper remains fetch-free above).
+    /runPlanningCoverageCheck/.test(panelSrc) &&
+    !/admin-blog-research/.test(
+      panelSrc.slice(
+        panelSrc.indexOf("runPlanningCoverageCheck"),
+        panelSrc.indexOf("runPlanningCoverageCheck") + 800
+      )
+    )
 );
 
 // 16. W1 + overview preserved
@@ -625,10 +633,10 @@ ok(
     )
 );
 ok(
-  "w2c_14_no_provider_or_writes",
-  !/admin-blog-research/.test(panelSrc) &&
-    !/\bfetch\s*\(/.test(helperSrc) &&
-    !/openai|gemini/i.test(helperSrc)
+  "w2c_14_planning_helper_still_pure",
+  !/\bfetch\s*\(/.test(helperSrc) &&
+    !/openai|gemini/i.test(helperSrc) &&
+    !/admin-blog-research/.test(helperSrc)
 );
 ok(
   "w2c_15_w1_overview_intact",
