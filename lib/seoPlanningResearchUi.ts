@@ -386,6 +386,31 @@ export function interpretSeoPlanningResearchResponse(input: {
     };
   }
 
+  // Fail closed: READY/MISSING require exact HTTP 200. A positive-looking
+  // envelope on any other status is never accepted as evidence.
+  if (
+    typeof input.httpStatus !== "number" ||
+    !Number.isFinite(input.httpStatus) ||
+    input.httpStatus !== 200
+  ) {
+    return {
+      status: "error",
+      message:
+        "Grounded research returned an unexpected HTTP status. Evidence was not accepted.",
+      subject: input.expectedSubject,
+      summary: null,
+      sources: [],
+      claims: [],
+      unknowns: [],
+      searchQueries: [],
+      reasonCodes: [],
+      httpStatus: Number.isFinite(input.httpStatus)
+        ? input.httpStatus
+        : null,
+      errorCode: "malformed_provider_output",
+    };
+  }
+
   if (
     envelope.provider !== "openai" ||
     envelope.task !== BLOG_GROUNDED_RESEARCH_TASK

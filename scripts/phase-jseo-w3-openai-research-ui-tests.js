@@ -344,6 +344,146 @@ for (const [name, status, body] of [
   ok(`12_error_${name}`, out.status === "error");
 }
 
+// ── JSEO-W3A — HTTP 200 fail-closed guard ──────────────────────────────────
+console.log("\nJSEO-W3A HTTP 200 fail-closed guard\n");
+
+const readyEnvelope = {
+  ok: true,
+  provider: "openai",
+  task: "research_blog_evidence",
+  evidence: readyEvidence,
+};
+const missingEnvelope = {
+  ok: true,
+  provider: "openai",
+  task: "research_blog_evidence",
+  evidence: {
+    ok: false,
+    evidenceState: "missing",
+    sources: [],
+    claims: [],
+    unknowns: [],
+    searchQueries: [],
+    reasonCodes: ["INSUFFICIENT_SOURCES"],
+  },
+};
+
+function assertNon200Rejected(name, httpStatus, envelope) {
+  const out = interpretSeoPlanningResearchResponse({
+    httpStatus,
+    json: envelope,
+    expectedSubject: subject,
+  });
+  ok(`w3a_${name}_status_error`, out.status === "error");
+  ok(
+    `w3a_${name}_not_ready_or_missing`,
+    out.status !== "ready" && out.status !== "missing"
+  );
+  ok(`w3a_${name}_no_summary`, out.summary === null);
+  ok(
+    `w3a_${name}_empty_sources_claims`,
+    Array.isArray(out.sources) &&
+      out.sources.length === 0 &&
+      Array.isArray(out.claims) &&
+      out.claims.length === 0
+  );
+  ok(
+    `w3a_${name}_http_retained`,
+    out.httpStatus === httpStatus
+  );
+  ok(
+    `w3a_${name}_sanitized_msg`,
+    /unexpected HTTP status/i.test(out.message) &&
+      !/GROUNDED_EVIDENCE_READY/.test(out.message)
+  );
+  ok(
+    `w3a_${name}_safe_code`,
+    out.errorCode === "malformed_provider_output"
+  );
+}
+
+ok(
+  "w3a_200_ready_still_ready",
+  interpretSeoPlanningResearchResponse({
+    httpStatus: 200,
+    json: readyEnvelope,
+    expectedSubject: subject,
+  }).status === "ready"
+);
+ok(
+  "w3a_200_missing_still_missing",
+  interpretSeoPlanningResearchResponse({
+    httpStatus: 200,
+    json: missingEnvelope,
+    expectedSubject: subject,
+  }).status === "missing"
+);
+ok(
+  "w3a_200_outer_false_error",
+  interpretSeoPlanningResearchResponse({
+    httpStatus: 200,
+    json: { ok: false, code: "invalid_request", message: "Bad request." },
+    expectedSubject: subject,
+  }).status === "error"
+);
+
+for (const status of [201, 202, 204, 206, 301, 302, 308, 400, 401, 403, 429, 502, 503]) {
+  assertNon200Rejected(`ready_http_${status}`, status, readyEnvelope);
+}
+
+assertNon200Rejected("missing_http_500", 500, missingEnvelope);
+assertNon200Rejected("missing_http_503", 503, missingEnvelope);
+
+{
+  const rate = interpretSeoPlanningResearchResponse({
+    httpStatus: 429,
+    json: {
+      ok: false,
+      code: "rate_limited",
+      message: "Too many AI requests. Please try again shortly.",
+    },
+    expectedSubject: subject,
+  });
+  ok("w3a_429_ok_false_error", rate.status === "error");
+  ok("w3a_429_ok_false_code", rate.errorCode === "rate_limited");
+  ok("w3a_429_ok_false_http", rate.httpStatus === 429);
+  ok("w3a_429_ok_false_empty", rate.sources.length === 0 && rate.claims.length === 0);
+}
+
+{
+  const timeout = interpretSeoPlanningResearchResponse({
+    httpStatus: 503,
+    json: {
+      ok: false,
+      code: "provider_timeout",
+      message: "Grounded research provider timed out.",
+    },
+    expectedSubject: subject,
+  });
+  ok("w3a_503_ok_false_error", timeout.status === "error");
+  ok("w3a_503_ok_false_code", timeout.errorCode === "provider_timeout");
+  ok("w3a_503_ok_false_http", timeout.httpStatus === 503);
+}
+
+{
+  const nanStatus = interpretSeoPlanningResearchResponse({
+    httpStatus: Number.NaN,
+    json: readyEnvelope,
+    expectedSubject: subject,
+  });
+  ok("w3a_nan_status_error", nanStatus.status === "error");
+  ok("w3a_nan_not_ready", nanStatus.status !== "ready");
+  ok("w3a_nan_empty", nanStatus.sources.length === 0);
+
+  const zeroStatus = interpretSeoPlanningResearchResponse({
+    httpStatus: 0,
+    json: readyEnvelope,
+    expectedSubject: subject,
+  });
+  ok("w3a_zero_status_error", zeroStatus.status === "error");
+  ok("w3a_zero_http_retained", zeroStatus.httpStatus === 0);
+}
+
 ok(
   "13_topic_change_invalidates_match",
   !planningInputsMatchCheckedPreview({
