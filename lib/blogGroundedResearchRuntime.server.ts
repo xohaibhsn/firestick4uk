@@ -18,7 +18,10 @@ import {
   runBlogGroundedResearchValidation,
   type BlogGroundedResearchValidatedResult,
 } from "@/lib/blogGroundedResearchValidation.server";
-import type { BlogResearchSubject } from "@/lib/blogResearchEvidence";
+import type {
+  BlogResearchEvidenceResult,
+  BlogResearchSubject,
+} from "@/lib/blogResearchEvidence";
 
 type ProviderConfig = { apiKey: string; model: string };
 
@@ -35,10 +38,26 @@ type OpenAiAdapterModule = {
   callOpenAiGroundedResearch: ProviderAdapterFn;
 };
 
+/**
+ * AB-8C1 — Observes the authentic provider packet after AB-7A READY only.
+ * Must not alter the public runtime response shape or invoke a provider.
+ * Callback exceptions are swallowed by the runtime (research remains usable).
+ */
+export type BlogGroundedResearchTrustedReadyCallback = (input: {
+  request: BlogGroundedResearchRequest;
+  packet: BlogGroundedResearchProviderPacket;
+  evidence: Extract<BlogResearchEvidenceResult, { ok: true }>;
+}) => void;
+
 export type BlogGroundedResearchRuntimeDeps = {
   /** Test seam: plain env map. Production defaults to process.env. */
   env?: Record<string, string | undefined>;
   loadOpenAiAdapter?: () => Promise<OpenAiAdapterModule>;
+  /**
+   * Optional server-only observer for authentic READY packets (AB-8C1 bridge).
+   * Never called for missing/failed evidence. Never retries providers.
+   */
+  onTrustedReadyEvidence?: BlogGroundedResearchTrustedReadyCallback;
 };
 
 /** Per Node process — max one grounded-research invocation in flight. */
@@ -101,20 +120,59 @@ export async function runBlogGroundedResearchRuntime(
       | BlogGroundedResearchFailure
     >;
 
+    /** Closure-local capture — no global mutable provider-packet state. */
+    const captured: {
+      packet: BlogGroundedResearchProviderPacket | null;
+    } = { packet: null };
+
     try {
       const load = deps?.loadOpenAiAdapter ?? defaultLoadOpenAiAdapter;
       const mod = await load();
-      providerCall = (subject, callOpts) =>
-        mod.callOpenAiGroundedResearch(subject, config, callOpts);
+      providerCall = async (subject, callOpts) => {
+        const providerResult = await mod.callOpenAiGroundedResearch(
+          subject,
+          config,
+          callOpts
+        );
+        if (providerResult.ok) {
+          captured.packet = providerResult.packet;
+        }
+        return providerResult;
+      };
     } catch {
       return createBlogGroundedResearchFailure("provider_upstream");
     }
 
-    return await runBlogGroundedResearchValidation(
+    const result = await runBlogGroundedResearchValidation(
       request,
       providerCall,
       callOptions
     );
+
+    // AB-8C1: observe authentic READY packets only. Bridge minting is optional
+    // and must never change the public runtime response or retry the provider.
+    const trustedPacket = captured.packet;
+    if (
+      result.ok &&
+      result.evidence.ok === true &&
+      result.evidence.evidenceState === "ready" &&
+      trustedPacket &&
+      trustedPacket.provider === "openai" &&
+      typeof deps?.onTrustedReadyEvidence === "function" &&
+      !(signal?.aborted)
+    ) {
+      try {
+        deps.onTrustedReadyEvidence({
+          request,
+          packet: trustedPacket,
+          evidence: result.evidence,
+        });
+      } catch {
+        // Bridge is optional — preserve validated research for human inspection.
+      }
+    }
+
+    return result;
   } catch {
     return createBlogGroundedResearchFailure("provider_upstream");
   } finally {

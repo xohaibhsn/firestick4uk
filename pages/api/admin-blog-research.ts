@@ -7,6 +7,7 @@
  */
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdminPermission } from "@/lib/adminAuth";
+import { mintBlogArticleEvidenceHandle } from "@/lib/blogArticleEvidenceBridge.server";
 import {
   BLOG_GROUNDED_RESEARCH_TASK,
   createBlogGroundedResearchFailure,
@@ -113,8 +114,29 @@ export default async function handler(
       return;
     }
 
+    // AB-8C1: optional opaque handle for authentic READY packets only.
+    // Mint failures never fabricate a handle and never fail the research response.
+    let evidenceHandle: string | undefined;
+
     const result = await runBlogGroundedResearchRuntime(parsed.value, {
       signal: controller.signal,
+      deps: {
+        onTrustedReadyEvidence: ({ packet, evidence }) => {
+          if (controller.signal.aborted) return;
+          if (evidence.evidenceState !== "ready" || evidence.ok !== true) return;
+          const minted = mintBlogArticleEvidenceHandle({
+            admin,
+            subject: evidence.subject,
+            provider: "openai",
+            packet,
+            evidence,
+            signal: controller.signal,
+          });
+          if (minted.ok) {
+            evidenceHandle = minted.handle;
+          }
+        },
+      },
     });
     settled = true;
 
@@ -127,12 +149,21 @@ export default async function handler(
       return;
     }
 
-    safeJson(res, 200, {
+    const body: Record<string, unknown> = {
       ok: true,
       provider: result.provider,
       task: BLOG_GROUNDED_RESEARCH_TASK,
       evidence: result.evidence,
-    });
+    };
+    if (
+      evidenceHandle &&
+      result.evidence &&
+      result.evidence.ok === true &&
+      result.evidence.evidenceState === "ready"
+    ) {
+      body.evidenceHandle = evidenceHandle;
+    }
+    safeJson(res, 200, body);
   } catch {
     settled = true;
     const failure = createBlogGroundedResearchFailure("provider_upstream");
