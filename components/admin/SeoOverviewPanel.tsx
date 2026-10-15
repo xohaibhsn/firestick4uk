@@ -38,6 +38,7 @@ import {
   type SeoEditorialChecklistState,
   type SeoPlanningResearchUiState,
 } from "@/lib/seoPlanningResearchUi";
+import { buildManualGscVerificationBrief } from "@/lib/seoOverview";
 
 type VerificationRow = {
   url: string;
@@ -222,12 +223,17 @@ export default function SeoOverviewPanel({
   const [briefCopyFeedback, setBriefCopyFeedback] = useState<
     "" | "copied" | "failed" | "unavailable"
   >("");
+  const [gscBriefCopyFeedback, setGscBriefCopyFeedback] = useState<{
+    url: string;
+    status: "copied" | "failed" | "unavailable";
+  } | null>(null);
   const researchGenRef = useRef(0);
   const researchRequestSeqRef = useRef(0);
   const researchAbortRef = useRef<AbortController | null>(null);
   const researchInFlightRef = useRef(false);
   const researchUiRef = useRef(researchUi);
   const briefCopyGenRef = useRef(0);
+  const gscBriefCopyGenRef = useRef(0);
 
   useEffect(() => {
     researchUiRef.current = researchUi;
@@ -349,9 +355,15 @@ export default function SeoOverviewPanel({
     }
   }, [getRoleHeaders]);
 
+  const clearGscBriefCopyFeedback = useCallback(() => {
+    gscBriefCopyGenRef.current += 1;
+    setGscBriefCopyFeedback(null);
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    clearGscBriefCopyFeedback();
     invalidatePlanningPreview();
     try {
       const res = await fetch("/api/admin-seo-overview", {
@@ -373,7 +385,7 @@ export default function SeoOverviewPanel({
     } finally {
       setLoading(false);
     }
-  }, [getRoleHeaders, loadMemory, invalidatePlanningPreview]);
+  }, [getRoleHeaders, loadMemory, invalidatePlanningPreview, clearGscBriefCopyFeedback]);
 
   useEffect(() => {
     let cancelled = false;
@@ -480,6 +492,35 @@ export default function SeoOverviewPanel({
     } catch {
       setCopiedUrl("");
     }
+  };
+
+  const copyVerificationBrief = (item: VerificationRow) => {
+    const built = buildManualGscVerificationBrief(item);
+    if (!built.ok) {
+      setGscBriefCopyFeedback({ url: item.url, status: "unavailable" });
+      return;
+    }
+
+    const snapshotBrief = built.brief;
+    const snapshotUrl = item.url;
+    const copyGen = ++gscBriefCopyGenRef.current;
+
+    void (async () => {
+      try {
+        await writeClipboardText(snapshotBrief);
+        if (copyGen !== gscBriefCopyGenRef.current) return;
+        setGscBriefCopyFeedback({ url: snapshotUrl, status: "copied" });
+        window.setTimeout(() => {
+          if (copyGen !== gscBriefCopyGenRef.current) return;
+          setGscBriefCopyFeedback((prev) =>
+            prev?.url === snapshotUrl && prev.status === "copied" ? null : prev
+          );
+        }, 2000);
+      } catch {
+        if (copyGen !== gscBriefCopyGenRef.current) return;
+        setGscBriefCopyFeedback({ url: snapshotUrl, status: "failed" });
+      }
+    })();
   };
 
   const toggleEditorialChecklistItem = (id: SeoEditorialChecklistItemId) => {
@@ -882,7 +923,29 @@ export default function SeoOverviewPanel({
                   >
                     Open
                   </a>
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    onClick={() => copyVerificationBrief(item)}
+                  >
+                    {gscBriefCopyFeedback?.url === item.url &&
+                    gscBriefCopyFeedback.status === "copied"
+                      ? "Brief Copied"
+                      : "Copy Verification Brief"}
+                  </button>
                   <span style={badgeStyle("Review")}>Verify in GSC</span>
+                  {gscBriefCopyFeedback?.url === item.url &&
+                  gscBriefCopyFeedback.status === "failed" ? (
+                    <span style={{ fontSize: 11, color: "#b42318" }}>
+                      Clipboard copy failed
+                    </span>
+                  ) : null}
+                  {gscBriefCopyFeedback?.url === item.url &&
+                  gscBriefCopyFeedback.status === "unavailable" ? (
+                    <span style={{ fontSize: 11, color: "#666" }}>
+                      Verification brief unavailable
+                    </span>
+                  ) : null}
                 </div>
               </td>
             </tr>

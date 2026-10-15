@@ -180,7 +180,7 @@ function verificationToItem(
     priorityLabel:
       priority === 3
         ? "Priority 3 — Manual GSC (migrations)"
-        : "Priority 3 — Manual GSC (core)",
+        : "Priority 4 — Manual GSC (core)",
     source: "GSC Manual Verification",
     entityLabel: item.label,
     reason,

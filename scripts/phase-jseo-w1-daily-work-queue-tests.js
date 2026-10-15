@@ -395,6 +395,34 @@ console.log("\nJSEO-W1 Daily Work Queue\n");
       !/indexed|completed|assigned/i.test(gsc.items[0].nextAction) &&
       !/indexed|completed|assigned/i.test(gsc.items[0].reason)
   );
+
+  const mixed = buildSeoDailyWorkQueue({
+    issues: [],
+    verificationQueue: [
+      verification({
+        url: "https://firestick4uk.com/mig",
+        group: "priority-migrations",
+        label: "Migration",
+      }),
+      verification({
+        url: "https://firestick4uk.com/core",
+        group: "core-content",
+        label: "Core page",
+      }),
+    ],
+    permissions: allPerms,
+  });
+  const migItem = mixed.items.find((i) => i.priority === 3);
+  const coreItem = mixed.items.find((i) => i.priority === 4);
+  ok(
+    "G_priority_labels_match_numeric",
+    !!migItem &&
+      !!coreItem &&
+      migItem.priorityLabel === "Priority 3 — Manual GSC (migrations)" &&
+      coreItem.priorityLabel === "Priority 4 — Manual GSC (core)" &&
+      mixed.items.findIndex((i) => i.priority === 3) <
+        mixed.items.findIndex((i) => i.priority === 4)
+  );
 }
 
 // --- PANEL / GRAPH CONTRACTS ---

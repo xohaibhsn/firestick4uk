@@ -499,3 +499,219 @@ export function buildContentVerificationItems(subscriptionUrl: string): Verifica
     note: GSC_VERIFY_NOTE,
   }));
 }
+
+/** Soft ceilings for manual GSC verification brief fields (fail closed if exceeded). */
+const MAX_GSC_BRIEF_LABEL_CHARS = 200;
+const MAX_GSC_BRIEF_NOTE_CHARS = 1000;
+const MAX_GSC_BRIEF_URL_CHARS = 2048;
+const MAX_GSC_BRIEF_CHARS = 8000;
+
+export type ManualGscVerificationBriefResult =
+  | { ok: true; brief: string }
+  | { ok: false; reason: string };
+
+function gscBriefFail(reason: string): ManualGscVerificationBriefResult {
+  return { ok: false, reason };
+}
+
+/** Reject CR/LF/control chars that could forge brief headings; keep legitimate plain text. */
+function isBoundedSafeGscPlainField(
+  value: string,
+  maxChars: number
+): boolean {
+  if (typeof value !== "string" || !value.trim() || value.length > maxChars) {
+    return false;
+  }
+  if (/[\x00-\x1f\x7f]/.test(value)) return false;
+  if (/[<>]/.test(value)) return false;
+  return true;
+}
+
+function isSafeSameOriginHttpsUrl(value: string): boolean {
+  if (typeof value !== "string" || !value || value.length > MAX_GSC_BRIEF_URL_CHARS) {
+    return false;
+  }
+  if (/[\x00-\x1f\x7f]/.test(value)) return false;
+  if (/[<>\s]/.test(value)) return false;
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:") return false;
+    if (parsed.origin !== SEO_SITE_ORIGIN) return false;
+    if (parsed.username || parsed.password) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function formatVerificationGroupLabel(group: VerificationGroup): string {
+  if (group === "priority-migrations") return "Priority URL Migrations";
+  return "Core Content";
+}
+
+function formatVerificationKindLabel(kind: VerificationKind): string {
+  if (kind === "legacy-redirect") return "Legacy redirect";
+  if (kind === "current") return "Current";
+  return "Content";
+}
+
+function formatExpectedHttp(status: 200 | 308 | null): string {
+  if (status === null) return "Requires technical review / not specified";
+  return String(status);
+}
+
+function formatOptionalUrl(value: string | null): string {
+  if (value === null) return "Not specified";
+  return value;
+}
+
+function formatSitemapExpectation(value: boolean | null): string {
+  if (value === null) return "Not determined";
+  return value ? "Yes" : "No";
+}
+
+/**
+ * Pure formatter for a human-copied manual GSC URL verification brief.
+ * Emits Firestick4UK technical expectations only — never Google observations.
+ * Fail closed on malformed or unsafe input. No network, storage, or mutation.
+ */
+export function buildManualGscVerificationBrief(
+  item: VerificationItem
+): ManualGscVerificationBriefResult {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return gscBriefFail(
+      "Verification brief is unavailable: queue row is malformed."
+    );
+  }
+
+  const group = item.group;
+  if (group !== "priority-migrations" && group !== "core-content") {
+    return gscBriefFail(
+      "Verification brief is unavailable: unknown verification group."
+    );
+  }
+
+  const kind = item.kind;
+  if (kind !== "current" && kind !== "legacy-redirect" && kind !== "content") {
+    return gscBriefFail(
+      "Verification brief is unavailable: unknown verification type."
+    );
+  }
+
+  if (
+    item.expectedStatus !== null &&
+    item.expectedStatus !== 200 &&
+    item.expectedStatus !== 308
+  ) {
+    return gscBriefFail(
+      "Verification brief is unavailable: expected HTTP status is invalid."
+    );
+  }
+
+  if (typeof item.inSitemap !== "boolean" && item.inSitemap !== null) {
+    return gscBriefFail(
+      "Verification brief is unavailable: sitemap expectation is invalid."
+    );
+  }
+
+  if (
+    typeof item.label !== "string" ||
+    !isBoundedSafeGscPlainField(item.label, MAX_GSC_BRIEF_LABEL_CHARS)
+  ) {
+    return gscBriefFail(
+      "Verification brief is unavailable: label is missing or unsafe."
+    );
+  }
+
+  if (
+    typeof item.note !== "string" ||
+    !isBoundedSafeGscPlainField(item.note, MAX_GSC_BRIEF_NOTE_CHARS)
+  ) {
+    return gscBriefFail(
+      "Verification brief is unavailable: source note is missing or unsafe."
+    );
+  }
+
+  if (typeof item.url !== "string" || !item.url) {
+    return gscBriefFail(
+      "Verification brief is unavailable: URL is missing."
+    );
+  }
+  if (!isSafeSameOriginHttpsUrl(item.url)) {
+    return gscBriefFail(
+      "Verification brief is unavailable: URL is not a safe same-origin HTTPS URL."
+    );
+  }
+
+  if (item.expectedCanonical !== null) {
+    if (
+      typeof item.expectedCanonical !== "string" ||
+      !isSafeSameOriginHttpsUrl(item.expectedCanonical)
+    ) {
+      return gscBriefFail(
+        "Verification brief is unavailable: expected canonical is unsafe."
+      );
+    }
+  }
+
+  if (item.expectedTarget !== null) {
+    if (
+      typeof item.expectedTarget !== "string" ||
+      !isSafeSameOriginHttpsUrl(item.expectedTarget)
+    ) {
+      return gscBriefFail(
+        "Verification brief is unavailable: expected redirect destination is unsafe."
+      );
+    }
+  }
+
+  const brief = [
+    "FIRESTICK4UK — MANUAL GSC URL VERIFICATION BRIEF",
+    "================================================",
+    "",
+    "SOURCE",
+    "Firestick4UK SEO Workspace",
+    "Technical expectations only — NOT Google observations.",
+    "",
+    "URL DETAILS",
+    `Label: ${item.label}`,
+    `URL: ${item.url}`,
+    `Group: ${formatVerificationGroupLabel(group)}`,
+    `Type: ${formatVerificationKindLabel(kind)}`,
+    "",
+    "EXPECTED TECHNICAL STATE",
+    `Expected HTTP: ${formatExpectedHttp(item.expectedStatus)}`,
+    `Expected redirect destination: ${formatOptionalUrl(item.expectedTarget)}`,
+    `Expected canonical: ${formatOptionalUrl(item.expectedCanonical)}`,
+    `Expected sitemap inclusion: ${formatSitemapExpectation(item.inSitemap)}`,
+    "",
+    "SOURCE NOTE",
+    item.note,
+    "",
+    "MANUAL GOOGLE SEARCH CONSOLE REVIEW",
+    "- Inspect this exact URL in the correct GSC property.",
+    "- Compare actual Google-reported indexing and canonical details.",
+    "- Check redirect/canonical behavior against the expected configuration.",
+    "- Review live URL inspection where appropriate.",
+    "- Record any discrepancy separately for editorial/technical follow-up.",
+    "",
+    "GOOGLE OBSERVATIONS",
+    "Not checked or recorded by this tool.",
+    "",
+    "IMPORTANT",
+    "These are website technical expectations, not live crawl results.",
+    "No indexing, clicks, impressions, position or coverage status is claimed.",
+    "No Google Search Console verification has been performed by this tool.",
+    "This brief is not saved in the CMS.",
+    "The operator must verify actual results in Google Search Console.",
+    "",
+  ].join("\n");
+
+  if (brief.length > MAX_GSC_BRIEF_CHARS) {
+    return gscBriefFail(
+      "Verification brief is unavailable: assembled brief exceeds safe size."
+    );
+  }
+
+  return { ok: true, brief };
+}
