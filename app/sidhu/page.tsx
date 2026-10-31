@@ -4702,9 +4702,27 @@ export default function AdminPage() {
                           </div>
                           {sectionModal.key.includes('testimonial') ? (
                             <>
-                              <div className="modal-field" style={{marginBottom:6}}><label>Name</label><input value={item.name||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,name:e.target.value}:x)}))} /></div>
-                              <div className="modal-field" style={{marginBottom:6}}><label>Rating (1-5)</label><input type="number" min={1} max={5} value={item.rating||5} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,rating:Number(e.target.value)}:x)}))} /></div>
-                              <div className="modal-field" style={{marginBottom:0}}><label>Review Text</label><textarea rows={2} value={item.text||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,text:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Display Name</label><input value={item.name||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,name:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Rating (1-5, optional — leave blank for no stars)</label><input type="number" min={1} max={5} value={item.rating ?? ""} onChange={e=>{
+                                const raw = e.target.value;
+                                setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>{
+                                  if (j!==i) return x;
+                                  if (raw === "") return {...x, rating: undefined};
+                                  const n = Number(raw);
+                                  return {...x, rating: Number.isFinite(n) ? n : undefined};
+                                })}));
+                              }} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Review Text</label><textarea rows={2} value={item.text||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,text:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Service / product (optional, verified only)</label><input value={item.service||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,service:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Date (optional, verified only)</label><input value={item.date||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,date:e.target.value}:x)}))} /></div>
+                              <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#333",cursor:"pointer"}}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.approved === true}
+                                  onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,approved:e.target.checked}:x)}))}
+                                />
+                                Customer permission granted — publish on homepage
+                              </label>
                             </>
                           ) : (
                             <>
@@ -4715,7 +4733,7 @@ export default function AdminPage() {
                           )}
                         </div>
                       ))}
-                      <button className="action-btn btn-view" onClick={()=>setSectionEditing((p:any)=>({...p,items:[...(p.items||[]),sectionModal.key.includes('testimonial')?{name:"",rating:5,text:""}:{icon:"⭐",title:"",description:""}]}))} >+ Add Item</button>
+                      <button className="action-btn btn-view" onClick={()=>setSectionEditing((p:any)=>({...p,items:[...(p.items||[]),sectionModal.key.includes('testimonial')?{name:"",text:"",approved:false}:{icon:"⭐",title:"",description:""}]}))} >+ Add Item</button>
                     </div>
                   </div>
                 )}

@@ -9,6 +9,7 @@ import HeroSlider from "@/components/HeroSlider";
 import Footer from "@/components/Footer";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import type { PublicProduct } from "@/lib/publicProductsServer";
+import { getPublishableHomeTestimonials } from "@/lib/homeTestimonials";
 
 const cardDescXss = {
   whiteList: {
@@ -182,6 +183,9 @@ export default function HomeClient({
   const handleAddToCart = (p: Product) => {
     addToCart({ id: p.id, name: p.name, price: Number(p.price), qty: 1 });
   };
+
+  const publishedReviews = getPublishableHomeTestimonials(sec.home_testimonials?.items);
+  const reviewsTitle = sec.home_testimonials?.title || "What Our Customers Say";
 
   return (
     <>
@@ -444,6 +448,24 @@ export default function HomeClient({
         .feature-icon { font-size:28px; margin-bottom:14px; display:block; }
         .feature-title { font-weight:700; font-size:15px; color:#111111; margin-bottom:7px; }
         .feature-desc { font-size:13px; color:#666666; line-height:1.6; }
+        .reviews-section { max-width:1300px; margin:0 auto; padding:0 60px 70px; background:transparent; }
+        .reviews-heading { margin-bottom:10px; }
+        .reviews-subtitle { max-width:640px; margin:0 auto 28px; text-align:center; font-family:var(--font-body); font-size:15px; line-height:1.6; color:#64748b; }
+        .reviews-empty { max-width:720px; margin:0 auto; padding:32px 28px; text-align:center; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:12px; }
+        .reviews-empty-message { margin:0 0 22px; font-family:var(--font-body); font-size:15px; line-height:1.7; color:#374151; }
+        .reviews-cta { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:11px 22px; border-radius:8px; background:#5B21B6; color:#FFFFFF; text-decoration:none; font-family:var(--font-body); font-size:14px; font-weight:600; letter-spacing:0.01em; transition:background 0.2s, transform 0.2s; }
+        .reviews-cta:hover { background:#1A1A1A; transform:translateY(-1px); }
+        .reviews-cta:focus-visible { outline:2px solid #5B21B6; outline-offset:3px; }
+        .reviews-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; margin-top:8px; }
+        .review-card { padding:28px 24px; border-radius:12px; background:#FFFFFF; border:1px solid #E5E5E5; transition:box-shadow 0.3s, transform 0.3s, border-color 0.3s; min-height:160px; }
+        .review-card:hover { box-shadow:0 4px 16px rgba(0,0,0,0.08); transform:translateY(-2px); border-color:#5B21B6; }
+        .review-stars { display:flex; gap:2px; margin-bottom:12px; font-size:16px; line-height:1; letter-spacing:0.02em; }
+        .review-star-on { color:#F59E0B; }
+        .review-star-off { color:#E5E5E5; }
+        .review-text { margin:0 0 16px; font-family:var(--font-body); font-size:14px; line-height:1.7; color:#374151; }
+        .review-meta { display:flex; flex-direction:column; gap:4px; }
+        .review-name { font-family:var(--font-display); font-size:14px; font-weight:700; color:#111111; }
+        .review-detail { font-family:var(--font-body); font-size:12px; color:#64748b; }
         footer { background:#111111; padding:50px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; }
         .footer-logo { font-family:var(--font-display); font-size:17px; font-weight:800; color:#FFFFFF; }
         .footer-links { display:flex; gap:24px; list-style:none; flex-wrap:wrap; }
@@ -505,6 +527,8 @@ export default function HomeClient({
           .hero-features{grid-template-columns:1fr;}
           .hero-stats{gap:20px;flex-wrap:wrap;margin-top:22px;justify-content:space-around;}
           .features-section{padding:40px 24px 50px;}
+          .reviews-section{padding:0 24px 50px;}
+          .reviews-empty{padding:28px 20px;}
           footer{padding:36px 24px;flex-direction:column;text-align:center;}
         }
         @media (max-width: 640px) {
@@ -726,20 +750,51 @@ export default function HomeClient({
             </div>
           </div>
           ) : null}
-          {sec.home_testimonials?.items?.length > 0 && (
-            <div className="features-section" style={{paddingTop:0}}>
-              <h2 className="section-title" style={{marginBottom:32}}>{sec.home_testimonials.title || "What Our Customers Say"}</h2>
-              <div className="features-grid">
-                {sec.home_testimonials.items.map((item:any,i:number)=>(
-                  <div className="feature-item" key={i}>
-                    <div style={{fontSize:20,marginBottom:8}}>{"⭐".repeat(item.rating||5)}</div>
-                    <div className="feature-desc" style={{marginBottom:10}}>&ldquo;{item.text}&rdquo;</div>
-                    <div className="feature-title" style={{fontSize:14}}>— {item.name}</div>
-                  </div>
+          <section className="reviews-section" aria-labelledby="home-reviews-heading">
+            <h2 id="home-reviews-heading" className="section-title reviews-heading">{reviewsTitle}</h2>
+            <p className="reviews-subtitle">Your feedback helps us improve our service.</p>
+            {publishedReviews.length > 0 ? (
+              <div className="reviews-grid">
+                {publishedReviews.map((item, i) => (
+                  <article className="review-card" key={`${item.name}-${i}`}>
+                    {item.rating !== null ? (
+                      <div
+                        className="review-stars"
+                        role="img"
+                        aria-label={`${item.rating} out of 5 stars`}
+                      >
+                        {Array.from({ length: 5 }, (_, starIdx) => (
+                          <span
+                            key={starIdx}
+                            aria-hidden="true"
+                            className={starIdx < item.rating! ? "review-star-on" : "review-star-off"}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    <p className="review-text">&ldquo;{item.text}&rdquo;</p>
+                    <div className="review-meta">
+                      <div className="review-name">{item.name}</div>
+                      {(item.date || item.service) ? (
+                        <div className="review-detail">
+                          {[item.service, item.date].filter(Boolean).join(" · ")}
+                        </div>
+                      ) : null}
+                    </div>
+                  </article>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="reviews-empty">
+                <p className="reviews-empty-message">
+                  Have you used Firestick4UK? We&apos;d love to hear about your experience. Genuine customer reviews will be featured here with permission.
+                </p>
+                <a className="reviews-cta" href="/contact">Share Your Experience</a>
+              </div>
+            )}
+          </section>
           {sec.home_newsletter && (
             <div className="features-section" style={{paddingTop:0}}>
               <h2 className="section-title">{sec.home_newsletter.title || "Stay in the Loop"}</h2>

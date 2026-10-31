@@ -126,7 +126,7 @@ export const SECTION_DEFAULTS: SectionDefault[] = [
   ],
   [
     "home_testimonials",
-    '{"title":"What Our Customers Say","items":[{"name":"John Smith","rating":5,"text":"Amazing service! Got my Firestick set up in minutes."},{"name":"Sarah Jones","rating":5,"text":"Best firestick service in UK! Great value."}]}',
+    '{"title":"What Our Customers Say","items":[]}',
     "json",
     "home",
     "Testimonials Section",
