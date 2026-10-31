@@ -333,6 +333,11 @@ export default function AdminPage() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [productModal, setProductModal] = useState<any|null|"new">(null);
   const [editProduct, setEditProduct] = useState({ name:"", slug:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
+  const [productUrlMigration, setProductUrlMigration] = useState<{
+    newSlug: string;
+    status: "idle" | "loading" | "ok" | "error";
+    message: string;
+  }>({ newSlug: "", status: "idle", message: "" });
   type MetaDraftAiState = {
     status: "idle" | "loading" | "ok" | "error";
     provider?: "gemini" | "openai";
@@ -1689,6 +1694,7 @@ export default function AdminPage() {
     const rawPrice = p.price ? `£${Number(String(p.price).replace(/[^0-9.]/g,'')).toFixed(2)}` : "";
     setProductMetaAi({ status: "idle" });
     resetProductAiState(p.category || "Subscription");
+    setProductUrlMigration({ newSlug: "", status: "idle", message: "" });
     setEditProduct({
       name: p.name || "",
       slug: p.slug || toSlug(p.name || ""),
@@ -1710,8 +1716,103 @@ export default function AdminPage() {
   const openNewProduct = () => {
     setProductMetaAi({ status: "idle" });
     resetProductAiState("Subscription");
+    setProductUrlMigration({ newSlug: "", status: "idle", message: "" });
     setEditProduct({ name:"", slug:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
     setProductModal("new");
+  };
+
+  const migrateProductUrl = async () => {
+    if (productModal === "new" || !productModal?.id) return;
+    if (!can("products.manage") || !can("redirects.manage")) {
+      showPermError();
+      return;
+    }
+    if (productUrlMigration.status === "loading") return;
+
+    const expectedOldSlug = String(editProduct.slug || "").trim();
+    const newSlug = String(productUrlMigration.newSlug || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+    if (!expectedOldSlug || !newSlug) {
+      setProductUrlMigration((s) => ({
+        ...s,
+        status: "error",
+        message: "Enter a valid new URL slug before migrating.",
+      }));
+      return;
+    }
+    if (newSlug === expectedOldSlug) {
+      setProductUrlMigration((s) => ({
+        ...s,
+        status: "error",
+        message: "New slug must differ from the current public slug.",
+      }));
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Migrate product #${productModal.id} URL?\n\n` +
+        `FROM: /products/${expectedOldSlug}\n` +
+        `TO:   /products/${newSlug}\n\n` +
+        `This creates a permanent 308 redirect and keeps the same product ID, price, and content.`
+    );
+    if (!confirmed) return;
+
+    setProductUrlMigration((s) => ({ ...s, status: "loading", message: "" }));
+    try {
+      const r = await fetch("/api/admin-product-url-migration", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: productModal.id,
+          expected_old_slug: expectedOldSlug,
+          new_slug: newSlug,
+        }),
+      });
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      if (r.status === 403) {
+        showPermError();
+        setProductUrlMigration((s) => ({
+          ...s,
+          status: "error",
+          message: "Forbidden: product URL migration requires redirects.manage.",
+        }));
+        return;
+      }
+      const res = await r.json().catch(() => ({}));
+      if (!r.ok || res.error) {
+        setProductUrlMigration((s) => ({
+          ...s,
+          status: "error",
+          message: String(res.error || "URL migration failed"),
+        }));
+        return;
+      }
+
+      setEditProduct((p) => ({ ...p, slug: String(res.new_slug || newSlug) }));
+      setProductModal((prev: any) =>
+        prev && prev !== "new" ? { ...prev, slug: String(res.new_slug || newSlug) } : prev
+      );
+      setProductUrlMigration({
+        newSlug: "",
+        status: "ok",
+        message: res.already_migrated
+          ? `Already migrated to /products/${res.new_slug}`
+          : `Migrated to /products/${res.new_slug} with permanent redirect`,
+      });
+      await loadProducts();
+    } catch {
+      setProductUrlMigration((s) => ({
+        ...s,
+        status: "error",
+        message: "URL migration failed",
+      }));
+    }
   };
 
   const draftNewProductFields = async (
@@ -2678,6 +2779,73 @@ export default function AdminPage() {
                   Public URL is protected. Slug changes require a controlled SEO migration with a redirect.
                 </small>
               )}
+              {productModal !== "new" && productModal?.id && can("products.manage") && can("redirects.manage") ? (
+                <div
+                  data-testid="product-url-migration-panel"
+                  style={{
+                    marginTop: 10,
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    border: "1px solid rgba(234,88,12,0.35)",
+                    background: "rgba(234,88,12,0.08)",
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                    Controlled URL migration
+                  </div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", marginBottom: 8, lineHeight: 1.45 }}>
+                    Changes only the public slug and creates a permanent 308 from the old path.
+                    Product ID, price, stock, media and content stay unchanged.
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <input
+                      type="text"
+                      data-testid="product-url-migration-new-slug"
+                      value={productUrlMigration.newSlug}
+                      disabled={productUrlMigration.status === "loading"}
+                      onChange={(e) =>
+                        setProductUrlMigration((s) => ({
+                          ...s,
+                          newSlug: e.target.value
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]+/g, "-")
+                            .replace(/(^-|-$)/g, ""),
+                          status: "idle",
+                          message: "",
+                        }))
+                      }
+                      placeholder="new-year-free-slug"
+                      style={{ flex: "1 1 180px", minWidth: 160 }}
+                    />
+                    <button
+                      type="button"
+                      className="action-btn btn-edit"
+                      data-testid="product-url-migration-submit"
+                      disabled={productUrlMigration.status === "loading"}
+                      onClick={() => void migrateProductUrl()}
+                    >
+                      {productUrlMigration.status === "loading" ? "Migrating…" : "Migrate URL"}
+                    </button>
+                  </div>
+                  {productUrlMigration.message ? (
+                    <div
+                      data-testid="product-url-migration-message"
+                      style={{
+                        marginTop: 8,
+                        fontSize: 11,
+                        color:
+                          productUrlMigration.status === "error"
+                            ? "#FCA5A5"
+                            : productUrlMigration.status === "ok"
+                              ? "#86EFAC"
+                              : "rgba(255,255,255,0.65)",
+                      }}
+                    >
+                      {productUrlMigration.message}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div className="modal-field"><label>Price</label><input placeholder="e.g. £9.99" value={editProduct.price} onChange={e => setEditProduct({...editProduct,price:e.target.value})} /></div>

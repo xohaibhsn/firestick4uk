@@ -2,7 +2,7 @@
  * Server-only Redirect Manager DB helpers.
  * Table must exist via scripts/migrate-url-redirects.js — no runtime DDL.
  */
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import pool from "@/lib/db";
 import {
   safeRedirectRow,
@@ -11,7 +11,8 @@ import {
   type UrlRedirectTypeV1,
 } from "@/lib/urlRedirects";
 
-type Queryable = typeof pool;
+/** Pool or transactional connection — matches contentRevisions Queryable. */
+type Queryable = Pool | PoolConnection;
 
 export async function listRedirects(conn: Queryable = pool): Promise<UrlRedirectRow[]> {
   const [rows] = await conn.query<RowDataPacket[]>(
