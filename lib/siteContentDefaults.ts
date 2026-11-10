@@ -2,6 +2,9 @@
 export const EXTRA_CONTENT_DEFAULTS: Array<[string, string, string, string, string]> = [
   // Global / settings
   ['site_meta_description','Buy Firestick, streaming subscriptions and Android boxes in the UK. Fast delivery, easy setup, real support.','textarea','settings','Default Meta Description'],
+  ['clarity_enabled','0','text','settings','Microsoft Clarity Enabled'],
+  ['clarity_project_id','','text','settings','Microsoft Clarity Project ID'],
+  ['clarity_dashboard_url','','url','settings','Microsoft Clarity Dashboard URL'],
   ['nav_logo_alt','Firestick4UK','text','settings','Navbar Logo Alt'],
   ['nav_logo_text','FIRESTICK4UK','text','settings','Navbar Text Logo'],
   ['nav_cart_label','Cart','text','settings','Navbar Cart Button'],

@@ -389,8 +389,9 @@ export default function TrackingConsent() {
                   Analytics
                 </label>
                 <p className="tc-row-desc">
-                  Helps us understand how pages are used (Google Analytics). No
-                  effect on cart or checkout.
+                  Helps us understand how pages are used (Google Analytics, and
+                  Microsoft Clarity session replays and heatmaps with typed
+                  input masked). No effect on cart or checkout.
                 </p>
               </div>
               <div className="tc-switch">

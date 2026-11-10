@@ -3,6 +3,8 @@
 export const TRACKING_CONSENT_STORAGE_KEY = "firestick_tracking_consent_v1";
 export const TRACKING_CONSENT_VERSION = 1;
 export const TRACKING_OPEN_PREFERENCES_EVENT = "firestick:open-tracking-preferences";
+/** Fired after a preference is written to localStorage (same-tab listeners). */
+export const TRACKING_CONSENT_CHANGED_EVENT = "firestick:tracking-consent-changed";
 
 export const GA_MEASUREMENT_ID = "G-055GHH06KD";
 export const GOOGLE_ADS_ID = "AW-18404353244";
@@ -59,6 +61,13 @@ export function writeTrackingConsent(
       );
     } catch {
       /* ignore quota / private mode */
+    }
+    try {
+      window.dispatchEvent(
+        new CustomEvent(TRACKING_CONSENT_CHANGED_EVENT, { detail: next })
+      );
+    } catch {
+      /* ignore */
     }
   }
   return next;

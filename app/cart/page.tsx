@@ -596,7 +596,7 @@ export default function CartPage() {
 
       <Navbar cta="none" />
 
-      <div className="page-wrapper">
+      <div className="page-wrapper" data-clarity-mask="True">
         <div className="page-header">
           <div className="section-tag">✦ {step === "cart" ? t("cart_tag", "Your Cart") : t("checkout_tag", "Checkout")}</div>
           <h1 className="page-title">{step === "cart" ? t("cart_title", "My Cart") : t("checkout_title", "Complete Order")}</h1>

@@ -4,6 +4,7 @@ import "./globals.css";
 import { CartProvider } from "./lib/cartContext";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import TrackingConsent from "@/components/TrackingConsent";
+import MicrosoftClarity from "@/components/MicrosoftClarity";
 import JsonLd from "@/components/JsonLd";
 import { SiteContentProvider } from "@/components/SiteContentProvider";
 import { getContactConfig } from "@/lib/contact-config";
@@ -168,6 +169,7 @@ export default async function RootLayout({
         <SiteContentProvider>
           <CartProvider>{children}</CartProvider>
           <TrackingConsent />
+          <MicrosoftClarity />
           <WhatsAppButton />
         </SiteContentProvider>
       </body>

@@ -5616,7 +5616,80 @@ export default function AdminPage() {
                     {contentMsg}
                   </div>
                 )}
-                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_meta_description","site_logo_url","og_default_image","whatsapp_icon_url"])}>
+                <div className="modal-field" style={{marginTop:24,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
+                  <label style={{fontWeight:700,fontSize:14,color:"#111"}}>Microsoft Clarity</label>
+                  <div style={{fontSize:11,color:"#888888",marginBottom:12,lineHeight:1.5}}>
+                    Heatmaps and session recordings. Off by default. Loads only on firestick4uk.com after analytics consent, never on /sidhu, /cart, /api, or /order-tracking. Project ID must be 6–20 alphanumeric characters. Do not paste Clarity scripts into any free-form HTML field.
+                  </div>
+                  <label style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,cursor:"pointer",fontSize:13}}>
+                    <input
+                      type="checkbox"
+                      checked={siteContent.clarity_enabled === "1" || siteContent.clarity_enabled === "true" || siteContent.clarity_enabled === "on"}
+                      onChange={(e) =>
+                        setSiteContent((s) => ({
+                          ...s,
+                          clarity_enabled: e.target.checked ? "1" : "0",
+                        }))
+                      }
+                    />
+                    Enable Microsoft Clarity
+                  </label>
+                  <div className="modal-field">
+                    <label>Clarity Project ID</label>
+                    <input
+                      className="modal-field"
+                      style={{width:"100%"}}
+                      value={siteContent.clarity_project_id || ""}
+                      onChange={(e) =>
+                        setSiteContent((s) => ({
+                          ...s,
+                          clarity_project_id: e.target.value.trim(),
+                        }))
+                      }
+                      placeholder="e.g. abc12xyz"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </div>
+                  <div className="modal-field">
+                    <label>Clarity Dashboard URL (optional)</label>
+                    <input
+                      className="modal-field"
+                      style={{width:"100%"}}
+                      value={siteContent.clarity_dashboard_url || ""}
+                      onChange={(e) =>
+                        setSiteContent((s) => ({
+                          ...s,
+                          clarity_dashboard_url: e.target.value.trim(),
+                        }))
+                      }
+                      placeholder="https://clarity.microsoft.com/projects/view/..."
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    {siteContent.clarity_dashboard_url &&
+                      String(siteContent.clarity_dashboard_url).startsWith(
+                        "https://clarity.microsoft.com/"
+                      ) && (
+                        <a
+                          href={siteContent.clarity_dashboard_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: "inline-block",
+                            marginTop: 8,
+                            fontSize: 13,
+                            color: "#5B21B6",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Open Clarity dashboard →
+                        </a>
+                      )}
+                  </div>
+                </div>
+
+                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_meta_description","site_logo_url","og_default_image","whatsapp_icon_url","clarity_enabled","clarity_project_id","clarity_dashboard_url"])}>
                   {contentSaving?"Saving...":"💾 Save Settings"}
                 </button>
               </div>
