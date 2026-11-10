@@ -22,6 +22,10 @@ import {
 } from "@/lib/blogSeoSafety";
 import { parseCouponAdminInput } from "@/lib/couponValidation";
 import {
+  classifyStoredPaymentMethod,
+  formatPaymentMethodLabel,
+} from "@/lib/paymentMethod";
+import {
   NEW_PRODUCT_AI_GENERATE_ALL_FIELDS,
   applyExistingProductAiFieldLocally,
   applyNewProductAiFieldLocally,
@@ -2533,7 +2537,7 @@ export default function AdminPage() {
             )}
 
             <div style={{fontSize:11,letterSpacing:1.5,textTransform:"uppercase",color:"#666",fontWeight:700,margin:"18px 0 10px"}}>Payment</div>
-            <div className="modal-field"><label>Payment Method</label><input readOnly value={orderModal.payment || "—"} /></div>
+            <div className="modal-field"><label>Payment Method</label><input readOnly value={orderModal.payment ? formatPaymentMethodLabel(orderModal.payment, "long") : "—"} /></div>
             {orderModal.payment_reference && (
               <div className="modal-field"><label>Payment Reference</label><input readOnly value={orderModal.payment_reference} style={{background:"#F5F3FF",borderColor:"#DDD6FE",fontWeight:600}} /></div>
             )}
@@ -4088,10 +4092,16 @@ export default function AdminPage() {
                         <td style={{fontWeight:700,whiteSpace:"nowrap"}}>{o.total}</td>
                         <td style={{whiteSpace:"nowrap",color:"#888888",fontSize:"12px"}}>{o.date}</td>
                         <td>
-                          {o.payment === "cod"
-                            ? <span style={{fontSize:"11px",padding:"3px 9px",borderRadius:"10px",background:"rgba(0,200,100,0.1)",border:"1px solid rgba(0,200,100,0.3)",color:"#00c864",fontWeight:700}}>💵 COD</span>
-                            : <span style={{fontSize:"11px",padding:"3px 9px",borderRadius:"10px",background:"rgba(68,136,255,0.1)",border:"1px solid rgba(68,136,255,0.3)",color:"#6699ff",fontWeight:700}}>🏦 Bank</span>
-                          }
+                          {(() => {
+                            const kind = classifyStoredPaymentMethod(o.payment);
+                            if (kind === "cod") {
+                              return <span style={{fontSize:"11px",padding:"3px 9px",borderRadius:"10px",background:"rgba(0,200,100,0.1)",border:"1px solid rgba(0,200,100,0.3)",color:"#00c864",fontWeight:700}}>💵 COD</span>;
+                            }
+                            if (kind === "bank") {
+                              return <span style={{fontSize:"11px",padding:"3px 9px",borderRadius:"10px",background:"rgba(68,136,255,0.1)",border:"1px solid rgba(68,136,255,0.3)",color:"#6699ff",fontWeight:700}}>🏦 Bank</span>;
+                            }
+                            return <span style={{fontSize:"11px",padding:"3px 9px",borderRadius:"10px",background:"rgba(150,150,150,0.12)",border:"1px solid rgba(150,150,150,0.35)",color:"#888888",fontWeight:700}}>Unknown</span>;
+                          })()}
                         </td>
                         <td>
                           {o.receipt

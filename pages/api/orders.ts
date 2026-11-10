@@ -23,6 +23,12 @@ import {
   hasMeaningfulCustomerIdentity,
   normalizeOrderCustomerIdentity,
 } from '../../lib/orderCustomerIdentity';
+import {
+  formatPaymentMethodLabel,
+  isPublicPaymentMethod,
+  toDbPaymentMethod,
+  type PublicPaymentMethod,
+} from '../../lib/paymentMethod';
 
 type DbProduct = {
   id: number;
@@ -32,8 +38,6 @@ type DbProduct = {
   stock: string | null;
   active: number;
 };
-
-const ALLOWED_PAYMENT_METHODS = new Set(['bank', 'cod']);
 
 /** Coupon/order validation failures that must roll back an open transaction. */
 class OrderValidationError extends Error {
@@ -80,9 +84,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: CUSTOMER_IDENTITY_REQUIRED_MSG });
     }
 
-    if (!ALLOWED_PAYMENT_METHODS.has(String(payment_method || ''))) {
+    if (!isPublicPaymentMethod(payment_method)) {
       return res.status(400).json({ error: 'Invalid payment method.' });
     }
+    const publicPaymentMethod: PublicPaymentMethod = payment_method;
+    const dbPaymentMethod = toDbPaymentMethod(publicPaymentMethod);
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Order items are required.' });
@@ -214,7 +220,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           city,
           postcode,
           notesToStore,
-          payment_method,
+          dbPaymentMethod,
           receipt_path || '',
           grandTotal,
           validatedCouponCode,
@@ -306,7 +312,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       <tr><td style="padding:5px 0;color:#888;font-size:13px">Email</td><td style="color:#111;font-size:13px">${safeAdminCustomerEmail}</td></tr>
       <tr><td style="padding:5px 0;color:#888;font-size:13px">Phone</td><td style="color:#111;font-size:13px">${safeAdminCustomerPhone}</td></tr>
       <tr><td style="padding:5px 0;color:#888;font-size:13px">Address</td><td style="color:#111;font-size:13px">${safeAdminAddress}</td></tr>
-      <tr><td style="padding:5px 0;color:#888;font-size:13px">Payment</td><td style="color:#111;font-size:13px;font-weight:600">${payment_method === 'bank' ? '🏦 Bank Transfer' : '💵 Cash on Delivery'}</td></tr>
+      <tr><td style="padding:5px 0;color:#888;font-size:13px">Payment</td><td style="color:#111;font-size:13px;font-weight:600">${formatPaymentMethodLabel(publicPaymentMethod, 'email-admin')}</td></tr>
       ${payment_reference ? `<tr><td style="padding:5px 0;color:#888;font-size:13px">Reference</td><td style="color:#111;font-size:13px">${safeAdminPaymentReference}</td></tr>` : ''}
       ${notesToStore ? `<tr><td style="padding:5px 0;color:#888;font-size:13px">Notes</td><td style="color:#111;font-size:13px">${safeAdminNotes}</td></tr>` : ''}
     </table>
@@ -341,8 +347,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (customer_email) {
         const safeName = escapeHtml(String(customer_name || ''));
         const safeOrderId = escapeHtml(String(order_id));
-        const safePayment =
-          payment_method === 'bank' ? 'Bank Transfer' : 'Cash on Delivery';
+        const safePayment = formatPaymentMethodLabel(publicPaymentMethod, 'email-customer');
         const customerItemRows = authoritativeItems
           .map((i) => {
             const name = escapeHtml(String(i.name || 'Item'));
@@ -430,6 +435,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (error instanceof OrderValidationError || error?.name === 'OrderValidationError') {
       return res.status(error.status || 400).json({ error: error.message });
     }
-    return res.status(500).json({ error: error.message });
+    // Do not leak raw DB/driver messages to clients. Log only non-sensitive diagnostics.
+    const errCode = typeof error?.code === 'string' ? error.code : undefined;
+    const errName = typeof error?.name === 'string' ? error.name : 'Error';
+    console.error('[orders] Order creation failed:', errName, errCode || '');
+    return res.status(500).json({ error: 'Unable to create order. Please try again.' });
   }
 }

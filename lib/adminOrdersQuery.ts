@@ -1,7 +1,14 @@
 /**
  * Shared admin order list/filter helpers (no request-time DDL).
  */
+import {
+  isPublicPaymentMethod,
+  paymentFilterStorageValues,
+  type PublicPaymentMethod,
+} from "./paymentMethod";
+
 export const ORDER_STATUSES = ["pending", "confirmed", "dispatched", "delivered"] as const;
+/** Admin filter vocabulary (public contract). Bank filter dual-matches storage. */
 export const PAYMENT_METHODS = ["bank", "cod"] as const;
 export const EXPORT_MAX = 5000;
 
@@ -35,7 +42,7 @@ function parseDateBound(raw: unknown, endOfDay: boolean): string | null {
 export type OrderFilters = {
   q: string;
   status: string | null;
-  paymentMethod: string | null;
+  paymentMethod: PublicPaymentMethod | null;
   dateFrom: string | null;
   dateTo: string | null;
 };
@@ -57,9 +64,9 @@ export function parseOrderFilters(query: Record<string, unknown> | any): {
     status = statusRaw;
   }
 
-  let paymentMethod: string | null = null;
+  let paymentMethod: PublicPaymentMethod | null = null;
   if (paymentRaw && paymentRaw !== "all") {
-    if (!(PAYMENT_METHODS as readonly string[]).includes(paymentRaw)) {
+    if (!isPublicPaymentMethod(paymentRaw)) {
       return { filters: empty, error: "Invalid payment_method" };
     }
     paymentMethod = paymentRaw;
@@ -137,8 +144,15 @@ export function buildOrderWhere(
     params.push(filters.status);
   }
   if (filters.paymentMethod) {
-    where.push(`${col("payment_method")} = ?`);
-    params.push(filters.paymentMethod);
+    const storageValues = paymentFilterStorageValues(filters.paymentMethod);
+    if (storageValues.length === 1) {
+      where.push(`${col("payment_method")} = ?`);
+      params.push(storageValues[0]);
+    } else {
+      const placeholders = storageValues.map(() => "?").join(", ");
+      where.push(`${col("payment_method")} IN (${placeholders})`);
+      params.push(...storageValues);
+    }
   }
   if (filters.dateFrom) {
     where.push(`${col("created_at")} >= ?`);

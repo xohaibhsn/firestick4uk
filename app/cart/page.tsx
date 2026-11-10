@@ -18,6 +18,20 @@ import {
   hasMeaningfulCustomerIdentity,
   normalizeOrderCustomerIdentity,
 } from "@/lib/orderCustomerIdentity";
+import {
+  RECEIPT_ACCEPT_ATTR,
+  RECEIPT_ERROR_DEFAULTS,
+  RECEIPT_HELP_DEFAULT,
+} from "@/lib/receiptUploadContract";
+import {
+  EMPTY_RECEIPT_SELECTION,
+  applyReceiptFileChoice,
+  clearReceiptSelectionState,
+  receiptSelectionBlocksBankSubmit,
+  receiptStatusLabel,
+  uploadReceiptDuringCheckout,
+  type ReceiptSelectionState,
+} from "@/lib/receiptCheckoutClient";
 
 type ProductFacts = {
   id: number;
@@ -131,11 +145,21 @@ const navStyles = `
   /* UPLOAD */
   .upload-area { border:2px dashed #CCCCCC; border-radius:10px; padding:28px; text-align:center; cursor:pointer; transition:all 0.2s; position:relative; background:#FAFAFA; }
   .upload-area:hover { border-color:#5B21B6; background:#F5F3FF; }
-  .upload-area.has-file { border-color:#16A34A; background:#F0FDF4; }
+  .upload-area.has-file { border-color:#5B21B6; background:#F5F3FF; cursor:default; }
   .upload-icon { font-size:32px; margin-bottom:8px; display:block; }
   .upload-text { font-size:14px; color:#666666; }
-  .upload-text strong { color:#5B21B6; }
-  .upload-area input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+  .upload-text strong { color:#111111; }
+  .upload-hint { font-size:12px; color:#666666; margin-top:8px; line-height:1.5; }
+  .upload-selected-actions { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:12px; position:relative; z-index:2; }
+  .upload-selected-actions button, .upload-selected-actions label {
+    background:#FFFFFF; border:1px solid #D4D4D8; color:#111111; padding:7px 14px; border-radius:8px;
+    font-size:12px; cursor:pointer; font-family:inherit;
+  }
+  .upload-selected-actions button:hover, .upload-selected-actions label:hover { border-color:#5B21B6; color:#5B21B6; }
+  .upload-area input[type="file"].upload-overlay {
+    position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; z-index:1;
+  }
+  .upload-area input[type="file"].upload-replace { display:none; }
 
   /* PLACE ORDER */
   .place-order-btn { width:100%; background:#5B21B6; color:#FFFFFF; border:none; padding:16px; border-radius:9px; font-size:15px; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; margin-top:10px; }
@@ -199,10 +223,45 @@ export default function CartPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("cart");
   const [paymentMethod, setPaymentMethod] = useState<"bank" | "cod">("bank");
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptSelection, setReceiptSelection] = useState<ReceiptSelectionState>(EMPTY_RECEIPT_SELECTION);
+  const receiptFile = receiptSelection.file;
+  const receiptSelectError = receiptSelection.selectError;
+  const receiptUiStatus = receiptStatusLabel(receiptSelection);
   const [paymentReference, setPaymentReference] = useState("");
   const [placing, setPlacing] = useState(false);
   const [orderError, setOrderError] = useState("");
+  const receiptInputId = useId();
+
+  const clearReceiptSelection = () => {
+    setReceiptSelection(clearReceiptSelectionState());
+  };
+
+  const onReceiptFileChosen = (file: File | null, reason: "pick" | "cancel" | "clear" = "pick") => {
+    setOrderError("");
+    setReceiptSelection((prev) =>
+      applyReceiptFileChoice(prev, file, {
+        reason,
+        formatError: (code) =>
+          t(
+            code === "file_too_large"
+              ? "bank_upload_err_too_large"
+              : code === "empty_file"
+                ? "bank_upload_err_empty"
+                : "bank_upload_err_type",
+            RECEIPT_ERROR_DEFAULTS[code]
+          ),
+      })
+    );
+  };
+
+  const choosePaymentMethod = (next: "bank" | "cod") => {
+    setPaymentMethod(next);
+    if (next !== "bank") {
+      // Optional receipt must not block COD after a leftover selection/rejection.
+      clearReceiptSelection();
+      setOrderError("");
+    }
+  };
 
   const [form, setForm] = useState({
     name: "", email: "", phone: "", address: "", city: "", postcode: "", notes: ""
@@ -364,29 +423,49 @@ export default function CartPage() {
       return;
     }
 
+    // Rejected selection must not silently become "no receipt" on bank checkout.
+    if (paymentMethod === "bank" && receiptSelectionBlocksBankSubmit(receiptSelection)) {
+      setOrderError(
+        receiptSelectError ||
+          t(
+            "bank_upload_err_type",
+            RECEIPT_ERROR_DEFAULTS.unsupported_type
+          )
+      );
+      return;
+    }
+
     setPlacing(true);
 
     try {
       let receiptPath = "";
       if (receiptFile) {
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(receiptFile);
-        });
-        const uploadRes = await fetch("/api/upload-receipt", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ file: base64, name: receiptFile.name }),
-        });
-        const uploadData = await uploadRes.json().catch(() => ({}));
-        if (!uploadRes.ok || !uploadData.path) {
-          setOrderError("Payment receipt could not be uploaded. Please try again.");
+        const uploaded = await uploadReceiptDuringCheckout(receiptFile);
+        if (!uploaded.ok) {
+          const kind = uploaded.kind;
+          const key =
+            kind === "unsupported_type"
+              ? "bank_upload_err_type"
+              : kind === "file_too_large"
+                ? "bank_upload_err_too_large"
+                : kind === "empty_file"
+                  ? "bank_upload_err_empty"
+                  : kind === "invalid_file"
+                    ? "bank_upload_err_invalid"
+                    : kind === "rate_limited"
+                      ? "bank_upload_err_rate"
+                      : kind === "gateway"
+                        ? "bank_upload_err_gateway"
+                        : kind === "network"
+                          ? "bank_upload_err_network"
+                          : kind === "file_read"
+                            ? "bank_upload_err_read"
+                            : "bank_upload_err_failed";
+          setOrderError(t(key, RECEIPT_ERROR_DEFAULTS[kind]));
           setPlacing(false);
           return;
         }
-        receiptPath = uploadData.path;
+        receiptPath = uploaded.path;
       }
 
       const res = await fetch("/api/orders", {
@@ -514,7 +593,7 @@ export default function CartPage() {
   return (
     <>
       <style>{navStyles}</style>
-      
+
       <Navbar cta="none" />
 
       <div className="page-wrapper">
@@ -630,7 +709,7 @@ export default function CartPage() {
                       {val:"bank", label: t("cart_pay_bank", "Bank Transfer"), sub: t("cart_pay_bank_sub", "Transfer to our UK bank & upload receipt")},
                       {val:"cod", label: t("cart_pay_cod", "Cash on Delivery"), sub: t("cart_pay_cod_sub", "Pay when your order arrives")},
                     ].map(p => (
-                      <div key={p.val} className={`payment-option ${paymentMethod === p.val ? "selected" : ""}`} onClick={() => setPaymentMethod(p.val as any)}>
+                      <div key={p.val} className={`payment-option ${paymentMethod === p.val ? "selected" : ""}`} onClick={() => choosePaymentMethod(p.val as "bank" | "cod")}>
                         <input type="radio" readOnly checked={paymentMethod === p.val} />
                         <div>
                           <div className="payment-option-label">{p.label}</div>
@@ -652,13 +731,82 @@ export default function CartPage() {
                       </div>
                       <div className="form-group">
                         <label>{t("bank_upload_label", "Upload Payment Receipt (Optional)")}</label>
-                        <div className={`upload-area ${receiptFile ? "has-file" : ""}`}>
-                          <span className="upload-icon">{receiptFile ? "✅" : "📎"}</span>
+                        <div className={`upload-area ${receiptUiStatus !== "empty" ? "has-file" : ""}`}>
+                          <span className="upload-icon">📎</span>
                           <div className="upload-text">
-                            {receiptFile ? <strong>{receiptFile.name}</strong> : t("bank_upload_text", "Click to upload your receipt")}
+                            {receiptUiStatus === "selected" && receiptFile ? (
+                              <>
+                                <strong>{receiptFile.name}</strong>
+                                <div className="upload-hint">
+                                  {t(
+                                    "bank_upload_selected",
+                                    "Selected — not uploaded yet. It uploads when you place the order."
+                                  )}
+                                </div>
+                              </>
+                            ) : receiptUiStatus === "rejected" ? (
+                              <>
+                                <strong>{receiptSelection.rejectedName || "receipt"}</strong>
+                                <div className="upload-hint">
+                                  {t(
+                                    "bank_upload_rejected",
+                                    "Not accepted — choose another file or remove to continue without a receipt."
+                                  )}
+                                </div>
+                              </>
+                            ) : (
+                              t("bank_upload_text", "Click to upload your receipt")
+                            )}
                           </div>
-                          <input type="file" accept="image/*,.pdf" onChange={e => setReceiptFile(e.target.files?.[0] || null)} />
+                          {receiptUiStatus === "empty" ? (
+                            <input
+                              id={receiptInputId}
+                              className="upload-overlay"
+                              type="file"
+                              accept={RECEIPT_ACCEPT_ATTR}
+                              onChange={(e) => {
+                                const next = e.target.files?.[0] || null;
+                                // Empty files list after open usually means cancel — do not clear state.
+                                onReceiptFileChosen(next, next ? "pick" : "cancel");
+                                e.target.value = "";
+                              }}
+                            />
+                          ) : (
+                            <div className="upload-selected-actions">
+                              <label htmlFor={`${receiptInputId}-replace`}>
+                                {t("bank_upload_replace", "Choose another file")}
+                                <input
+                                  id={`${receiptInputId}-replace`}
+                                  className="upload-replace"
+                                  type="file"
+                                  accept={RECEIPT_ACCEPT_ATTR}
+                                  onChange={(e) => {
+                                    const next = e.target.files?.[0] || null;
+                                    onReceiptFileChosen(next, next ? "pick" : "cancel");
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onReceiptFileChosen(null, "clear");
+                                  setOrderError("");
+                                }}
+                              >
+                                {t("bank_upload_remove", "Remove receipt")}
+                              </button>
+                            </div>
+                          )}
                         </div>
+                        <div className="upload-hint">
+                          {t("bank_upload_help", RECEIPT_HELP_DEFAULT)}
+                        </div>
+                        {receiptSelectError ? (
+                          <div style={{ marginTop: 8, fontSize: 12, color: "#DC2626", lineHeight: 1.5 }}>
+                            {receiptSelectError}
+                          </div>
+                        ) : null}
                       </div>
                       <div className="form-group">
                         <label>{t("bank_ref_input_label", "Payment Reference")}</label>
