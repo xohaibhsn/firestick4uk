@@ -51,7 +51,10 @@ function hasMeaningfulCustomerIdentity(identity) {
   );
 }
 
-const ALLOWED_PAYMENT_METHODS = new Set(["bank", "cod"]);
+/** Mirror Task-31 public payment allowlist (strict equality; no silent default). */
+function isPublicPaymentMethod(value) {
+  return value === "bank" || value === "cod";
+}
 
 /** Early API pipeline through identity + payment method (no DB). */
 function earlyOrderGate(body) {
@@ -59,7 +62,7 @@ function earlyOrderGate(body) {
   if (!hasMeaningfulCustomerIdentity(identity)) {
     return { status: 400, error: CUSTOMER_IDENTITY_REQUIRED_MSG, identity };
   }
-  if (!ALLOWED_PAYMENT_METHODS.has(String(body.payment_method || ""))) {
+  if (!isPublicPaymentMethod(body.payment_method)) {
     return { status: 400, error: "Invalid payment method.", identity };
   }
   return { status: "passed_identity_gate", identity };
@@ -94,13 +97,17 @@ ok(
     /status\(400\)/.test(orders)
 );
 
-const identityIdx = orders.indexOf("hasMeaningfulCustomerIdentity");
-const paymentIdx = orders.indexOf("ALLOWED_PAYMENT_METHODS.has");
+// Compare CALL sites (not import lines): hasMeaningfulCustomerIdentity({ ... })
+// before isPublicPaymentMethod(payment_method).
+const identityIdx = orders.indexOf("hasMeaningfulCustomerIdentity({");
+const paymentIdx = orders.indexOf("isPublicPaymentMethod(payment_method)");
 const poolIdx = orders.indexOf("pool.query");
 const insertIdx = orders.indexOf("INSERT INTO orders");
 ok(
   "orders_identity_before_payment_check",
-  identityIdx > 0 && paymentIdx > identityIdx
+  identityIdx > 0 &&
+    paymentIdx > identityIdx &&
+    /isPublicPaymentMethod\(payment_method\)/.test(orders)
 );
 ok(
   "orders_identity_before_db_query",
@@ -123,10 +130,20 @@ ok(
 ok(
   "cart_checks_identity_before_receipt_upload",
   (() => {
+    // Stale assertion looked for inline "/api/upload-receipt"; Task-29 extracted
+    // uploadReceiptDuringCheckout which POSTs /api/upload-receipt in the helper.
     const idCheck = cart.indexOf("hasMeaningfulCustomerIdentity");
-    const upload = cart.indexOf("/api/upload-receipt");
+    const upload = cart.indexOf("uploadReceiptDuringCheckout");
     const ordersCall = cart.indexOf('fetch("/api/orders"');
-    return idCheck > 0 && upload > idCheck && ordersCall > idCheck;
+    const receiptClient = exists("lib/receiptCheckoutClient.ts")
+      ? read("lib/receiptCheckoutClient.ts")
+      : "";
+    return (
+      idCheck > 0 &&
+      upload > idCheck &&
+      ordersCall > upload &&
+      /\/api\/upload-receipt/.test(receiptClient)
+    );
   })()
 );
 ok(

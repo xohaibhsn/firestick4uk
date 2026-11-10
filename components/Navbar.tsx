@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { useSiteContent } from "@/hooks/useSiteContent";
 
 export interface NavbarProps {
@@ -36,6 +36,7 @@ export default function Navbar({
   const { sc } = useSiteContent();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logo, setLogo] = useState(logoUrl || "");
+  const menuId = useId();
 
   const labels = useMemo(() => {
     const slug = normalizeSubscriptionSlug(
@@ -66,6 +67,32 @@ export default function Navbar({
   }, [logoUrl, sc.site_logo_url]);
 
   const close = () => setMenuOpen(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    const onResize = () => {
+      if (window.matchMedia("(min-width: 769px)").matches) setMenuOpen(false);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const logoEl = logo ? (
     <a href="/" className="nav-logo nav-logo-img">
@@ -118,28 +145,37 @@ export default function Navbar({
         .site-nav .hamburger {
           display: none; flex-direction: column; gap: 5px; cursor: pointer;
           background: none; border: none; padding: 5px; z-index: 101;
+          min-width: 44px; min-height: 44px; align-items: center; justify-content: center;
         }
         .site-nav .hamburger span {
           display: block; width: 25px; height: 2px; background: #111111; border-radius: 2px;
         }
+        .site-nav .hamburger .hamburger-icon {
+          display: block; width: 24px; height: 24px; color: #111111; flex-shrink: 0;
+        }
         .site-nav .nav-end { display: flex; align-items: center; gap: 12px; }
         @media (max-width: 768px) {
           .site-nav { padding: 16px 24px; }
+          .site-nav.menu-open { z-index: 10050; }
           .site-nav .nav-links { display: none; }
           .site-nav .nav-links.open {
             display: flex; flex-direction: column; position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh; background: #FFFFFF;
-            align-items: center; justify-content: center; gap: 28px; z-index: 9999;
+            align-items: center; justify-content: center; gap: 28px; z-index: 1;
             margin: 0; padding: 0;
           }
           .site-nav .nav-links.open a { color: #111111; font-size: 18px; }
-          .site-nav .hamburger { display: flex; }
+          .site-nav .hamburger { display: flex; position: relative; z-index: 2; }
+          .site-nav.menu-open .nav-logo,
+          .site-nav.menu-open .nav-end {
+            position: relative; z-index: 2;
+          }
         }
       `}</style>
 
-      <nav className="site-nav">
+      <nav className={`site-nav${menuOpen ? " menu-open" : ""}`}>
         {logoEl}
-        <ul className={`nav-links ${menuOpen ? "open" : ""}`}>
+        <ul id={menuId} className={`nav-links ${menuOpen ? "open" : ""}`}>
           <li><a href="/" onClick={close}>Home</a></li>
           <li><a href="/products" onClick={close}>Products</a></li>
           <li>
@@ -170,10 +206,33 @@ export default function Navbar({
           <button
             className="hamburger"
             onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Menu"
+            aria-label={menuOpen ? "Close menu" : "Menu"}
+            aria-expanded={menuOpen}
+            aria-controls={menuId}
             type="button"
           >
-            <span /><span /><span />
+            {menuOpen ? (
+              <svg
+                className="hamburger-icon"
+                viewBox="0 0 24 24"
+                width="24"
+                height="24"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M6 6L18 18M18 6L6 18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            ) : (
+              <>
+                <span /><span /><span />
+              </>
+            )}
           </button>
         </div>
       </nav>

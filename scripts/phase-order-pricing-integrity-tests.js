@@ -290,13 +290,50 @@ ok(
   /items:\s*responseItems/.test(orders) || /items: responseItems/.test(orders)
 );
 
-// Payment method
+// Payment method — public allowlist via paymentMethod adapter (Task-31).
+// Stale Task-30-era assertion looked for local ALLOWED_PAYMENT_METHODS Set literal.
 ok(
   "payment_method_bank_cod_only",
-  /ALLOWED_PAYMENT_METHODS/.test(orders) &&
-    /'bank'/.test(orders) &&
-    /'cod'/.test(orders) &&
-    /Invalid payment method/.test(orders)
+  /isPublicPaymentMethod/.test(orders) &&
+    /toDbPaymentMethod/.test(orders) &&
+    /from ['\"]\.\.\/\.\.\/lib\/paymentMethod['\"]/.test(orders) &&
+    /Invalid payment method/.test(orders) &&
+    (() => {
+      // Load real adapter via TypeScript transpile (Node 20 has no strip-types).
+      const ts = require(path.join(ROOT, "node_modules", "typescript"));
+      const helperPath = path.join(ROOT, "lib", "paymentMethod.ts");
+      const code = ts.transpileModule(fs.readFileSync(helperPath, "utf8"), {
+        compilerOptions: {
+          module: ts.ModuleKind.CommonJS,
+          target: ts.ScriptTarget.ES2020,
+          esModuleInterop: true,
+        },
+        fileName: helperPath,
+      }).outputText;
+      const mod = { exports: {} };
+      const wrapper = new Function(
+        "exports",
+        "require",
+        "module",
+        "__filename",
+        "__dirname",
+        code
+      );
+      wrapper(mod.exports, require, mod, helperPath, path.dirname(helperPath));
+      const {
+        isPublicPaymentMethod,
+        toDbPaymentMethod,
+      } = mod.exports;
+      return (
+        isPublicPaymentMethod("bank") === true &&
+        isPublicPaymentMethod("cod") === true &&
+        isPublicPaymentMethod("bank_transfer") === false &&
+        isPublicPaymentMethod("") === false &&
+        isPublicPaymentMethod("paypal") === false &&
+        toDbPaymentMethod("bank") === "bank_transfer" &&
+        toDbPaymentMethod("cod") === "cod"
+      );
+    })()
 );
 
 // Transaction + coupon increment after store
