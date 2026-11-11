@@ -259,7 +259,7 @@ export default function TrackingConsent() {
         .tc-btn {
           appearance: none; border: 1px solid transparent; border-radius: 6px;
           font-size: 13px; font-weight: 600; padding: 10px 14px; cursor: pointer;
-          font-family: inherit; line-height: 1.2;
+          font-family: inherit; line-height: 1.2; min-height: 44px; min-width: 44px;
         }
         .tc-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
         .tc-btn-primary { background: #fff; color: #111; }

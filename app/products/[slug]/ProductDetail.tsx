@@ -403,8 +403,9 @@ export default function ProductDetail({
         .product-description img,.product-full-description img{max-width:100%;border-radius:10px;margin:1.25rem 0;display:block;}
         .product-price{font-family:var(--font-display);font-size:36px;font-weight:800;color:#5B21B6;-webkit-text-fill-color:#5B21B6;margin-bottom:22px;}
         .badge-tag{display:inline-block;background:#5B21B6;color:#FFFFFF;font-size:12px;font-weight:700;padding:4px 14px;border-radius:20px;letter-spacing:1px;margin-bottom:14px;}
-        .add-btn{width:100%;background:#5B21B6;color:#FFFFFF;border:none;padding:18px;border-radius:9px;font-size:16px;font-weight:700;letter-spacing:0.5px;cursor:pointer;transition:all 0.2s;}
+        .add-btn{width:100%;min-height:44px;background:#5B21B6;color:#FFFFFF;border:none;padding:18px;border-radius:9px;font-size:16px;font-weight:700;letter-spacing:0.5px;cursor:pointer;transition:all 0.2s;}
         .add-btn:hover{background:#4C1D95;transform:translateY(-1px);box-shadow:0 4px 16px rgba(91,33,182,0.35);}
+        .add-btn:focus-visible,.pdp-sticky-atc__btn:focus-visible,.back-link:focus-visible,.cart-link:focus-visible{outline:2px solid #5B21B6;outline-offset:2px;}
         .add-btn.added{background:#16A34A;}
         .meta-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px;}
         .meta-pill{background:#F5F5F5;border:1px solid #E5E5E5;border-radius:20px;padding:6px 14px;font-size:13px;color:#555555;}

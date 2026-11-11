@@ -99,6 +99,22 @@ const navStyles = `
   .copy-btn-wrap { display:inline-flex; align-items:center; gap:8px; flex:0 0 auto; }
   .copy-btn { min-height:44px; min-width:44px; padding:6px 12px; border-radius:8px; border:1px solid #DDD6FE; background:#F5F3FF; color:#5B21B6; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
   .copy-btn:hover, .copy-btn:focus-visible { border-color:#5B21B6; outline:2px solid #5B21B6; outline-offset:2px; }
+  .qty-btn:focus-visible,
+  .remove-btn:focus-visible,
+  .payment-option:focus-within,
+  .checkout-btn:focus-visible,
+  .upload-selected-actions button:focus-visible,
+  .upload-selected-actions label:focus-visible,
+  .step-btn:focus-visible,
+  button:focus-visible,
+  a.track-btn:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline:2px solid #5B21B6; outline-offset:2px;
+  }
+  .remove-btn { min-height:44px; min-width:44px; padding:8px 10px; }
+  .upload-receipt-photo-hint { font-size:12px; color:#666666; margin-top:6px; line-height:1.5; }
   .copy-btn-live { font-size:11px; color:#16A34A; min-width:0; }
   .copy-btn-live:not(:empty) { min-width:3.5em; }
   .bank-row-value { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; column-gap:8px; color:#111111; font-weight:600; min-width:0; width:100%; }
@@ -145,7 +161,7 @@ const navStyles = `
     .order-summary { padding-bottom:8px; }
   }
   .qty-num { font-size:16px; font-weight:700; color:#111111; min-width:20px; text-align:center; }
-  .remove-btn { background:none; border:none; color:#CCCCCC; font-size:13px; cursor:pointer; transition:color 0.2s; }
+  .remove-btn { background:none; border:none; color:#CCCCCC; font-size:13px; cursor:pointer; transition:color 0.2s; display:inline-flex; align-items:center; justify-content:center; }
   .remove-btn:hover { color:#DC2626; }
 
   /* ORDER SUMMARY */
@@ -775,7 +791,7 @@ export default function CartPage() {
                         <span className="qty-num">{item.qty}</span>
                         <button type="button" className="qty-btn" aria-label="Increase quantity" onClick={() => updateQty(item.id, 1)}>+</button>
                       </div>
-                      <button className="remove-btn" onClick={() => removeFromCart(item.id)}>✕ {t("cart_remove", "Remove")}</button>
+                      <button type="button" className="remove-btn" aria-label={t("cart_remove_aria", "Remove item")} onClick={() => removeFromCart(item.id)}>✕ {t("cart_remove", "Remove")}</button>
                     </div>
                   </div>
                 ))
@@ -1040,6 +1056,12 @@ export default function CartPage() {
                         <div className="upload-hint">
                           {t("bank_upload_help", RECEIPT_HELP_DEFAULT)}
                         </div>
+                        <p className="upload-receipt-photo-hint" data-cart-receipt-hint="1">
+                          {t(
+                            "cart_receipt_hint",
+                            "You can take a photo or choose a screenshot of the payment confirmation."
+                          )}
+                        </p>
                         {receiptSelectError ? (
                           <div style={{ marginTop: 8, fontSize: 12, color: "#DC2626", lineHeight: 1.5 }}>
                             {receiptSelectError}

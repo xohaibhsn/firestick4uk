@@ -124,6 +124,17 @@ export default function ProductsClient({
   const applyFilter = (cat: string) => { setFilter(cat); fetchProducts(cat, sort, minPrice, maxPrice); };
   const applySort = (s: string) => { setSort(s); fetchProducts(filter, s, minPrice, maxPrice); };
   const applyPrice = () => fetchProducts(filter, sort, minPrice, maxPrice);
+  const resetProductFilters = () => {
+    setFilter("All");
+    setSort("featured");
+    setMinPrice("");
+    setMaxPrice("");
+    setSearchQ("");
+    setSearchResults([]);
+    setSearchOpen(false);
+    setSearchActive(false);
+    fetchProducts("All", "featured", "", "");
+  };
 
   const categories = ["All", ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))];
   const filtered = products;
@@ -158,6 +169,23 @@ export default function ProductsClient({
         .filter-btn { padding:10px 20px; min-height:44px; min-width:44px; border-radius:30px; border:1px solid #E5E5E5; background:#F5F5F5; color:#111111; font-size:13px; cursor:pointer; transition:all 0.2s; }
         .filter-btn:hover { border-color:#5B21B6; color:#5B21B6; }
         .filter-btn.active { background:#5B21B6; color:#FFFFFF; border-color:transparent; }
+        .filter-btn:focus-visible,
+        .products-search-btn:focus-visible,
+        .products-empty-reset:focus-visible,
+        .add-btn:focus-visible,
+        .filters-mobile-toggle:focus-visible {
+          outline:2px solid #5B21B6; outline-offset:2px;
+        }
+        .products-search-btn {
+          background:none;border:none;cursor:pointer;color:#666;font-size:20px;
+          padding:0;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;
+        }
+        .products-empty-state { text-align:center; padding:48px 16px; }
+        .products-empty-reset {
+          margin-top:16px; min-height:44px; min-width:44px; padding:10px 20px; border-radius:9px;
+          border:1px solid #DDD6FE; background:#F5F3FF; color:#5B21B6; font-size:13px; font-weight:600;
+          cursor:pointer; font-family:inherit;
+        }
         .filters-toolbar { max-width:1300px; margin:0 auto; padding:0 60px 20px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
         .filters-mobile-toggle { display:none; }
         .filters-collapsible { display:flex; flex-wrap:wrap; gap:12px; align-items:center; width:100%; }
@@ -238,8 +266,8 @@ export default function ProductsClient({
         {/* Live Search */}
         <div ref={searchRef} style={{position:"relative",display:"flex",alignItems:"center",gap:8}}>
           {searchActive
-            ? <input autoFocus style={{background:"#F5F5F5",border:"1px solid #E5E5E5",borderRadius:20,padding:"7px 16px",color:"#111",fontSize:13,outline:"none",width:220}} placeholder="Search products..." value={searchQ} onChange={e=>setSearchQ(e.target.value)} onKeyDown={e=>e.key==="Escape"&&(setSearchActive(false),setSearchQ(""),setSearchOpen(false))} />
-            : <button type="button" style={{background:"none",border:"none",cursor:"pointer",color:"#666",fontSize:20,padding:"4px 8px"}} onClick={()=>setSearchActive(true)} title="Search">🔍</button>
+            ? <input autoFocus aria-label={t("products_search_aria", "Search products")} style={{background:"#F5F5F5",border:"1px solid #E5E5E5",borderRadius:20,padding:"7px 16px",color:"#111",fontSize:13,outline:"none",width:220,minHeight:44}} placeholder="Search products..." value={searchQ} onChange={e=>setSearchQ(e.target.value)} onKeyDown={e=>e.key==="Escape"&&(setSearchActive(false),setSearchQ(""),setSearchOpen(false))} />
+            : <button type="button" className="products-search-btn" onClick={()=>setSearchActive(true)} title="Search" aria-label={t("products_search_aria", "Search products")}>🔍</button>
           }
           {searchOpen && searchResults.length > 0 && (
             <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:320,background:"#FFFFFF",border:"1px solid #E5E5E5",borderRadius:14,overflow:"hidden",zIndex:200,boxShadow:"0 8px 32px rgba(0,0,0,0.12)"}}>
@@ -256,7 +284,17 @@ export default function ProductsClient({
             </div>
           )}
           {searchOpen && searchQ.length >= 2 && searchResults.length === 0 && (
-            <div style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:240,background:"#FFFFFF",border:"1px solid #E5E5E5",borderRadius:10,padding:"14px 16px",zIndex:200,fontSize:13,color:"#888"}}>No products found for &quot;{searchQ}&quot;</div>
+            <div data-products-search-empty="1" style={{position:"absolute",top:"calc(100% + 8px)",right:0,width:260,background:"#FFFFFF",border:"1px solid #E5E5E5",borderRadius:10,padding:"14px 16px",zIndex:200,fontSize:13,color:"#555"}}>
+              <div>{t("products_search_empty", "No products match")}</div>
+              <button
+                type="button"
+                className="products-empty-reset"
+                style={{marginTop:10,width:"100%"}}
+                onClick={() => { setSearchQ(""); setSearchResults([]); setSearchOpen(false); setSearchActive(false); }}
+              >
+                {t("products_search_reset", "Clear search")}
+              </button>
+            </div>
           )}
         </div>
       </Navbar>
@@ -323,7 +361,14 @@ export default function ProductsClient({
               <button onClick={() => window.location.reload()} style={{background:"linear-gradient(135deg,#4a0080,#8b00ff)",color:"white",border:"none",padding:"10px 24px",borderRadius:"30px",cursor:"pointer",fontSize:"14px"}}>{t("products_retry", "Try Again")}</button>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="loading">{t("products_empty", "No products found.")}</div>
+            <div className="products-empty-state" data-products-empty="1">
+              <div className="loading" style={{padding:0}}>
+                {t("products_empty_match", "No products match")}
+              </div>
+              <button type="button" className="products-empty-reset" onClick={resetProductFilters}>
+                {t("products_empty_reset", "Reset filters")}
+              </button>
+            </div>
           ) : (
             filtered.map((p) => {
               const href = productDetailHref(p);
