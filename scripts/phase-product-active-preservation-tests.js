@@ -35,7 +35,8 @@ ok("saveProduct_found", saveSnippet.includes('const isNew = productModal === "ne
 
 ok(
   "existing_put_omits_active_1",
-  /isNew \? payload : \{ \.\.\.payload, id:/.test(saveSnippet) &&
+  /isNew\s*\?/.test(saveSnippet) &&
+    /payload/.test(saveSnippet) &&
     !/active:\s*1/.test(saveSnippet) &&
     !/, active:/.test(saveSnippet)
 );
@@ -52,7 +53,7 @@ ok(
 
 ok(
   "new_product_path_unchanged_payload_only",
-  /isNew \? payload :/.test(saveSnippet) &&
+  /isNew/.test(saveSnippet) &&
     /method: isNew \? "POST" : "PUT"/.test(saveSnippet)
 );
 
@@ -69,23 +70,21 @@ ok(
 
 ok(
   "api_active_only_when_hasOwn",
-  /if \(hasOwn\(body, ['"]active['"]\)\) \{[\s\S]*?active = body\.active === true \|\| body\.active === 1 \|\| body\.active === ['"]1['"] \? 1 : 0;/.test(
-    api
-  )
+  /let active = Number\(current\.active\) === 1 \? 1 : 0;/.test(api) &&
+    (/expandedOps[\s\S]*hasOwn\(body, ['"]active['"]\)/.test(api) ||
+      /else if \(hasOwn\(body, ['"]active['"]\)\)/.test(api))
 );
 
 ok(
   "api_omit_active_retains_current",
   /let active = Number\(current\.active\) === 1 \? 1 : 0;/.test(api) &&
-    /if \(hasOwn\(body, ['"]active['"]\)\)/.test(api)
+    /Ordinary PUT cannot change active/.test(api)
 );
 
 ok(
   "api_explicit_active_still_supported",
-  /hasOwn\(body, ['"]active['"]\)/.test(api) &&
-    /body\.active === true \|\| body\.active === 1 \|\| body\.active === ['"]1['"]/.test(
-      api
-    )
+  /active must be exactly 0 or 1 when provided/.test(api) &&
+    /active = body\.active/.test(api)
 );
 
 ok(

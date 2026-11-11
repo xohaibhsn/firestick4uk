@@ -17,6 +17,13 @@ import {
   PRODUCT8_LEGACY_SLUG_REDIRECTS,
   PRODUCT9_LEGACY_SLUG_REDIRECTS,
 } from "@/lib/productLegacyRedirects";
+import { detectProductSchemaCapability } from "@/lib/productSchemaCapabilityServer";
+import { isPurchasable, resolveSeasonPhase } from "@/lib/productSeasonEligibility";
+import { floorSecondUtcMs, normalizeSeasonalUtcFields } from "@/lib/productSeasonLondon";
+import { queryWithSeasonalUtc } from "@/lib/productSeasonalQuery";
+import { toPublicDetailProduct } from "@/lib/productPublicDto";
+import { loadSeasonalAlternativeCards } from "@/lib/productSeasonAlternativesServer";
+import { resolveSeasonalHubPublicState } from "@/lib/seasonalHubPublic";
 
 interface Product {
   id: number;
@@ -36,6 +43,15 @@ interface Product {
   og_image: string | null;
   slug: string | null;
   active?: number;
+  lifecycle_mode?: string;
+  shop_listed?: number;
+  season_paused?: number;
+  season_starts_at?: string | null;
+  season_ends_at?: string | null;
+  season_ended_notice?: string | null;
+  available_offers_heading?: string | null;
+  season_show_countdown?: number;
+  season_name?: string | null;
 }
 
 function stripHtml(html: string): string {
@@ -117,11 +133,14 @@ const resolveProduct = cache(async (rawSlug: string): Promise<ResolveResult> => 
   if (!s) return { status: "missing" };
 
   try {
-    const [exactRows]: any = await pool.query(
+    const [exactRows]: any = await queryWithSeasonalUtc(
+      pool,
       `SELECT * FROM products WHERE active = 1 AND slug = ? LIMIT 1`,
       [s]
     );
-    if (exactRows?.[0]) return { status: "ok", product: exactRows[0] };
+    if (exactRows?.[0]) {
+      return { status: "ok", product: normalizeSeasonalUtcFields(exactRows[0]) as Product };
+    }
 
     // Legacy sources → canonical only when target slug is live in DB.
     // Product 8 (Phase 20D) + Product 9 historical name-derived alias
@@ -136,14 +155,17 @@ const resolveProduct = cache(async (rawSlug: string): Promise<ResolveResult> => 
       }
     }
 
-    const [legacyRows]: any = await pool.query(
+    const [legacyRows]: any = await queryWithSeasonalUtc(
+      pool,
       `SELECT * FROM products
        WHERE active = 1
          AND LOWER(REPLACE(REPLACE(name, ' ', '-'), '/', '')) = ?
        LIMIT 1`,
       [s]
     );
-    const legacy = legacyRows?.[0];
+    const legacy = legacyRows?.[0]
+      ? (normalizeSeasonalUtcFields(legacyRows[0]) as Product)
+      : null;
     if (!legacy) return { status: "missing" };
 
     const auth = String(legacy.slug || "")
@@ -156,7 +178,11 @@ const resolveProduct = cache(async (rawSlug: string): Promise<ResolveResult> => 
   }
 });
 
-function buildProductJsonLd(product: Product, productUrl: string): Record<string, unknown> {
+function buildProductJsonLd(
+  product: Product,
+  productUrl: string,
+  opts: { includeOffer: boolean }
+): Record<string, unknown> {
   const description = stripHtml(
     product.short_description || product.description || product.full_description || ""
   );
@@ -170,7 +196,11 @@ function buildProductJsonLd(product: Product, productUrl: string): Record<string
       "@type": "Brand",
       name: "Firestick4UK",
     },
-    offers: {
+  };
+
+  // Non-live seasonal: retain Product identity; omit Offer (no fabricated PreOrder/SoldOut).
+  if (opts.includeOffer) {
+    ld.offers = {
       "@type": "Offer",
       price: String(Number(product.price).toFixed(2)),
       priceCurrency: "GBP",
@@ -180,8 +210,8 @@ function buildProductJsonLd(product: Product, productUrl: string): Record<string
         "@type": "Organization",
         name: "Firestick4UK",
       },
-    },
-  };
+    };
+  }
 
   if (description) ld.description = description;
   if (image) ld.image = image;
@@ -262,7 +292,7 @@ export default async function ProductDetailPage({
     notFound();
   }
 
-  const product = resolved.product;
+  const product = normalizeSeasonalUtcFields(resolved.product as any);
   const canonicalSlug = authoritativeProductSlug(product, slug);
   // Preserve raw request segment; redirect mixed-case / punctuated variants to DB slug.
   const rawTrimmed = String(slug || "")
@@ -272,8 +302,25 @@ export default async function ProductDetailPage({
     permanentRedirect(`/products/${canonicalSlug}`);
   }
 
+  const capability = await detectProductSchemaCapability();
+  const nowMs = floorSecondUtcMs();
+  const purchasable = isPurchasable(product, nowMs, capability);
+  const phase = resolveSeasonPhase(product, nowMs, capability);
+  const publicDto = toPublicDetailProduct(product as any, nowMs, capability);
+  const hubState = await resolveSeasonalHubPublicState(pool, { nowMs, capability });
+  const alts = await loadSeasonalAlternativeCards({
+    db: pool,
+    selfId: Number(product.id),
+    availableRaw: (product as any).season_available_ids,
+    upcomingRaw: (product as any).season_upcoming_ids,
+    nowMs,
+    capability,
+  });
+
   const productUrl = `https://firestick4uk.com/products/${canonicalSlug}`;
-  const productLd = buildProductJsonLd(product, productUrl);
+  const productLd = buildProductJsonLd(product, productUrl, {
+    includeOffer: purchasable,
+  });
 
   return (
     <>
@@ -285,7 +332,15 @@ export default async function ProductDetailPage({
         ]}
       />
       <JsonLd data={productLd} />
-      <ProductDetail slug={canonicalSlug} initialProduct={product as any} />
+      <ProductDetail
+        slug={canonicalSlug}
+        initialProduct={publicDto as any}
+        seasonPhase={phase}
+        purchasable={purchasable}
+        showHubLink={hubState.effectivelyPublic}
+        availableOffers={alts.available}
+        upcomingOffers={alts.upcoming}
+      />
     </>
   );
 }

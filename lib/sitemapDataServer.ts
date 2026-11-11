@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache";
 import pool from "@/lib/db";
 import { getSubscriptionSlugConfig } from "@/lib/subscriptionSlugServer";
+import { resolveSeasonalHubPublicState } from "@/lib/seasonalHubPublic";
 
 /**
  * Pages Router mutation handlers do not have the App Router static-generation
@@ -13,6 +14,8 @@ export type SitemapDynamicData = {
   subscriptionUrl: string;
   products: Array<{ slug: string; lastModified: string | null }>;
   posts: Array<{ slug: string; lastModified: string | null }>;
+  /** Include /seasonal-offers once when effectively published + useful. */
+  includeSeasonalHub: boolean;
 };
 
 const DEFAULT_SUBSCRIPTION_URL = "https://firestick4uk.com/iptv-subscriptions-uk";
@@ -22,6 +25,7 @@ export function emptySitemapDynamicData(): SitemapDynamicData {
     subscriptionUrl: DEFAULT_SUBSCRIPTION_URL,
     products: [],
     posts: [],
+    includeSeasonalHub: false,
   };
 }
 
@@ -86,6 +90,13 @@ export async function loadSitemapDynamicData(): Promise<SitemapDynamicData> {
 
   const products: SitemapDynamicData["products"] = [];
   const posts: SitemapDynamicData["posts"] = [];
+  let includeSeasonalHub = false;
+  try {
+    const hub = await resolveSeasonalHubPublicState(pool);
+    includeSeasonalHub = hub.effectivelyPublic;
+  } catch {
+    includeSeasonalHub = false;
+  }
 
   try {
     // Live schema has created_at only — do not SELECT a non-existent column.
@@ -126,7 +137,7 @@ export async function loadSitemapDynamicData(): Promise<SitemapDynamicData> {
     // empty posts on failure
   }
 
-  return { subscriptionUrl, products, posts };
+  return { subscriptionUrl, products, posts, includeSeasonalHub };
 }
 
 /**

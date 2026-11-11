@@ -25,6 +25,7 @@ const SUBSCRIPTION_SITEMAP_KEYS = new Set([
   "subscription_slug",
   "subscription_previous_slug",
   "subscription_canonical",
+  "seasonal_hub_published",
 ]);
 
 export function siteContentKeysAffectSitemap(keys: string[]): boolean {

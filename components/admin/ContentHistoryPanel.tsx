@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AdminRoleName } from "@/lib/adminPermissions";
 import { revisionEntityTypesForRole } from "@/lib/contentRevisionsClient";
 
@@ -22,6 +22,22 @@ type Props = {
   initialEntityType?: string;
   initialEntityId?: string;
   embedded?: boolean;
+  /**
+   * @deprecated Prefer authorized current-entity read in confirmRestore.
+   * Kept for backward-compat hints only — never trusted alone for restore.
+   */
+  currentProductVersion?: number | null;
+  /** Called after a successful restore so parents can refresh live editor state. */
+  onRestored?: (info: { entityType: string; entityId: string }) => void;
+};
+
+type BoundRestoreVersion = {
+  entityType: string;
+  entityId: string;
+  revisionId: number;
+  version: number | null;
+  missing: boolean;
+  error?: string;
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -76,6 +92,8 @@ export default function ContentHistoryPanel({
   initialEntityType = "",
   initialEntityId = "",
   embedded = false,
+  currentProductVersion = null,
+  onRestored,
 }: Props) {
   const allowedTypes = revisionEntityTypesForRole(role);
   const [entityType, setEntityType] = useState(initialEntityType);
@@ -91,7 +109,10 @@ export default function ContentHistoryPanel({
   const [msg, setMsg] = useState("");
   const [viewItem, setViewItem] = useState<any>(null);
   const [confirmRestore, setConfirmRestore] = useState<RevisionItem | null>(null);
+  const [boundRestoreVersion, setBoundRestoreVersion] = useState<BoundRestoreVersion | null>(null);
+  const [restoreVersionLoading, setRestoreVersionLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const restoreReqSeq = useRef(0);
 
   const load = useCallback(
     async (pageNum = 1) => {
@@ -150,27 +171,149 @@ export default function ContentHistoryPanel({
     }
   };
 
+  const loadCurrentProductVersionForRestore = async (item: RevisionItem) => {
+    const seq = ++restoreReqSeq.current;
+    setRestoreVersionLoading(true);
+    setBoundRestoreVersion(null);
+    try {
+      if (item.entity_type !== "product") {
+        if (seq !== restoreReqSeq.current) return;
+        setBoundRestoreVersion({
+          entityType: item.entity_type,
+          entityId: item.entity_id,
+          revisionId: item.id,
+          version: null,
+          missing: false,
+        });
+        return;
+      }
+      const r = await fetch("/api/admin-products", { credentials: "include" });
+      if (seq !== restoreReqSeq.current) return;
+      if (r.status === 401) {
+        setBoundRestoreVersion({
+          entityType: item.entity_type,
+          entityId: item.entity_id,
+          revisionId: item.id,
+          version: null,
+          missing: true,
+          error: "Session expired",
+        });
+        return;
+      }
+      if (r.status === 403) {
+        setBoundRestoreVersion({
+          entityType: item.entity_type,
+          entityId: item.entity_id,
+          revisionId: item.id,
+          version: null,
+          missing: true,
+          error: "Permission denied",
+        });
+        return;
+      }
+      const data = await r.json().catch(() => null);
+      if (seq !== restoreReqSeq.current) return;
+      const list = Array.isArray(data) ? data : [];
+      const row = list.find((p: any) => String(p.id) === String(item.entity_id));
+      if (!row) {
+        setBoundRestoreVersion({
+          entityType: item.entity_type,
+          entityId: item.entity_id,
+          revisionId: item.id,
+          version: null,
+          missing: true,
+          error: "Product no longer exists",
+        });
+        return;
+      }
+      const v =
+        row.product_version != null && Number.isFinite(Number(row.product_version))
+          ? Number(row.product_version)
+          : null;
+      setBoundRestoreVersion({
+        entityType: item.entity_type,
+        entityId: String(item.entity_id),
+        revisionId: item.id,
+        version: v,
+        missing: false,
+      });
+    } catch {
+      if (seq !== restoreReqSeq.current) return;
+      setBoundRestoreVersion({
+        entityType: item.entity_type,
+        entityId: item.entity_id,
+        revisionId: item.id,
+        version: null,
+        missing: true,
+        error: "Failed to load current product version",
+      });
+    } finally {
+      if (seq === restoreReqSeq.current) setRestoreVersionLoading(false);
+    }
+  };
+
+  const openConfirmRestore = (item: RevisionItem) => {
+    setConfirmRestore(item);
+    setMsg("");
+    void loadCurrentProductVersionForRestore(item);
+  };
+
   const doRestore = async () => {
     if (!confirmRestore) return;
+    if (confirmRestore.entity_type === "product") {
+      if (restoreVersionLoading) return;
+      if (
+        !boundRestoreVersion ||
+        boundRestoreVersion.revisionId !== confirmRestore.id ||
+        boundRestoreVersion.entityId !== String(confirmRestore.entity_id)
+      ) {
+        setMsg("❌ Current product version is not bound to this revision yet — wait or reopen confirm.");
+        return;
+      }
+      if (boundRestoreVersion.missing) {
+        setMsg(`❌ ${boundRestoreVersion.error || "Cannot restore — product unavailable"}`);
+        return;
+      }
+      if (boundRestoreVersion.version == null) {
+        // Legacy product without product_version — omit expected_version.
+      }
+    }
     setBusy(true);
     setMsg("");
     try {
+      const expected =
+        confirmRestore.entity_type === "product" && boundRestoreVersion?.version != null
+          ? Number(boundRestoreVersion.version)
+          : null;
       const r = await fetch("/api/admin-revisions/restore", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ revision_id: confirmRestore.id }),
+        body: JSON.stringify({
+          revision_id: confirmRestore.id,
+          ...(expected != null ? { expected_version: expected } : {}),
+        }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
+        if (r.status === 409) {
+          setMsg(
+            `❌ ${data.error || "Stale version"} — reconfirm with a fresh current-product read (not auto-resubmitted).`
+          );
+          await loadCurrentProductVersionForRestore(confirmRestore);
+          return;
+        }
         setMsg(`❌ ${data.error || "Restore failed"}`);
         return;
       }
       const base =
-        "✅ Version restored. Current state was saved to History first.";
+        "✅ Version restored. Current state was saved to History first. Private / shop listing / seasonal window controls were preserved (not restored from the snapshot).";
       setMsg(`${base}${formatRestoreSeoBanner(data.seo_guard)}`);
+      const restored = confirmRestore;
       setConfirmRestore(null);
+      setBoundRestoreVersion(null);
       setViewItem(null);
+      onRestored?.({ entityType: restored.entity_type, entityId: restored.entity_id });
       await load(page);
     } catch {
       setMsg("❌ Restore failed");
@@ -178,6 +321,9 @@ export default function ContentHistoryPanel({
       setBusy(false);
     }
   };
+
+  // Keep unused prop referenced so callers remain compatible (never used for restore).
+  void currentProductVersion;
 
   return (
     <div>
@@ -326,7 +472,7 @@ export default function ContentHistoryPanel({
                       <button
                         type="button"
                         className="action-btn btn-edit"
-                        onClick={() => setConfirmRestore(item)}
+                        onClick={() => openConfirmRestore(item)}
                         disabled={busy}
                       >
                         Restore
@@ -413,7 +559,7 @@ export default function ContentHistoryPanel({
                   type="button"
                   className="modal-save"
                   onClick={() =>
-                    setConfirmRestore({
+                    openConfirmRestore({
                       id: viewItem.id,
                       entity_type: viewItem.entity_type,
                       entity_id: viewItem.entity_id,
@@ -435,7 +581,14 @@ export default function ContentHistoryPanel({
       )}
 
       {confirmRestore && (
-        <div className="modal-overlay" style={{ zIndex: 1400 }} onClick={() => setConfirmRestore(null)}>
+        <div
+          className="modal-overlay"
+          style={{ zIndex: 1400 }}
+          onClick={() => {
+            setConfirmRestore(null);
+            setBoundRestoreVersion(null);
+          }}
+        >
           <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-title">Confirm restore</div>
             <p style={{ fontSize: 14, color: "#333", lineHeight: 1.55, marginBottom: 16 }}>
@@ -444,12 +597,53 @@ export default function ContentHistoryPanel({
               <br />
               <br />
               The current version will be saved to History first, so this restore can be undone.
+              {confirmRestore.entity_type === "product" ? (
+                <>
+                  <br />
+                  <br />
+                  {restoreVersionLoading ? (
+                    <span data-testid="restore-version-loading">Loading current product version…</span>
+                  ) : boundRestoreVersion?.missing ? (
+                    <span data-testid="restore-version-missing" style={{ color: "#B45309" }}>
+                      {boundRestoreVersion.error || "Current product unavailable"}
+                    </span>
+                  ) : (
+                    <span data-testid="restore-expected-version">
+                      Current product version for confirmation:{" "}
+                      <strong>
+                        {boundRestoreVersion?.version != null
+                          ? boundRestoreVersion.version
+                          : "legacy (no product_version)"}
+                      </strong>
+                      {" "}(from authorized current-product read — not from the historical snapshot)
+                    </span>
+                  )}
+                </>
+              ) : null}
             </p>
             <div className="modal-actions">
-              <button type="button" className="modal-cancel" onClick={() => setConfirmRestore(null)} disabled={busy}>
+              <button
+                type="button"
+                className="modal-cancel"
+                onClick={() => {
+                  setConfirmRestore(null);
+                  setBoundRestoreVersion(null);
+                }}
+                disabled={busy}
+              >
                 Cancel
               </button>
-              <button type="button" className="modal-save" onClick={doRestore} disabled={busy}>
+              <button
+                type="button"
+                className="modal-save"
+                data-testid="confirm-restore-btn"
+                onClick={doRestore}
+                disabled={
+                  busy ||
+                  restoreVersionLoading ||
+                  (confirmRestore.entity_type === "product" && !!boundRestoreVersion?.missing)
+                }
+              >
                 {busy ? "Restoring…" : "Restore this version"}
               </button>
             </div>

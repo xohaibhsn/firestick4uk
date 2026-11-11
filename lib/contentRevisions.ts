@@ -48,6 +48,19 @@ export const PRODUCT_SNAPSHOT_FIELDS = [
   "focus_keyword",
   "features",
   "og_image",
+  // Seasonal / listing ops (present when schema expanded; omitted harmlessly otherwise)
+  "product_version",
+  "lifecycle_mode",
+  "shop_listed",
+  "season_name",
+  "season_starts_at",
+  "season_ends_at",
+  "season_paused",
+  "season_show_countdown",
+  "season_ended_notice",
+  "available_offers_heading",
+  "season_available_ids",
+  "season_upcoming_ids",
 ] as const;
 
 export const BLOG_SNAPSHOT_FIELDS = [

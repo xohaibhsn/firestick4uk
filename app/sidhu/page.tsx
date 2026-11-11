@@ -7,6 +7,7 @@ import SubscriptionContentEditor from "@/components/admin/SubscriptionContentEdi
 import MediaLibraryPanel from "@/components/admin/MediaLibraryPanel";
 import MediaLibraryPicker, { type MediaAsset } from "@/components/admin/MediaLibraryPicker";
 import ContentHistoryPanel from "@/components/admin/ContentHistoryPanel";
+import ProductSeasonalityPanel from "@/components/admin/ProductSeasonalityPanel";
 import SeoOverviewPanel from "@/components/admin/SeoOverviewPanel";
 import RedirectManagerPanel from "@/components/admin/RedirectManagerPanel";
 import { keysForPage } from "@/lib/adminContentFields";
@@ -61,6 +62,19 @@ import {
   type ProductSeoReviewRow,
 } from "@/lib/productSeoReviewClient";
 import type { ProductAiEditableField, ProductKindHint } from "@/lib/seoAi";
+import {
+  applyLiveVersionOnly,
+  applyOwnContentPreservingActionResult,
+  applyPut409ToDraftSession,
+  isActiveEditorRequest,
+  isCompleteProductContentRow,
+  newEditorSessionId,
+  openContentDraftSession,
+  productRowToEditDraft,
+  resolveConflictReloadFromCompleteProduct,
+  type ContentDraftSession,
+  type EditProductDraft,
+} from "@/lib/productContentDraftClient";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
 const styles = `
@@ -327,6 +341,8 @@ export default function AdminPage() {
   const [productMsg, setProductMsg] = useState("");
   const [productSaving, setProductSaving] = useState(false);
   const [productDeletingId, setProductDeletingId] = useState<number | null>(null);
+  const [productVisibilityPendingId, setProductVisibilityPendingId] = useState<number | null>(null);
+  const [productVisibilityFilter, setProductVisibilityFilter] = useState<"all" | "visible" | "hidden">("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ordersPage, setOrdersPage] = useState(1);
   const ORDERS_PER_PAGE = 25;
@@ -337,6 +353,45 @@ export default function AdminPage() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [productModal, setProductModal] = useState<any|null|"new">(null);
   const [editProduct, setEditProduct] = useState({ name:"", slug:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
+  /** Base product_version for the open content draft — not advanced by arbitrary list refresh/409. */
+  const [contentDraftBaseVersion, setContentDraftBaseVersion] = useState<number | null>(null);
+  const [contentConflict, setContentConflict] = useState<null | {
+    server: Record<string, unknown>;
+    draft: typeof editProduct;
+    incompleteServerRow?: boolean;
+  }>(null);
+  /** Bind mutation/reload responses to the open editor session (ignore late Product A after opening B). */
+  const [editorSessionId, setEditorSessionId] = useState(() => newEditorSessionId());
+  const editorSessionIdRef = useRef<string>(editorSessionId);
+  useEffect(() => {
+    editorSessionIdRef.current = editorSessionId;
+  }, [editorSessionId]);
+  /** Invalidate so late responses cannot match after close/switch/reset (including reopen of same product). */
+  const invalidateEditorSession = useCallback(() => {
+    const next = newEditorSessionId();
+    editorSessionIdRef.current = next;
+    setEditorSessionId(next);
+  }, []);
+  const contentDraftSessionSnapshot = useCallback((): ContentDraftSession | null => {
+    if (!productModal || productModal === "new" || !productModal.id) return null;
+    return {
+      editorSessionId: editorSessionIdRef.current,
+      productId: Number(productModal.id),
+      contentDraftBaseVersion,
+      liveProductVersion:
+        productModal.product_version != null && Number.isFinite(Number(productModal.product_version))
+          ? Number(productModal.product_version)
+          : null,
+      contentConflict: contentConflict
+        ? {
+            server: contentConflict.server,
+            draft: contentConflict.draft as EditProductDraft,
+            incompleteServerRow: !!contentConflict.incompleteServerRow,
+          }
+        : null,
+      editProduct: editProduct as EditProductDraft,
+    };
+  }, [productModal, contentDraftBaseVersion, contentConflict, editProduct]);
   const [productUrlMigration, setProductUrlMigration] = useState<{
     newSlug: string;
     status: "idle" | "loading" | "ok" | "error";
@@ -649,7 +704,36 @@ export default function AdminPage() {
         return;
       }
       // Empty array is valid — never keep stale/demo rows
-      setProducts(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setProducts(list);
+      setProductModal((prev: any) => {
+        if (!prev || prev === "new" || !prev.id) return prev;
+        const fresh = list.find((p: any) => Number(p.id) === Number(prev.id));
+        if (!fresh) return prev;
+        // Refresh operational/slug from list. Do NOT advance contentDraftBaseVersion here —
+        // product_version on the modal tracks live ops for seasonal panel; content saves use
+        // contentDraftBaseVersion until an explicit successful content-preserving action.
+        return {
+          ...prev,
+          active: fresh.active,
+          shop_listed: fresh.shop_listed,
+          lifecycle_mode: fresh.lifecycle_mode,
+          season_name: fresh.season_name,
+          season_starts_at: fresh.season_starts_at,
+          season_ends_at: fresh.season_ends_at,
+          season_paused: fresh.season_paused,
+          season_show_countdown: fresh.season_show_countdown,
+          season_ended_notice: fresh.season_ended_notice,
+          available_offers_heading: fresh.available_offers_heading,
+          season_available_ids: fresh.season_available_ids,
+          season_upcoming_ids: fresh.season_upcoming_ids,
+          slug: fresh.slug,
+          // Live server version for ops UI only — content PUT uses contentDraftBaseVersion.
+          product_version: fresh.product_version,
+          price: fresh.price,
+          name: fresh.name,
+        };
+      });
     } catch {
       setProductsError("Failed to load products");
       setProducts([]);
@@ -1220,15 +1304,18 @@ export default function AdminPage() {
     [productSeoReviewRows]
   );
 
-  const displayedProducts = useMemo(
-    () =>
-      filterAndOrderProductsForSeoReview(
-        products,
-        productSeoReviewById,
-        productSeoFilter
-      ),
-    [products, productSeoReviewById, productSeoFilter]
-  );
+  const displayedProducts = useMemo(() => {
+    const seoFiltered = filterAndOrderProductsForSeoReview(
+      products,
+      productSeoReviewById,
+      productSeoFilter
+    );
+    if (productVisibilityFilter === "all") return seoFiltered;
+    return seoFiltered.filter((p) => {
+      const visible = Number((p as { active?: unknown }).active) === 1;
+      return productVisibilityFilter === "visible" ? visible : !visible;
+    });
+  }, [products, productSeoReviewById, productSeoFilter, productVisibilityFilter]);
 
   const productSeoBadgeColors = (status: ProductSeoReviewRow["status"]) => {
     if (status === "needs-attention") {
@@ -1528,12 +1615,24 @@ export default function AdminPage() {
       return;
     }
     if (productDeletingId != null) return;
+    const listRow = products.find((p: any) => Number(p.id) === Number(id));
+    const modalRow =
+      productModal !== "new" && productModal && Number(productModal.id) === Number(id)
+        ? productModal
+        : null;
+    const versionSource = modalRow || listRow;
     setProductDeletingId(id);
     setProductMsg("");
     try {
+      const body: Record<string, unknown> = {};
+      if (versionSource && (versionSource as any).product_version != null) {
+        body.expected_version = Number((versionSource as any).product_version);
+      }
       const r = await fetch(`/api/admin-products?id=${id}`, {
         method: "DELETE",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
       if (r.status === 401) {
         handleSessionExpired();
@@ -1547,15 +1646,230 @@ export default function AdminPage() {
       const data = await r.json().catch(() => ({}));
       if (!r.ok || data?.error) {
         setProductMsg(`❌ ${data?.error || "Failed to delete product"}`);
+        if (r.status === 409) await loadProducts();
         return;
       }
       setProductMsg("✅ Product deleted");
+      if (productModal !== "new" && productModal && Number(productModal.id) === Number(id)) {
+        invalidateEditorSession();
+        setProductModal(null);
+      }
       await loadProducts();
     } catch {
       setProductMsg("❌ Failed to delete product");
     } finally {
       setProductDeletingId(null);
       setTimeout(() => setProductMsg(""), 3000);
+    }
+  };
+
+  /** Merge authoritative server product into open editor without clobbering dirty content fields unless requested. */
+  const applyAuthoritativeProductRow = (
+    row: Record<string, unknown>,
+    opts?: {
+      replaceContent?: boolean;
+      reason?: string;
+      /** @deprecated Prefer applyOwnContentPreservingActionResult via panel meta. */
+      advanceContentBase?: boolean;
+      editorSessionId?: string;
+    }
+  ) => {
+    if (
+      opts?.editorSessionId &&
+      opts.editorSessionId !== editorSessionIdRef.current
+    ) {
+      return;
+    }
+    if (opts?.replaceContent) {
+      // Never treat a version-only placeholder as complete content (blanks the form).
+      if (!isCompleteProductContentRow(row)) {
+        setProductMsg(
+          "⚠️ Incomplete server row — draft and conflict retained. Fetch the current product before reloading."
+        );
+        return;
+      }
+      const draft = productRowToEditDraft(row);
+      setEditProduct(draft);
+      if (row.product_version != null) setContentDraftBaseVersion(Number(row.product_version));
+      setContentConflict(null);
+    }
+    // Unqualified advanceContentBase is intentionally ignored — ops must not bump draft base
+    // without a matching actionStartedAtVersion (see onProductUpdate meta).
+    setProductModal((prev: any) => {
+      if (!prev || prev === "new" || Number(prev.id) !== Number(row.id)) return prev;
+      if (opts?.replaceContent) {
+        return { ...prev, ...row };
+      }
+      // Operational + live version refresh; keep unsaved content draft fields in editProduct.
+      return {
+        ...prev,
+        product_version: row.product_version ?? prev.product_version,
+        active: row.active ?? prev.active,
+        shop_listed: row.shop_listed ?? prev.shop_listed,
+        lifecycle_mode: row.lifecycle_mode ?? prev.lifecycle_mode,
+        season_name: row.season_name ?? prev.season_name,
+        season_starts_at: row.season_starts_at ?? prev.season_starts_at,
+        season_ends_at: row.season_ends_at ?? prev.season_ends_at,
+        season_paused: row.season_paused ?? prev.season_paused,
+        season_show_countdown: row.season_show_countdown ?? prev.season_show_countdown,
+        season_ended_notice: row.season_ended_notice ?? prev.season_ended_notice,
+        available_offers_heading: row.available_offers_heading ?? prev.available_offers_heading,
+        season_available_ids: row.season_available_ids ?? prev.season_available_ids,
+        season_upcoming_ids: row.season_upcoming_ids ?? prev.season_upcoming_ids,
+        slug: row.slug ?? prev.slug,
+      };
+    });
+    if (opts?.reason === "conflict") {
+      setProductMsg(
+        "⚠️ Server state changed (409). Your draft was kept. Review current vs draft and choose Reload or keep editing — Save stays blocked on the old draft base until you resolve."
+      );
+    }
+  };
+
+  /**
+   * Reload must obtain a complete authoritative current product through an authorized read.
+   * Do not apply {id, version} placeholders as complete content.
+   */
+  const resolveContentConflictReload = async () => {
+    const snap = contentDraftSessionSnapshot();
+    if (!snap || !contentConflict) return;
+    const sessionId = editorSessionIdRef.current;
+    const productId = snap.productId;
+    setProductMsg("⏳ Loading current product from server…");
+    try {
+      const r = await fetch("/api/admin-products", { credentials: "include", cache: "no-store" });
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      if (r.status === 403) {
+        showPermError();
+        setProductMsg("❌ Forbidden — draft and conflict retained.");
+        return;
+      }
+      if (!r.ok) {
+        setProductMsg("❌ Failed to load current product — draft and conflict retained.");
+        return;
+      }
+      const list = await r.json().catch(() => null);
+      if (sessionId !== editorSessionIdRef.current) {
+        // Editor switched while fetch was in flight.
+        return;
+      }
+      if (!Array.isArray(list)) {
+        setProductMsg("❌ Unexpected product list — draft and conflict retained.");
+        return;
+      }
+      const complete = list.find((p: any) => Number(p.id) === Number(productId));
+      if (!complete || !isCompleteProductContentRow(complete)) {
+        setProductMsg("❌ Current product incomplete or missing — draft and conflict retained.");
+        return;
+      }
+      const next = resolveConflictReloadFromCompleteProduct(snap, complete, {
+        editorSessionId: sessionId,
+      });
+      if ("ok" in next && next.ok === false) {
+        setProductMsg(`❌ Reload rejected (${next.error}) — draft and conflict retained.`);
+        return;
+      }
+      const session = next as ContentDraftSession;
+      setEditProduct(session.editProduct);
+      setContentDraftBaseVersion(session.contentDraftBaseVersion);
+      setContentConflict(null);
+      setProductModal((prev: any) =>
+        prev && prev !== "new" && Number(prev.id) === Number(productId)
+          ? { ...prev, ...complete }
+          : prev
+      );
+      setProductMsg("✅ Reloaded server content into the editor. Review, then save if needed.");
+    } catch {
+      setProductMsg("❌ Network error loading product — draft and conflict retained.");
+    }
+  };
+
+  const toggleProductVisibility = async (p: {
+    id: number;
+    name?: string;
+    slug?: string;
+    active?: unknown;
+  }) => {
+    if (!can("products.manage")) return;
+    if (productVisibilityPendingId != null || productSaving || productDeletingId != null) return;
+
+    const id = Number(p.id);
+    if (!Number.isInteger(id) || id <= 0) return;
+
+    const expectedActive = Number(p.active) === 1 ? 1 : 0;
+    const nextActive = expectedActive === 1 ? 0 : 1;
+    const actionLabel = nextActive === 1 ? "Make Public" : "Make Private";
+    const slugPath = p.slug ? `/products/${p.slug}` : "(no slug)";
+    const confirmed = window.confirm(
+      `${actionLabel} product "${p.name || id}" (#${id})?\n\n` +
+        `Stored URL: ${slugPath}\n\n` +
+        (nextActive === 0
+          ? "PRIVATE: the public product page becomes unavailable (404) and drops from the sitemap after cache refresh. This is genuine privacy — not “hidden from shop”. Seasonal archives must stay Public (active=1) and use Hidden from shop / Pause instead.\n\nMake private?"
+          : "PUBLIC: the product page can resolve again (HTTP 200 when active). Shop listing still depends on shop_listed and seasonal purchase window.\n\nMake public?")
+    );
+    if (!confirmed) return;
+
+    setProductVisibilityPendingId(id);
+    setProductMsg("");
+    try {
+      const body: Record<string, unknown> = {
+        id,
+        active: nextActive,
+        expected_active: expectedActive,
+      };
+      const rowVersion = (p as { product_version?: unknown } | null | undefined)?.product_version;
+      if (rowVersion != null) {
+        body.expected_version = Number(rowVersion);
+      }
+      const r = await fetch("/api/admin-products", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      if (r.status === 403) {
+        showPermError();
+        setProductMsg(`❌ Failed to ${actionLabel.toLowerCase()} product`);
+        await loadProducts();
+        return;
+      }
+      const data = await r.json().catch(() => ({}));
+      if (r.status === 409) {
+        setProductMsg(
+          `❌ ${data.error || "Visibility conflict — refresh and try again."}`
+        );
+        await loadProducts();
+        return;
+      }
+      if (!r.ok || data?.error || !data?.success) {
+        setProductMsg(`❌ ${data.error || `Failed to ${actionLabel.toLowerCase()} product`}`);
+        await loadProducts();
+        return;
+      }
+      const resulting = Number(data.active) === 1 ? "Public" : "Private";
+      const pageNote =
+        Number(data.active) === 1
+          ? "Public page eligible."
+          : "Public page unavailable (404) while private.";
+      setProductMsg(
+        data.noop
+          ? `✅ Already ${resulting} — no change needed. ${pageNote}`
+          : `✅ ${p.name || id} is now ${resulting}. ${pageNote}`
+      );
+      await loadProducts();
+    } catch {
+      setProductMsg(`❌ Failed to ${actionLabel.toLowerCase()} product`);
+      await loadProducts();
+    } finally {
+      setProductVisibilityPendingId(null);
+      setTimeout(() => setProductMsg(""), 5000);
     }
   };
 
@@ -1644,6 +1958,10 @@ export default function AdminPage() {
       focus_keyword: editProduct.focus_keyword || "",
       og_image: editProduct.og_image || "",
     };
+    if (contentConflict) {
+      setProductMsg("❌ Resolve the version conflict (Reload server content or review) before saving.");
+      return;
+    }
     setProductSaving(true);
     setProductMsg("");
     try {
@@ -1653,7 +1971,21 @@ export default function AdminPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          isNew ? payload : { ...payload, id: (productModal as { id: number }).id }
+          isNew
+            ? payload
+            : {
+                ...payload,
+                id: (productModal as { id: number }).id,
+                ...(contentDraftBaseVersion != null
+                  ? { expected_version: Number(contentDraftBaseVersion) }
+                  : (productModal as { product_version?: number })?.product_version != null
+                    ? {
+                        expected_version: Number(
+                          (productModal as { product_version: number }).product_version
+                        ),
+                      }
+                    : {}),
+              }
         ),
       });
       if (r.status === 401) {
@@ -1668,6 +2000,48 @@ export default function AdminPage() {
       const res = await r.json().catch(() => ({}));
       if (!r.ok || res.error) {
         setProductMsg(`❌ ${res.error || "Failed to save product"}`);
+        if (r.status === 409) {
+          await loadProducts();
+          const serverRow =
+            res.product && typeof res.product === "object"
+              ? (res.product as Record<string, unknown>)
+              : null;
+          const snap = contentDraftSessionSnapshot();
+          if (snap) {
+            const next = applyPut409ToDraftSession(snap, {
+              currentVersion:
+                res.current_version != null ? Number(res.current_version) : undefined,
+              serverProduct: serverRow,
+            });
+            // Capture draft vs server for explicit review — do not advance contentDraftBaseVersion.
+            setContentConflict(
+              next.contentConflict
+                ? {
+                    server: next.contentConflict.server,
+                    draft: next.contentConflict.draft,
+                    incompleteServerRow: next.contentConflict.incompleteServerRow,
+                  }
+                : {
+                    server: {
+                      id: (productModal as { id: number }).id,
+                      product_version: res.current_version,
+                    },
+                    draft: { ...editProduct },
+                    incompleteServerRow: true,
+                  }
+            );
+            // Live ops version only from 409 current_version — never blank content fields.
+            applyAuthoritativeProductRow(
+              {
+                id: (productModal as { id: number }).id,
+                ...(res.current_version != null
+                  ? { product_version: res.current_version }
+                  : {}),
+              },
+              { reason: "conflict", editorSessionId: editorSessionIdRef.current }
+            );
+          }
+        }
         return;
       }
       setProductMetaAi({ status: "idle" });
@@ -1675,6 +2049,9 @@ export default function AdminPage() {
       setProductReviewUi(createIdleProductReviewUi());
       setProductImageBriefUi(createIdleProductImageBriefUi());
       setProductAiFacts(createDefaultProductAiFacts("Subscription"));
+      setContentDraftBaseVersion(null);
+      setContentConflict(null);
+      invalidateEditorSession();
       setProductModal(null);
       setProductMsg(`✅ Product saved${formatSeoGuardBannerClient(res.seo_guard)}`);
       await loadProducts();
@@ -1695,32 +2072,27 @@ export default function AdminPage() {
   };
 
   const openEditProduct = (p: any) => {
-    const rawPrice = p.price ? `£${Number(String(p.price).replace(/[^0-9.]/g,'')).toFixed(2)}` : "";
+    const session = openContentDraftSession(p as Record<string, unknown>);
+    editorSessionIdRef.current = session.editorSessionId;
+    setEditorSessionId(session.editorSessionId);
     setProductMetaAi({ status: "idle" });
     resetProductAiState(p.category || "Subscription");
     setProductUrlMigration({ newSlug: "", status: "idle", message: "" });
-    setEditProduct({
-      name: p.name || "",
-      slug: p.slug || toSlug(p.name || ""),
-      category: p.category || "Subscription",
-      price: rawPrice,
-      stock: p.stock || "Digital",
-      image: p.image || "",
-      short_description: p.short_description || p.description || "",
-      full_description: p.full_description || "",
-      features: p.features || "",
-      seo_title: p.seo_title || "",
-      meta_description: p.meta_description || "",
-      focus_keyword: p.focus_keyword || "",
-      og_image: p.og_image || "",
-    });
+    setContentConflict(null);
+    setContentDraftBaseVersion(session.contentDraftBaseVersion);
+    setEditProduct(session.editProduct);
     setProductModal(p);
   };
 
   const openNewProduct = () => {
+    const next = newEditorSessionId();
+    editorSessionIdRef.current = next;
+    setEditorSessionId(next);
     setProductMetaAi({ status: "idle" });
     resetProductAiState("Subscription");
     setProductUrlMigration({ newSlug: "", status: "idle", message: "" });
+    setContentConflict(null);
+    setContentDraftBaseVersion(null);
     setEditProduct({ name:"", slug:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
     setProductModal("new");
   };
@@ -1773,6 +2145,15 @@ export default function AdminPage() {
           product_id: productModal.id,
           expected_old_slug: expectedOldSlug,
           new_slug: newSlug,
+          ...(contentDraftBaseVersion != null
+            ? { expected_version: Number(contentDraftBaseVersion) }
+            : (productModal as { product_version?: unknown }).product_version != null
+              ? {
+                  expected_version: Number(
+                    (productModal as { product_version?: unknown }).product_version
+                  ),
+                }
+              : {}),
         }),
       });
       if (r.status === 401) {
@@ -1799,8 +2180,17 @@ export default function AdminPage() {
       }
 
       setEditProduct((p) => ({ ...p, slug: String(res.new_slug || newSlug) }));
+      if (res.product_version != null) {
+        setContentDraftBaseVersion(Number(res.product_version));
+      }
       setProductModal((prev: any) =>
-        prev && prev !== "new" ? { ...prev, slug: String(res.new_slug || newSlug) } : prev
+        prev && prev !== "new"
+          ? {
+              ...prev,
+              slug: String(res.new_slug || newSlug),
+              ...(res.product_version != null ? { product_version: Number(res.product_version) } : {}),
+            }
+          : prev
       );
       setProductUrlMigration({
         newSlug: "",
@@ -2783,6 +3173,163 @@ export default function AdminPage() {
                   Public URL is protected. Slug changes require a controlled SEO migration with a redirect.
                 </small>
               )}
+              {productModal !== "new" && Number(productModal?.active) !== 1 ? (
+                <small
+                  data-testid="product-editor-hidden-url-note"
+                  style={{display:"block",marginTop:6,fontSize:11,color:"#EA580C",lineHeight:1.45}}
+                >
+                  This product is Private (active=0). Stored slug is retained, but the public page is unavailable (404) until Make Public. Ordinary Save preserves Private status and does not change seasonal/shop controls.
+                </small>
+              ) : null}
+              {productModal !== "new" && productModal?.id && can("products.manage") ? (
+                <ProductSeasonalityPanel
+                  product={productModal as any}
+                  editorSessionId={editorSessionId}
+                  disabled={productSaving}
+                  pending={productVisibilityPendingId === productModal.id}
+                  onSessionExpired={handleSessionExpired}
+                  onForbidden={showPermError}
+                  onMessage={(msg) => {
+                    setProductMsg(msg);
+                    setTimeout(() => setProductMsg(""), 5000);
+                  }}
+                  onRefresh={async () => {
+                    await loadProducts();
+                  }}
+                  onProductUpdate={(row, meta) => {
+                    // Compare captured dispatch context against CURRENT active editor — never
+                    // re-label an old response with editorSessionIdRef.current.
+                    const activeProductId =
+                      productModal && productModal !== "new" ? Number(productModal.id) : null;
+                    if (
+                      !isActiveEditorRequest(
+                        editorSessionIdRef.current,
+                        activeProductId,
+                        meta
+                      )
+                    ) {
+                      return;
+                    }
+                    const snap = contentDraftSessionSnapshot();
+                    if (!snap) {
+                      applyAuthoritativeProductRow(row as any, {
+                        replaceContent: false,
+                        editorSessionId: meta.editorSessionId,
+                      });
+                      return;
+                    }
+                    const next = applyOwnContentPreservingActionResult(snap, {
+                      editorSessionId: meta.editorSessionId,
+                      productId: meta.productId,
+                      actionStartedAtVersion: meta.actionStartedAtVersion,
+                      nextVersion: meta.nextVersion,
+                      noop: meta.noop,
+                      // Successful Pause does not resolve an existing content conflict.
+                      clearConflict: false,
+                    });
+                    setContentDraftBaseVersion(next.contentDraftBaseVersion);
+                    // Keep outstanding conflict; only refresh ops fields + live version.
+                    applyAuthoritativeProductRow(
+                      {
+                        ...row,
+                        product_version: next.liveProductVersion ?? row.product_version,
+                      } as any,
+                      {
+                        replaceContent: false,
+                        editorSessionId: meta.editorSessionId,
+                      }
+                    );
+                  }}
+                  onVersionUpdate={(version, ctx) => {
+                    // Live ops version only — NEVER advance content draft base from unqualified callback.
+                    // Reject late responses that belong to a closed/switched editor session.
+                    const activeProductId =
+                      productModal && productModal !== "new" ? Number(productModal.id) : null;
+                    if (
+                      !isActiveEditorRequest(
+                        editorSessionIdRef.current,
+                        activeProductId,
+                        ctx
+                      )
+                    ) {
+                      return;
+                    }
+                    const snap = contentDraftSessionSnapshot();
+                    if (snap) {
+                      const next = applyLiveVersionOnly(snap, Number(version));
+                      setProductModal((prev: any) =>
+                        prev && prev !== "new" && Number(prev.id) === Number(ctx.productId)
+                          ? { ...prev, product_version: next.liveProductVersion }
+                          : prev
+                      );
+                    } else {
+                      setProductModal((prev: any) =>
+                        prev && prev !== "new" && Number(prev.id) === Number(ctx.productId)
+                          ? { ...prev, product_version: version }
+                          : prev
+                      );
+                    }
+                  }}
+                />
+              ) : null}
+              {contentConflict ? (
+                <div
+                  data-testid="product-content-conflict"
+                  style={{
+                    marginTop: 12,
+                    padding: "12px 14px",
+                    borderRadius: 8,
+                    border: "1px solid #F59E0B",
+                    background: "#FFFBEB",
+                    fontSize: 13,
+                  }}
+                >
+                  <strong>Version conflict</strong>
+                  <p style={{ margin: "8px 0" }}>
+                    Your draft price: <code>{contentConflict.draft.price || "—"}</code>
+                    {" · "}
+                    Server price:{" "}
+                    <code>
+                      {contentConflict.server.price != null
+                        ? `£${Number(String(contentConflict.server.price).replace(/[^0-9.]/g, "")).toFixed(2)}`
+                        : "(reload to inspect)"}
+                    </code>
+                    {" · "}
+                    Draft base version: <code>{contentDraftBaseVersion ?? "—"}</code>
+                    {" · "}
+                    Server version:{" "}
+                    <code>{String(contentConflict.server.product_version ?? "—")}</code>
+                  </p>
+                  <p style={{ margin: "0 0 10px", color: "#92400E" }}>
+                    Save is blocked until you reload server content into the editor (recommended) or
+                    dismiss after reviewing. Stale draft content will not silently overwrite newer
+                    server fields.
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      data-testid="product-conflict-reload"
+                      className="modal-save"
+                      onClick={resolveContentConflictReload}
+                    >
+                      Reload server content
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="product-conflict-dismiss"
+                      className="modal-cancel"
+                      onClick={() => {
+                        setContentConflict(null);
+                        setProductMsg(
+                          "⚠️ Conflict dismissed — Save still uses your draft base version until you reload or successfully save."
+                        );
+                      }}
+                    >
+                      Keep draft (still on old base)
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               {productModal !== "new" && productModal?.id && can("products.manage") && can("redirects.manage") ? (
                 <div
                   data-testid="product-url-migration-panel"
@@ -3554,6 +4101,7 @@ export default function AdminPage() {
                   setProductReviewUi(createIdleProductReviewUi());
                   setProductImageBriefUi(createIdleProductImageBriefUi());
                   setProductAiFacts(createDefaultProductAiFacts("Subscription"));
+                  invalidateEditorSession();
                   setProductMetaAi({ status: "idle" });
                   setProductModal(null);
                 }}
@@ -3568,6 +4116,7 @@ export default function AdminPage() {
                     setHistoryFilter({ entityType: "product", entityId: String(productModal.id) });
                     setProductMetaAi({ status: "idle" });
                     resetProductAiState("Subscription");
+                    invalidateEditorSession();
                     setProductModal(null);
                     setTab("history");
                   }}
@@ -3575,8 +4124,13 @@ export default function AdminPage() {
                   🕘 History
                 </button>
               )}
-              <button className="modal-save" onClick={saveProduct} disabled={imageUploading || productSaving}>
-                {productSaving ? "Saving…" : "Save Product"}
+              <button
+                className="modal-save"
+                onClick={saveProduct}
+                disabled={imageUploading || productSaving || !!contentConflict}
+                data-testid="product-save-btn"
+              >
+                {productSaving ? "Saving…" : contentConflict ? "Resolve conflict to save" : "Save Product"}
               </button>
             </div>
           </div>
@@ -4135,15 +4689,62 @@ export default function AdminPage() {
               <div className="section-header">
                 <div className="section-title">Products ({productsLoading ? "…" : products.length})</div>
                 {can("products.manage") && (
-                  <button className="add-btn" onClick={openNewProduct} disabled={productSaving}>+ Add Product</button>
+                  <button className="add-btn" onClick={openNewProduct} disabled={productSaving || productVisibilityPendingId != null}>+ Add Product</button>
                 )}
               </div>
+              <p
+                data-testid="product-visibility-help"
+                style={{ margin: "0 0 12px", fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.45 }}
+              >
+                Private (active=0) removes the public page (404) and sitemap membership after the configured sitemap TTL (300 seconds). Hidden from shop (shop_listed=0) keeps the public page indexable. Seasonal archives must stay Public and use Pause / End Early / Hidden from shop — never Private — when an offer ends. Permanent/Seasonal is separate from Subscription/Device/Bundle. Ordinary Edit preserves operational controls.
+              </p>
               {productsError && (
                 <div style={{padding:"14px 16px",marginBottom:12,background:"rgba(220,38,38,0.1)",border:"1px solid rgba(220,38,38,0.25)",borderRadius:10,color:"#DC2626",fontSize:13}}>
                   {productsError}
                   <button type="button" className="action-btn btn-edit" style={{marginLeft:12}} onClick={() => loadProducts()}>Retry</button>
                 </div>
               )}
+
+              {!productsLoading && !productsError && products.length > 0 ? (
+                <div
+                  data-testid="product-visibility-filters"
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    marginBottom: 12,
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.85, marginRight: 4 }}>Visibility</span>
+                  {(
+                    [
+                      ["all", "All"],
+                      ["visible", "Public"],
+                      ["hidden", "Private"],
+                    ] as const
+                  ).map(([value, label]) => {
+                    const selected = productVisibilityFilter === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        data-testid={`product-visibility-filter-${value}`}
+                        className="action-btn btn-view"
+                        aria-pressed={selected}
+                        onClick={() => setProductVisibilityFilter(value)}
+                        style={{
+                          opacity: selected ? 1 : 0.7,
+                          borderColor: selected ? "rgba(91,33,182,0.55)" : undefined,
+                          background: selected ? "rgba(91,33,182,0.12)" : undefined,
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
 
               {!productsLoading && !productsError && products.length > 0 ? (
                 <div
@@ -4223,16 +4824,20 @@ export default function AdminPage() {
 
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Content</th><th>SEO</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>Image</th><th>Name</th><th>Visibility</th><th>Category</th><th>Price</th><th>Stock</th><th>Content</th><th>SEO</th><th>Actions</th></tr></thead>
                   <tbody>
                     {productsLoading && (
-                      <tr><td colSpan={8} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>Loading products…</td></tr>
+                      <tr><td colSpan={9} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>Loading products…</td></tr>
                     )}
                     {!productsLoading && !productsError && products.length === 0 && (
-                      <tr><td colSpan={8} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No products found{can("products.manage") ? ". Add a product above." : "."}</td></tr>
+                      <tr><td colSpan={9} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No products found{can("products.manage") ? ". Add a product above." : "."}</td></tr>
                     )}
                     {!productsLoading && !productsError && products.length > 0 && displayedProducts.length === 0 && (
-                      <tr><td colSpan={8} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No products match this SEO filter.</td></tr>
+                      <tr><td colSpan={9} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>
+                        {productVisibilityFilter !== "all"
+                          ? `No ${productVisibilityFilter} products match the current filters.`
+                          : "No products match this SEO filter."}
+                      </td></tr>
                     )}
                     {!productsLoading && displayedProducts.map(p => {
                       const health = productHealth(p);
@@ -4245,10 +4850,47 @@ export default function AdminPage() {
                         productSeoReviewById.get(Number(p.id)) ||
                         buildProductSeoReviewRow(p);
                       const seoColor = productSeoBadgeColors(seoRow.status);
+                      const isVisible = Number(p.active) === 1;
+                      const slugPath = p.slug ? `/products/${p.slug}` : "";
+                      const visibilityBusy = productVisibilityPendingId === p.id;
                       return (
                       <tr key={p.id} data-testid={`product-row-${p.id}`}>
                         <td><div className="product-thumb">{p.image ? <img src={p.image} alt="" style={{width:36,height:36,objectFit:"cover",borderRadius:6}} /> : (p.emoji || "📦")}</div></td>
-                        <td style={{fontWeight:600}}>{p.name}</td>
+                        <td style={{fontWeight:600}}>
+                          <div>{p.name}</div>
+                          {slugPath ? (
+                            <div style={{marginTop:4,fontSize:11,fontWeight:400,color:"rgba(255,255,255,0.45)",lineHeight:1.35}}>
+                              <span data-testid={`product-stored-url-${p.id}`}>{slugPath}</span>
+                              <button
+                                type="button"
+                                className="action-btn btn-view"
+                                style={{marginLeft:6,padding:"2px 6px",fontSize:10}}
+                                onClick={() => {
+                                  void copyTextToClipboard(slugPath).then((ok) => {
+                                    setProductMsg(ok ? "✅ Stored URL copied" : "❌ Could not copy URL");
+                                    setTimeout(() => setProductMsg(""), 2500);
+                                  });
+                                }}
+                              >
+                                Copy URL
+                              </button>
+                              {!isVisible ? (
+                                <div data-testid={`product-url-hidden-note-${p.id}`} style={{marginTop:2,color:"#EA580C"}}>
+                                  Public page unavailable while hidden (404). Slug retained in CMS.
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td>
+                          <span
+                            data-testid={`product-visibility-badge-${p.id}`}
+                            className={`status-badge ${isVisible ? "status-delivered" : "status-pending"}`}
+                            title={isVisible ? "Visible on public commerce" : "Hidden from public commerce; CMS record retained"}
+                          >
+                            {isVisible ? "Public" : "Private"}
+                          </span>
+                        </td>
                         <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{p.category}</span></td>
                         <td style={{fontWeight:700,color:"#5B21B6"}}>{p.price}</td>
                         <td>{p.stock}</td>
@@ -4264,11 +4906,41 @@ export default function AdminPage() {
                             {productSeoBadgeText(seoRow)}
                           </span>
                         </td>
-                        <td>
+                        <td style={{whiteSpace:"nowrap"}}>
                           {can("products.manage") && (
                             <>
-                              <button className="action-btn btn-edit" onClick={() => openEditProduct(p)} disabled={productSaving || productDeletingId != null}>Edit</button>
-                              <button className="action-btn btn-delete" onClick={() => deleteProduct(p.id)} disabled={productDeletingId != null || productSaving}>
+                              <button
+                                className="action-btn btn-edit"
+                                onClick={() => openEditProduct(p)}
+                                disabled={productSaving || productDeletingId != null || productVisibilityPendingId != null}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className={`action-btn ${isVisible ? "btn-view" : "btn-verify"}`}
+                                data-testid={`product-visibility-toggle-${p.id}`}
+                                onClick={() => toggleProductVisibility(p)}
+                                disabled={
+                                  productVisibilityPendingId != null ||
+                                  productSaving ||
+                                  productDeletingId != null
+                                }
+                                aria-busy={visibilityBusy}
+                              >
+                                {visibilityBusy
+                                  ? isVisible
+                                    ? "Privatising…"
+                                    : "Publishing…"
+                                  : isVisible
+                                    ? "Make Private"
+                                    : "Make Public"}
+                              </button>
+                              <button
+                                className="action-btn btn-delete"
+                                onClick={() => deleteProduct(p.id)}
+                                disabled={productDeletingId != null || productSaving || productVisibilityPendingId != null}
+                              >
                                 {productDeletingId === p.id ? "Deleting…" : "Delete"}
                               </button>
                             </>
@@ -4344,6 +5016,18 @@ export default function AdminPage() {
               role={adminRole}
               initialEntityType={historyFilter?.entityType || ""}
               initialEntityId={historyFilter?.entityId || ""}
+              currentProductVersion={
+                historyFilter?.entityType === "product" &&
+                productModal !== "new" &&
+                productModal &&
+                String(productModal.id) === String(historyFilter.entityId)
+                  ? (productModal as any).product_version ?? null
+                  : products.find(
+                      (p: any) =>
+                        historyFilter?.entityType === "product" &&
+                        String(p.id) === String(historyFilter?.entityId || "")
+                    )?.product_version ?? null
+              }
             />
           )}
 
@@ -5689,8 +6373,47 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_meta_description","site_logo_url","og_default_image","whatsapp_icon_url","clarity_enabled","clarity_project_id","clarity_dashboard_url"])}>
-                  {contentSaving?"Saving...":"💾 Save Settings"}
+                <div
+                  data-testid="seasonal-hub-publish-control"
+                  style={{
+                    marginTop: 18,
+                    padding: "14px 16px",
+                    borderRadius: 12,
+                    border: "1px solid #DDD6FE",
+                    background: "#F5F3FF",
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>Seasonal Offers Hub</div>
+                  <p style={{ fontSize: 13, color: "#4C1D95", marginBottom: 10, lineHeight: 1.45 }}>
+                    Default unpublished. Publishing requires at least one public seasonal product in Live /
+                    Upcoming / Past. Empty publication is rejected server-side. Sitemap includes the hub only
+                    when effectively published and useful (TTL refresh — no immediate invalidation claim).
+                  </p>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                    <input
+                      type="checkbox"
+                      checked={String(siteContent.seasonal_hub_published || "") === "1"}
+                      onChange={(e) =>
+                        setSiteContent((s: any) => ({
+                          ...s,
+                          seasonal_hub_published: e.target.checked ? "1" : "0",
+                        }))
+                      }
+                    />
+                    Publish seasonal offers hub
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ marginTop: 10 }}
+                    disabled={contentSaving}
+                    data-testid="seasonal-hub-publish-save"
+                    onClick={() => saveContent(["seasonal_hub_published"])}
+                  >
+                    {contentSaving ? "Saving..." : "Save hub publication"}
+                  </button>
+                </div>
+                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_meta_description","site_logo_url","og_default_image","whatsapp_icon_url","clarity_enabled","clarity_project_id","clarity_dashboard_url"])}>                  {contentSaving?"Saving...":"💾 Save Settings"}
                 </button>
               </div>
             </div>

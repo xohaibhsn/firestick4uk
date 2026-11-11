@@ -28,6 +28,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const productId = Number(body.product_id ?? body.productId ?? body.id);
   const expectedOldSlug = String(body.expected_old_slug ?? body.expectedOldSlug ?? "");
   const newSlug = String(body.new_slug ?? body.newSlug ?? "");
+  const expectedVersionRaw = body.expected_version ?? body.expectedVersion;
+  const expectedVersion =
+    expectedVersionRaw === undefined || expectedVersionRaw === null
+      ? undefined
+      : Number(expectedVersionRaw);
 
   try {
     const result = await migrateProductUrl({
@@ -35,6 +40,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       expectedOldSlug,
       newSlug,
       actor: admin,
+      ...(expectedVersion !== undefined && Number.isFinite(expectedVersion)
+        ? { expectedVersion }
+        : {}),
     });
 
     if (!result.ok) {
@@ -77,6 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       destination_path: result.destinationPath,
       redirect_id: result.redirectId,
       preserved: result.preserved,
+      ...(result.productVersion != null ? { product_version: result.productVersion } : {}),
     });
   } catch (error: any) {
     return res.status(500).json({ error: error?.message || "Migration failed" });

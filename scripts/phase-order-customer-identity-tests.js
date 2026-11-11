@@ -100,8 +100,14 @@ ok(
 // Compare CALL sites (not import lines): hasMeaningfulCustomerIdentity({ ... })
 // before isPublicPaymentMethod(payment_method).
 const identityIdx = orders.indexOf("hasMeaningfulCustomerIdentity({");
+const normalizeIdx = orders.indexOf("normalizeOrderCustomerIdentity(");
 const paymentIdx = orders.indexOf("isPublicPaymentMethod(payment_method)");
-const poolIdx = orders.indexOf("pool.query");
+// First DB access may be pool.query (pre-seasonal) or pool.getConnection (TX lock path).
+const poolQueryIdx = orders.indexOf("pool.query");
+const poolGetConnIdx = orders.indexOf("pool.getConnection");
+const firstDbIdx = [poolQueryIdx, poolGetConnIdx]
+  .filter((i) => i >= 0)
+  .reduce((a, b) => Math.min(a, b), Number.POSITIVE_INFINITY);
 const insertIdx = orders.indexOf("INSERT INTO orders");
 ok(
   "orders_identity_before_payment_check",
@@ -111,7 +117,11 @@ ok(
 );
 ok(
   "orders_identity_before_db_query",
-  identityIdx > 0 && poolIdx > identityIdx
+  normalizeIdx >= 0 &&
+    identityIdx > 0 &&
+    Number.isFinite(firstDbIdx) &&
+    normalizeIdx < firstDbIdx &&
+    identityIdx < firstDbIdx
 );
 ok(
   "orders_identity_before_insert",

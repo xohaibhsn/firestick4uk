@@ -102,7 +102,25 @@ const consentLib = read("lib/trackingConsent.ts");
 ok("helper_exists", exists("lib/orderPricing.ts"));
 ok("orders_imports_orderPricing", /from ['\"]\.\.\/\.\.\/lib\/orderPricing['\"]/.test(orders));
 ok("coupons_imports_orderPricing", /from ['\"]\.\.\/\.\.\/lib\/orderPricing['\"]/.test(coupons));
-ok("orders_selects_db_price", /SELECT id, name, price, category, stock, active FROM products/.test(orders));
+{
+  const eligibility = read("lib/orderProductEligibility.ts");
+  const legacySelect = /const LEGACY_SELECT = `[\s\S]*?\bprice\b[\s\S]*?FROM products/.test(
+    eligibility
+  );
+  const expandedSelect = /const EXPANDED_SELECT = `[\s\S]*?\bprice\b[\s\S]*?FROM products/.test(
+    eligibility
+  );
+  ok(
+    "orders_selects_db_price",
+    /lockAndAuthorizeOrderProducts\s*\(/.test(orders) &&
+      /orderProductEligibility/.test(orders) &&
+      legacySelect &&
+      expandedSelect &&
+      /Client total \/ discount_amount \/ vat_amount \/ item\.price \/ item\.name are intentionally ignored/.test(
+        orders
+      )
+  );
+}
 ok("orders_ignores_client_total_authority", /Client total \/ discount_amount \/ vat_amount/.test(orders));
 ok(
   "orders_insert_uses_server_totals",

@@ -19,12 +19,16 @@ import {
 } from "@/lib/urlRedirectsServer";
 import { URL_REDIRECT_TYPE_V1 } from "@/lib/urlRedirects";
 import { invalidateSitemapCache } from "@/lib/hostingerResourceInvalidation";
+import { queryWithSeasonalUtc } from "@/lib/productSeasonalQuery";
+import { normalizeSeasonalUtcFields } from "@/lib/productSeasonLondon";
 
 export type MigrateProductUrlInput = {
   productId: number;
   expectedOldSlug: string;
   newSlug: string;
   actor: AdminIdentity;
+  /** When product_version column exists, compared under FOR UPDATE. */
+  expectedVersion?: number;
 };
 
 export type MigrateProductUrlResult =
@@ -37,6 +41,7 @@ export type MigrateProductUrlResult =
       sourcePath: string;
       destinationPath: string;
       redirectId: number | null;
+      productVersion?: number;
       preserved: {
         name: string;
         price: string | number;
@@ -53,7 +58,7 @@ export type MigrateProductUrlResult =
       code?: string;
     };
 
-function commercialFingerprint(row: RowDataPacket) {
+function commercialFingerprint(row: RowDataPacket | Record<string, unknown>) {
   return {
     name: String(row.name || ""),
     price: row.price,
@@ -105,11 +110,15 @@ export async function migrateProductUrl(
   try {
     await conn.beginTransaction();
 
-    const [lockedRows] = await conn.query<RowDataPacket[]>(
+    const [lockedRows] = await queryWithSeasonalUtc<RowDataPacket[]>(
+      conn,
       `SELECT * FROM products WHERE id = ? LIMIT 1 FOR UPDATE`,
       [paths.productId]
     );
-    const current = Array.isArray(lockedRows) && lockedRows[0] ? lockedRows[0] : null;
+    const current =
+      Array.isArray(lockedRows) && lockedRows[0]
+        ? normalizeSeasonalUtcFields(lockedRows[0] as Record<string, unknown>)
+        : null;
     if (!current) {
       await conn.rollback();
       return { ok: false, status: 404, error: "Product not found", code: "not_found" };
@@ -261,10 +270,50 @@ export async function migrateProductUrl(
       conn
     );
 
-    const [updateResult] = await conn.query<ResultSetHeader>(
-      `UPDATE products SET slug = ? WHERE id = ? AND slug = ?`,
-      [paths.newSlug, paths.productId, current.slug]
-    );
+    const hasVersion = Object.prototype.hasOwnProperty.call(current, "product_version");
+    let updateResult: ResultSetHeader;
+    if (hasVersion) {
+      const curVer = Number(current.product_version);
+      if (!Number.isInteger(curVer) || curVer < 0) {
+        await conn.rollback();
+        return {
+          ok: false,
+          status: 500,
+          error: "Invalid product_version on product row",
+          code: "server_error",
+        };
+      }
+      if (input.expectedVersion == null || !Number.isInteger(Number(input.expectedVersion))) {
+        await conn.rollback();
+        return {
+          ok: false,
+          status: 400,
+          error: "expected_version is required for product URL migration on expanded schema",
+          code: "validation",
+        };
+      }
+      const expectedVersion = Number(input.expectedVersion);
+      if (expectedVersion !== curVer) {
+        await conn.rollback();
+        return {
+          ok: false,
+          status: 409,
+          error: "Stale product_version; refresh before URL migration",
+          code: "stale_version",
+        };
+      }
+      const [ur] = await conn.query<ResultSetHeader>(
+        `UPDATE products SET slug = ?, product_version = ? WHERE id = ? AND slug = ? AND product_version = ?`,
+        [paths.newSlug, curVer + 1, paths.productId, current.slug, curVer]
+      );
+      updateResult = ur;
+    } else {
+      const [ur] = await conn.query<ResultSetHeader>(
+        `UPDATE products SET slug = ? WHERE id = ? AND slug = ?`,
+        [paths.newSlug, paths.productId, current.slug]
+      );
+      updateResult = ur;
+    }
     if (Number(updateResult.affectedRows || 0) !== 1) {
       await conn.rollback();
       return {
@@ -307,6 +356,7 @@ export async function migrateProductUrl(
     await conn.commit();
     invalidateSitemapCache();
 
+    const nextVersion = hasVersion ? Number(current.product_version) + 1 : undefined;
     return {
       ok: true,
       alreadyMigrated: false,
@@ -316,6 +366,7 @@ export async function migrateProductUrl(
       sourcePath: paths.sourcePath,
       destinationPath: paths.destinationPath,
       redirectId,
+      ...(nextVersion != null ? { productVersion: nextVersion } : {}),
       preserved: commercialFingerprint(current),
     };
   } catch (err: any) {

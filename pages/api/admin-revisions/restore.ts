@@ -22,6 +22,17 @@ import {
 } from "../../../lib/blogSeoSafety";
 import { invalidateSitemapCache } from "../../../lib/hostingerResourceInvalidation";
 import { runPostSaveSeoGuard } from "../../../lib/postSaveSeoGuard";
+import {
+  assertSingleUpdate,
+  gateExpectedVersionAllowMaxNoop,
+} from "../../../lib/productWriterTx";
+import { normalizeSeasonalUtcFields } from "../../../lib/productSeasonLondon";
+import { queryWithSeasonalUtc } from "../../../lib/productSeasonalQuery";
+import { PRODUCT_VERSION_MAX } from "../../../lib/productSeasonActions";
+import {
+  SEASONAL_HUB_PUBLISHED_KEY,
+  validateSeasonalHubPublicationWrite,
+} from "../../../lib/seasonalHubPublic";
 
 const PRODUCT_CATEGORIES = ["Subscription", "Device", "Bundle"] as const;
 
@@ -132,15 +143,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (revision.entity_type === "product") {
       const productId = Number(revision.entity_id);
-      const [rows] = await conn.query<RowDataPacket[]>(
-        "SELECT * FROM products WHERE id=? LIMIT 1",
+      const [rows] = await queryWithSeasonalUtc<RowDataPacket[]>(
+        conn,
+        "SELECT * FROM products WHERE id=? LIMIT 1 FOR UPDATE",
         [productId]
       );
-      const current = rows[0];
-      if (!current) {
+      const currentRaw = rows[0];
+      if (!currentRaw) {
         await conn.rollback();
         return res.status(404).json({ error: "Product no longer exists; restore denied in V1." });
       }
+      const current = normalizeSeasonalUtcFields(currentRaw as Record<string, unknown>);
 
       const snap = snapshot as Record<string, unknown>;
       const name = String(snap.name || "").trim();
@@ -165,6 +178,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: "Historical product category is invalid" });
       }
 
+      // expected_version from CURRENT product confirmation — never from historical snapshot.
+      const expanded = Object.prototype.hasOwnProperty.call(current, "product_version");
+      if (expanded) {
+        const gate = gateExpectedVersionAllowMaxNoop(current, req.body?.expected_version, false);
+        if (!gate.ok) {
+          await conn.rollback();
+          return res.status(gate.status).json({
+            error: gate.error,
+            code: gate.code,
+            ...(gate.current_version != null ? { current_version: gate.current_version } : {}),
+          });
+        }
+        if (Number(current.product_version) === PRODUCT_VERSION_MAX) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "product_version overflow; refuse further mutations",
+            code: "version_overflow",
+            current_version: Number(current.product_version),
+          });
+        }
+      }
+
       await recordContentRevision(
         {
           entityType: "product",
@@ -178,30 +213,64 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         conn
       );
 
-      await conn.query(
-        `UPDATE products SET name=?, slug=?, description=?, price=?, category=?, badge=?, image=?, stock=?, active=?,
-          short_description=?, full_description=?, seo_title=?, meta_description=?, focus_keyword=?, features=?, og_image=?
-         WHERE id=?`,
-        [
-          name,
-          currentSlug,
-          snap.description ?? "",
-          priceCheck.price,
-          category,
-          snap.badge ?? null,
-          snap.image ?? null,
-          snap.stock ?? "Digital",
-          snap.active === 0 || snap.active === "0" || snap.active === false ? 0 : 1,
-          snap.short_description ?? "",
-          snap.full_description ?? "",
-          snap.seo_title ?? "",
-          snap.meta_description ?? "",
-          snap.focus_keyword ?? "",
-          snap.features ?? "",
-          snap.og_image ?? "",
-          productId,
-        ]
-      );
+      // Content-only restore: never apply snapshot active/listing/lifecycle/version.
+      if (expanded) {
+        const nextVer = Number(current.product_version) + 1;
+        const [upd] = await conn.query<ResultSetHeader>(
+          `UPDATE products SET name=?, slug=?, description=?, price=?, category=?, badge=?, image=?, stock=?,
+            short_description=?, full_description=?, seo_title=?, meta_description=?, focus_keyword=?, features=?, og_image=?,
+            product_version=?
+           WHERE id=? AND product_version=? AND slug=?`,
+          [
+            name,
+            currentSlug,
+            snap.description ?? "",
+            priceCheck.price,
+            category,
+            snap.badge ?? null,
+            snap.image ?? null,
+            snap.stock ?? "Digital",
+            snap.short_description ?? "",
+            snap.full_description ?? "",
+            snap.seo_title ?? "",
+            snap.meta_description ?? "",
+            snap.focus_keyword ?? "",
+            snap.features ?? "",
+            snap.og_image ?? "",
+            nextVer,
+            productId,
+            Number(current.product_version),
+            current.slug,
+          ]
+        );
+        assertSingleUpdate(upd, "product_restore");
+      } else {
+        const [upd] = await conn.query<ResultSetHeader>(
+          `UPDATE products SET name=?, slug=?, description=?, price=?, category=?, badge=?, image=?, stock=?,
+            short_description=?, full_description=?, seo_title=?, meta_description=?, focus_keyword=?, features=?, og_image=?
+           WHERE id=? AND slug=?`,
+          [
+            name,
+            currentSlug,
+            snap.description ?? "",
+            priceCheck.price,
+            category,
+            snap.badge ?? null,
+            snap.image ?? null,
+            snap.stock ?? "Digital",
+            snap.short_description ?? "",
+            snap.full_description ?? "",
+            snap.seo_title ?? "",
+            snap.meta_description ?? "",
+            snap.focus_keyword ?? "",
+            snap.features ?? "",
+            snap.og_image ?? "",
+            productId,
+            current.slug,
+          ]
+        );
+        assertSingleUpdate(upd, "product_restore_legacy");
+      }
 
       await conn.commit();
       const { ip } = getRequestMeta(req);
@@ -225,6 +294,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         entity_type: "product",
         entity_id: String(productId),
         seo_guard,
+        ...(expanded ? { product_version: Number(current.product_version) + 1 } : {}),
       });
     }
 
@@ -386,6 +456,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (keys.some((k) => isSuperAdminSettingsKey(k)) && admin.role !== "super_admin") {
         await conn.rollback();
         return res.status(403).json({ error: "Forbidden" });
+      }
+
+      if (Object.prototype.hasOwnProperty.call(values, SEASONAL_HUB_PUBLISHED_KEY)) {
+        const hubGate = await validateSeasonalHubPublicationWrite({
+          db: pool,
+          nextValue: values[SEASONAL_HUB_PUBLISHED_KEY],
+        });
+        if (!hubGate.ok) {
+          await conn.rollback();
+          return res.status(hubGate.status).json({
+            error: hubGate.error,
+            code: "seasonal_hub_publish_rejected",
+          });
+        }
       }
 
       const [prevRows] = await conn.query<RowDataPacket[]>(

@@ -70,6 +70,7 @@ const eslintConfig = defineConfig([
     "tmp-*.json",
     ".tmp-*/**",
     "public/uploads/**",
+    "review-artifacts/**",
   ]),
 ]);
 

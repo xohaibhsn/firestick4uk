@@ -147,6 +147,8 @@ export const SUPER_ADMIN_SITE_SETTINGS_KEYS = new Set<string>([
   "clarity_enabled",
   "clarity_project_id",
   "clarity_dashboard_url",
+  /** Seasonal offers hub publication (default unpublished). */
+  "seasonal_hub_published",
 ]);
 
 export function isSuperAdminSettingsKey(key: string): boolean {

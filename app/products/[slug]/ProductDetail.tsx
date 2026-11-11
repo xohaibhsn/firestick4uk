@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
 import { useCart } from "../../lib/cartContext";
@@ -8,6 +9,19 @@ import Footer from "@/components/Footer";
 import { useContactConfig } from "@/hooks/useContactConfig";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import { fillVars } from "@/lib/cms";
+import SeasonalCountdown from "@/components/product/SeasonalCountdown";
+import SeasonalAlternativeCards, {
+  type SeasonalAltCard,
+} from "@/components/product/SeasonalAlternativeCards";
+import { floorSecondUtcMs, parseUtcSqlToMs } from "@/lib/productSeasonLondon";
+import {
+  bindCoordinatorProduct,
+  clearPurchaseBlockAfterAuthoritativeOk,
+  createBoundaryCoordinator,
+  makeBoundaryKey,
+  runBoundaryRevalidation,
+  type BoundaryCoordinatorState,
+} from "@/lib/productSeasonBoundaryClient";
 
 const xssOptions = {
   whiteList: {
@@ -31,30 +45,275 @@ interface Product {
   price: number; badge: string | null; image: string | null; category: string; stock: string;
   short_description: string | null; full_description: string | null;
   features: string | null; seo_title: string | null; og_image: string | null;
+  season_ended_notice?: string | null;
+  available_offers_heading?: string | null;
+  season_name?: string | null;
+  season_phase?: string;
+  season_starts_at?: string | null;
+  season_ends_at?: string | null;
+  season_show_countdown?: boolean;
+  purchasable?: boolean;
 }
 
-export default function ProductDetail({ slug, initialProduct }: { slug: string; initialProduct: Product | null }) {
+export default function ProductDetail({
+  slug,
+  initialProduct,
+  seasonPhase = "permanent",
+  purchasable = true,
+  showHubLink = false,
+  availableOffers = [],
+  upcomingOffers = [],
+  /** Test-only coherent clock shared with SeasonalCountdown. */
+  getNowMs,
+  /** Test-only fetch boundary (production uses global fetch). */
+  fetchImpl,
+}: {
+  slug: string;
+  initialProduct: Product | null;
+  seasonPhase?: string;
+  purchasable?: boolean;
+  showHubLink?: boolean;
+  availableOffers?: SeasonalAltCard[];
+  upcomingOffers?: SeasonalAltCard[];
+  getNowMs?: () => number;
+  fetchImpl?: typeof fetch;
+}) {
+  const doFetch = fetchImpl || fetch;
+  const router = useRouter();
   const [product, setProduct] = useState<Product | null>(initialProduct);
+  const [phase, setPhase] = useState(seasonPhase);
+  const [canBuyProp, setCanBuyProp] = useState(purchasable);
+  const [availAlts, setAvailAlts] = useState(availableOffers);
+  const [upAlts, setUpAlts] = useState(upcomingOffers);
   const [loading, setLoading] = useState(!initialProduct);
   const [added, setAdded] = useState(false);
   const [hovering, setHovering] = useState(false);
+  const [revalidating, setRevalidating] = useState(false);
+  const [revalidateFailed, setRevalidateFailed] = useState(false);
+  const [purchaseBlockedLocal, setPurchaseBlockedLocal] = useState(false);
+  const boundaryRef = useRef<BoundaryCoordinatorState>(createBoundaryCoordinator());
+  // Bind coordinator to the current product/slug on route changes (never via late callbacks).
+  useEffect(() => {
+    if (!initialProduct?.id && !product?.id) return;
+    const id = initialProduct?.id ?? product?.id;
+    if (id == null) return;
+    bindCoordinatorProduct(boundaryRef.current, id, slug);
+  }, [slug, initialProduct?.id, product?.id]);
   const { addToCart, removeFromCart, cart } = useCart();
   const contact = useContactConfig();
   const { t } = useSiteContent();
   const vars = { phone: contact.phone, telegram: contact.telegram };
 
+  // SSR / router.refresh props replace stale client state — never re-enable an expired CTA
+  // from stale purchasable=true while a boundary block is active. After a settled boundary
+  // refresh, do not clobber the authoritative client purchase decision with stale props.
+  useEffect(() => {
+    if (!initialProduct) return;
+    setProduct((prev) => {
+      // Prefer fresher client merge when a boundary already settled for this product.
+      if (
+        prev &&
+        Number(prev.id) === Number(initialProduct.id) &&
+        boundaryRef.current.completed.size > 0
+      ) {
+        return {
+          ...initialProduct,
+          ...prev,
+          // Keep SSR alts/content fields from props when present
+          name: initialProduct.name ?? prev.name,
+          short_description: initialProduct.short_description ?? prev.short_description,
+        };
+      }
+      return initialProduct;
+    });
+    setAvailAlts(availableOffers);
+    setUpAlts(upcomingOffers);
+    setLoading(false);
+    const blocked = boundaryRef.current.purchaseBlocked;
+    if (blocked && boundaryRef.current.blockedReason) {
+      setCanBuyProp(false);
+      return;
+    }
+    if (boundaryRef.current.completed.size > 0) {
+      // Authoritative client decision already applied — ignore stale purchasable prop.
+      return;
+    }
+    setPhase(seasonPhase);
+    setCanBuyProp(purchasable);
+    setRevalidateFailed(false);
+  }, [initialProduct, seasonPhase, purchasable, availableOffers, upcomingOffers]);
+
   useEffect(() => {
     if (initialProduct) return;
-    fetch(`/api/products?slug=${encodeURIComponent(slug)}`)
+    doFetch(`/api/products?slug=${encodeURIComponent(slug)}`)
       .then(r => r.json())
       .then(data => { setProduct(data); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [slug, initialProduct]);
+  }, [slug, initialProduct, doFetch]);
+
+  const handleBoundary = useCallback(
+    async (kind: "start" | "end") => {
+      const p = product;
+      if (!p?.id) return;
+      const targetIso = kind === "start" ? p.season_starts_at : p.season_ends_at;
+      const targetMs = parseUtcSqlToMs(targetIso);
+      if (targetMs == null) return;
+      const key = makeBoundaryKey({ productId: p.id, kind, targetMs });
+      const requestSlug = slug;
+      const requestProductId = p.id;
+
+      const outcome = await runBoundaryRevalidation({
+        state: boundaryRef.current,
+        key,
+        productId: requestProductId,
+        slug: requestSlug,
+        maxRetries: 3,
+        onImmediateBlock: () => {
+          setPurchaseBlockedLocal(true);
+          setCanBuyProp(false);
+          setRevalidating(true);
+        },
+        refresh: async () => {
+          const r = await doFetch(`/api/products?slug=${encodeURIComponent(requestSlug)}`, {
+            cache: "no-store",
+          });
+          if (!r.ok) throw new Error("refresh_failed");
+          const data = await r.json();
+          if (!data || typeof data !== "object") throw new Error("empty");
+          if (Number(data.id) !== Number(requestProductId)) throw new Error("stale_product_response");
+          return data;
+        },
+      });
+
+      // Completed/stale duplicates must not re-disable CTA or re-apply settled state.
+      if (outcome.completedDuplicate || outcome.ignoredStaleContext) {
+        return;
+      }
+
+      if (outcome.duplicate && !outcome.result && !outcome.error) {
+        setRevalidating(boundaryRef.current.inflight.size > 0);
+        return;
+      }
+
+      // Ignore late response if product/slug changed while awaiting.
+      if (
+        String(boundaryRef.current.activeProductId) !== String(requestProductId) ||
+        boundaryRef.current.activeSlug !== requestSlug
+      ) {
+        return;
+      }
+
+      if (outcome.error || !outcome.result) {
+        setRevalidateFailed(true);
+        setCanBuyProp(false);
+        setPurchaseBlockedLocal(true);
+        setPhase((prev) => (prev === "live" || prev === "upcoming" ? "ended" : prev));
+        setRevalidating(false);
+        return;
+      }
+
+      // Apply settled response only once (owner started === true, or first joiner with result).
+      if (outcome.duplicate && !outcome.started) {
+        // Joiners that received the same settled result: apply only if still pending block.
+        if (!boundaryRef.current.purchaseBlocked && !revalidating) {
+          return;
+        }
+      }
+
+      const data = outcome.result as Product & { season_phase?: string; purchasable?: boolean };
+      setProduct((prev) => ({ ...(prev || {}), ...data }));
+      if (typeof data.season_phase === "string") setPhase(data.season_phase);
+      const nextPurchasable = data.purchasable !== false && data.purchasable !== undefined
+        ? !!data.purchasable
+        : false;
+      setCanBuyProp(nextPurchasable);
+      clearPurchaseBlockAfterAuthoritativeOk(boundaryRef.current, {
+        productId: requestProductId,
+        slug: requestSlug,
+        purchasable: nextPurchasable,
+      });
+      setPurchaseBlockedLocal(boundaryRef.current.purchaseBlocked);
+      setRevalidateFailed(false);
+      setRevalidating(false);
+      if (outcome.started) {
+        router.refresh();
+      }
+    },
+    [product, slug, router, doFetch, revalidating]
+  );
+
+  const onSeasonBoundary = useCallback(
+    (kind: "start" | "end") => {
+      void handleBoundary(kind);
+    },
+    [handleBoundary]
+  );
+
+  // Test-only fixture controls (present only when a coherent getNowMs clock is injected).
+  useEffect(() => {
+    if (!getNowMs || typeof window === "undefined") return;
+    const w = window as unknown as {
+      __PRODUCT_DETAIL_FIXTURE__?: {
+        refireBoundary: (kind: "start" | "end") => void;
+        getBoundarySnapshot: () => {
+          completed: string[];
+          purchaseBlocked: boolean;
+          blockedReason: string | null;
+        };
+      };
+    };
+    w.__PRODUCT_DETAIL_FIXTURE__ = {
+      refireBoundary: (kind) => {
+        void handleBoundary(kind);
+      },
+      getBoundarySnapshot: () => ({
+        completed: Array.from(boundaryRef.current.completed),
+        purchaseBlocked: boundaryRef.current.purchaseBlocked,
+        blockedReason: boundaryRef.current.blockedReason,
+      }),
+    };
+    return () => {
+      delete w.__PRODUCT_DETAIL_FIXTURE__;
+    };
+  }, [getNowMs, handleBoundary]);
+
+  // Purchase-state boundary handling even when countdown display is OFF.
+  useEffect(() => {
+    if (phase !== "upcoming" && phase !== "live") return;
+    const targetIso =
+      phase === "upcoming" ? product?.season_starts_at : product?.season_ends_at;
+    if (!targetIso || !product?.id) return;
+    const target = parseUtcSqlToMs(targetIso);
+    if (target == null) return;
+    const kind = phase === "upcoming" ? "start" : "end";
+    const tick = () => {
+      const now = getNowMs ? getNowMs() : floorSecondUtcMs();
+      if (now >= target) void handleBoundary(kind);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", tick);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", tick);
+    };
+  }, [phase, product?.id, product?.season_starts_at, product?.season_ends_at, handleBoundary, getNowMs]);
 
   const isInCart = product ? cart.some(i => i.id === product.id) : false;
 
+  const canPurchase =
+    canBuyProp &&
+    product?.purchasable !== false &&
+    !revalidateFailed &&
+    !purchaseBlockedLocal &&
+    !revalidating;
   const handleAdd = () => {
-    if (!product || isInCart) return;
+    if (!product || isInCart || !canPurchase) return;
     addToCart({ id: product.id, name: product.name, price: Number(product.price), qty: 1 });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -163,26 +422,104 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
                     }}
                   />
                 )}
-                <div className="product-price">£{Number(product.price).toFixed(2)}</div>
+                <div className="product-price">
+                  £{Number(product.price).toFixed(2)}
+                  {(phase === "ended" || phase === "paused") && (
+                    <span
+                      data-testid="historical-price-label"
+                      style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#92400E", marginTop: 4 }}
+                    >
+                      Historical seasonal price — not currently available to purchase
+                    </span>
+                  )}
+                </div>
+                {(phase === "ended" || phase === "paused" || phase === "upcoming" || revalidateFailed) && (
+                  <div
+                    data-testid="seasonal-status-banner"
+                    style={{
+                      margin: "12px 0",
+                      padding: "12px 14px",
+                      borderRadius: 10,
+                      border: "1px solid #FCD34D",
+                      background: "#FFFBEB",
+                      color: "#92400E",
+                      fontSize: 14,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {revalidateFailed
+                      ? "Offer status could not be refreshed. Purchasing is unavailable until you reload."
+                      : phase === "upcoming"
+                      ? `Upcoming seasonal offer${product.season_name ? `: ${product.season_name}` : ""}. Purchasing is not available yet.`
+                      : product.season_ended_notice ||
+                        (phase === "paused"
+                          ? "This seasonal offer is paused. Historical information remains available; purchasing is disabled."
+                          : "This seasonal offer has ended. Prices shown are historical; purchasing is disabled.")}
+                  </div>
+                )}
+                {revalidating ? (
+                  <div data-testid="seasonal-revalidating" style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>
+                    Updating offer status…
+                  </div>
+                ) : null}
+                <SeasonalCountdown
+                  phase={phase}
+                  show={product.season_show_countdown !== false}
+                  startsAt={product.season_starts_at}
+                  endsAt={product.season_ends_at}
+                  onBoundary={onSeasonBoundary}
+                  getNowMs={getNowMs}
+                />
                 <div className="meta-row">
                   <span className="meta-pill">📦 {product.stock || t("pd_stock_fallback", "In Stock")}</span>
-                  <span className="meta-pill">🚚 {t("pd_pill_delivery", "Fast Delivery")}</span>
-                  <span className="meta-pill">⚡ {t("pd_pill_active", "Active within 1 hour")}</span>
+                  {canPurchase ? (
+                    <>
+                      <span className="meta-pill">🚚 {t("pd_pill_delivery", "Fast Delivery")}</span>
+                      <span className="meta-pill">⚡ {t("pd_pill_active", "Active within 1 hour")}</span>
+                    </>
+                  ) : (
+                    <span className="meta-pill" data-testid="seasonal-archive-meta">
+                      Archive information
+                    </span>
+                  )}
                   <span className="meta-pill">✅ {t("pd_pill_uk", "UK Based")}</span>
                 </div>
-                <div className="activation-note">
-                  {fillVars(t("pd_activation", "Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp {phone} or Telegram {telegram}."), vars)}
-                </div>
-                <button
-                  className="add-btn"
-                  style={{background: isInCart ? (hovering ? "#DC2626" : "#16A34A") : "#5B21B6", cursor: isInCart && !hovering ? "default" : "pointer", transform: "none"}}
-                  onMouseEnter={() => isInCart && setHovering(true)}
-                  onMouseLeave={() => setHovering(false)}
-                  onClick={() => isInCart ? removeFromCart(product!.id) : handleAdd()}
-                >
-                  {isInCart ? (hovering ? t("pd_remove", "Remove from Cart") : t("pd_added", "Added to Cart!")) : t("pd_add_cart", "Add to Cart →")}
-                </button>
+                {canPurchase ? (
+                  <div className="activation-note">
+                    {fillVars(t("pd_activation", "Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp {phone} or Telegram {telegram}."), vars)}
+                  </div>
+                ) : null}
+                {canPurchase ? (
+                  <button
+                    className="add-btn"
+                    style={{background: isInCart ? (hovering ? "#DC2626" : "#16A34A") : "#5B21B6", cursor: isInCart && !hovering ? "default" : "pointer", transform: "none"}}
+                    onMouseEnter={() => isInCart && setHovering(true)}
+                    onMouseLeave={() => setHovering(false)}
+                    onClick={() => isInCart ? removeFromCart(product!.id) : handleAdd()}
+                  >
+                    {isInCart ? (hovering ? t("pd_remove", "Remove from Cart") : t("pd_added", "Added to Cart!")) : t("pd_add_cart", "Add to Cart →")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="add-btn"
+                    disabled
+                    data-testid="seasonal-purchase-disabled"
+                    style={{ background: "#9CA3AF", cursor: "not-allowed", transform: "none" }}
+                  >
+                    {phase === "upcoming" ? "Purchasing opens soon" : "Offer not available to purchase"}
+                  </button>
+                )}
                 <a href={t("pd_view_cart_link", "/cart")} className="cart-link">{t("pd_view_cart", "View Cart & Checkout →")}</a>
+                {showHubLink ? (
+                  <a
+                    href="/seasonal-offers"
+                    data-testid="seasonal-hub-link"
+                    style={{ display: "block", marginTop: 10, fontSize: 13, color: "#5B21B6" }}
+                  >
+                    Seasonal offers hub
+                  </a>
+                ) : null}
               </div>
             </div>
           </>
@@ -212,6 +549,20 @@ export default function ProductDetail({ slug, initialProduct }: { slug: string; 
               </ul>
             </div>
           )}
+          <SeasonalAlternativeCards
+            heading={product.available_offers_heading}
+            available={availAlts}
+            upcoming={upAlts}
+          />
+        </div>
+      )}
+      {product && !(product.full_description || featureList.length > 0) && (
+        <div className="product-sections">
+          <SeasonalAlternativeCards
+            heading={product.available_offers_heading}
+            available={availableOffers}
+            upcoming={upcomingOffers}
+          />
         </div>
       )}
         <Footer />

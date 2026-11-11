@@ -15,11 +15,12 @@ export const revalidate = 0;
 
 function buildStaticPages(
   baseUrl: string,
-  subscriptionUrl: string
+  subscriptionUrl: string,
+  includeSeasonalHub = false
 ): MetadataRoute.Sitemap {
   // Static/marketing URLs: omit lastModified — no reliable change timestamp;
   // never use request-time new Date() (false "always changed" signal).
-  return [
+  const pages: MetadataRoute.Sitemap = [
     { url: baseUrl, changeFrequency: "daily", priority: 1.0 },
     { url: `${baseUrl}/products`, changeFrequency: "daily", priority: 0.9 },
     {
@@ -36,6 +37,14 @@ function buildStaticPages(
     { url: `${baseUrl}/privacy-policy`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${baseUrl}/refund-policy`, changeFrequency: "yearly", priority: 0.3 },
   ];
+  if (includeSeasonalHub) {
+    pages.push({
+      url: `${baseUrl}/seasonal-offers`,
+      changeFrequency: "daily",
+      priority: 0.7,
+    });
+  }
+  return pages;
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -46,7 +55,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const data = await getSitemapDynamicDataSafe();
 
-    const staticPages = buildStaticPages(baseUrl, data.subscriptionUrl);
+    const staticPages = buildStaticPages(
+      baseUrl,
+      data.subscriptionUrl,
+      !!data.includeSeasonalHub
+    );
 
     const productPages: MetadataRoute.Sitemap = data.products.map((p) => {
       const lastModified = parseFactualLastModified(p.lastModified);
@@ -71,6 +84,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return [...staticPages, ...productPages, ...blogPages];
   } catch {
     const fallback = emptySitemapDynamicData();
-    return buildStaticPages(baseUrl, fallback.subscriptionUrl);
+    return buildStaticPages(baseUrl, fallback.subscriptionUrl, false);
   }
 }

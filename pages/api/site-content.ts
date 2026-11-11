@@ -29,6 +29,24 @@ import {
   sanitizeClaritySiteContentMap,
   validateClarityCmsUpdate,
 } from '../../lib/clarityConfig';
+import {
+  SEASONAL_HUB_PUBLISHED_KEY,
+  validateSeasonalHubPublicationWrite,
+} from '../../lib/seasonalHubPublic';
+
+async function assertSeasonalHubWritesAllowed(
+  updateList: Array<{ key: string; value: string }>
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  for (const u of updateList) {
+    if (u.key !== SEASONAL_HUB_PUBLISHED_KEY) continue;
+    const gate = await validateSeasonalHubPublicationWrite({
+      db: pool,
+      nextValue: u.value,
+    });
+    if (!gate.ok) return gate;
+  }
+  return { ok: true };
+}
 
 /** Lookup metadata for upserts only — does not seed the database at request time. */
 const DEFAULTS = SITE_CONTENT_DEFAULTS;
@@ -123,6 +141,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const settingsKeys = updateList.filter((u) => isSuperAdminSettingsKey(u.key)).map((u) => u.key);
       const contentKeys = updateList.filter((u) => !isSuperAdminSettingsKey(u.key)).map((u) => u.key);
 
+      // Authorize the complete operation BEFORE any publication validation / product reads.
       if (settingsKeys.length && !hasAdminPermission(admin.role, 'settings.manage')) {
         return res.status(403).json({
           error: 'Forbidden',
@@ -147,6 +166,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
         }
         u.value = validated.value;
+      }
+
+      const hubGate = await assertSeasonalHubWritesAllowed(updateList);
+      if (!hubGate.ok) {
+        return res.status(hubGate.status).json({ error: hubGate.error, code: 'seasonal_hub_publish_rejected' });
       }
 
       const affectedKeys = updateList.map((u) => u.key);
@@ -367,6 +391,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
       const nextVal = clarityPut.value;
+      const hubGate = await assertSeasonalHubWritesAllowed([{ key: ck, value: nextVal }]);
+      if (!hubGate.ok) {
+        return res.status(hubGate.status).json({ error: hubGate.error, code: 'seasonal_hub_publish_rejected' });
+      }
       const changed = before.values[ck] === undefined || before.values[ck] !== nextVal;
       if (changed) {
         const entityType = classifySiteContentEntityType([ck]);

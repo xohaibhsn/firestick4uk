@@ -29,15 +29,7 @@ import {
   toDbPaymentMethod,
   type PublicPaymentMethod,
 } from '../../lib/paymentMethod';
-
-type DbProduct = {
-  id: number;
-  name: string;
-  price: number | string;
-  category: string | null;
-  stock: string | null;
-  active: number;
-};
+import { lockAndAuthorizeOrderProducts } from '../../lib/orderProductEligibility';
 
 /** Coupon/order validation failures that must roll back an open transaction. */
 class OrderValidationError extends Error {
@@ -113,64 +105,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const uniqueIds = [...qtyById.keys()];
-    const placeholders = uniqueIds.map(() => '?').join(',');
-    const [rows]: any = await pool.query(
-      `SELECT id, name, price, category, stock, active FROM products WHERE id IN (${placeholders}) AND active=1`,
-      uniqueIds
-    );
-    const products = (Array.isArray(rows) ? rows : []) as DbProduct[];
-    const byId = new Map(products.map((p) => [Number(p.id), p]));
-
-    for (const id of uniqueIds) {
-      if (!byId.has(id)) {
-        return res.status(400).json({
-          error: 'One or more items in your cart are no longer available. Please remove them and try again.',
-        });
-      }
-    }
-
-    const authoritativeItems: AuthoritativeLineItem[] = [];
-    for (const id of uniqueIds) {
-      const p = byId.get(id)!;
-      const price = Number(p.price);
-      if (!isFiniteNonNegativeMoney(price)) {
-        return res.status(500).json({
-          error: 'Unable to process order due to an invalid product price. Please contact support.',
-        });
-      }
-      authoritativeItems.push({
-        id: Number(p.id),
-        name: String(p.name),
-        price: roundMoney(price),
-        qty: qtyById.get(id)!,
-        category: p.category,
-        stock: p.stock,
-      });
-    }
-
-    const digitalProducts = authoritativeItems.filter((p) => isDigitalProduct(p));
-    const hasDigital = digitalProducts.length > 0;
-
-    if (hasDigital && digital_supply_acknowledgement !== true) {
-      return res.status(400).json({
-        error: 'Digital supply acknowledgement is required for subscription/digital items.',
-      });
-    }
-
-    const { subtotal, shipping, vatAmount } = calculateAuthoritativePricing(authoritativeItems);
-
     const rawCoupon = normalizeCouponCode(coupon_code);
-
     const customerNotes = typeof notes === 'string' ? notes : '';
-    const recordedAt = new Date().toISOString();
-    const notesToStore = hasDigital
-      ? buildDigitalSupplyAckNotes({
-          customerNotes,
-          digitalProductIds: digitalProducts.map((p) => Number(p.id)),
-          recordedAtIso: recordedAt,
-        })
-      : customerNotes || '';
-
     const order_id = 'ORD-' + Date.now();
     // Contact/SMTP stay outside the short DB transaction.
     const contact = await getContactConfig();
@@ -178,10 +114,67 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let validatedCouponCode: string | null = null;
     let discountAmount = 0;
     let grandTotal = 0;
+    let authoritativeItems: AuthoritativeLineItem[] = [];
+    let notesToStore = customerNotes || '';
+    let subtotal = 0;
+    let shipping = 0;
+    let vatAmount = 0;
+    let hasDigital = false;
 
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+
+      // Lock products in ascending id order; sample eligibility time inside the TX.
+      const authorized = await lockAndAuthorizeOrderProducts({
+        conn,
+        productIds: uniqueIds,
+      });
+      if (!authorized.ok) {
+        throw new OrderValidationError(authorized.error);
+      }
+
+      authoritativeItems = [];
+      for (const id of uniqueIds) {
+        const p = authorized.productsById.get(id)!;
+        const price = Number(p.price);
+        if (!isFiniteNonNegativeMoney(price)) {
+          throw new OrderValidationError(
+            'Unable to process order due to an invalid product price. Please contact support.',
+            500
+          );
+        }
+        authoritativeItems.push({
+          id: Number(p.id),
+          name: String(p.name),
+          price: roundMoney(price),
+          qty: qtyById.get(id)!,
+          category: p.category,
+          stock: p.stock,
+        });
+      }
+
+      const digitalProducts = authoritativeItems.filter((p) => isDigitalProduct(p));
+      hasDigital = digitalProducts.length > 0;
+      if (hasDigital && digital_supply_acknowledgement !== true) {
+        throw new OrderValidationError(
+          'Digital supply acknowledgement is required for subscription/digital items.'
+        );
+      }
+
+      const pricing = calculateAuthoritativePricing(authoritativeItems);
+      subtotal = pricing.subtotal;
+      shipping = pricing.shipping;
+      vatAmount = pricing.vatAmount;
+
+      const recordedAt = new Date().toISOString();
+      notesToStore = hasDigital
+        ? buildDigitalSupplyAckNotes({
+            customerNotes,
+            digitalProductIds: digitalProducts.map((p) => Number(p.id)),
+            recordedAtIso: recordedAt,
+          })
+        : customerNotes || '';
 
       if (rawCoupon) {
         const [couponRows]: any = await conn.query(
