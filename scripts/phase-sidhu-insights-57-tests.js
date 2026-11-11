@@ -452,6 +452,7 @@ async function main() {
     if (rel === "app/layout.tsx") return true;
     if (rel === "app/sidhu/page.tsx") return true;
     if (rel === "scripts/phase-sidhu-insights-57-tests.js") return true;
+    if (rel === "scripts/phase-insights-w2-60-tests.js") return true;
     if (rel.startsWith("pages/api/admin-insights/")) return true;
     if (rel.startsWith("components/sidhu/insights/")) return true;
     // data-insights-id attribute hosts
