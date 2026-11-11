@@ -196,6 +196,14 @@ const allow = new Set([
   "scripts/phase-home-testimonials-foundation-tests.js",
   "scripts/phase-windup-59-tests.js",
   "scripts/phase-sidhu-insights-57-tests.js",
+  // F4UK-W4-INSIGHTS-LIVE-63
+  "components/TrackingConsent.tsx",
+  "lib/trackingConsent.ts",
+  "scripts/phase-insights-live-63-tests.js",
+  "scripts/phase20g3b-tracking-consent-tests.js",
+  "scripts/phase-clarity-35-tests.js",
+  "scripts/phase-tracking-consent-final-tests.js",
+  "scripts/phase-home-reviews-61-tests.js",
 ]);
 const unexpected = allTouched.filter((f) => !allow.has(f));
 ok(

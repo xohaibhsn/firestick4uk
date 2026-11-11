@@ -1,7 +1,7 @@
 /** Client-side tracking preference model (no identity, no DB). */
 
 export const TRACKING_CONSENT_STORAGE_KEY = "firestick_tracking_consent_v1";
-export const TRACKING_CONSENT_VERSION = 1;
+export const TRACKING_CONSENT_VERSION = 2;
 export const TRACKING_OPEN_PREFERENCES_EVENT = "firestick:open-tracking-preferences";
 /** Fired after a preference is written to localStorage (same-tab listeners). */
 export const TRACKING_CONSENT_CHANGED_EVENT = "firestick:tracking-consent-changed";

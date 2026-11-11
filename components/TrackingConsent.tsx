@@ -340,10 +340,11 @@ export default function TrackingConsent() {
         >
           <div className="tc-banner-inner">
             <p className="tc-banner-copy">
-              <strong>Privacy choices.</strong> We use optional analytics and
-              advertising technologies to understand site use and measure ads.
-              Essential features (cart, checkout, login) work without them. You
-              can change this anytime via Privacy choices in the footer.
+              <strong>Privacy choices.</strong> We use optional analytics
+              (including our own first-party site statistics) and advertising
+              technologies to understand site use and measure ads. Essential
+              features (cart, checkout, login) work without them. You can change
+              this anytime via Privacy choices in the footer.
             </p>
             <div className="tc-actions">
               <button type="button" className="tc-btn tc-btn-primary" onClick={acceptAll}>
@@ -405,9 +406,11 @@ export default function TrackingConsent() {
                   Analytics
                 </label>
                 <p className="tc-row-desc">
-                  Helps us understand how pages are used (Google Analytics, and
-                  Microsoft Clarity session replays and heatmaps with typed
-                  input masked). No effect on cart or checkout.
+                  Helps us understand how the site is used: Google Analytics and
+                  our own site statistics (pages viewed, traffic source,
+                  approximate location from IP, device type, cart and checkout
+                  steps; never what you type into forms). Microsoft Clarity only
+                  if we switch it on. No effect on cart or checkout.
                 </p>
               </div>
               <div className="tc-switch">

@@ -219,7 +219,14 @@ function sha256File(rel) {
       f === "scripts/phase-ux-fix-53-tests.js" ||
       f === "scripts/phase-cod-restore-54-tests.js" ||
       f === "scripts/phase-sidhu-insights-57-tests.js" ||
-      f === "scripts/phase19b-content-integrity-tests.js";
+      f === "scripts/phase19b-content-integrity-tests.js" ||
+      // F4UK-W4-INSIGHTS-LIVE-63
+      f === "components/TrackingConsent.tsx" ||
+      f === "lib/trackingConsent.ts" ||
+      f === "scripts/phase-insights-live-63-tests.js" ||
+      f === "scripts/phase20g3b-tracking-consent-tests.js" ||
+      f === "scripts/phase-clarity-35-tests.js" ||
+      f === "scripts/phase-tracking-consent-final-tests.js";
     const unexpected = touched.filter((f) => !allow(f));
     const seoTouched = touched.filter((f) =>
       /^(app\/layout\.tsx|app\/page\.tsx|.*sitemap|.*robots|components\/Navbar|components\/Footer)/i.test(f)

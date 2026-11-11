@@ -62,6 +62,13 @@ const ALLOWLIST = new Set([
   "scripts/phase-ux-batch-51-tests.js",
   "scripts/phase-ux-fix-53-tests.js",
   "scripts/phase-cod-restore-54-tests.js",
+  // F4UK-W4-INSIGHTS-LIVE-63 — consent copy + version bump
+  "lib/trackingConsent.ts",
+  "scripts/phase-insights-live-63-tests.js",
+  "scripts/phase20g3b-tracking-consent-tests.js",
+  "scripts/phase-clarity-35-tests.js",
+  "scripts/phase-tracking-consent-final-tests.js",
+  "scripts/phase-home-reviews-61-tests.js",
 ]);
 
 const BASE_SHA = "76067a765b091bbbf0f2d4375c3d17f0b3af53bc";

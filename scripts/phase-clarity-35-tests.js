@@ -250,7 +250,7 @@ ok(
 const consentCopy = read("components/TrackingConsent.tsx").replace(/\s+/g, " ");
 ok(
   "R4_analytics_copy_mentions_clarity",
-  /Helps us understand how pages are used \(Google Analytics, and Microsoft Clarity session replays and heatmaps with typed input masked\)\. No effect on cart or checkout\./.test(
+  /Helps us understand how the site is used: Google Analytics and our own site statistics \(pages viewed, traffic source, approximate location from IP, device type, cart and checkout steps; never what you type into forms\)\. Microsoft Clarity only if we switch it on\. No effect on cart or checkout\./.test(
     consentCopy
   )
 );
@@ -442,7 +442,7 @@ ok(
 // ── C2 wording / no anonymised ────────────────────────────────────────────
 ok(
   "C2_exact_analytics_wording",
-  /Helps us understand how pages are used \(Google Analytics, and Microsoft Clarity session replays and heatmaps with typed input masked\)\. No effect on cart or checkout\./.test(
+  /Helps us understand how the site is used: Google Analytics and our own site statistics \(pages viewed, traffic source, approximate location from IP, device type, cart and checkout steps; never what you type into forms\)\. Microsoft Clarity only if we switch it on\. No effect on cart or checkout\./.test(
     read("components/TrackingConsent.tsx").replace(/\s+/g, " ")
   )
 );

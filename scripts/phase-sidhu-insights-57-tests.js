@@ -453,6 +453,18 @@ async function main() {
     if (rel === "app/sidhu/page.tsx") return true;
     if (rel === "scripts/phase-sidhu-insights-57-tests.js") return true;
     if (rel === "scripts/phase-insights-w2-60-tests.js") return true;
+    // F4UK-W4-INSIGHTS-LIVE-63
+    if (rel === "components/TrackingConsent.tsx") return true;
+    if (rel === "lib/trackingConsent.ts") return true;
+    if (rel === "scripts/phase-insights-live-63-tests.js") return true;
+    if (rel === "scripts/phase20g3b-tracking-consent-tests.js") return true;
+    if (rel === "scripts/phase-clarity-35-tests.js") return true;
+    if (rel === "scripts/phase-tracking-consent-final-tests.js") return true;
+    if (rel === "scripts/phase-home-reviews-61-tests.js") return true;
+    if (rel === "scripts/phase-ux-batch-51-tests.js") return true;
+    if (rel === "scripts/phase-ux-fix-53-tests.js") return true;
+    if (rel === "scripts/phase-cod-restore-54-tests.js") return true;
+    if (rel === "scripts/phase-windup-59-tests.js") return true;
     if (rel.startsWith("pages/api/admin-insights/")) return true;
     if (rel.startsWith("components/sidhu/insights/")) return true;
     // F4UK-HOME-REVIEWS-R1-61

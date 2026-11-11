@@ -66,9 +66,9 @@ ok(
   /firestick_tracking_consent_v1/.test(consentLib)
 );
 ok(
-  "preference_model_version_1",
-  /TRACKING_CONSENT_VERSION\s*=\s*1/.test(consentLib) ||
-    /version:\s*1/.test(consentLib) ||
+  "preference_model_version_current",
+  /TRACKING_CONSENT_VERSION\s*=\s*2/.test(consentLib) ||
+    /version:\s*2/.test(consentLib) ||
     /version:\s*typeof TRACKING_CONSENT_VERSION/.test(consentLib)
 );
 ok(
