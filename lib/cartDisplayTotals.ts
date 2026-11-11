@@ -1,11 +1,10 @@
 /**
  * Client/server-safe cart display totals — same math as /cart summary
  * (pre-coupon): subtotal + shipping + VAT(20%).
+ *
+ * Coupons are NOT applied here — /cart remains the source of truth for discounts.
  */
-import {
-  cartShippingPounds,
-  PHYSICAL_SHIPPING_GBP,
-} from "./productFulfilment";
+import { cartShippingPounds } from "./productFulfilment";
 import { calculateGrandTotal, roundMoney } from "./orderPricing";
 
 export type CartDisplayTotalsInput = {
@@ -14,9 +13,11 @@ export type CartDisplayTotalsInput = {
   /** Number of line items (cart.length), same input cartShippingPounds uses. */
   cartLength: number;
   /**
-   * When known (after product classification), drives shipping.
-   * When null/undefined and cart non-empty, matches /cart unclassified path
-   * (PHYSICAL_SHIPPING_GBP).
+   * When true/false (after product classification), drives shipping exactly
+   * as /cart does once classification.ready.
+   * When null/undefined: shipping is 0 — do NOT assume PHYSICAL_SHIPPING_GBP
+   * for display helpers (mini-bar must not show a shipping-inclusive guess).
+   * /cart page still applies PHYSICAL_SHIPPING_GBP inline while unclassified.
    */
   hasPhysicalItems?: boolean | null;
   discountAmount?: number;
@@ -30,7 +31,7 @@ export type CartDisplayTotals = {
   grandTotal: number;
 };
 
-/** Same presentation totals used on /cart (before coupon unless discount passed). */
+/** Same presentation totals used on /cart when classification is known (pre-coupon). */
 export function computeCartDisplayTotals(
   opts: CartDisplayTotalsInput
 ): CartDisplayTotals {
@@ -47,10 +48,8 @@ export function computeCartDisplayTotals(
           hasPhysicalItems: opts.hasPhysicalItems,
         })
       );
-    } else {
-      // Match /cart while classification is loading / unresolved
-      shipping = roundMoney(PHYSICAL_SHIPPING_GBP);
     }
+    // null/undefined → shipping 0 (no assumed physical shipping for display)
   }
 
   const vatAmount = roundMoney(subtotal * 0.2);
@@ -66,4 +65,26 @@ export function computeCartDisplayTotals(
 
 export function formatGbp(amount: number): string {
   return `£${roundMoney(amount).toFixed(2)}`;
+}
+
+/**
+ * Mini-bar amount text.
+ * Ready + classified → £grandTotal (shipping included exactly as /cart).
+ * Pending / error / unknown → "£subtotal + VAT" (label only; no shipping guess).
+ */
+export function formatMiniCartAmountText(opts: {
+  subtotal: number;
+  cartLength: number;
+  classificationReady: boolean;
+  hasPhysicalItems: boolean;
+}): string {
+  if (opts.classificationReady) {
+    const t = computeCartDisplayTotals({
+      subtotal: opts.subtotal,
+      cartLength: opts.cartLength,
+      hasPhysicalItems: opts.hasPhysicalItems,
+    });
+    return formatGbp(t.grandTotal);
+  }
+  return `${formatGbp(roundMoney(Number(opts.subtotal) || 0))} + VAT`;
 }

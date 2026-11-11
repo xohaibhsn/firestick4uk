@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/app/lib/cartContext";
-import {
-  computeCartDisplayTotals,
-  formatGbp,
-} from "@/lib/cartDisplayTotals";
+import { useCartClassification } from "@/lib/useCartClassification";
+import { formatMiniCartAmountText } from "@/lib/cartDisplayTotals";
 
 /** Routes where the mini-cart bar must stay hidden. */
 export function shouldHideMiniCartBar(pathname: string | null): boolean {
@@ -33,11 +31,26 @@ export default function MiniCartBar() {
   const hide = shouldHideMiniCartBar(pathname);
   const visible = mounted && !hide && itemCount > 0;
 
-  const totals = computeCartDisplayTotals({
-    subtotal: total,
-    cartLength: cart.length,
-    hasPhysicalItems: null,
+  // Coupons are not applied in the bar — /cart is the source of truth for discounts.
+  const { classification } = useCartClassification({
+    enabled: visible,
+    cart,
   });
+
+  const classificationReady = Boolean(
+    classification && classification.ready && !classification.error
+  );
+
+  const amountText = useMemo(
+    () =>
+      formatMiniCartAmountText({
+        subtotal: total,
+        cartLength: cart.length,
+        classificationReady,
+        hasPhysicalItems: classification?.hasPhysicalItems === true,
+      }),
+    [total, cart.length, classificationReady, classification?.hasPhysicalItems]
+  );
 
   useEffect(() => {
     if (!mounted) return;
@@ -58,10 +71,10 @@ export default function MiniCartBar() {
     if (!mounted || !lastAddedAt) return;
     const label =
       itemCount === 1
-        ? `1 item in cart, ${formatGbp(totals.grandTotal)}`
-        : `${itemCount} items in cart, ${formatGbp(totals.grandTotal)}`;
+        ? `1 item in cart, ${amountText}`
+        : `${itemCount} items in cart, ${amountText}`;
     setAnnounce(`Added to cart. ${label}`);
-  }, [lastAddedAt, itemCount, totals.grandTotal, mounted]);
+  }, [lastAddedAt, itemCount, amountText, mounted]);
 
   // SSR + first client paint: no markup (SEO / CLS safe)
   if (!mounted || !visible) return null;
@@ -160,9 +173,12 @@ export default function MiniCartBar() {
         role="region"
         aria-label="Cart summary"
         data-minicart-bar="visible"
+        data-minicart-classification={
+          classificationReady ? "ready" : "pending"
+        }
       >
         <div className="mini-cart-bar__summary">
-          {itemLabel} · {formatGbp(totals.grandTotal)}
+          {itemLabel} · {amountText}
         </div>
         <div className="mini-cart-bar__actions">
           <a className="mini-cart-bar__btn mini-cart-bar__btn--view" href="/cart">

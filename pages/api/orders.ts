@@ -278,9 +278,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const subjectCustomerName = sanitizeEmailHeaderText(customer_name);
       // Receipt status only — never attach the file; never link public/guessable receipt URLs.
       const receiptUploaded = Boolean(String(receipt_path || '').trim());
+      // Row label is "Receipt"; value must not repeat the "Receipt:" prefix.
       const receiptStatusLine = receiptUploaded
-        ? 'Receipt: attached — view in /sidhu → Orders'
-        : 'Receipt: not uploaded';
+        ? 'Attached — view in /sidhu → Orders'
+        : 'Not uploaded';
       const safeAdminReceiptStatus = escapeHtml(receiptStatusLine);
 
       const itemRows = authoritativeItems

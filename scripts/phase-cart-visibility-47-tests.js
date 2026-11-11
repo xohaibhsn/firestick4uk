@@ -73,7 +73,23 @@ ok("minicart_prefers_reduced_motion", /prefers-reduced-motion:\s*reduce/.test(mi
 ok("cart_context_exposes_itemCount", /itemCount/.test(cartCtx));
 ok("cart_context_exposes_lastAddedAt", /lastAddedAt/.test(cartCtx));
 ok("totals_helper_reuses_orderPricing", /calculateGrandTotal/.test(totalsSrc) && /cartShippingPounds/.test(totalsSrc));
-ok("totals_helper_physical_fallback", /PHYSICAL_SHIPPING_GBP/.test(totalsSrc));
+ok(
+  "totals_helper_no_assumed_shipping_on_null",
+  /null\/undefined:\s*shipping is 0|shipping is 0 — do NOT assume PHYSICAL_SHIPPING/.test(
+    totalsSrc
+  ) || /When null\/undefined: shipping is 0/.test(totalsSrc)
+);
+ok(
+  "minibar_uses_classification_hook",
+  /useCartClassification/.test(mini) &&
+    fs.existsSync(path.join(ROOT, "lib/useCartClassification.ts")) &&
+    fs.existsSync(path.join(ROOT, "lib/cartClassification.ts"))
+);
+ok(
+  "classification_uses_api_products_and_isDigitalProduct",
+  /\/api\/products/.test(read("lib/cartClassification.ts")) &&
+    /isDigitalProduct/.test(read("lib/cartClassification.ts"))
+);
 
 ok("shouldHide_exported", /export function shouldHideMiniCartBar/.test(mini));
 
@@ -121,9 +137,8 @@ function computeCartDisplayTotals(opts) {
           hasPhysicalItems: opts.hasPhysicalItems,
         })
       );
-    } else {
-      shipping = roundMoney(3.99);
     }
+    // null/undefined → shipping 0 (Task-48: no assumed physical shipping)
   }
   const vatAmount = roundMoney(subtotal * 0.2);
   const grandTotal = calculateGrandTotal({
@@ -137,11 +152,23 @@ function computeCartDisplayTotals(opts) {
 function formatGbp(amount) {
   return `£${roundMoney(amount).toFixed(2)}`;
 }
+function formatMiniCartAmountText(opts) {
+  if (opts.classificationReady) {
+    const t = computeCartDisplayTotals({
+      subtotal: opts.subtotal,
+      cartLength: opts.cartLength,
+      hasPhysicalItems: opts.hasPhysicalItems,
+    });
+    return formatGbp(t.grandTotal);
+  }
+  return `${formatGbp(roundMoney(Number(opts.subtotal) || 0))} + VAT`;
+}
 
-// Confirm MiniCartBar calls the shared helper
+// Confirm MiniCartBar uses shared amount formatter (which uses computeCartDisplayTotals when ready)
 ok(
-  "minibar_uses_computeCartDisplayTotals",
-  /computeCartDisplayTotals\(/.test(mini) && /from ["']@\/lib\/cartDisplayTotals["']/.test(mini)
+  "minibar_uses_formatMiniCartAmountText",
+  /formatMiniCartAmountText\(/.test(mini) &&
+    /from ["']@\/lib\/cartDisplayTotals["']/.test(mini)
 );
 
 const sample = computeCartDisplayTotals({
@@ -150,9 +177,9 @@ const sample = computeCartDisplayTotals({
   hasPhysicalItems: null,
 });
 ok(
-  "totals_match_cart_unclassified",
-  sample.shipping === 3.99 && sample.vatAmount === 4 && sample.grandTotal === 27.99,
-  JSON.stringify(sample)
+  "totals_null_has_zero_shipping_not_assumed_physical",
+  sample.shipping === 0 && sample.vatAmount === 4 && sample.grandTotal === 24,
+  JSON.stringify(sample) + " — why: Task-48 forbids shipping-inclusive guess for unclassified display"
 );
 const digital = computeCartDisplayTotals({
   subtotal: 20,
@@ -165,6 +192,137 @@ ok(
   JSON.stringify(digital)
 );
 ok("formatGbp", formatGbp(27.99) === "£27.99");
+
+// ── Task-48: digital / physical / mixed / pending totals ─────────────────────
+function isDigitalProduct(product) {
+  const category = String(product?.category ?? "").trim().toLowerCase();
+  const stock = String(product?.stock ?? "").trim().toLowerCase();
+  if (category === "subscription") return true;
+  if (stock === "digital") return true;
+  return false;
+}
+function classifyCartItems(cart, productMap) {
+  if (!productMap) {
+    return { ready: false, error: "unavailable", hasDigitalItems: false, hasPhysicalItems: false };
+  }
+  if (cart.length === 0) {
+    return { ready: true, error: null, hasDigitalItems: false, hasPhysicalItems: false };
+  }
+  let hasDigitalItems = false;
+  let hasPhysicalItems = false;
+  for (const item of cart) {
+    const facts = productMap.get(Number(item.id));
+    if (!facts) {
+      return { ready: false, error: "unresolved", hasDigitalItems: false, hasPhysicalItems: false };
+    }
+    if (isDigitalProduct(facts)) hasDigitalItems = true;
+    else hasPhysicalItems = true;
+  }
+  return { ready: true, error: null, hasDigitalItems, hasPhysicalItems };
+}
+
+const digitalMap = new Map([
+  [101, { id: 101, category: "Subscription", stock: "Digital" }],
+]);
+const physicalMap = new Map([
+  [201, { id: 201, category: "Hardware", stock: "Physical" }],
+]);
+const mixedMap = new Map([
+  [101, { id: 101, category: "Subscription", stock: "Digital" }],
+  [201, { id: 201, category: "Hardware", stock: "Physical" }],
+]);
+
+const digClass = classifyCartItems([{ id: 101 }], digitalMap);
+ok("class_digital_ready", digClass.ready && digClass.hasPhysicalItems === false && digClass.hasDigitalItems === true);
+const digTotal = computeCartDisplayTotals({
+  subtotal: 14.99,
+  cartLength: 1,
+  hasPhysicalItems: digClass.hasPhysicalItems,
+});
+ok(
+  "digital_1499_ready_total_1799",
+  digTotal.shipping === 0 && digTotal.vatAmount === 3 && digTotal.grandTotal === 17.99,
+  JSON.stringify(digTotal)
+);
+ok(
+  "digital_amount_text_ready",
+  formatMiniCartAmountText({
+    subtotal: 14.99,
+    cartLength: 1,
+    classificationReady: true,
+    hasPhysicalItems: false,
+  }) === "£17.99"
+);
+
+const physClass = classifyCartItems([{ id: 201 }], physicalMap);
+ok("class_physical_ready", physClass.ready && physClass.hasPhysicalItems === true);
+const physTotal = computeCartDisplayTotals({
+  subtotal: 49.99,
+  cartLength: 1,
+  hasPhysicalItems: true,
+});
+ok(
+  "physical_4999_ready_total_6398",
+  physTotal.shipping === 3.99 &&
+    physTotal.vatAmount === 10 &&
+    physTotal.grandTotal === 63.98,
+  JSON.stringify(physTotal)
+);
+
+const mixedClass = classifyCartItems([{ id: 101 }, { id: 201 }], mixedMap);
+ok(
+  "class_mixed_physical_shipping",
+  mixedClass.ready && mixedClass.hasPhysicalItems === true && mixedClass.hasDigitalItems === true
+);
+const mixedTotal = computeCartDisplayTotals({
+  subtotal: 14.99 + 49.99,
+  cartLength: 2,
+  hasPhysicalItems: true,
+});
+ok("mixed_includes_physical_shipping", mixedTotal.shipping === 3.99, JSON.stringify(mixedTotal));
+
+ok(
+  "pending_amount_text_is_subtotal_plus_VAT_label",
+  formatMiniCartAmountText({
+    subtotal: 14.99,
+    cartLength: 1,
+    classificationReady: false,
+    hasPhysicalItems: false,
+  }) === "£14.99 + VAT"
+);
+ok(
+  "pending_never_shipping_inclusive_number",
+  !/£21\.98/.test(
+    formatMiniCartAmountText({
+      subtotal: 14.99,
+      cartLength: 1,
+      classificationReady: false,
+      hasPhysicalItems: false,
+    })
+  )
+);
+
+const unknownClass = classifyCartItems([{ id: 999 }], digitalMap);
+ok("unknown_id_not_ready", unknownClass.ready === false);
+ok(
+  "error_unknown_uses_pending_label",
+  formatMiniCartAmountText({
+    subtotal: 14.99,
+    cartLength: 1,
+    classificationReady: false,
+    hasPhysicalItems: false,
+  }) === "£14.99 + VAT"
+);
+
+// Fetch gating / cache / abort (source + behavioural mirrors)
+const classSrc = read("lib/cartClassification.ts");
+const hookSrc = read("lib/useCartClassification.ts");
+ok("fetch_only_when_enabled", /if \(!opts\.enabled\)/.test(hookSrc) && /enabled: visible/.test(mini));
+ok("no_fetch_when_hidden_or_empty", /enabled: visible/.test(mini) && /itemCount > 0/.test(mini));
+ok("catalog_inflight_dedupe", /inflight/.test(classSrc) && /shared/.test(classSrc));
+ok("session_cache_ttl", /SESSION_KEY/.test(classSrc) && /CATALOG_TTL_MS/.test(classSrc));
+ok("abort_on_unmount", /ac\.abort\(\)/.test(hookSrc) && /AbortController/.test(hookSrc));
+ok("coupon_not_in_bar_comment", /Coupons are not applied/.test(mini));
 
 function miniVisible({ mounted, pathname, itemCount }) {
   return mounted && !shouldHideMiniCartBar(pathname) && itemCount > 0;

@@ -26,11 +26,23 @@ function read(rel) {
 
 const orders = read("pages/api/orders.ts");
 
-ok("receipt_status_attached_phrase", /Receipt:\s*attached/.test(orders));
-ok("receipt_status_not_uploaded_phrase", /Receipt:\s*not uploaded/.test(orders));
+ok(
+  "receipt_value_attached_no_duplicated_prefix",
+  /Attached — view in \/sidhu → Orders/.test(orders) &&
+    !/Receipt:\s*attached/.test(orders)
+);
+ok(
+  "receipt_value_not_uploaded_no_duplicated_prefix",
+  /'Not uploaded'|\"Not uploaded\"/.test(orders) &&
+    !/Receipt:\s*not uploaded/.test(orders)
+);
 ok(
   "receipt_sidhu_hint_when_attached",
   /view in \/sidhu → Orders/.test(orders) || /view in \/sidhu/.test(orders)
+);
+ok(
+  "receipt_row_label_is_Receipt",
+  /<td[^>]*>Receipt<\/td><td[^>]*>\$\{safeAdminReceiptStatus\}<\/td>/.test(orders)
 );
 ok(
   "receipt_status_html_escaped",
@@ -101,15 +113,15 @@ ok("escapeHtml_loaded", typeof escapeHtml === "function");
 function buildReceiptStatusLine(receipt_path) {
   const receiptUploaded = Boolean(String(receipt_path || "").trim());
   return receiptUploaded
-    ? "Receipt: attached — view in /sidhu → Orders"
-    : "Receipt: not uploaded";
+    ? "Attached — view in /sidhu → Orders"
+    : "Not uploaded";
 }
 
 const withReceipt = buildReceiptStatusLine("/uploads/receipts/123-x.jpg");
 const withoutReceipt = buildReceiptStatusLine("");
 
-ok("mock_receipt_attached_text", withReceipt.startsWith("Receipt: attached"));
-ok("mock_receipt_not_uploaded_text", withoutReceipt === "Receipt: not uploaded");
+ok("mock_receipt_attached_text", withReceipt === "Attached — view in /sidhu → Orders");
+ok("mock_receipt_not_uploaded_text", withoutReceipt === "Not uploaded");
 ok(
   "escapeHtml_hostile_works",
   escapeHtml("<img src=x onerror=alert(1)>").includes("&lt;img") &&
@@ -143,8 +155,8 @@ function simulateAdminSend(receipt_path) {
 
 const m1 = simulateAdminSend("/uploads/receipts/abc.jpg");
 const m0 = simulateAdminSend("");
-ok("mock_mail_sent_with_receipt", m1.length === 1 && /Receipt: attached/.test(m1[0].html));
-ok("mock_mail_sent_without_receipt", m0.length === 1 && /Receipt: not uploaded/.test(m0[0].html));
+ok("mock_mail_sent_with_receipt", m1.length === 1 && /Attached — view in \/sidhu → Orders/.test(m1[0].html));
+ok("mock_mail_sent_without_receipt", m0.length === 1 && />Not uploaded</.test(m0[0].html));
 ok(
   "mock_mail_no_attachments_field",
   m1[0].attachments === undefined && m0[0].attachments === undefined
