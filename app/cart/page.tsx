@@ -468,20 +468,30 @@ export default function CartPage() {
   const effectiveDigitalAck =
     classification.hasDigitalItems && digitalSupplyAcknowledged;
 
-  // COD only when classification ready AND cart has physical items.
-  // While pending: hide COD (no flash of wrong option on digital-only carts).
-  const showCodOption =
-    classification.ready && classification.hasPhysicalItems === true;
+  // Second payment option (stored/posted value always "cod") on every cart type
+  // once classification is ready (digital-only, mixed, physical).
+  // Pending strategy: keep the option HIDDEN until ready so a digital-only cart
+  // never flashes "Cash on Delivery" then switches to the digital label.
+  const showSecondPaymentOption = classification.ready === true;
   const digitalOnlyCart =
     classification.ready &&
     classification.hasDigitalItems &&
     !classification.hasPhysicalItems;
+  const codOptionLabel = digitalOnlyCart
+    ? t("cart_pay_cod_digital", "Pay on Delivery / Activation")
+    : t("cart_pay_cod", "Cash on Delivery");
+  const codOptionSub = digitalOnlyCart
+    ? t(
+        "cart_pay_cod_digital_sub",
+        "Pay when your order is delivered or activated"
+      )
+    : t("cart_pay_cod_sub", "Pay when your order arrives");
 
   useEffect(() => {
-    if (!showCodOption && paymentMethod === "cod") {
+    if (!showSecondPaymentOption && paymentMethod === "cod") {
       setPaymentMethod("bank");
     }
-  }, [showCodOption, paymentMethod]);
+  }, [showSecondPaymentOption, paymentMethod]);
 
   // Signal sticky checkout bar for WA float hide (mobile checkout only).
   useEffect(() => {
@@ -897,8 +907,8 @@ export default function CartPage() {
                   <div className="payment-options" role="radiogroup" aria-label={t("cart_pay_heading", "Payment Method")}>
                     {[
                       {val:"bank" as const, label: t("cart_pay_bank", "Bank Transfer"), sub: t("cart_pay_bank_sub", "Transfer to our UK bank & upload receipt")},
-                      ...(showCodOption
-                        ? [{val:"cod" as const, label: t("cart_pay_cod", "Cash on Delivery"), sub: t("cart_pay_cod_sub", "Pay when your order arrives")}]
+                      ...(showSecondPaymentOption
+                        ? [{val:"cod" as const, label: codOptionLabel, sub: codOptionSub}]
                         : []),
                     ].map(p => (
                       <label
@@ -1052,8 +1062,12 @@ export default function CartPage() {
                   )}
 
                   {paymentMethod === "cod" && (
-                    <div className="bank-details">
-                      <h4>{t("cart_cod_heading", "Cash on Delivery")}</h4>
+                    <div className="bank-details" data-cod-note="1">
+                      <h4>
+                        {digitalOnlyCart
+                          ? t("cart_pay_cod_digital", "Pay on Delivery / Activation")
+                          : t("cart_cod_heading", "Cash on Delivery")}
+                      </h4>
                       <div className="bank-row"><span>{t("cart_amount_due", "Amount Due")}</span><span>£{grandTotal.toFixed(2)}</span></div>
                     </div>
                   )}

@@ -169,6 +169,8 @@ const allowed = new Set([
   "scripts/phase-ux-fix-53-tests.js",
   // Allow batch-51 allowlist update so new fix-53 script is recognized
   "scripts/phase-ux-batch-51-tests.js",
+  // COD restore-54: second payment option + digital label tests
+  "scripts/phase-cod-restore-54-tests.js",
 ]);
 let changed = [];
 try {

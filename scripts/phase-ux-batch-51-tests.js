@@ -138,21 +138,31 @@ ok(
     /grandTotal\.toFixed\(2\)/.test(cart)
 );
 
-// E — COD gating
+// E — second payment option on all carts (COD restore 54).
+// Edited vs batch-51: was "COD hidden for digital-only" (showCodOption /
+// hasPhysicalItems). Now shown once classification.ready for every cart;
+// digital-only uses cart_pay_cod_digital*; pending still hides (no wrong-label flash).
+// cod-digital-count expectation (batch-51 screenshots): was 0, now 1 when ready.
 ok(
-  "cod_gated_on_physical_ready",
-  /showCodOption/.test(cart) &&
-    /hasPhysicalItems\s*===\s*true/.test(cart) &&
-    /showCodOption\s*\?/.test(cart)
+  "cod_shown_when_classification_ready",
+  /showSecondPaymentOption/.test(cart) &&
+    /classification\.ready\s*===\s*true/.test(cart) &&
+    /showSecondPaymentOption\s*\?/.test(cart) &&
+    /codOptionLabel/.test(cart) &&
+    !/showCodOption/.test(cart)
 );
 ok(
-  "cod_defaults_bank_when_hidden",
-  /!showCodOption && paymentMethod === ["']cod["']/.test(cart) &&
-    /setPaymentMethod\(["']bank["']\)/.test(cart)
+  "cod_digital_label_keys",
+  /cart_pay_cod_digital/.test(cart) &&
+    /Pay on Delivery \/ Activation/.test(cart) &&
+    /cart_pay_cod_digital_sub/.test(cart) &&
+    /Pay when your order is delivered or activated/.test(cart)
 );
 ok(
   "cod_no_flash_while_pending",
-  /classification\.ready && classification\.hasPhysicalItems/.test(cart)
+  /showSecondPaymentOption\s*=\s*classification\.ready\s*===\s*true/.test(cart) &&
+    /digitalOnlyCart/.test(cart) &&
+    /!showSecondPaymentOption && paymentMethod === ["']cod["']/.test(cart)
 );
 ok(
   "payment_radio_accessible_names",
@@ -331,6 +341,7 @@ const allowedPrefixes = [
   "lib/stockBadgeLabel.ts",
   "scripts/phase-ux-batch-51-tests.js",
   "scripts/phase-ux-fix-53-tests.js",
+  "scripts/phase-cod-restore-54-tests.js",
 ];
 const unexpected = allTouched.filter((f) => {
   const n = f.replace(/\\/g, "/");
