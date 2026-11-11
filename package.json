@@ -28,6 +28,7 @@
     "cloudinary": "^2.10.0",
     "dotenv": "^17.4.2",
     "hls.js": "^1.6.16",
+    "mmdb-lib": "3.0.5",
     "mysql2": "^3.24.4",
     "next": "16.4.3",
     "nodemailer": "10.3.1",

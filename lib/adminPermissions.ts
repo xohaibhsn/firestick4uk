@@ -26,7 +26,10 @@ export type AdminPermission =
   | "media.upload"
   | "blog_media.upload"
   | "revisions.view"
-  | "redirects.manage";
+  | "redirects.manage"
+  | "insights.view"
+  | "insights.export"
+  | "insights.settings";
 
 export type SidhuTab =
   | "dashboard"
@@ -69,6 +72,9 @@ const ALL_PERMISSIONS: readonly AdminPermission[] = [
   "blog_media.upload",
   "revisions.view",
   "redirects.manage",
+  "insights.view",
+  "insights.export",
+  "insights.settings",
 ] as const;
 
 const MANAGER_PERMISSIONS: readonly AdminPermission[] = [
@@ -87,6 +93,8 @@ const MANAGER_PERMISSIONS: readonly AdminPermission[] = [
   "media.upload",
   "blog_media.upload",
   "revisions.view",
+  "insights.view",
+  "insights.export",
 ] as const;
 
 const WRITER_PERMISSIONS: readonly AdminPermission[] = [
@@ -158,6 +166,11 @@ export function isSuperAdminSettingsKey(key: string): boolean {
 export function hasAdminPermission(role: AdminRoleName, permission: AdminPermission): boolean {
   const caps = ROLE_PERMISSIONS[role];
   return Array.isArray(caps) && caps.includes(permission);
+}
+
+/** Full / partial IP columns — super_admin only (managers export without IP). */
+export function canViewInsightsIp(role: AdminRoleName): boolean {
+  return role === "super_admin";
 }
 
 export function allowedRolesFor(permission: AdminPermission): AdminRoleName[] {
