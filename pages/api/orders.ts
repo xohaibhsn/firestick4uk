@@ -24,7 +24,6 @@ import {
   normalizeOrderCustomerIdentity,
 } from '../../lib/orderCustomerIdentity';
 import {
-  formatPaymentMethodLabel,
   isPublicPaymentMethod,
   toDbPaymentMethod,
   type PublicPaymentMethod,
@@ -39,6 +38,43 @@ class OrderValidationError extends Error {
     this.name = 'OrderValidationError';
     this.status = status;
   }
+}
+
+/**
+ * Email-only payment label. Same digital-only classification as cart
+ * (digital items present and no physical items). Does not change DB values.
+ */
+function emailPaymentMethodLabel(
+  method: PublicPaymentMethod,
+  digitalOnly: boolean,
+  style: 'email-admin' | 'email-customer'
+): string {
+  if (method === 'bank') {
+    return style === 'email-admin' ? '🏦 Bank Transfer' : 'Bank Transfer';
+  }
+  if (digitalOnly) {
+    const label = 'Pay on Delivery / Activation';
+    return style === 'email-admin' ? `💵 ${label}` : label;
+  }
+  const label = 'Cash on Delivery';
+  return style === 'email-admin' ? `💵 ${label}` : label;
+}
+
+/** Email-only: render digital-supply marker as readable text; stored notes stay untouched. */
+function formatAdminEmailNotesDisplay(storedNotes: string): string {
+  const marker = '[DIGITAL_SUPPLY_ACK_V1]';
+  const idx = storedNotes.indexOf(marker);
+  if (idx < 0) return storedNotes;
+
+  const customerPart = storedNotes.slice(0, idx).replace(/\s+$/, '');
+  const markerBlock = storedNotes.slice(idx);
+  const recordedAt = /recorded_at=([^\r\n]*)/.exec(markerBlock)?.[1]?.trim() || '';
+  const productIds = /product_ids=([^\r\n]*)/.exec(markerBlock)?.[1]?.trim() || '';
+  const readable =
+    `Digital supply acknowledgement: accepted — recorded ${recordedAt}` +
+    (productIds ? `, product ids ${productIds}` : '');
+
+  return customerPart ? `${customerPart}\n${readable}` : readable;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -273,15 +309,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         [delivery_address, city, postcode].filter(Boolean).join(', ')
       );
       const safeAdminPaymentReference = escapeHtml(String(payment_reference || ''));
-      const safeAdminNotes = escapeHtmlWithLineBreaks(notesToStore);
+      // Email display only — notesToStore (DB insert) stays byte-identical.
+      const safeAdminNotes = escapeHtmlWithLineBreaks(
+        formatAdminEmailNotesDisplay(notesToStore)
+      );
       const safeAdminCouponCode = escapeHtml(String(validatedCouponCode || ''));
       const subjectCustomerName = sanitizeEmailHeaderText(customer_name);
+      const hasPhysical = authoritativeItems.some((p) => !isDigitalProduct(p));
+      const digitalOnly = hasDigital && !hasPhysical;
+      const adminPaymentLabel = emailPaymentMethodLabel(
+        publicPaymentMethod,
+        digitalOnly,
+        'email-admin'
+      );
+      const safeAdminPaymentLabel = escapeHtml(adminPaymentLabel);
       // Receipt status only — never attach the file; never link public/guessable receipt URLs.
       const receiptUploaded = Boolean(String(receipt_path || '').trim());
       // Row label is "Receipt"; value must not repeat the "Receipt:" prefix.
-      const receiptStatusLine = receiptUploaded
-        ? 'Attached — view in /sidhu → Orders'
-        : 'Not uploaded';
+      // COD: receipt not required; bank keeps existing attached / not-uploaded strings.
+      const receiptStatusLine =
+        publicPaymentMethod === 'cod'
+          ? 'Not required (pay on delivery / activation)'
+          : receiptUploaded
+            ? 'Attached — view in /sidhu → Orders'
+            : 'Not uploaded';
       const safeAdminReceiptStatus = escapeHtml(receiptStatusLine);
 
       const itemRows = authoritativeItems
@@ -312,7 +363,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       <tr><td style="padding:5px 0;color:#888;font-size:13px">Email</td><td style="color:#111;font-size:13px">${safeAdminCustomerEmail}</td></tr>
       <tr><td style="padding:5px 0;color:#888;font-size:13px">Phone</td><td style="color:#111;font-size:13px">${safeAdminCustomerPhone}</td></tr>
       <tr><td style="padding:5px 0;color:#888;font-size:13px">Address</td><td style="color:#111;font-size:13px">${safeAdminAddress}</td></tr>
-      <tr><td style="padding:5px 0;color:#888;font-size:13px">Payment</td><td style="color:#111;font-size:13px;font-weight:600">${formatPaymentMethodLabel(publicPaymentMethod, 'email-admin')}</td></tr>
+      <tr><td style="padding:5px 0;color:#888;font-size:13px">Payment</td><td style="color:#111;font-size:13px;font-weight:600">${safeAdminPaymentLabel}</td></tr>
       <tr><td style="padding:5px 0;color:#888;font-size:13px">Receipt</td><td style="color:#111;font-size:13px;font-weight:600">${safeAdminReceiptStatus}</td></tr>
       ${payment_reference ? `<tr><td style="padding:5px 0;color:#888;font-size:13px">Reference</td><td style="color:#111;font-size:13px">${safeAdminPaymentReference}</td></tr>` : ''}
       ${notesToStore ? `<tr><td style="padding:5px 0;color:#888;font-size:13px">Notes</td><td style="color:#111;font-size:13px">${safeAdminNotes}</td></tr>` : ''}
@@ -348,7 +399,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (customer_email) {
         const safeName = escapeHtml(String(customer_name || ''));
         const safeOrderId = escapeHtml(String(order_id));
-        const safePayment = formatPaymentMethodLabel(publicPaymentMethod, 'email-customer');
+        const customerPaymentLabel = emailPaymentMethodLabel(
+          publicPaymentMethod,
+          digitalOnly,
+          'email-customer'
+        );
+        const safePayment = escapeHtml(customerPaymentLabel);
+        const customerStatusLine =
+          publicPaymentMethod === 'cod'
+            ? digitalOnly
+              ? 'Thank you for your order. You chose to pay on delivery / activation.'
+              : 'Thank you for your order. You chose Cash on Delivery.'
+            : 'Thank you for your order. Your order is currently <strong>pending</strong> payment/verification.';
         const customerItemRows = authoritativeItems
           .map((i) => {
             const name = escapeHtml(String(i.name || 'Item'));
@@ -376,7 +438,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   </div>
   <div style="padding:28px 32px">
     <p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 16px">Hi ${safeName},</p>
-    <p style="color:#333;font-size:14px;line-height:1.6;margin:0 0 16px">Thank you for your order. Your order is currently <strong>pending</strong> payment/verification.</p>
+    <p style="color:#333;font-size:14px;line-height:1.6;margin:0 0 16px">${customerStatusLine}</p>
     <div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;padding:14px 20px;margin-bottom:20px;display:inline-block">
       <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7C3AED;margin-bottom:4px;font-weight:700">Order ID</div>
       <div style="font-size:20px;font-weight:700;color:#5B21B6">${safeOrderId}</div>

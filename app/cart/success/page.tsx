@@ -138,7 +138,15 @@ export default function CartSuccessPage() {
 
           <h1 className="title">{t("success_title", "Thank you for your order!")}</h1>
           <p className="subtitle">
-            {t("success_body", "Your order has been received and is being processed. You will receive confirmation once payment is verified. Subscription services are active within 1 hour of payment confirmation.")}
+            {snap.paymentMethod === "cod"
+              ? t(
+                  "success_body_cod",
+                  "Your order has been received and is being processed. You chose to pay on delivery / activation. Subscription services are active within 1 hour of payment confirmation."
+                )
+              : t(
+                  "success_body",
+                  "Your order has been received and is being processed. You will receive confirmation once payment is verified. Subscription services are active within 1 hour of payment confirmation."
+                )}
           </p>
 
           {/* Order ID */}
