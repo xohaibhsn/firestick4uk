@@ -36,7 +36,13 @@ export default function Navbar({
   const { sc } = useSiteContent();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logo, setLogo] = useState(logoUrl || "");
+  /** Client-only header cart icon — false on SSR so nav link HTML is unchanged. */
+  const [headerCartMounted, setHeaderCartMounted] = useState(false);
   const menuId = useId();
+
+  useEffect(() => {
+    setHeaderCartMounted(true);
+  }, []);
 
   const labels = useMemo(() => {
     const slug = normalizeSubscriptionSlug(
@@ -141,7 +147,14 @@ export default function Navbar({
           padding: 10px 24px !important; border-radius: 30px !important; font-weight: 600 !important;
           font-family: var(--font-body), 'Inter', system-ui, sans-serif !important;
         }
-        .site-nav .nav-cta:hover { background: #4C1D95 !important; }
+        .site-nav .nav-cta:hover { background: #4C1D95 !important; color: #FFFFFF !important; }
+        /* Open-menu links are dark; keep Cart pill readable (white on purple). */
+        .site-nav .nav-links.open a.nav-cta,
+        .site-nav .nav-links.open a.nav-cta:hover,
+        .site-nav .nav-links.open a.nav-cta:focus-visible {
+          background: #5B21B6 !important;
+          color: #FFFFFF !important;
+        }
         .site-nav .hamburger {
           display: none; flex-direction: column; gap: 5px; cursor: pointer;
           background: none; border: none; padding: 5px; z-index: 101;
@@ -154,6 +167,25 @@ export default function Navbar({
           display: block; width: 24px; height: 24px; color: #111111; flex-shrink: 0;
         }
         .site-nav .nav-end { display: flex; align-items: center; gap: 12px; }
+        .site-nav .nav-header-cart {
+          display: none;
+          position: relative;
+          align-items: center;
+          justify-content: center;
+          min-width: 44px; min-height: 44px;
+          color: #111111; text-decoration: none;
+          border-radius: 8px;
+        }
+        .site-nav .nav-header-cart:focus-visible {
+          outline: 2px solid #5B21B6; outline-offset: 2px;
+        }
+        .site-nav .nav-header-cart__badge {
+          position: absolute; top: 4px; right: 2px;
+          min-width: 18px; height: 18px; padding: 0 5px;
+          border-radius: 999px; background: #5B21B6; color: #FFFFFF;
+          font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+          font-family: var(--font-body), 'Inter', system-ui, sans-serif;
+        }
         @media (max-width: 768px) {
           .site-nav { padding: 16px 24px; }
           .site-nav.menu-open { z-index: 10050; }
@@ -165,7 +197,9 @@ export default function Navbar({
             margin: 0; padding: 0;
           }
           .site-nav .nav-links.open a { color: #111111; font-size: 18px; }
+          .site-nav .nav-links.open a.nav-cta { color: #FFFFFF !important; }
           .site-nav .hamburger { display: flex; position: relative; z-index: 2; }
+          .site-nav .nav-header-cart { display: inline-flex; position: relative; z-index: 2; }
           .site-nav.menu-open .nav-logo,
           .site-nav.menu-open .nav-end {
             position: relative; z-index: 2;
@@ -203,6 +237,42 @@ export default function Navbar({
         </ul>
         <div className="nav-end">
           {children}
+          {headerCartMounted && cta === "cart" && (
+            <a
+              href="/cart"
+              className="nav-header-cart"
+              aria-label={
+                cartCount > 0
+                  ? `Cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`
+                  : "Cart"
+              }
+              data-nav-header-cart="1"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M7 4h-2l-1 2v1h2l2.4 10.4a2 2 0 0 0 2 1.6h7.2a2 2 0 0 0 2-1.6L21 8H8"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <circle cx="10" cy="20" r="1.5" fill="currentColor" />
+                <circle cx="18" cy="20" r="1.5" fill="currentColor" />
+              </svg>
+              {cartCount > 0 && (
+                <span className="nav-header-cart__badge" aria-hidden="true">
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
+            </a>
+          )}
           <button
             className="hamburger"
             onClick={() => setMenuOpen(!menuOpen)}

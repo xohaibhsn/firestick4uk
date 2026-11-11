@@ -276,6 +276,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const safeAdminNotes = escapeHtmlWithLineBreaks(notesToStore);
       const safeAdminCouponCode = escapeHtml(String(validatedCouponCode || ''));
       const subjectCustomerName = sanitizeEmailHeaderText(customer_name);
+      // Receipt status only — never attach the file; never link public/guessable receipt URLs.
+      const receiptUploaded = Boolean(String(receipt_path || '').trim());
+      const receiptStatusLine = receiptUploaded
+        ? 'Receipt: attached — view in /sidhu → Orders'
+        : 'Receipt: not uploaded';
+      const safeAdminReceiptStatus = escapeHtml(receiptStatusLine);
 
       const itemRows = authoritativeItems
         .map((i) => {
@@ -306,6 +312,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       <tr><td style="padding:5px 0;color:#888;font-size:13px">Phone</td><td style="color:#111;font-size:13px">${safeAdminCustomerPhone}</td></tr>
       <tr><td style="padding:5px 0;color:#888;font-size:13px">Address</td><td style="color:#111;font-size:13px">${safeAdminAddress}</td></tr>
       <tr><td style="padding:5px 0;color:#888;font-size:13px">Payment</td><td style="color:#111;font-size:13px;font-weight:600">${formatPaymentMethodLabel(publicPaymentMethod, 'email-admin')}</td></tr>
+      <tr><td style="padding:5px 0;color:#888;font-size:13px">Receipt</td><td style="color:#111;font-size:13px;font-weight:600">${safeAdminReceiptStatus}</td></tr>
       ${payment_reference ? `<tr><td style="padding:5px 0;color:#888;font-size:13px">Reference</td><td style="color:#111;font-size:13px">${safeAdminPaymentReference}</td></tr>` : ''}
       ${notesToStore ? `<tr><td style="padding:5px 0;color:#888;font-size:13px">Notes</td><td style="color:#111;font-size:13px">${safeAdminNotes}</td></tr>` : ''}
     </table>

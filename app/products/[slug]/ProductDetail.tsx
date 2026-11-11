@@ -99,7 +99,7 @@ export default function ProductDetail({
     if (id == null) return;
     bindCoordinatorProduct(boundaryRef.current, id, slug);
   }, [slug, initialProduct?.id, product?.id]);
-  const { addToCart, removeFromCart, cart } = useCart();
+  const { addToCart, removeFromCart, cart, itemCount } = useCart();
   const contact = useContactConfig();
   const { t } = useSiteContent();
   const vars = { phone: contact.phone, telegram: contact.telegram };
@@ -391,7 +391,7 @@ export default function ProductDetail({
         @media(max-width:768px){.page-wrap{padding:90px 16px 40px;}.product-sections{padding:0 16px 60px;}.product-layout{grid-template-columns:1fr;gap:24px;}footer{padding:30px 24px;flex-direction:column;text-align:center;}}
       `}</style>
 
-      <Navbar cartCount={cart.length} cta="cart" />
+      <Navbar cartCount={itemCount} cta="cart" />
 
       <div className="page-wrap">
         {loading ? (

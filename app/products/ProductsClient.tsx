@@ -68,7 +68,7 @@ export default function ProductsClient({
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
-  const { addToCart, removeFromCart, cart } = useCart();
+  const { addToCart, removeFromCart, cart, itemCount } = useCart();
 
   const fetchProducts = useCallback((cat = filter, s = sort, mn = minPrice, mx = maxPrice) => {
     setLoading(true);
@@ -207,7 +207,7 @@ export default function ProductsClient({
         ))}
       </div>
 
-      <Navbar cartCount={cart.length} cta="cart">
+      <Navbar cartCount={itemCount} cta="cart">
         {/* Live Search */}
         <div ref={searchRef} style={{position:"relative",display:"flex",alignItems:"center",gap:8}}>
           {searchActive

@@ -204,11 +204,11 @@ export default function SubscriptionPageClient({
   howSteps: CardItem[];
   whatsappUrl: string;
 }) {
-  const { addToCart, cart } = useCart();
+  const { addToCart, cart, itemCount } = useCart();
   const [addedId, setAddedId] = useState<number | null>(null);
 
   const t = (key: string, fallback = "") => cms(content, key, fallback);
-  const cartCount = useMemo(() => cart.reduce((n, i) => n + i.qty, 0), [cart]);
+  const cartCount = itemCount;
 
   const richHtml = useMemo(() => {
     const raw = t(

@@ -99,7 +99,7 @@ export default function HomeClient({
     secondaryShow: true,
   });
   const [heroStats, setHeroStats] = useState<{ num: string; label: string }[]>([]);
-  const { addToCart, removeFromCart, cart } = useCart();
+  const { addToCart, removeFromCart, cart, itemCount } = useCart();
 
   const handleSearch = () => {
     const q = searchTerm.trim();
@@ -547,7 +547,7 @@ export default function HomeClient({
         }
       `}</style>
 
-      <Navbar cartCount={cart.length} cta="cart" />
+      <Navbar cartCount={itemCount} cta="cart" />
 
       <div className="page-wrapper">
         <HeroSlider slides={slides}>

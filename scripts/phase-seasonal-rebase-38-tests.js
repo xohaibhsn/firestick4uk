@@ -211,12 +211,72 @@ ok(
     /<TrackingConsent\s*\/>/.test(layout)
 );
 
-// Navbar: byte-identical to f65f984 unless seasonal delta touches it (it does not)
-byteIdenticalToPristine("components/Navbar.tsx", "navbar");
+// Navbar: cart-47 intentionally changes Navbar (client-only header cart + CTA contrast).
+// Why this assertion changed: byte-identity to f65f984 would fail after cart-47 UI;
+// we still pin the 7 SSR nav link hrefs/text/order (SEO), not full file bytes.
+{
+  function extractNavAnchors(src) {
+    const anchors = [];
+    const ulMatch = src.match(/<ul[\s\S]*?className=\{`nav-links[\s\S]*?<\/ul>/);
+    const block = ulMatch ? ulMatch[0] : src;
+    const linkRe =
+      /href=(?:\{labels\.subscriptionHref\}|"(\/[^"]*)"|'(\/[^']*)'|`(\/[^`]*)`)[\s\S]*?>([\s\S]*?)<\/a>/g;
+    let m;
+    while ((m = linkRe.exec(block))) {
+      let href = m[1] || m[2] || m[3] || null;
+      let text = m[4]
+        .replace(/\{labels\.subscription\}/g, "IPTV Subscription")
+        .replace(/\{labels\.cart\}[\s\S]*$/g, "Cart")
+        .replace(/\{labels\.shop\}/g, "Shop Now")
+        .replace(/\{[^}]+\}/g, "")
+        .replace(/<[^>]+>/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!href && /labels\.subscriptionHref/.test(m[0])) {
+        href = "/iptv-subscriptions-uk";
+      }
+      if (href) anchors.push({ href, text });
+    }
+    return anchors;
+  }
+  const navbarSrc = read("components/Navbar.tsx");
+  let baselineSrc = "";
+  try {
+    baselineSrc = f65f984BlobRaw("components/Navbar.tsx").toString("utf8");
+  } catch (err) {
+    ok("navbar_nav_links_baseline_readable", false, String(err && err.message ? err.message : err));
+  }
+  if (baselineSrc) {
+    const current = extractNavAnchors(navbarSrc);
+    const baseline = extractNavAnchors(baselineSrc);
+    ok(
+      "navbar_nav_links_href_order_vs_f65f984",
+      current.length === baseline.length &&
+        current.every((a, i) => a.href === baseline[i].href),
+      JSON.stringify({ current, baseline })
+    );
+    ok(
+      "navbar_nav_links_text_order_vs_f65f984",
+      current.length === baseline.length &&
+        current.every((a, i) => a.text === baseline[i].text),
+      JSON.stringify({ current, baseline })
+    );
+    ok(
+      "navbar_header_cart_is_client_mounted_only",
+      /headerCartMounted/.test(navbarSrc) &&
+        /headerCartMounted && cta === ["']cart["']/.test(navbarSrc)
+    );
+  }
+  ok(
+    "navbar_byte_identical_f65f984_skipped_cart47",
+    true,
+    "intentional: cart-47 client header cart + CTA contrast; SEO nav links still asserted"
+  );
+}
 ok(
   "navbar_seasonal_delta_does_not_touch",
   true,
-  "seasonal delta does not include components/Navbar.tsx"
+  "seasonal delta did not include Navbar; cart-47 does (reported)"
 );
 
 byteIdenticalToPristine("lib/paymentMethod.ts", "paymentMethod_file");

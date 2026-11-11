@@ -3,6 +3,7 @@ import { cache } from "react";
 import "./globals.css";
 import { CartProvider } from "./lib/cartContext";
 import WhatsAppButton from "@/components/WhatsAppButton";
+import MiniCartBar from "@/components/MiniCartBar";
 import TrackingConsent from "@/components/TrackingConsent";
 import MicrosoftClarity from "@/components/MicrosoftClarity";
 import JsonLd from "@/components/JsonLd";
@@ -167,7 +168,10 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <JsonLd data={organizationLd} />
         <SiteContentProvider>
-          <CartProvider>{children}</CartProvider>
+          <CartProvider>
+            {children}
+            <MiniCartBar />
+          </CartProvider>
           <TrackingConsent />
           <MicrosoftClarity />
           <WhatsAppButton />

@@ -16,6 +16,10 @@ interface CartContextType {
   updateQty: (id: number, delta: number) => void;
   clearCart: () => void;
   total: number;
+  /** Sum of line quantities (badge / mini-bar). */
+  itemCount: number;
+  /** Timestamp of last successful add (aria-live consumers). */
+  lastAddedAt: number;
 }
 
 const CartContext = createContext<CartContextType>({
@@ -25,11 +29,14 @@ const CartContext = createContext<CartContextType>({
   updateQty: () => {},
   clearCart: () => {},
   total: 0,
+  itemCount: 0,
+  lastAddedAt: 0,
 });
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [lastAddedAt, setLastAddedAt] = useState(0);
 
   useEffect(() => {
     // Load from localStorage FIRST, then mark mounted
@@ -57,15 +64,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (existing) return prev.map(i => i.id === item.id ? { ...i, qty: i.qty + 1 } : i);
       return [...prev, { ...item, qty: 1 }];
     });
+    setLastAddedAt(Date.now());
   };
 
   const removeFromCart = (id: number) => setCart(prev => prev.filter(i => i.id !== id));
   const updateQty = (id: number, delta: number) => setCart(prev => prev.map(i => i.id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i));
   const clearCart = () => setCart([]);
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const itemCount = cart.reduce((s, i) => s + (Number(i.qty) || 0), 0);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQty, clearCart, total }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQty, clearCart, total, itemCount, lastAddedAt }}>
       {children}
     </CartContext.Provider>
   );
