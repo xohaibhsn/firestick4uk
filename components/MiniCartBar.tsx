@@ -201,12 +201,17 @@ export default function MiniCartBar() {
           {itemLabel} · {amountText}
         </div>
         <div className="mini-cart-bar__actions">
-          <a className="mini-cart-bar__btn mini-cart-bar__btn--view" href="/cart">
+          <a
+            className="mini-cart-bar__btn mini-cart-bar__btn--view"
+            href="/cart"
+            data-insights-id="cart_view"
+          >
             View cart
           </a>
           <a
             className="mini-cart-bar__btn mini-cart-bar__btn--checkout"
             href="/cart"
+            data-insights-id="mini_checkout"
           >
             Checkout
           </a>

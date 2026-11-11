@@ -1121,6 +1121,7 @@ export default function CartPage() {
                   <button
                     className="place-order-btn place-order-btn--inline"
                     data-place-order="inline"
+                    data-insights-id="place_order"
                     disabled={placing || cart.length === 0 || classificationBlocked}
                     onClick={handleOrder}
                   >
@@ -1160,6 +1161,7 @@ export default function CartPage() {
               <button
                 className="place-order-btn"
                 data-place-order="sticky"
+                data-insights-id="place_order"
                 disabled={placing || cart.length === 0 || classificationBlocked}
                 onClick={handleOrder}
               >

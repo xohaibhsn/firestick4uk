@@ -370,6 +370,7 @@ export default function ProductsClient({
                       return(
                       <button
                         className="add-btn"
+                        data-insights-id="cart_add"
                         style={{background:inCart?(hovering?"#DC2626":"#16A34A"):"#5B21B6",cursor:inCart&&!hovering?"default":"pointer"}}
                         onMouseEnter={()=>inCart&&setHoveringId(p.id)}
                         onMouseLeave={()=>setHoveringId(null)}

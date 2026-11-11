@@ -550,6 +550,7 @@ export default function ProductDetail({
                   <button
                     className={`add-btn${added ? " added" : ""}`}
                     data-pdp-atc="inline"
+                    data-insights-id="cart_add"
                     style={{background: isInCart ? (hovering ? "#DC2626" : "#16A34A") : (added ? "#16A34A" : "#5B21B6"), cursor: isInCart && !hovering ? "default" : "pointer", transform: "none"}}
                     onMouseEnter={() => isInCart && setHovering(true)}
                     onMouseLeave={() => setHovering(false)}

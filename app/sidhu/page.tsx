@@ -10,6 +10,7 @@ import ContentHistoryPanel from "@/components/admin/ContentHistoryPanel";
 import ProductSeasonalityPanel from "@/components/admin/ProductSeasonalityPanel";
 import SeoOverviewPanel from "@/components/admin/SeoOverviewPanel";
 import RedirectManagerPanel from "@/components/admin/RedirectManagerPanel";
+import InsightsPanel from "@/components/sidhu/insights/InsightsPanel";
 import { keysForPage } from "@/lib/adminContentFields";
 import {
   canAccessSidhuTab,
@@ -254,7 +255,7 @@ const styles = `
   }
 `;
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history"|"seo"|"redirects";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history"|"seo"|"redirects"|"insights";
 type AdminRole = "super_admin"|"manager"|"writer";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
@@ -988,7 +989,10 @@ export default function AdminPage() {
   // Keep current tab within role permissions (no hidden-tab bypass via state)
   useEffect(() => {
     if (!loggedIn) return;
-    if (!canAccessSidhuTab(adminRole, tab as SidhuTab)) {
+    const tabAllowed = tab === "insights"
+      ? hasAdminPermission(adminRole, "insights.view")
+      : canAccessSidhuTab(adminRole, tab as SidhuTab);
+    if (!tabAllowed) {
       setTab("dashboard");
     }
   }, [loggedIn, adminRole, tab]);
@@ -4412,6 +4416,7 @@ export default function AdminPage() {
               { id:"blog",      icon:"📝", label:"Blog",         roles:["super_admin","manager","writer"] },
               { id:"seo",       icon:"🔎", label:"SEO",          roles:["super_admin","manager","writer"] },
               { id:"redirects", icon:"↪️", label:"Redirects",    roles:["super_admin"] },
+              { id:"insights",  icon:"📈", label:"Insights",     roles:["super_admin","manager"] },
               { id:"media",     icon:"🖼️", label:"Media Library", roles:["super_admin","manager","writer"] },
               { id:"history",   icon:"🕘", label:"History", roles:["super_admin","manager","writer"] },
               { id:"coupons",   icon:"🎟️", label:"Coupons",      roles:["super_admin"] },
@@ -4421,7 +4426,7 @@ export default function AdminPage() {
               { id:"staff",     icon:"👤", label:"Staff Users",  roles:["super_admin"] },
               { id:"audit",     icon:"📜", label:"Activity Log", roles:["super_admin"] },
               { id:"settings",  icon:"⚙️", label:"Site Settings",roles:["super_admin"] },
-            ] as const).filter(item => canAccessSidhuTab(adminRole, item.id as SidhuTab)).map(item => (
+            ] as const).filter(item => item.id === "insights" ? hasAdminPermission(adminRole, "insights.view") : canAccessSidhuTab(adminRole, item.id as SidhuTab)).map(item => (
               <button key={item.id} className={`nav-item ${tab===item.id?"active":""}`} onClick={() => {
                 if (item.id === "history") setHistoryFilter(null);
                 setTab(item.id);
@@ -4454,6 +4459,7 @@ export default function AdminPage() {
                 {tab==="blog" && <>Manage <span>Blog</span></>}
                 {tab==="seo" && <>SEO <span>Overview</span></>}
                 {tab==="redirects" && <>Manage <span>Redirects</span></>}
+                {tab==="insights" && <>Sidhu <span>Insights</span></>}
                 {tab==="media" && <>Media <span>Library</span></>}
                 {tab==="history" && <>Content <span>History</span></>}
                 {tab==="coupons" && <>Manage <span>Coupons</span></>}
@@ -4969,6 +4975,9 @@ export default function AdminPage() {
           )}
           {tab==="redirects" && canAccessSidhuTab(adminRole, "redirects") && (
             <RedirectManagerPanel role={adminRole} adminApi={adminApi} />
+          )}
+          {tab==="insights" && hasAdminPermission(adminRole, "insights.view") && (
+            <InsightsPanel role={adminRole} />
           )}
           {tab==="blog" && can("blog.manage") && (
             <div>
