@@ -52,6 +52,16 @@ const ALLOWLIST = new Set([
   "pages/api/admin-insights/orders-attribution.ts",
   "pages/api/admin-insights/returning.ts",
   "pages/api/admin-insights/export.ts",
+  // F4UK-HOME-REVIEWS-R1-61 — CMS home reviews redesign.
+  "app/HomeClient.tsx",
+  "lib/homeTestimonials.ts",
+  "app/sidhu/page.tsx",
+  "scripts/phase-home-reviews-61-tests.js",
+  "scripts/phase-home-testimonials-foundation-tests.js",
+  "scripts/phase-windup-59-tests.js",
+  "scripts/phase-ux-batch-51-tests.js",
+  "scripts/phase-ux-fix-53-tests.js",
+  "scripts/phase-cod-restore-54-tests.js",
 ]);
 
 const BASE_SHA = "76067a765b091bbbf0f2d4375c3d17f0b3af53bc";

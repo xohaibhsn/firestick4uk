@@ -342,6 +342,12 @@ const allowedPrefixes = [
   "scripts/phase-ux-batch-51-tests.js",
   "scripts/phase-ux-fix-53-tests.js",
   "scripts/phase-cod-restore-54-tests.js",
+  "lib/homeTestimonials.ts",
+  "app/sidhu/page.tsx",
+  "scripts/phase-home-reviews-61-tests.js",
+  "scripts/phase-home-testimonials-foundation-tests.js",
+  "scripts/phase-windup-59-tests.js",
+  "scripts/phase-sidhu-insights-57-tests.js",
 ];
 const unexpected = allTouched.filter((f) => {
   const n = f.replace(/\\/g, "/");

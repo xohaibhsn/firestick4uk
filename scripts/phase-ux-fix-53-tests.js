@@ -171,6 +171,15 @@ const allowed = new Set([
   "scripts/phase-ux-batch-51-tests.js",
   // COD restore-54: second payment option + digital label tests
   "scripts/phase-cod-restore-54-tests.js",
+  // F4UK-HOME-REVIEWS-R1-61
+  "app/HomeClient.tsx",
+  "lib/homeTestimonials.ts",
+  "app/sidhu/page.tsx",
+  "scripts/phase-home-reviews-61-tests.js",
+  "scripts/phase-home-testimonials-foundation-tests.js",
+  "scripts/phase-windup-59-tests.js",
+  "scripts/phase-ux-batch-51-tests.js",
+  "scripts/phase-sidhu-insights-57-tests.js",
 ]);
 let changed = [];
 try {

@@ -455,6 +455,21 @@ async function main() {
     if (rel === "scripts/phase-insights-w2-60-tests.js") return true;
     if (rel.startsWith("pages/api/admin-insights/")) return true;
     if (rel.startsWith("components/sidhu/insights/")) return true;
+    // F4UK-HOME-REVIEWS-R1-61
+    if (
+      [
+        "lib/homeTestimonials.ts",
+        "app/sidhu/page.tsx",
+        "scripts/phase-home-reviews-61-tests.js",
+        "scripts/phase-home-testimonials-foundation-tests.js",
+        "scripts/phase-windup-59-tests.js",
+        "scripts/phase-ux-batch-51-tests.js",
+        "scripts/phase-ux-fix-53-tests.js",
+        "scripts/phase-cod-restore-54-tests.js",
+      ].includes(rel)
+    ) {
+      return true;
+    }
     // data-insights-id attribute hosts
     if (
       [

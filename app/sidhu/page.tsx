@@ -5394,7 +5394,24 @@ export default function AdminPage() {
                 {/* FEATURES/VALUES/ITEMS */}
                 {(['features','values','testimonials'].some(k=>sectionModal.key.includes(k))) && (
                   <div>
-                    <div className="modal-field"><label>Section Title</label><input value={sectionEditing.title||""} onChange={e=>setSectionEditing((p:any)=>({...p,title:e.target.value}))} /></div>
+                    <div className="modal-field"><label>Section Title</label><input value={sectionEditing.title||""} onChange={e=>setSectionEditing((p:any)=>({...p,title:e.target.value}))} maxLength={120} /></div>
+                    {sectionModal.key.includes('testimonial') ? (
+                      <>
+                        <div className="modal-field"><label>Subtitle (optional)</label><input value={sectionEditing.subtitle||""} onChange={e=>setSectionEditing((p:any)=>({...p,subtitle:e.target.value}))} maxLength={240} placeholder="Your feedback helps us improve our service." /></div>
+                        <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#333",cursor:"pointer",marginBottom:10}}>
+                          <input
+                            type="checkbox"
+                            checked={sectionEditing.showSummary === true}
+                            onChange={e=>setSectionEditing((p:any)=>({...p,showSummary:e.target.checked}))}
+                          />
+                          Show summary bar (average + count) — off by default
+                        </label>
+                        <div className="modal-field"><label>Min rated reviews to show summary (default 3)</label><input type="number" min={1} max={100} value={sectionEditing.minReviewsForSummary ?? 3} onChange={e=>{
+                          const n = Number(e.target.value);
+                          setSectionEditing((p:any)=>({...p,minReviewsForSummary: Number.isFinite(n) ? Math.max(1, Math.min(100, Math.trunc(n))) : 3}));
+                        }} /></div>
+                      </>
+                    ) : null}
                     <div style={{marginBottom:12}}>
                       <div style={{fontWeight:600,fontSize:12,letterSpacing:"1px",textTransform:"uppercase",color:"#666",marginBottom:8}}>Items</div>
                       {(sectionEditing.items||[]).map((item:any,i:number)=>(
@@ -5405,19 +5422,48 @@ export default function AdminPage() {
                           </div>
                           {sectionModal.key.includes('testimonial') ? (
                             <>
-                              <div className="modal-field" style={{marginBottom:6}}><label>Display Name</label><input value={item.name||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,name:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Display Name</label><input value={item.name||""} maxLength={80} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,name:e.target.value}:x)}))} /></div>
                               <div className="modal-field" style={{marginBottom:6}}><label>Rating (1-5, optional — leave blank for no stars)</label><input type="number" min={1} max={5} value={item.rating ?? ""} onChange={e=>{
                                 const raw = e.target.value;
                                 setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>{
                                   if (j!==i) return x;
                                   if (raw === "") return {...x, rating: undefined};
                                   const n = Number(raw);
-                                  return {...x, rating: Number.isFinite(n) ? n : undefined};
+                                  if (!Number.isFinite(n)) return {...x, rating: undefined};
+                                  const clamped = Math.max(1, Math.min(5, Math.trunc(n)));
+                                  return {...x, rating: clamped};
                                 })}));
                               }} /></div>
-                              <div className="modal-field" style={{marginBottom:6}}><label>Review Text</label><textarea rows={2} value={item.text||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,text:e.target.value}:x)}))} /></div>
-                              <div className="modal-field" style={{marginBottom:6}}><label>Service / product (optional, verified only)</label><input value={item.service||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,service:e.target.value}:x)}))} /></div>
-                              <div className="modal-field" style={{marginBottom:6}}><label>Date (optional, verified only)</label><input value={item.date||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,date:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Review Text</label><textarea rows={2} maxLength={2000} value={item.text||""} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,text:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Service / product (optional)</label><input value={item.service||""} maxLength={120} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,service:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Date (optional)</label><input value={item.date||""} maxLength={40} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,date:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Display order (optional, lower first)</label><input type="number" value={item.order ?? ""} onChange={e=>{
+                                const raw = e.target.value;
+                                setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>{
+                                  if (j!==i) return x;
+                                  if (raw === "") return {...x, order: undefined};
+                                  const n = Number(raw);
+                                  return {...x, order: Number.isFinite(n) ? Math.trunc(n) : undefined};
+                                })}));
+                              }} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Source label (optional free text)</label><input value={item.sourceLabel||""} maxLength={60} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,sourceLabel:e.target.value}:x)}))} /></div>
+                              <div className="modal-field" style={{marginBottom:6}}><label>Verified order id (optional — shows Verified order badge)</label><input value={item.verifiedOrderId||""} maxLength={64} onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,verifiedOrderId:e.target.value}:x)}))} /></div>
+                              <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#333",cursor:"pointer",marginBottom:6}}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.pinned === true || item.featured === true}
+                                  onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,pinned:e.target.checked,featured:e.target.checked}:x)}))}
+                                />
+                                Pinned / featured (show first)
+                              </label>
+                              <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#333",cursor:"pointer",marginBottom:6}}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.hidden === true}
+                                  onChange={e=>setSectionEditing((p:any)=>({...p,items:p.items.map((x:any,j:number)=>j===i?{...x,hidden:e.target.checked}:x)}))}
+                                />
+                                Hidden (keep in CMS, do not show on homepage)
+                              </label>
                               <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#333",cursor:"pointer"}}>
                                 <input
                                   type="checkbox"
@@ -5436,7 +5482,7 @@ export default function AdminPage() {
                           )}
                         </div>
                       ))}
-                      <button className="action-btn btn-view" onClick={()=>setSectionEditing((p:any)=>({...p,items:[...(p.items||[]),sectionModal.key.includes('testimonial')?{name:"",text:"",approved:false}:{icon:"⭐",title:"",description:""}]}))} >+ Add Item</button>
+                      <button className="action-btn btn-view" onClick={()=>setSectionEditing((p:any)=>({...p,items:[...(p.items||[]),sectionModal.key.includes('testimonial')?{name:"",text:"",approved:false,hidden:false,pinned:false}:{icon:"⭐",title:"",description:""}]}))} >+ Add Item</button>
                     </div>
                   </div>
                 )}

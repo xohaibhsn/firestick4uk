@@ -4,8 +4,7 @@
  */
 const fs = require("fs");
 const path = require("path");
-const { pathToFileURL } = require("url");
-const { spawnSync } = require("child_process");
+const ts = require("typescript");
 
 const ROOT = process.cwd();
 
@@ -19,59 +18,46 @@ function mark(id, ok, detail = "") {
 }
 
 function loadHelper() {
-  const helperPath = path.join(ROOT, "lib", "homeTestimonials.ts");
-  const runner = `
-    import {
-      parseHomeTestimonialRating,
-      isHomeTestimonialApproved,
-      getPublishableHomeTestimonials,
-    } from ${JSON.stringify(pathToFileURL(helperPath).href)};
-    const payload = {
-      parseHomeTestimonialRating,
-      isHomeTestimonialApproved,
-      getPublishableHomeTestimonials,
-    };
-    process.stdout.write(JSON.stringify({
-      m1: parseHomeTestimonialRating(undefined),
-      m2: parseHomeTestimonialRating(null),
-      m3: parseHomeTestimonialRating(""),
-      m4: parseHomeTestimonialRating(0),
-      m5: parseHomeTestimonialRating(6),
-      m6: parseHomeTestimonialRating(5),
-      m7: parseHomeTestimonialRating("3"),
-      m8len: getPublishableHomeTestimonials([
-        { name: "John Smith", rating: 5, text: "Amazing", approved: false },
-        { name: "A", text: "Real", approved: true },
-      ]).length,
-      m8rating: getPublishableHomeTestimonials([
+  const src = read("lib/homeTestimonials.ts");
+  const { outputText } = ts.transpileModule(src, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+      esModuleInterop: true,
+    },
+    fileName: "lib/homeTestimonials.ts",
+  });
+  const fakeModule = { exports: {} };
+  const fn = new Function("require", "module", "exports", outputText);
+  fn(require, fakeModule, fakeModule.exports);
+  const {
+    parseHomeTestimonialRating,
+    isHomeTestimonialApproved,
+    getPublishableHomeTestimonials,
+  } = fakeModule.exports;
+  return {
+    m1: parseHomeTestimonialRating(undefined),
+    m2: parseHomeTestimonialRating(null),
+    m3: parseHomeTestimonialRating(""),
+    m4: parseHomeTestimonialRating(0),
+    m5: parseHomeTestimonialRating(6),
+    m6: parseHomeTestimonialRating(5),
+    m7: parseHomeTestimonialRating("3"),
+    m8len: getPublishableHomeTestimonials([
+      { name: "John Smith", rating: 5, text: "Amazing", approved: false },
+      { name: "A", text: "Real", approved: true },
+    ]).length,
+    m8rating:
+      getPublishableHomeTestimonials([
         { name: "A", text: "Real", approved: true },
       ])[0]?.rating ?? null,
-      m9: getPublishableHomeTestimonials([
+    m9:
+      getPublishableHomeTestimonials([
         { name: "A", text: "Real", approved: true, rating: 4 },
       ])[0]?.rating ?? null,
-      approvedFalse: isHomeTestimonialApproved({ approved: false }),
-      approvedTrue: isHomeTestimonialApproved({ approved: true }),
-    }));
-  `;
-  const tmp = path.join(ROOT, "_tmp_home_testimonials_runner.mts");
-  fs.writeFileSync(tmp, runner, "utf8");
-  try {
-    const r = spawnSync(
-      process.execPath,
-      ["--experimental-strip-types", tmp],
-      { encoding: "utf8", cwd: ROOT }
-    );
-    if (r.status !== 0) {
-      throw new Error((r.stderr || r.stdout || "helper runner failed").slice(0, 500));
-    }
-    return JSON.parse(r.stdout.trim());
-  } finally {
-    try {
-      fs.unlinkSync(tmp);
-    } catch {
-      /* ignore */
-    }
-  }
+    approvedFalse: isHomeTestimonialApproved({ approved: false }),
+    approvedTrue: isHomeTestimonialApproved({ approved: true }),
+  };
 }
 
 (async () => {
@@ -92,7 +78,13 @@ function loadHelper() {
     /Genuine customer reviews will be featured here with permission/.test(home),
     "truthful empty-state message"
   );
-  fail("D", /Your feedback helps us improve our service\./.test(home), "subtitle present");
+  fail(
+    "D",
+    /Your feedback helps us improve our service\./.test(home) ||
+      /Your feedback helps us improve our service\./.test(helperSrc) ||
+      /getHomeTestimonialsSubtitle/.test(home),
+    "subtitle present (CMS or helper default)"
+  );
   fail("E", !/rating\s*\|\|\s*5/.test(home), "no five-star fallback in HomeClient");
   fail("F", !/AggregateRating/.test(home) && !/"@type"\s*:\s*"Review"/.test(home), "no review structured data");
   fail("G", !/Verified Purchase/.test(home), "no Verified Purchase badge");
