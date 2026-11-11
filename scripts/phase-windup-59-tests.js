@@ -44,6 +44,14 @@ const ALLOWLIST = new Set([
   "scripts/phase-hostinger-h1-cms-bootstrap-tests.js",
   "scripts/phase-windup-59-tests.js",
   "scripts/phase-order-email-receipt-47-tests.js",
+  // F4UK-INSIGHTS-W2-60 — Phase 2 Insights admin APIs + tests (INERT screens).
+  "scripts/phase-insights-w2-60-tests.js",
+  "scripts/phase-sidhu-insights-57-tests.js",
+  "pages/api/admin-insights/funnel.ts",
+  "pages/api/admin-insights/checkout-problems.ts",
+  "pages/api/admin-insights/orders-attribution.ts",
+  "pages/api/admin-insights/returning.ts",
+  "pages/api/admin-insights/export.ts",
 ]);
 
 const BASE_SHA = "76067a765b091bbbf0f2d4375c3d17f0b3af53bc";
@@ -76,7 +84,8 @@ function diffAllowlistCheck() {
     (f) =>
       /^lib\/insights/.test(f) ||
       /^pages\/api\/insights/.test(f) ||
-      /^pages\/api\/admin-insights\//.test(f) ||
+      // Phase 1 admin-insights routes stay frozen; Phase 2 endpoints are allowlisted above.
+      (/^pages\/api\/admin-insights\//.test(f) && !ALLOWLIST.has(f)) ||
       f === "app/layout.tsx" ||
       /Navbar|Footer/.test(f)
   );
