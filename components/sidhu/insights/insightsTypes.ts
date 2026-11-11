@@ -207,6 +207,89 @@ export type InsightsSettingsResponse = {
   bounds: typeof INSIGHTS_SETTINGS_BOUNDS;
 };
 
+/** Phase 2 — funnel step ids (product view → order placed). */
+export type InsightsFunnelStepId =
+  | "product_view"
+  | "add_to_cart"
+  | "cart_view"
+  | "checkout_start"
+  | "order_placed";
+
+export type InsightsFunnelStep = {
+  id: InsightsFunnelStepId;
+  label: string;
+  sessions: number;
+  /** Drop-off % from previous step; null for the first step or when previous is 0. */
+  dropoff_pct: number | null;
+};
+
+export type InsightsFunnelResponse = OkBase & {
+  has_data: boolean;
+  steps: InsightsFunnelStep[];
+};
+
+/** Phase 2 — checkout problem metric; tracked=false when the beacon never emits that signal. */
+export type InsightsCheckoutMetric = {
+  id: string;
+  label: string;
+  tracked: boolean;
+  count: number | null;
+  note: string | null;
+};
+
+export type InsightsCheckoutProblemsResponse = OkBase & {
+  has_data: boolean;
+  metrics: InsightsCheckoutMetric[];
+};
+
+export type InsightsOrderAttributionRow = {
+  order_id: string;
+  ordered_at: string | null;
+  payment_method: string | null;
+  status: string | null;
+  total: number | null;
+  source: string | null;
+  medium: string | null;
+  referrer_host: string | null;
+  landing_path: string;
+  country: string;
+  device_type: string;
+  /** Present ONLY for super_admin responses. */
+  ip_address?: string | null;
+  ip_masked?: boolean;
+};
+
+export type InsightsOrdersAttributionResponse = OkBase & {
+  has_data: boolean;
+  ip_visible: boolean;
+  limit: number;
+  rows: InsightsOrderAttributionRow[];
+};
+
+export type InsightsReturningBucket = {
+  label: string;
+  visitors: number;
+};
+
+export type InsightsReturningResponse = OkBase & {
+  has_data: boolean;
+  totals: {
+    visitors: number;
+    new_visitors: number;
+    returning_visitors: number;
+    sessions: number;
+  };
+  visit_count_buckets: InsightsReturningBucket[];
+  days_since_last_buckets: InsightsReturningBucket[];
+  /** Average days since prior visit among returning visitors in range; null if none. */
+  avg_days_since_last: number | null;
+};
+
+export const INSIGHTS_EXPORT_MAX_ROWS = 50_000;
+export const INSIGHTS_EXPORT_DEFAULT_ROWS = 10_000;
+
+export type InsightsExportKind = "daily" | "sessions";
+
 // ---------------------------------------------------------------------------
 // Pure date helpers (UTC, YYYY-MM-DD) — insights timestamps are stored in UTC.
 // ---------------------------------------------------------------------------
