@@ -22,6 +22,8 @@ import {
   runBoundaryRevalidation,
   type BoundaryCoordinatorState,
 } from "@/lib/productSeasonBoundaryClient";
+import { isDigitalProduct } from "@/lib/productFulfilment";
+import { stockBadgeLabel } from "@/lib/stockBadgeLabel";
 
 const xssOptions = {
   whiteList: {
@@ -314,10 +316,43 @@ export default function ProductDetail({
     !revalidating;
   const handleAdd = () => {
     if (!product || isInCart || !canPurchase) return;
-    addToCart({ id: product.id, name: product.name, price: Number(product.price), qty: 1 });
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: Number(product.price),
+      qty: 1,
+      image: product.image || undefined,
+    });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
+
+  const isDigital = product
+    ? isDigitalProduct({ category: product.category, stock: product.stock })
+    : false;
+
+  // Sticky mobile ATC: hide mini-cart while this bar is active (combined CTA surface).
+  useEffect(() => {
+    if (!product) return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const sync = () => {
+      const on = mq.matches;
+      if (on) {
+        document.body.classList.add("pdp-sticky-atc-visible");
+        document.documentElement.setAttribute("data-pdp-sticky-atc", "1");
+      } else {
+        document.body.classList.remove("pdp-sticky-atc-visible");
+        document.documentElement.removeAttribute("data-pdp-sticky-atc");
+      }
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => {
+      mq.removeEventListener("change", sync);
+      document.body.classList.remove("pdp-sticky-atc-visible");
+      document.documentElement.removeAttribute("data-pdp-sticky-atc");
+    };
+  }, [product]);
 
   const featureList = product?.features
     ? product.features.split('\n').map(f => f.trim()).filter(Boolean)
@@ -388,7 +423,27 @@ export default function ProductDetail({
         .footer-copy{font-size:12px;color:rgba(255,255,255,0.4);}
         .whatsapp-btn{position:fixed;bottom:30px;right:30px;z-index:999;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,#25d366,#128c7e);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 25px rgba(37,211,102,0.5);text-decoration:none;font-size:26px;transition:all 0.3s;}
         .whatsapp-btn:hover{transform:scale(1.1);}
-        @media(max-width:768px){.page-wrap{padding:90px 16px 40px;}.product-sections{padding:0 16px 60px;}.product-layout{grid-template-columns:1fr;gap:24px;}footer{padding:30px 24px;flex-direction:column;text-align:center;}}
+        .pdp-sticky-atc{display:none;}
+        .pdp-sticky-atc__live{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+        @media(max-width:768px){
+          .page-wrap{padding:90px 16px 40px;padding-bottom:calc(88px + env(safe-area-inset-bottom, 0px));}
+          .product-sections{padding:0 16px 60px;padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px));}
+          .product-layout{grid-template-columns:1fr;gap:24px;}
+          footer{padding:30px 24px;flex-direction:column;text-align:center;}
+          .pdp-sticky-atc{
+            display:flex;position:fixed;left:0;right:0;bottom:0;z-index:10001;
+            align-items:center;justify-content:space-between;gap:12px;
+            min-height:56px;padding:10px 16px;padding-bottom:max(10px, env(safe-area-inset-bottom, 0px));
+            background:#111111;color:#FFFFFF;box-shadow:0 -4px 20px rgba(0,0,0,0.18);
+          }
+          .pdp-sticky-atc__price{font-family:var(--font-display);font-size:18px;font-weight:800;color:#C4B5FD;white-space:nowrap;}
+          .pdp-sticky-atc__btn{
+            flex:1;max-width:240px;min-height:44px;border:none;border-radius:8px;
+            background:#5B21B6;color:#FFFFFF;font-size:14px;font-weight:700;cursor:pointer;
+          }
+          .pdp-sticky-atc__btn.added{background:#16A34A;}
+          .pdp-sticky-atc__btn:disabled{background:#9CA3AF;cursor:not-allowed;}
+        }
       `}</style>
 
       <Navbar cartCount={itemCount} cta="cart" />
@@ -471,11 +526,13 @@ export default function ProductDetail({
                   getNowMs={getNowMs}
                 />
                 <div className="meta-row">
-                  <span className="meta-pill">📦 {product.stock || t("pd_stock_fallback", "In Stock")}</span>
+                  <span className="meta-pill" data-stock-badge="1">{stockBadgeLabel(product.stock)}</span>
                   {canPurchase ? (
                     <>
                       <span className="meta-pill">🚚 {t("pd_pill_delivery", "Fast Delivery")}</span>
-                      <span className="meta-pill">⚡ {t("pd_pill_active", "Active within 1 hour")}</span>
+                      {isDigital ? (
+                        <span className="meta-pill" data-activation-badge="1">⚡ {t("pd_pill_active", "Active within 1 hour")}</span>
+                      ) : null}
                     </>
                   ) : (
                     <span className="meta-pill" data-testid="seasonal-archive-meta">
@@ -484,20 +541,25 @@ export default function ProductDetail({
                   )}
                   <span className="meta-pill">✅ {t("pd_pill_uk", "UK Based")}</span>
                 </div>
-                {canPurchase ? (
-                  <div className="activation-note">
+                {canPurchase && isDigital ? (
+                  <div className="activation-note" data-activation-note="1">
                     {fillVars(t("pd_activation", "Subscription services are active within 1 hour of payment confirmation. Need help? WhatsApp {phone} or Telegram {telegram}."), vars)}
                   </div>
                 ) : null}
                 {canPurchase ? (
                   <button
-                    className="add-btn"
-                    style={{background: isInCart ? (hovering ? "#DC2626" : "#16A34A") : "#5B21B6", cursor: isInCart && !hovering ? "default" : "pointer", transform: "none"}}
+                    className={`add-btn${added ? " added" : ""}`}
+                    data-pdp-atc="inline"
+                    style={{background: isInCart ? (hovering ? "#DC2626" : "#16A34A") : (added ? "#16A34A" : "#5B21B6"), cursor: isInCart && !hovering ? "default" : "pointer", transform: "none"}}
                     onMouseEnter={() => isInCart && setHovering(true)}
                     onMouseLeave={() => setHovering(false)}
                     onClick={() => isInCart ? removeFromCart(product!.id) : handleAdd()}
                   >
-                    {isInCart ? (hovering ? t("pd_remove", "Remove from Cart") : t("pd_added", "Added to Cart!")) : t("pd_add_cart", "Add to Cart →")}
+                    {added && !isInCart
+                      ? "✅ Added!"
+                      : isInCart
+                        ? (hovering ? t("pd_remove", "Remove from Cart") : t("pd_added", "Added to Cart!"))
+                        : t("pd_add_cart", "Add to Cart →")}
                   </button>
                 ) : (
                   <button
@@ -565,6 +627,37 @@ export default function ProductDetail({
           />
         </div>
       )}
+      {product ? (
+        <div
+          className="pdp-sticky-atc"
+          data-pdp-sticky-atc-bar="1"
+          role="region"
+          aria-label="Add to cart"
+        >
+          <div className="pdp-sticky-atc__price">£{Number(product.price).toFixed(2)}</div>
+          {canPurchase ? (
+            <button
+              type="button"
+              className={`pdp-sticky-atc__btn${added || isInCart ? " added" : ""}`}
+              data-pdp-atc="sticky"
+              onClick={() => (isInCart ? removeFromCart(product.id) : handleAdd())}
+            >
+              {added && !isInCart
+                ? "✅ Added!"
+                : isInCart
+                  ? t("pd_added", "Added to Cart!")
+                  : t("pd_add_cart", "Add to Cart →")}
+            </button>
+          ) : (
+            <button type="button" className="pdp-sticky-atc__btn" disabled>
+              {phase === "upcoming" ? "Purchasing opens soon" : "Offer not available to purchase"}
+            </button>
+          )}
+          <div className="pdp-sticky-atc__live" aria-live="polite" aria-atomic="true">
+            {added ? "Added to cart" : ""}
+          </div>
+        </div>
+      ) : null}
         <Footer />
 
     </>

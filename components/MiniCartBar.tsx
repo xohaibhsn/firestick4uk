@@ -17,19 +17,39 @@ export function shouldHideMiniCartBar(pathname: string | null): boolean {
 }
 
 const BAR_VISIBLE_ATTR = "data-minicart-bar";
+const PDP_STICKY_ATC_ATTR = "data-pdp-sticky-atc";
 
 export default function MiniCartBar() {
   const pathname = usePathname();
   const { cart, total, itemCount, lastAddedAt } = useCart();
   const [mounted, setMounted] = useState(false);
   const [announce, setAnnounce] = useState("");
+  const [pdpStickyAtc, setPdpStickyAtc] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Hide mini-cart while PDP sticky Add-to-Cart bar is active (avoids tap intercept).
+  useEffect(() => {
+    const sync = () => {
+      setPdpStickyAtc(
+        document.body.classList.contains("pdp-sticky-atc-visible") ||
+          document.documentElement.getAttribute(PDP_STICKY_ATC_ATTR) === "1"
+      );
+    };
+    sync();
+    const obs = new MutationObserver(sync);
+    obs.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: [PDP_STICKY_ATC_ATTR],
+    });
+    return () => obs.disconnect();
+  }, []);
+
   const hide = shouldHideMiniCartBar(pathname);
-  const visible = mounted && !hide && itemCount > 0;
+  const visible = mounted && !hide && itemCount > 0 && !pdpStickyAtc;
 
   // Coupons are not applied in the bar — /cart is the source of truth for discounts.
   const { classification } = useCartClassification({

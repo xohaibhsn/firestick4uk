@@ -59,6 +59,8 @@ export default function ProductsClient({
   const [sort, setSort] = useState("featured");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
   const contact = useContactConfig();
   const { t } = useSiteContent();
   const vars = { phone: contact.phone, telegram: contact.telegram };
@@ -69,6 +71,10 @@ export default function ProductsClient({
   const [searchActive, setSearchActive] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const { addToCart, removeFromCart, cart, itemCount } = useCart();
+
+  useEffect(() => {
+    setFiltersHydrated(true);
+  }, []);
 
   const fetchProducts = useCallback((cat = filter, s = sort, mn = minPrice, mx = maxPrice) => {
     setLoading(true);
@@ -104,7 +110,13 @@ export default function ProductsClient({
   }, []);
 
   const handleAddToCart = (p: Product) => {
-    addToCart({ id: p.id, name: p.name, price: Number(p.price), qty: 1 });
+    addToCart({
+      id: p.id,
+      name: p.name,
+      price: Number(p.price),
+      qty: 1,
+      image: p.image || undefined,
+    });
     setAdded(p.id);
     setTimeout(() => setAdded(null), 1500);
   };
@@ -143,9 +155,12 @@ export default function ProductsClient({
         .activation-banner { max-width:1300px; margin:0 auto 24px; padding:0 60px; }
         .activation-banner-inner { background:#F5F3FF; border:1px solid #DDD6FE; border-radius:14px; padding:14px 18px; color:#444444; font-size:14px; line-height:1.6; }
         .filters { max-width:1300px; margin:0 auto; padding:0 60px 30px; display:flex; gap:10px; flex-wrap:wrap; }
-        .filter-btn { padding:8px 20px; border-radius:30px; border:1px solid #E5E5E5; background:#F5F5F5; color:#111111; font-size:13px; cursor:pointer; transition:all 0.2s; }
+        .filter-btn { padding:10px 20px; min-height:44px; min-width:44px; border-radius:30px; border:1px solid #E5E5E5; background:#F5F5F5; color:#111111; font-size:13px; cursor:pointer; transition:all 0.2s; }
         .filter-btn:hover { border-color:#5B21B6; color:#5B21B6; }
         .filter-btn.active { background:#5B21B6; color:#FFFFFF; border-color:transparent; }
+        .filters-toolbar { max-width:1300px; margin:0 auto; padding:0 60px 20px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+        .filters-mobile-toggle { display:none; }
+        .filters-collapsible { display:flex; flex-wrap:wrap; gap:12px; align-items:center; width:100%; }
         .products-grid { max-width:1300px; margin:0 auto; padding:0 60px 80px; display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:22px; }
         .product-card { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:12px; overflow:hidden; transition:all 0.3s; position:relative; box-shadow:0 2px 8px rgba(0,0,0,0.06); min-width:0; }
         @keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
@@ -188,16 +203,28 @@ export default function ProductsClient({
           .hamburger{display:flex;}
           .page-header{padding:32px 16px 20px;}
           .activation-banner{padding:0 16px;margin-bottom:18px;}
-          .filters{padding:0 16px 16px;}
+          .filters-toolbar{padding:0 16px 12px;}
+          .filters-mobile-toggle{
+            display:inline-flex;align-items:center;justify-content:space-between;gap:8px;
+            width:100%;min-height:44px;padding:10px 14px;border-radius:10px;
+            border:1px solid #E5E5E5;background:#FFFFFF;color:#111111;font-size:14px;font-weight:600;cursor:pointer;
+          }
+          .filters-collapsible{display:none;padding-top:8px;}
+          .filters-collapsible.is-open{display:flex;}
+          .filters{padding:0;width:100%;}
           .products-grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:0 12px 50px;}
           .product-info{padding:10px 12px;}
           .product-name{font-size:12px;}
           .product-desc,.product-short-desc{font-size:11px;margin-bottom:8px;-webkit-line-clamp:2;}
           .product-short-desc p{font-size:11px;}
           .product-price{font-size:14px;}
-          .add-btn{padding:7px 10px;font-size:11px;}
+          .add-btn{padding:7px 10px;font-size:11px;min-height:44px;}
           .badge{font-size:9px;padding:3px 7px;top:6px;right:6px;}
           footer{padding:36px 24px;flex-direction:column;text-align:center;}
+        }
+        @media(min-width:769px){
+          .filters-mobile-toggle{display:none !important;}
+          .filters-collapsible{display:flex !important;}
         }
       `}</style>
 
@@ -246,24 +273,42 @@ export default function ProductsClient({
           </div>
         </div>
 
-        {/* Filters + Sort */}
-        <div style={{maxWidth:1300,margin:"0 auto",padding:"0 60px 20px",display:"flex",flexWrap:"wrap",gap:12,alignItems:"center"}}>
-          <div className="filters" style={{margin:0,padding:0,flex:1,minWidth:200}}>
-            {["All","Subscription","Device","Bundle"].map(cat => (
-              <button key={cat} className={`filter-btn ${filter===cat?"active":""}`} onClick={()=>applyFilter(cat)}>{cat === "All" ? t("products_filter_all", "All") : cat}</button>
-            ))}
-          </div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-            <input type="number" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none"}} placeholder={t("products_min_ph", "Min £")} value={minPrice} onChange={e=>setMinPrice(e.target.value)} />
-            <span style={{color:"rgba(255,255,255,0.3)",fontSize:13}}>—</span>
-            <input type="number" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none"}} placeholder={t("products_max_ph", "Max £")} value={maxPrice} onChange={e=>setMaxPrice(e.target.value)} />
-            <button style={{background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",color:"#5B21B6",padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600}} onClick={applyPrice}>{t("products_apply", "Apply")}</button>
-            <select style={{background:"rgba(13,0,20,0.9)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none",cursor:"pointer"}} value={sort} onChange={e=>applySort(e.target.value)}>
-              <option value="featured">{t("products_sort_featured", "Featured")}</option>
-              <option value="price_asc">{t("products_sort_low", "Price: Low → High")}</option>
-              <option value="price_desc">{t("products_sort_high", "Price: High → Low")}</option>
-              <option value="newest">{t("products_sort_newest", "Newest")}</option>
-            </select>
+        {/* Filters + Sort — chips/sort remain in SSR HTML; mobile collapse is CSS + client toggle */}
+        <div className="filters-toolbar" data-filters-toolbar="1">
+          {filtersHydrated ? (
+            <button
+              type="button"
+              className="filters-mobile-toggle"
+              aria-expanded={filtersOpen}
+              aria-controls="products-filters-panel"
+              onClick={() => setFiltersOpen((v) => !v)}
+            >
+              <span>Filters</span>
+              <span aria-hidden="true">{filtersOpen ? "▲" : "▼"}</span>
+            </button>
+          ) : null}
+          <div
+            id="products-filters-panel"
+            className={`filters-collapsible${filtersOpen ? " is-open" : ""}`}
+            data-filters-panel="1"
+          >
+            <div className="filters" style={{margin:0,padding:0,flex:1,minWidth:200}}>
+              {["All","Subscription","Device","Bundle"].map(cat => (
+                <button key={cat} type="button" className={`filter-btn ${filter===cat?"active":""}`} onClick={()=>applyFilter(cat)}>{cat === "All" ? t("products_filter_all", "All") : cat}</button>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+              <input type="number" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none",minHeight:44}} placeholder={t("products_min_ph", "Min £")} value={minPrice} onChange={e=>setMinPrice(e.target.value)} />
+              <span style={{color:"rgba(255,255,255,0.3)",fontSize:13}}>—</span>
+              <input type="number" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none",minHeight:44}} placeholder={t("products_max_ph", "Max £")} value={maxPrice} onChange={e=>setMaxPrice(e.target.value)} />
+              <button type="button" style={{background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",color:"#5B21B6",padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600,minHeight:44}} onClick={applyPrice}>{t("products_apply", "Apply")}</button>
+              <select style={{background:"rgba(13,0,20,0.9)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none",cursor:"pointer",minHeight:44}} value={sort} onChange={e=>applySort(e.target.value)}>
+                <option value="featured">{t("products_sort_featured", "Featured")}</option>
+                <option value="price_asc">{t("products_sort_low", "Price: Low → High")}</option>
+                <option value="price_desc">{t("products_sort_high", "Price: High → Low")}</option>
+                <option value="newest">{t("products_sort_newest", "Newest")}</option>
+              </select>
+            </div>
           </div>
         </div>
 

@@ -6,6 +6,8 @@ import { useSiteContent } from "@/hooks/useSiteContent";
 export default function WhatsAppButton() {
   const { sc } = useSiteContent();
   const [offsetForMiniCart, setOffsetForMiniCart] = useState(false);
+  const [hideForConsent, setHideForConsent] = useState(false);
+  const [hideForStickyCheckout, setHideForStickyCheckout] = useState(false);
 
   const config = useMemo(
     () => ({
@@ -18,12 +20,20 @@ export default function WhatsAppButton() {
     [sc]
   );
 
-  // Offset only after mount when mini-cart bar is visible (no SSR class change)
+  // Offset / hide after mount from body/html markers (no SSR class change)
   useEffect(() => {
     const sync = () => {
       setOffsetForMiniCart(
         document.body.classList.contains("minicart-bar-visible") ||
           document.documentElement.getAttribute("data-minicart-bar") === "1"
+      );
+      setHideForConsent(
+        document.body.classList.contains("consent-banner-visible") ||
+          document.documentElement.getAttribute("data-consent-banner") === "1"
+      );
+      setHideForStickyCheckout(
+        document.body.classList.contains("sticky-checkout-bar-visible") ||
+          document.documentElement.getAttribute("data-sticky-checkout") === "1"
       );
     };
     sync();
@@ -34,12 +44,17 @@ export default function WhatsAppButton() {
     });
     obs.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["data-minicart-bar"],
+      attributeFilter: [
+        "data-minicart-bar",
+        "data-consent-banner",
+        "data-sticky-checkout",
+      ],
     });
     return () => obs.disconnect();
   }, []);
 
   const whatsappUrl = `https://wa.me/${config.number}`;
+  const hidden = hideForConsent || hideForStickyCheckout;
 
   return (
     <>
@@ -55,13 +70,23 @@ export default function WhatsAppButton() {
           align-items: center;
           justify-content: center;
           box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          z-index: 9999;
+          z-index: 9997;
           cursor: pointer;
           overflow: hidden;
         }
         /* Stack WhatsApp above the mini-cart bar (bar ~56px + gap) */
         .wa-float.wa-float--above-minicart {
           bottom: 88px;
+        }
+        /* Cart page: lift above coupon / summary CTAs */
+        .wa-float.wa-float--cart-page {
+          bottom: 96px;
+        }
+        .wa-float.wa-float--above-minicart.wa-float--cart-page {
+          bottom: 120px;
+        }
+        .wa-float.wa-float--hidden {
+          display: none !important;
         }
         @media (prefers-reduced-motion: reduce) {
           .wa-float {
@@ -73,15 +98,21 @@ export default function WhatsAppButton() {
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className={
-          offsetForMiniCart
-            ? "wa-float wa-float--above-minicart"
-            : "wa-float"
-        }
+        className={[
+          "wa-float",
+          offsetForMiniCart ? "wa-float--above-minicart" : "",
+          "wa-float--cart-aware",
+          hidden ? "wa-float--hidden" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         style={{
           background: config.iconUrl ? "transparent" : "#25D366",
         }}
         title={config.title}
+        aria-hidden={hidden ? true : undefined}
+        tabIndex={hidden ? -1 : undefined}
+        data-wa-hidden={hidden ? "1" : "0"}
       >
         {config.iconUrl ? (
           <img
@@ -100,6 +131,15 @@ export default function WhatsAppButton() {
           </svg>
         )}
       </a>
+      <style>{`
+        /* On cart route, lift WA so it clears coupon Apply / summary CTAs */
+        body[data-cart-page="1"] .wa-float.wa-float--cart-aware:not(.wa-float--hidden) {
+          bottom: 96px;
+        }
+        body[data-cart-page="1"] .wa-float.wa-float--above-minicart.wa-float--cart-aware:not(.wa-float--hidden) {
+          bottom: 120px;
+        }
+      `}</style>
     </>
   );
 }

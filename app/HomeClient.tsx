@@ -181,7 +181,13 @@ export default function HomeClient({
   }, [cmsData]);
 
   const handleAddToCart = (p: Product) => {
-    addToCart({ id: p.id, name: p.name, price: Number(p.price), qty: 1 });
+    addToCart({
+      id: p.id,
+      name: p.name,
+      price: Number(p.price),
+      qty: 1,
+      image: p.image || undefined,
+    });
   };
 
   const publishedReviews = getPublishableHomeTestimonials(sec.home_testimonials?.items);

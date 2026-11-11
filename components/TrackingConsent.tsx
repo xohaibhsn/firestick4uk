@@ -175,6 +175,22 @@ export default function TrackingConsent() {
     }
   }, []);
 
+  // Signal consent banner for float collision avoidance (client-only; no SSR).
+  useEffect(() => {
+    if (!hydrated) return;
+    if (bannerVisible) {
+      document.body.classList.add("consent-banner-visible");
+      document.documentElement.setAttribute("data-consent-banner", "1");
+    } else {
+      document.body.classList.remove("consent-banner-visible");
+      document.documentElement.removeAttribute("data-consent-banner");
+    }
+    return () => {
+      document.body.classList.remove("consent-banner-visible");
+      document.documentElement.removeAttribute("data-consent-banner");
+    };
+  }, [hydrated, bannerVisible]);
+
   const openDialog = useCallback((fromPreference?: TrackingConsentPreference | null) => {
     const base = fromPreference ?? readTrackingConsent();
     setDraftAnalytics(base?.analytics ?? false);

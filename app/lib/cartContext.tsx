@@ -61,7 +61,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const addToCart = (item: CartItem) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id);
-      if (existing) return prev.map(i => i.id === item.id ? { ...i, qty: i.qty + 1 } : i);
+      if (existing) {
+        return prev.map(i =>
+          i.id === item.id
+            ? {
+                ...i,
+                qty: i.qty + 1,
+                image: i.image || item.image,
+              }
+            : i
+        );
+      }
       return [...prev, { ...item, qty: 1 }];
     });
     setLastAddedAt(Date.now());

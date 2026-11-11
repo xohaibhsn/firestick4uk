@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "../lib/cartContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import CopyButton from "@/components/CopyButton";
 import { useContactConfig } from "@/hooks/useContactConfig";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import {
@@ -92,8 +93,42 @@ const navStyles = `
   .cart-item-price { font-size:17px; font-weight:700; color:#5B21B6; font-family:var(--font-display); }
   .cart-item-actions { display:flex; flex-direction:column; align-items:flex-end; gap:12px; }
   .qty-control { display:flex; align-items:center; gap:10px; }
-  .qty-btn { width:32px; height:32px; border-radius:50%; border:1px solid #E5E5E5; background:#F5F5F5; color:#111111; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
+  .qty-btn { width:44px; height:44px; min-width:44px; min-height:44px; border-radius:50%; border:1px solid #E5E5E5; background:#F5F5F5; color:#111111; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
   .qty-btn:hover { background:#5B21B6; color:#FFFFFF; border-color:#5B21B6; }
+  .cart-item-image img { width:100%; height:100%; object-fit:cover; border-radius:10px; display:block; }
+  .copy-btn-wrap { display:inline-flex; align-items:center; gap:8px; }
+  .copy-btn { min-height:44px; min-width:44px; padding:6px 12px; border-radius:8px; border:1px solid #DDD6FE; background:#F5F3FF; color:#5B21B6; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .copy-btn:hover, .copy-btn:focus-visible { border-color:#5B21B6; outline:2px solid #5B21B6; outline-offset:2px; }
+  .copy-btn-live { font-size:11px; color:#16A34A; min-width:3.5em; }
+  .bank-row-value { display:flex; align-items:center; gap:10px; color:#111111; font-weight:600; }
+  .checkout-steps { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 18px; font-size:12px; letter-spacing:0.04em; text-transform:uppercase; color:#888888; }
+  .checkout-steps span { color:#888888; }
+  .checkout-steps .step-current { color:#5B21B6; font-weight:700; }
+  .checkout-steps .step-done { color:#16A34A; font-weight:600; }
+  .checkout-btn.preparing { opacity:0.75; cursor:wait; }
+  .checkout-btn.preparing::after { content:""; display:inline-block; width:12px; height:12px; margin-left:8px; border:2px solid rgba(255,255,255,0.35); border-top-color:#fff; border-radius:50%; vertical-align:-1px; animation:cartPrepSpin 0.7s linear infinite; }
+  @keyframes cartPrepSpin { to { transform:rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .checkout-btn.preparing::after { animation:none; opacity:0.5; }
+  }
+  .sticky-place-order {
+    display:none;
+  }
+  @media (max-width:900px) {
+    .sticky-place-order {
+      display:flex; position:fixed; left:0; right:0; bottom:0; z-index:10001;
+      align-items:center; justify-content:space-between; gap:12px;
+      padding:10px 16px; padding-bottom:max(10px, env(safe-area-inset-bottom, 0px));
+      background:#111111; color:#FFFFFF; box-shadow:0 -4px 20px rgba(0,0,0,0.18);
+    }
+    .sticky-place-order.is-keyboard-hidden { display:none; }
+    .sticky-place-order__total { font-size:14px; font-weight:600; white-space:nowrap; }
+    .sticky-place-order__total strong { color:#C4B5FD; font-size:16px; }
+    .sticky-place-order .place-order-btn { margin:0; width:auto; flex:1; max-width:220px; padding:12px 14px; font-size:13px; }
+    .checkout-section { padding-bottom:calc(88px + env(safe-area-inset-bottom, 0px)); }
+    .bank-details { padding-bottom:24px; margin-right:72px; }
+    .order-summary { padding-bottom:8px; }
+  }
   .qty-num { font-size:16px; font-weight:700; color:#111111; min-width:20px; text-align:center; }
   .remove-btn { background:none; border:none; color:#CCCCCC; font-size:13px; cursor:pointer; transition:color 0.2s; }
   .remove-btn:hover { color:#DC2626; }
@@ -280,6 +315,47 @@ export default function CartPage() {
   const [ackError, setAckError] = useState("");
   const digitalAckRef = useRef<HTMLInputElement | null>(null);
   const digitalAckId = useId();
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  // Mark cart page for WA float clearance (coupon / CTAs).
+  useEffect(() => {
+    document.body.setAttribute("data-cart-page", "1");
+    return () => {
+      document.body.removeAttribute("data-cart-page");
+    };
+  }, []);
+
+  // Soft-keyboard heuristic: hide sticky Place Order while a field is focused
+  // (visualViewport not available in all environments — documented limitation).
+  useEffect(() => {
+    if (step !== "checkout") {
+      setKeyboardOpen(false);
+      return;
+    }
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      const tag = t.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+        setKeyboardOpen(true);
+      }
+    };
+    const onFocusOut = () => {
+      window.setTimeout(() => {
+        const active = document.activeElement as HTMLElement | null;
+        const tag = active?.tagName;
+        if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT") {
+          setKeyboardOpen(false);
+        }
+      }, 50);
+    };
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+    };
+  }, [step]);
 
   useEffect(() => {
     let cancelled = false;
@@ -372,6 +448,37 @@ export default function CartPage() {
 
   const effectiveDigitalAck =
     classification.hasDigitalItems && digitalSupplyAcknowledged;
+
+  // COD only when classification ready AND cart has physical items.
+  // While pending: hide COD (no flash of wrong option on digital-only carts).
+  const showCodOption =
+    classification.ready && classification.hasPhysicalItems === true;
+  const digitalOnlyCart =
+    classification.ready &&
+    classification.hasDigitalItems &&
+    !classification.hasPhysicalItems;
+
+  useEffect(() => {
+    if (!showCodOption && paymentMethod === "cod") {
+      setPaymentMethod("bank");
+    }
+  }, [showCodOption, paymentMethod]);
+
+  // Signal sticky checkout bar for WA float hide (mobile checkout only).
+  useEffect(() => {
+    const stickyActive = step === "checkout" && !keyboardOpen;
+    if (stickyActive) {
+      document.body.classList.add("sticky-checkout-bar-visible");
+      document.documentElement.setAttribute("data-sticky-checkout", "1");
+    } else {
+      document.body.classList.remove("sticky-checkout-bar-visible");
+      document.documentElement.removeAttribute("data-sticky-checkout");
+    }
+    return () => {
+      document.body.classList.remove("sticky-checkout-bar-visible");
+      document.documentElement.removeAttribute("data-sticky-checkout");
+    };
+  }, [step, keyboardOpen]);
 
   const shipping =
     cart.length === 0
@@ -600,6 +707,13 @@ export default function CartPage() {
         <div className="page-header">
           <div className="section-tag">✦ {step === "cart" ? t("cart_tag", "Your Cart") : t("checkout_tag", "Checkout")}</div>
           <h1 className="page-title">{step === "cart" ? t("cart_title", "My Cart") : t("checkout_title", "Complete Order")}</h1>
+          <div className="checkout-steps" aria-label="Checkout progress" data-checkout-steps="1">
+            <span className={step === "cart" ? "step-current" : "step-done"}>Cart</span>
+            <span aria-hidden="true">→</span>
+            <span className={step === "checkout" ? "step-current" : step === "success" ? "step-done" : ""}>Checkout</span>
+            <span aria-hidden="true">→</span>
+            <span className={step === "success" ? "step-current" : ""}>Done</span>
+          </div>
         </div>
 
         {step === "cart" && (
@@ -615,16 +729,22 @@ export default function CartPage() {
               ) : (
                 cart.map(item => (
                   <div className="cart-item" key={item.id}>
-                    <div className="cart-item-image">📦</div>
+                    <div className="cart-item-image">
+                      {item.image ? (
+                        <img src={item.image} alt="" loading="lazy" />
+                      ) : (
+                        "📦"
+                      )}
+                    </div>
                     <div className="cart-item-details">
                       <div className="cart-item-name">{item.name}</div>
                       <div className="cart-item-price">£{(item.price * item.qty).toFixed(2)}</div>
                     </div>
                     <div className="cart-item-actions">
                       <div className="qty-control">
-                        <button className="qty-btn" onClick={() => updateQty(item.id, -1)}>−</button>
+                        <button type="button" className="qty-btn" aria-label="Decrease quantity" onClick={() => updateQty(item.id, -1)}>−</button>
                         <span className="qty-num">{item.qty}</span>
-                        <button className="qty-btn" onClick={() => updateQty(item.id, 1)}>+</button>
+                        <button type="button" className="qty-btn" aria-label="Increase quantity" onClick={() => updateQty(item.id, 1)}>+</button>
                       </div>
                       <button className="remove-btn" onClick={() => removeFromCart(item.id)}>✕ {t("cart_remove", "Remove")}</button>
                     </div>
@@ -644,14 +764,19 @@ export default function CartPage() {
               </div>
               {/* Coupon input */}
               <div style={{padding:"0 20px 16px"}}>
-                <div style={{display:"flex",gap:8,marginBottom:6}}>
+                <div style={{display:"flex",gap:8,marginBottom:6}} className="coupon-row">
                   <input style={{flex:1,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"8px 12px",color:"white",fontSize:13,outline:"none"}} placeholder={t("cart_coupon_ph", "Coupon code")} value={couponCode} onChange={e=>setCouponCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&applyCoupon()} />
-                  <button style={{background:"rgba(139,0,255,0.2)",border:"1px solid rgba(139,0,255,0.4)",color:"#5B21B6",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,whiteSpace:"nowrap"}} onClick={applyCoupon} disabled={couponChecking}>{couponChecking?"...":t("cart_apply", "Apply")}</button>
+                  <button type="button" style={{background:"rgba(139,0,255,0.2)",border:"1px solid rgba(139,0,255,0.4)",color:"#5B21B6",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,whiteSpace:"nowrap",minHeight:44,minWidth:44}} onClick={applyCoupon} disabled={couponChecking}>{couponChecking?"...":t("cart_apply", "Apply")}</button>
                 </div>
                 {couponApplied && <div style={{fontSize:12,color:"#00c864"}}>✅ {couponApplied.message} — Save £{discountAmount.toFixed(2)}</div>}
                 {couponError && <div style={{fontSize:12,color:"#ff6666"}}>❌ {couponError}</div>}
               </div>
-              <button className="checkout-btn" disabled={cart.length === 0 || classificationBlocked} onClick={() => setStep("checkout")}>
+              <button
+                className={`checkout-btn${classificationLoading ? " preparing" : ""}`}
+                disabled={cart.length === 0 || classificationBlocked}
+                aria-busy={classificationLoading ? true : undefined}
+                onClick={() => setStep("checkout")}
+              >
                 {classificationLoading
                   ? "Preparing checkout..."
                   : t("cart_checkout_btn", "Proceed to Checkout →")}
@@ -672,62 +797,137 @@ export default function CartPage() {
                 <div className="form-section">
                   <h3>{t("cart_details", "Your Details")}</h3>
                   {[
-                    {label: t("cart_lbl_name", "Full Name"), key:"name", type:"text", placeholder:"John Smith"},
-                    {label: t("cart_lbl_email", "Email Address"), key:"email", type:"email", placeholder:"john@example.com"},
-                    {label: t("cart_lbl_phone", "WhatsApp / Phone"), key:"phone", type:"tel", placeholder:contact.phone},
-                    {label: t("cart_lbl_address", "Delivery Address"), key:"address", type:"text", placeholder:"123 High Street"},
+                    {label: t("cart_lbl_name", "Full Name"), key:"name", type:"text", placeholder:"John Smith", name:"name", autoComplete:"name", inputMode: undefined as string | undefined, autoCapitalize:"words", enterKeyHint:"next"},
+                    {label: t("cart_lbl_email", "Email Address"), key:"email", type:"email", placeholder:"john@example.com", name:"email", autoComplete:"email", inputMode:"email", autoCapitalize:"off", enterKeyHint:"next"},
+                    {label: t("cart_lbl_phone", "WhatsApp / Phone"), key:"phone", type:"tel", placeholder:contact.phone, name:"tel", autoComplete:"tel", inputMode:"tel", autoCapitalize:"off", enterKeyHint:"next"},
+                    {label: t("cart_lbl_address", "Delivery Address"), key:"address", type:"text", placeholder:"123 High Street", name:"street-address", autoComplete:"street-address", inputMode: undefined, autoCapitalize:"sentences", enterKeyHint:"next"},
                   ].map(f => (
                     <div className="form-group" key={f.key}>
-                      <label>{f.label}</label>
-                      <input type={f.type} placeholder={f.placeholder}
+                      <label htmlFor={`checkout-${f.key}`}>{f.label}</label>
+                      <input
+                        id={`checkout-${f.key}`}
+                        type={f.type}
+                        name={f.name}
+                        autoComplete={f.autoComplete}
+                        inputMode={f.inputMode as "email" | "tel" | undefined}
+                        autoCapitalize={f.autoCapitalize}
+                        enterKeyHint={f.enterKeyHint as "next" | "done" | undefined}
+                        placeholder={f.placeholder}
                         value={(form as any)[f.key]}
-                        onChange={e => setForm({...form, [f.key]: e.target.value})} />
+                        onChange={e => setForm({...form, [f.key]: e.target.value})}
+                      />
                     </div>
                   ))}
                   <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px"}}>
                     <div className="form-group">
-                      <label>{t("cart_lbl_city", "City")}</label>
-                      <input type="text" placeholder="London" value={form.city} onChange={e => setForm({...form, city: e.target.value})} />
+                      <label htmlFor="checkout-city">{t("cart_lbl_city", "City")}</label>
+                      <input
+                        id="checkout-city"
+                        type="text"
+                        name="address-level2"
+                        autoComplete="address-level2"
+                        autoCapitalize="words"
+                        enterKeyHint="next"
+                        placeholder="London"
+                        value={form.city}
+                        onChange={e => setForm({...form, city: e.target.value})}
+                      />
                     </div>
                     <div className="form-group">
-                      <label>{t("cart_lbl_postcode", "Postcode")}</label>
-                      <input type="text" placeholder="SW1A 1AA" value={form.postcode} onChange={e => setForm({...form, postcode: e.target.value})} />
+                      <label htmlFor="checkout-postcode">{t("cart_lbl_postcode", "Postcode")}</label>
+                      <input
+                        id="checkout-postcode"
+                        type="text"
+                        name="postal-code"
+                        autoComplete="postal-code"
+                        autoCapitalize="characters"
+                        enterKeyHint="next"
+                        placeholder="SW1A 1AA"
+                        value={form.postcode}
+                        onChange={e => setForm({...form, postcode: e.target.value})}
+                      />
                     </div>
                   </div>
                   <div className="form-group">
-                    <label>{t("cart_lbl_notes", "Order Notes (Optional)")}</label>
-                    <textarea placeholder="Any special instructions..." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
+                    <label htmlFor="checkout-notes">{t("cart_lbl_notes", "Order Notes (Optional)")}</label>
+                    <textarea
+                      id="checkout-notes"
+                      name="order-notes"
+                      enterKeyHint="done"
+                      placeholder="Any special instructions..."
+                      value={form.notes}
+                      onChange={e => setForm({...form, notes: e.target.value})}
+                    />
                   </div>
+                  <input type="hidden" name="country" autoComplete="country" value="GB" readOnly aria-hidden="true" />
                 </div>
               </div>
 
               <div>
                 <div className="form-section">
                   <h3>{t("cart_pay_heading", "Payment Method")}</h3>
-                  <div className="payment-options">
+                  <div className="payment-options" role="radiogroup" aria-label={t("cart_pay_heading", "Payment Method")}>
                     {[
-                      {val:"bank", label: t("cart_pay_bank", "Bank Transfer"), sub: t("cart_pay_bank_sub", "Transfer to our UK bank & upload receipt")},
-                      {val:"cod", label: t("cart_pay_cod", "Cash on Delivery"), sub: t("cart_pay_cod_sub", "Pay when your order arrives")},
+                      {val:"bank" as const, label: t("cart_pay_bank", "Bank Transfer"), sub: t("cart_pay_bank_sub", "Transfer to our UK bank & upload receipt")},
+                      ...(showCodOption
+                        ? [{val:"cod" as const, label: t("cart_pay_cod", "Cash on Delivery"), sub: t("cart_pay_cod_sub", "Pay when your order arrives")}]
+                        : []),
                     ].map(p => (
-                      <div key={p.val} className={`payment-option ${paymentMethod === p.val ? "selected" : ""}`} onClick={() => choosePaymentMethod(p.val as "bank" | "cod")}>
-                        <input type="radio" readOnly checked={paymentMethod === p.val} />
+                      <label
+                        key={p.val}
+                        className={`payment-option ${paymentMethod === p.val ? "selected" : ""}`}
+                        data-payment-option={p.val}
+                        data-digital-only={digitalOnlyCart ? "1" : "0"}
+                      >
+                        <input
+                          type="radio"
+                          name="payment_method"
+                          value={p.val}
+                          checked={paymentMethod === p.val}
+                          onChange={() => choosePaymentMethod(p.val)}
+                          aria-label={p.label}
+                        />
                         <div>
                           <div className="payment-option-label">{p.label}</div>
                           <div className="payment-option-sub">{p.sub}</div>
                         </div>
-                      </div>
+                      </label>
                     ))}
                   </div>
 
                   {paymentMethod === "bank" && (
                     <>
-                      <div className="bank-details">
+                      <div className="bank-details" data-bank-details="1">
                         <h4>{t("bank_heading", "Bank Account Details")}</h4>
-                        <div className="bank-row"><span>{t("bank_lbl_name", "Account Name")}</span><span>{t("bank_account_name", "Robert George Bennett")}</span></div>
-                        <div className="bank-row"><span>{t("bank_lbl_sort", "Sort Code")}</span><span>{t("bank_sort_code", "60-84-07")}</span></div>
-                        <div className="bank-row"><span>{t("bank_lbl_no", "Account No.")}</span><span>{t("bank_account_no", "70745518")}</span></div>
+                        <div className="bank-row">
+                          <span>{t("bank_lbl_name", "Account Name")}</span>
+                          <span className="bank-row-value">
+                            <span>{t("bank_account_name", "Robert George Bennett")}</span>
+                            <CopyButton value={t("bank_account_name", "Robert George Bennett")} label="Copy" />
+                          </span>
+                        </div>
+                        <div className="bank-row">
+                          <span>{t("bank_lbl_sort", "Sort Code")}</span>
+                          <span className="bank-row-value">
+                            <span>{t("bank_sort_code", "60-84-07")}</span>
+                            <CopyButton value={t("bank_sort_code", "60-84-07")} label="Copy" />
+                          </span>
+                        </div>
+                        <div className="bank-row">
+                          <span>{t("bank_lbl_no", "Account No.")}</span>
+                          <span className="bank-row-value">
+                            <span>{t("bank_account_no", "70745518")}</span>
+                            <CopyButton value={t("bank_account_no", "70745518")} label="Copy" />
+                          </span>
+                        </div>
                         <div className="bank-row"><span>{t("bank_lbl_ref", "Reference")}</span><span>{t("bank_reference_value", "Your name only")}</span></div>
-                        <div className="bank-row"><span>{t("bank_lbl_amount", "Amount")}</span><span>£{grandTotal.toFixed(2)}</span></div>
+                        <div className="bank-row">
+                          <span>{t("bank_lbl_amount", "Amount")}</span>
+                          <span className="bank-row-value">
+                            <span>£{grandTotal.toFixed(2)}</span>
+                            <CopyButton value={grandTotal.toFixed(2)} label="Copy" />
+                          </span>
+                        </div>
                       </div>
                       <div className="form-group">
                         <label>{t("bank_upload_label", "Upload Payment Receipt (Optional)")}</label>
@@ -876,9 +1076,12 @@ export default function CartPage() {
                     {" "}before placing your order.
                   </p>
 
-                  <button className="place-order-btn"
+                  <button
+                    className="place-order-btn place-order-btn--inline"
+                    data-place-order="inline"
                     disabled={placing || cart.length === 0 || classificationBlocked}
-                    onClick={handleOrder}>
+                    onClick={handleOrder}
+                  >
                     {placing ? t("cart_placing", "Placing Order...") : t("cart_place_order", "Place Order →")}
                   </button>
                   {orderError && (
@@ -902,6 +1105,24 @@ export default function CartPage() {
                   </button>
                 </div>
               </div>
+            </div>
+            <div
+              className={`sticky-place-order${keyboardOpen ? " is-keyboard-hidden" : ""}`}
+              data-sticky-place-order="1"
+              role="region"
+              aria-label="Place order"
+            >
+              <div className="sticky-place-order__total">
+                Total <strong>£{grandTotal.toFixed(2)}</strong>
+              </div>
+              <button
+                className="place-order-btn"
+                data-place-order="sticky"
+                disabled={placing || cart.length === 0 || classificationBlocked}
+                onClick={handleOrder}
+              >
+                {placing ? t("cart_placing", "Placing Order...") : t("cart_place_order", "Place Order →")}
+              </button>
             </div>
           </div>
         )}
