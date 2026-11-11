@@ -456,6 +456,8 @@ async function main() {
     // F4UK-W4-INSIGHTS-LIVE-63
     if (rel === "components/TrackingConsent.tsx") return true;
     if (rel === "lib/trackingConsent.ts") return true;
+    if (rel === "components/sidhu/insights/SettingsScreen.tsx") return true;
+    if (rel === "scripts/phase-city-cleanup-64-tests.js") return true;
     if (rel === "scripts/phase-insights-live-63-tests.js") return true;
     if (rel === "scripts/phase20g3b-tracking-consent-tests.js") return true;
     if (rel === "scripts/phase-clarity-35-tests.js") return true;

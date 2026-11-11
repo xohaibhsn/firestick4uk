@@ -226,6 +226,11 @@ ok(
 const ALLOWED = new Set([
   "components/TrackingConsent.tsx",
   "lib/trackingConsent.ts",
+  "lib/insightsClient.ts",
+  "components/SidhuInsightsBeacon.tsx",
+  "components/sidhu/insights/SettingsScreen.tsx",
+  "app/sidhu/page.tsx",
+  "scripts/phase-city-cleanup-64-tests.js",
   "scripts/phase-insights-live-63-tests.js",
   "scripts/phase20g3b-tracking-consent-tests.js",
   "scripts/phase-clarity-35-tests.js",

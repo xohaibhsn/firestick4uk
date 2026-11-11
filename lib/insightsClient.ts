@@ -75,6 +75,8 @@ export function isInsightsExcludedPath(path: string): boolean {
 
 export const INSIGHTS_VISITOR_KEY = "firestick_insights_vid_v1";
 export const INSIGHTS_SESSION_KEY = "firestick_insights_sid_v1";
+/** Admin-browser opt-out (localStorage). When "1", client sends no insights-collect requests. */
+export const INSIGHTS_OPTOUT_KEY = "firestick_insights_optout_v1";
 export const INSIGHTS_COLLECT_PATH = "/api/insights-collect";
 
 export const INSIGHTS_VISITOR_TTL_MS = 180 * 24 * 60 * 60 * 1000;
@@ -164,6 +166,28 @@ export function hasAnalyticsConsent(
   return preference?.analytics === true;
 }
 
+/** True when this browser has opted out of Insights (admin auto-exclude / Settings toggle). */
+export function hasInsightsOptOut(storage?: Storage | null): boolean {
+  try {
+    const store =
+      storage ||
+      (typeof window !== "undefined" ? window.localStorage : null);
+    if (!store) return false;
+    return store.getItem(INSIGHTS_OPTOUT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setInsightsOptOut(storage: Storage, excluded: boolean): void {
+  try {
+    if (excluded) storage.setItem(INSIGHTS_OPTOUT_KEY, "1");
+    else storage.removeItem(INSIGHTS_OPTOUT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Sec-GPC / navigator.globalPrivacyControl => treat as no recording. */
 export function hasGlobalPrivacyControl(nav?: {
   globalPrivacyControl?: boolean;
@@ -183,9 +207,11 @@ export function shouldRecordInsights(opts: {
   preference: { analytics?: boolean } | null | undefined;
   pathname: string;
   gpc?: boolean;
+  storage?: Storage | null;
 }): boolean {
   if (opts.gpc === true) return false;
   if (hasGlobalPrivacyControl()) return false;
+  if (hasInsightsOptOut(opts.storage)) return false;
   if (!hasAnalyticsConsent(opts.preference)) return false;
   if (isInsightsExcludedPath(opts.pathname || "/")) return false;
   return true;
@@ -638,7 +664,11 @@ export function createInsightsController(hooks: InsightsRuntimeHooks): InsightsC
 
   const transport = hooks.transport || sendInsightsPayload;
 
-  const networkAllowed = () => running && !stoppedFor204 && consecutive204 < INSIGHTS_CONSECUTIVE_204_STOP;
+  const networkAllowed = () =>
+    running &&
+    !stoppedFor204 &&
+    consecutive204 < INSIGHTS_CONSECUTIVE_204_STOP &&
+    !hasInsightsOptOut(hooks.localStorage);
 
   const clearFlushTimer = () => {
     if (flushTimer != null) {
@@ -791,7 +821,7 @@ export function createInsightsController(hooks: InsightsRuntimeHooks): InsightsC
       if (running) return;
       const pref = readTrackingConsent();
       const path = hooks.getPathname();
-      if (!shouldRecordInsights({ preference: pref, pathname: path })) return;
+      if (!shouldRecordInsights({ preference: pref, pathname: path, storage: hooks.localStorage })) return;
       running = true;
       stoppedFor204 = false;
       consecutive204 = 0;

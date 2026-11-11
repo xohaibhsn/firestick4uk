@@ -89,7 +89,7 @@ export default function SidhuInsightsBeacon() {
     const maybeStart = (preference: TrackingConsentPreference | null) => {
       const path = window.location.pathname || "/";
       const gpc = hasGlobalPrivacyControl();
-      if (!shouldRecordInsights({ preference, pathname: path, gpc })) {
+      if (!shouldRecordInsights({ preference, pathname: path, gpc, storage: window.localStorage })) {
         controller.stop({ dropQueue: true });
         return;
       }
@@ -269,7 +269,10 @@ export default function SidhuInsightsBeacon() {
     const pref = preferenceRef.current ?? readTrackingConsent();
     const gpc = hasGlobalPrivacyControl();
 
-    if (isInsightsExcludedPath(pathname) || !shouldRecordInsights({ preference: pref, pathname, gpc })) {
+    if (
+      isInsightsExcludedPath(pathname) ||
+      !shouldRecordInsights({ preference: pref, pathname, gpc, storage: window.localStorage })
+    ) {
       controller.stop({ dropQueue: true });
       return;
     }

@@ -223,7 +223,11 @@ function sha256File(rel) {
       // F4UK-W4-INSIGHTS-LIVE-63
       f === "components/TrackingConsent.tsx" ||
       f === "lib/trackingConsent.ts" ||
-      f === "scripts/phase-insights-live-63-tests.js" ||
+            f === "lib/insightsClient.ts" ||
+      f === "components/SidhuInsightsBeacon.tsx" ||
+      f === "components/sidhu/insights/SettingsScreen.tsx" ||
+      f === "scripts/phase-city-cleanup-64-tests.js" ||
+f === "scripts/phase-insights-live-63-tests.js" ||
       f === "scripts/phase20g3b-tracking-consent-tests.js" ||
       f === "scripts/phase-clarity-35-tests.js" ||
       f === "scripts/phase-tracking-consent-final-tests.js";

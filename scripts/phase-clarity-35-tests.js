@@ -512,9 +512,15 @@ ok(
     "app/order-tracking/page.tsx",
   ];
   for (const rel of pages) {
+    // Scope to Clarity-35 commit range only (base..clarity commit), not current HEAD.
     const diff = execFileSync(
       "git",
-      ["diff", "6292b55390318c2c55f31fa8cd17f5fa7cb034bd", "--", rel],
+      [
+        "diff",
+        "6292b55390318c2c55f31fa8cd17f5fa7cb034bd..af366135f8315a58579d0fa1f1752d0457a8ea36",
+        "--",
+        rel,
+      ],
       { cwd: ROOT, encoding: "utf8" }
     );
     const added = diff

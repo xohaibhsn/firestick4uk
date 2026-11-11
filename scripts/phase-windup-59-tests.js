@@ -64,6 +64,10 @@ const ALLOWLIST = new Set([
   "scripts/phase-cod-restore-54-tests.js",
   // F4UK-W4-INSIGHTS-LIVE-63 — consent copy + version bump
   "lib/trackingConsent.ts",
+  "scripts/phase-city-cleanup-64-tests.js",
+  "lib/insightsClient.ts",
+  "components/SidhuInsightsBeacon.tsx",
+  "components/sidhu/insights/SettingsScreen.tsx",
   "scripts/phase-insights-live-63-tests.js",
   "scripts/phase20g3b-tracking-consent-tests.js",
   "scripts/phase-clarity-35-tests.js",

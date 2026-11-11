@@ -823,6 +823,12 @@ export default function AdminPage() {
           setAdminName(res.name || "Admin");
           setAdminPrincipalType(res.principalType === "staff" ? "staff" : "master");
           setAdminEmail(res.email || null);
+          // F6: auto-exclude this admin browser from Insights (localStorage only).
+          try {
+            window.localStorage.setItem("firestick_insights_optout_v1", "1");
+          } catch {
+            /* ignore */
+          }
         } else {
           setLoggedIn(false);
         }

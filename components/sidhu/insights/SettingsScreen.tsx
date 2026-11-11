@@ -4,7 +4,12 @@
  * Insights Settings — super_admin only (panel hides the tab without insights.settings).
  * Recording must stay OFF until privacy text is approved.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  INSIGHTS_OPTOUT_KEY,
+  hasInsightsOptOut,
+  setInsightsOptOut,
+} from "@/lib/insightsClient";
 import type {
   InsightsGeoFileStatus,
   InsightsSettingsResponse,
@@ -195,6 +200,8 @@ function SettingsBody({
         </div>
       </div>
 
+      <ThisBrowserOptOutCard />
+
       <div style={S.card}>
         <h3 style={S.cardTitle}>Change settings</h3>
         {BOOL_FIELDS.map((f) => (
@@ -344,6 +351,48 @@ function SettingsBody({
         )}
       </div>
     </>
+  );
+}
+
+function ThisBrowserOptOutCard() {
+  const [excluded, setExcluded] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      setExcluded(hasInsightsOptOut(window.localStorage));
+    } catch {
+      setExcluded(false);
+    }
+    setReady(true);
+  }, []);
+
+  const toggle = () => {
+    try {
+      const next = !excluded;
+      setInsightsOptOut(window.localStorage, next);
+      setExcluded(next);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <div style={S.card}>
+      <h3 style={S.cardTitle}>This browser</h3>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontWeight: 600 }}>
+          {ready ? (excluded ? "Excluded" : "Included") : "…"}
+        </span>
+        <button type="button" style={S.btnGhost} onClick={toggle} disabled={!ready}>
+          {excluded ? "Include this browser" : "Exclude this browser"}
+        </button>
+      </div>
+      <div style={{ ...S.muted, marginTop: 8 }}>
+        Stored only in this browser as <code>{INSIGHTS_OPTOUT_KEY}</code>. No server setting.
+        Authenticated /sidhu loads set Excluded automatically.
+      </div>
+    </div>
   );
 }
 
