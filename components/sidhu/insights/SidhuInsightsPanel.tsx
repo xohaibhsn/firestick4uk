@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Sidhu Insights (Phase 1) — Today, Overview, Sources, Geography, Pages, Journeys, Settings.
+ * Sidhu Insights — Phase 1 + Phase 2 screens.
  * Fetches /api/admin-insights/* with credentials. Settings is shown only with insights.settings.
+ * Export is shown only with insights.export.
  */
 import { useState } from "react";
 import { hasAdminPermission, type AdminRoleName } from "@/lib/adminPermissions";
@@ -14,9 +15,26 @@ import SourcesScreen from "./SourcesScreen";
 import GeographyScreen from "./GeographyScreen";
 import PagesScreen from "./PagesScreen";
 import JourneysScreen from "./JourneysScreen";
+import FunnelScreen from "./FunnelScreen";
+import CheckoutProblemsScreen from "./CheckoutProblemsScreen";
+import OrdersAttributionScreen from "./OrdersAttributionScreen";
+import ReturningScreen from "./ReturningScreen";
+import ExportScreen from "./ExportScreen";
 import SettingsScreen from "./SettingsScreen";
 
-type View = "today" | "overview" | "sources" | "geography" | "pages" | "journeys" | "settings";
+type View =
+  | "today"
+  | "overview"
+  | "sources"
+  | "geography"
+  | "pages"
+  | "journeys"
+  | "funnel"
+  | "checkout"
+  | "orders"
+  | "returning"
+  | "export"
+  | "settings";
 
 const VIEWS: Array<{ id: View; label: string }> = [
   { id: "today", label: "Today" },
@@ -25,6 +43,11 @@ const VIEWS: Array<{ id: View; label: string }> = [
   { id: "geography", label: "Geography" },
   { id: "pages", label: "Pages" },
   { id: "journeys", label: "Journeys" },
+  { id: "funnel", label: "Funnel" },
+  { id: "checkout", label: "Checkout problems" },
+  { id: "orders", label: "Orders attribution" },
+  { id: "returning", label: "Returning" },
+  { id: "export", label: "Export" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -36,8 +59,15 @@ export default function SidhuInsightsPanel({ adminRole }: { adminRole: AdminRole
   if (!hasAdminPermission(adminRole, "insights.view")) return null;
 
   const canSettings = hasAdminPermission(adminRole, "insights.settings");
-  const items = VIEWS.filter((v) => v.id !== "settings" || canSettings);
-  const active: View = view === "settings" && !canSettings ? "today" : view;
+  const canExport = hasAdminPermission(adminRole, "insights.export");
+  const items = VIEWS.filter((v) => {
+    if (v.id === "settings") return canSettings;
+    if (v.id === "export") return canExport;
+    return true;
+  });
+  let active: View = view;
+  if (view === "settings" && !canSettings) active = "today";
+  if (view === "export" && !canExport) active = "today";
 
   const shared = { range, onRange: setRange, includeBots, onIncludeBots: setIncludeBots };
 
@@ -63,6 +93,11 @@ export default function SidhuInsightsPanel({ adminRole }: { adminRole: AdminRole
       {active === "geography" && <GeographyScreen {...shared} />}
       {active === "pages" && <PagesScreen {...shared} />}
       {active === "journeys" && <JourneysScreen adminRole={adminRole} {...shared} />}
+      {active === "funnel" && <FunnelScreen {...shared} />}
+      {active === "checkout" && <CheckoutProblemsScreen {...shared} />}
+      {active === "orders" && <OrdersAttributionScreen adminRole={adminRole} {...shared} />}
+      {active === "returning" && <ReturningScreen {...shared} />}
+      {active === "export" && canExport && <ExportScreen adminRole={adminRole} {...shared} />}
       {active === "settings" && canSettings && <SettingsScreen />}
     </div>
   );
