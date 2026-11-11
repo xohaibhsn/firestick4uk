@@ -73,9 +73,13 @@ ok(
     /og_image:""/.test(sidhu) &&
       /const \[editProduct, setEditProduct\]/.test(sidhu)
 );
+const draftClient = read("lib/productContentDraftClient.ts");
 ok(
   "openEditProduct_hydrates_og_image",
-  /const openEditProduct[\s\S]*?og_image:\s*p\.og_image\s*\|\|\s*""/.test(sidhu)
+  // 0fffdab: openEditProduct delegates to openContentDraftSession → productRowToEditDraft
+  /const openEditProduct[\s\S]*?openContentDraftSession[\s\S]*?setEditProduct\(session\.editProduct\)/.test(
+    sidhu
+  ) && /og_image:\s*String\(product\.og_image\s*\|\|\s*""\)/.test(draftClient)
 );
 ok(
   "openNewProduct_defaults_og_image_empty",
@@ -112,9 +116,14 @@ ok(
 );
 ok(
   "og_no_second_uploader_system",
+  // 416c9a9: second label is image-brief OG_SOCIAL slot reusing the same MediaLibraryPicker
   !/pages\/api\/admin-og/.test(sidhu) &&
     !/new MediaUploader/.test(sidhu) &&
-    (sidhu.match(/Choose Product OG Image/g) || []).length === 1
+    (sidhu.match(/Choose Product OG Image/g) || []).length === 2 &&
+    /openProductImageLibraryForSlot/.test(sidhu) &&
+    /setMediaPicker\(\{[\s\S]*?purposes:\s*\["products"\][\s\S]*?Choose Product OG Image/.test(
+      sidhu
+    )
 );
 ok(
   "og_media_purpose_products_not_global_og",
@@ -251,12 +260,23 @@ ok(
   const otherPosts = [
     ...seoPanel.matchAll(/method:\s*["']POST["']/g),
   ].length;
+  // Allowed non-overview POSTs: issue explain (3c2a84a), reconcile, blog research (da6afbe)
+  const explainPost =
+    /fetch\(\s*["']\/api\/admin-seo-ai["'][\s\S]{0,120}?method:\s*["']POST["']/.test(
+      seoPanel
+    );
+  const researchPost =
+    /fetch\(\s*["']\/api\/admin-blog-research["'][\s\S]{0,120}?method:\s*["']POST["']/.test(
+      seoPanel
+    );
   ok(
     "seo_overview_still_read_only",
     !hasPut &&
       !overviewPosts &&
       reconcilePost &&
-      otherPosts === 1 &&
+      explainPost &&
+      researchPost &&
+      otherPosts === 3 &&
       /Panel mounts only when SEO tab opens/.test(seoPanel) &&
       /req\.method !== ["']GET["']/.test(seoApi)
   );

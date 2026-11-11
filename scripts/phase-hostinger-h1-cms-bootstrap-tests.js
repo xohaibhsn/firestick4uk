@@ -137,7 +137,9 @@ ok(
 
 ok(
   "sidhu_admin_page_all_untouched",
-  (sidhu.match(/site-content\?page=all/g) || []).length >= 2
+  // be4e137 lazy-load: single gated fetch when settings/pages tab opens (was fan-out >=2)
+  (sidhu.match(/site-content\?page=all/g) || []).length === 1 &&
+    /tab !== ["']settings["']\s*&&\s*tab !== ["']pages["']/.test(sidhu)
 );
 
 ok(
