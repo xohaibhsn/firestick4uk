@@ -212,7 +212,7 @@ export default function ProductsClient({
           .filters-collapsible{display:none;padding-top:8px;}
           .filters-collapsible.is-open{display:flex;}
           .filters{padding:0;width:100%;}
-          .products-grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:0 12px 50px;}
+          .products-grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:0 12px 72px;}
           .product-info{padding:10px 12px;}
           .product-name{font-size:12px;}
           .product-desc,.product-short-desc{font-size:11px;margin-bottom:8px;-webkit-line-clamp:2;}

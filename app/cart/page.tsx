@@ -85,26 +85,32 @@ const navStyles = `
   .cart-empty p { color:#666666; font-size:14px; margin-bottom:28px; }
 
   /* CART ITEM */
-  .cart-item { display:grid; grid-template-columns:100px 1fr auto; gap:20px; align-items:center; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:14px; padding:20px; transition:all 0.2s; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+  .cart-item { display:flex; flex-direction:row; align-items:flex-start; gap:20px; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:14px; padding:20px; transition:all 0.2s; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
   .cart-item:hover { border-color:#5B21B6; box-shadow:0 4px 14px rgba(91,33,182,0.1); }
-  .cart-item-image { width:100px; height:100px; border-radius:10px; background:#F5F3FF; border:1px solid #DDD6FE; display:flex; align-items:center; justify-content:center; font-size:36px; flex-shrink:0; }
-  .cart-item-details { flex:1; }
-  .cart-item-name { font-family:var(--font-display); font-size:16px; font-weight:700; color:#111111; margin-bottom:6px; }
+  .cart-item-image { width:72px; height:72px; border-radius:10px; background:#F5F3FF; border:1px solid #DDD6FE; display:flex; align-items:center; justify-content:center; font-size:36px; flex-shrink:0; overflow:hidden; }
+  .cart-item-details { flex:1 1 auto; min-width:0; }
+  .cart-item-name { font-family:var(--font-display); font-size:16px; font-weight:700; color:#111111; margin-bottom:6px; overflow-wrap:anywhere; word-break:break-word; }
   .cart-item-price { font-size:17px; font-weight:700; color:#5B21B6; font-family:var(--font-display); }
-  .cart-item-actions { display:flex; flex-direction:column; align-items:flex-end; gap:12px; }
+  .cart-item-actions { display:flex; flex-direction:column; align-items:flex-end; gap:12px; flex-shrink:0; }
   .qty-control { display:flex; align-items:center; gap:10px; }
   .qty-btn { width:44px; height:44px; min-width:44px; min-height:44px; border-radius:50%; border:1px solid #E5E5E5; background:#F5F5F5; color:#111111; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
   .qty-btn:hover { background:#5B21B6; color:#FFFFFF; border-color:#5B21B6; }
   .cart-item-image img { width:100%; height:100%; object-fit:cover; border-radius:10px; display:block; }
-  .copy-btn-wrap { display:inline-flex; align-items:center; gap:8px; }
+  .copy-btn-wrap { display:inline-flex; align-items:center; gap:8px; flex:0 0 auto; }
   .copy-btn { min-height:44px; min-width:44px; padding:6px 12px; border-radius:8px; border:1px solid #DDD6FE; background:#F5F3FF; color:#5B21B6; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
   .copy-btn:hover, .copy-btn:focus-visible { border-color:#5B21B6; outline:2px solid #5B21B6; outline-offset:2px; }
-  .copy-btn-live { font-size:11px; color:#16A34A; min-width:3.5em; }
-  .bank-row-value { display:flex; align-items:center; gap:10px; color:#111111; font-weight:600; }
-  .checkout-steps { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 18px; font-size:12px; letter-spacing:0.04em; text-transform:uppercase; color:#888888; }
+  .copy-btn-live { font-size:11px; color:#16A34A; min-width:0; }
+  .copy-btn-live:not(:empty) { min-width:3.5em; }
+  .bank-row-value { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; column-gap:8px; color:#111111; font-weight:600; min-width:0; width:100%; }
+  .bank-row-value__text { min-width:0; max-width:100%; text-align:right; }
+  .bank-row-value__text--nowrap { white-space:nowrap; }
+  .bank-row-value__text--wrap { white-space:normal; overflow-wrap:break-word; word-break:normal; }
+  .bank-row-value .copy-btn-wrap { justify-self:end; }
+  .checkout-steps { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:16px 0 18px; font-size:12px; letter-spacing:0.04em; text-transform:uppercase; color:#888888; }
   .checkout-steps span { color:#888888; }
   .checkout-steps .step-current { color:#5B21B6; font-weight:700; }
   .checkout-steps .step-done { color:#16A34A; font-weight:600; }
+  .cart-help-wa { display:inline-flex; align-items:center; gap:6px; margin:0 20px 16px; font-size:13px; color:#25d366; text-decoration:none; font-weight:600; }
   .checkout-btn.preparing { opacity:0.75; cursor:wait; }
   .checkout-btn.preparing::after { content:""; display:inline-block; width:12px; height:12px; margin-left:8px; border:2px solid rgba(255,255,255,0.35); border-top-color:#fff; border-radius:50%; vertical-align:-1px; animation:cartPrepSpin 0.7s linear infinite; }
   @keyframes cartPrepSpin { to { transform:rotate(360deg); } }
@@ -116,17 +122,26 @@ const navStyles = `
   }
   @media (max-width:900px) {
     .sticky-place-order {
-      display:flex; position:fixed; left:0; right:0; bottom:0; z-index:10001;
+      display:flex; position:fixed; z-index:10001;
+      left:max(12px, env(safe-area-inset-left, 0px));
+      right:max(12px, env(safe-area-inset-right, 0px));
+      bottom:max(0px, env(safe-area-inset-bottom, 0px));
+      width:auto; max-width:calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+      box-sizing:border-box;
       align-items:center; justify-content:space-between; gap:12px;
-      padding:10px 16px; padding-bottom:max(10px, env(safe-area-inset-bottom, 0px));
+      padding:10px 12px; padding-bottom:max(10px, env(safe-area-inset-bottom, 0px));
       background:#111111; color:#FFFFFF; box-shadow:0 -4px 20px rgba(0,0,0,0.18);
+      border-radius:12px 12px 0 0;
     }
     .sticky-place-order.is-keyboard-hidden { display:none; }
-    .sticky-place-order__total { font-size:14px; font-weight:600; white-space:nowrap; }
+    .sticky-place-order__total { font-size:14px; font-weight:600; white-space:nowrap; flex-shrink:0; }
     .sticky-place-order__total strong { color:#C4B5FD; font-size:16px; }
-    .sticky-place-order .place-order-btn { margin:0; width:auto; flex:1; max-width:220px; padding:12px 14px; font-size:13px; }
+    .sticky-place-order .place-order-btn {
+      margin:0; width:auto; flex:1 1 auto; min-width:0; max-width:220px;
+      padding:12px 14px; font-size:13px; box-sizing:border-box;
+    }
     .checkout-section { padding-bottom:calc(88px + env(safe-area-inset-bottom, 0px)); }
-    .bank-details { padding-bottom:24px; margin-right:72px; }
+    .bank-details { padding-bottom:24px; margin-right:0; width:100%; max-width:100%; box-sizing:border-box; }
     .order-summary { padding-bottom:8px; }
   }
   .qty-num { font-size:16px; font-weight:700; color:#111111; min-width:20px; text-align:center; }
@@ -170,12 +185,12 @@ const navStyles = `
   .payment-option-sub { font-size:12px; color:#888888; margin-top:2px; }
 
   /* BANK DETAILS */
-  .bank-details { background:#F9F9F9; border:1px solid #E5E5E5; border-radius:10px; padding:18px; margin-bottom:18px; }
+  .bank-details { background:#F9F9F9; border:1px solid #E5E5E5; border-radius:10px; padding:18px; margin-bottom:18px; width:100%; max-width:100%; box-sizing:border-box; }
   .bank-details h4 { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#5B21B6; margin-bottom:12px; font-weight:700; }
-  .bank-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #F0F0F0; font-size:14px; }
+  .bank-row { display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:12px; align-items:start; padding:7px 0; border-bottom:1px solid #F0F0F0; font-size:14px; width:100%; box-sizing:border-box; }
   .bank-row:last-child { border:none; }
-  .bank-row span:first-child { color:#777777; }
-  .bank-row span:last-child { color:#111111; font-weight:600; }
+  .bank-row > span:first-child { color:#777777; white-space:nowrap; }
+  .bank-row > span:last-child { color:#111111; font-weight:600; min-width:0; }
 
   /* UPLOAD */
   .upload-area { border:2px dashed #CCCCCC; border-radius:10px; padding:28px; text-align:center; cursor:pointer; transition:all 0.2s; position:relative; background:#FAFAFA; }
@@ -244,8 +259,12 @@ const navStyles = `
     footer{padding:36px 24px;flex-direction:column;text-align:center;}
   }
   @media(max-width:500px){
-    .cart-item{grid-template-columns:70px 1fr auto;gap:12px;padding:14px;}
+    .cart-item{gap:12px;padding:14px;}
+    .cart-item-image{width:64px;height:64px;font-size:28px;}
     .place-order-btn{font-size:14px;padding:14px;}
+    .bank-details{padding:14px;}
+    .bank-row{gap:8px;font-size:13px;}
+    .copy-btn{min-width:44px;padding:6px 10px;}
   }
 `;
 
@@ -771,6 +790,15 @@ export default function CartPage() {
                 {couponApplied && <div style={{fontSize:12,color:"#00c864"}}>✅ {couponApplied.message} — Save £{discountAmount.toFixed(2)}</div>}
                 {couponError && <div style={{fontSize:12,color:"#ff6666"}}>❌ {couponError}</div>}
               </div>
+              <a
+                className="cart-help-wa"
+                href={contact.whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-cart-help-wa="1"
+              >
+                💬 {t("cart_wa_btn", "WhatsApp Us")}
+              </a>
               <button
                 className={`checkout-btn${classificationLoading ? " preparing" : ""}`}
                 disabled={cart.length === 0 || classificationBlocked}
@@ -899,32 +927,32 @@ export default function CartPage() {
                     <>
                       <div className="bank-details" data-bank-details="1">
                         <h4>{t("bank_heading", "Bank Account Details")}</h4>
-                        <div className="bank-row">
+                        <div className="bank-row bank-row--name">
                           <span>{t("bank_lbl_name", "Account Name")}</span>
                           <span className="bank-row-value">
-                            <span>{t("bank_account_name", "Robert George Bennett")}</span>
+                            <span className="bank-row-value__text bank-row-value__text--wrap">{t("bank_account_name", "Robert George Bennett")}</span>
                             <CopyButton value={t("bank_account_name", "Robert George Bennett")} label="Copy" />
                           </span>
                         </div>
-                        <div className="bank-row">
+                        <div className="bank-row bank-row--sort">
                           <span>{t("bank_lbl_sort", "Sort Code")}</span>
                           <span className="bank-row-value">
-                            <span>{t("bank_sort_code", "60-84-07")}</span>
+                            <span className="bank-row-value__text bank-row-value__text--nowrap">{t("bank_sort_code", "60-84-07")}</span>
                             <CopyButton value={t("bank_sort_code", "60-84-07")} label="Copy" />
                           </span>
                         </div>
-                        <div className="bank-row">
+                        <div className="bank-row bank-row--account">
                           <span>{t("bank_lbl_no", "Account No.")}</span>
                           <span className="bank-row-value">
-                            <span>{t("bank_account_no", "70745518")}</span>
+                            <span className="bank-row-value__text bank-row-value__text--nowrap">{t("bank_account_no", "70745518")}</span>
                             <CopyButton value={t("bank_account_no", "70745518")} label="Copy" />
                           </span>
                         </div>
                         <div className="bank-row"><span>{t("bank_lbl_ref", "Reference")}</span><span>{t("bank_reference_value", "Your name only")}</span></div>
-                        <div className="bank-row">
+                        <div className="bank-row bank-row--amount">
                           <span>{t("bank_lbl_amount", "Amount")}</span>
                           <span className="bank-row-value">
-                            <span>£{grandTotal.toFixed(2)}</span>
+                            <span className="bank-row-value__text bank-row-value__text--nowrap">£{grandTotal.toFixed(2)}</span>
                             <CopyButton value={grandTotal.toFixed(2)} label="Copy" />
                           </span>
                         </div>

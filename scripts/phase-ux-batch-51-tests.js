@@ -330,6 +330,7 @@ const allowedPrefixes = [
   "lib/clipboardCopy.ts",
   "lib/stockBadgeLabel.ts",
   "scripts/phase-ux-batch-51-tests.js",
+  "scripts/phase-ux-fix-53-tests.js",
 ];
 const unexpected = allTouched.filter((f) => {
   const n = f.replace(/\\/g, "/");
