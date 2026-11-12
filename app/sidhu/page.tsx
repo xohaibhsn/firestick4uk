@@ -28,6 +28,12 @@ import {
   formatPaymentMethodLabel,
 } from "@/lib/paymentMethod";
 import {
+  bankDetailsComplete,
+  parsePaymentMethodToggle,
+  paymentToggleToStoredValue,
+  validatePaymentTogglesForSave,
+} from "@/lib/paymentMethodSettings";
+import {
   NEW_PRODUCT_AI_GENERATE_ALL_FIELDS,
   applyExistingProductAiFieldLocally,
   applyNewProductAiFieldLocally,
@@ -6689,8 +6695,102 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* FOOTER / FAQ / PRODUCTS / CART / TRACKING / BLOG / LEGAL / GLOBAL */}
-              {["footer","faq","products","cart","tracking","blog","legal","global"].includes(activePage) && (
+              {/* CART — payment method toggles + content fields */}
+              {activePage==="cart" && (
+                <div className="section-card" style={{padding:24}} data-payment-methods-panel="1">
+                  <div className="section-header" style={{marginBottom:16}}>
+                    <div className="section-title">Payment methods</div>
+                  </div>
+                  <p style={{fontSize:13,color:"#555",lineHeight:1.55,marginBottom:14}}>
+                    Turn Bank Transfer or Cash on Delivery / Pay on Delivery on or off for checkout.
+                    At least one method must stay enabled. Absent toggles behave as enabled.
+                    Bank Transfer also hides itself on the cart when account name, sort code or account number is blank.
+                  </p>
+                  <label style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,cursor:"pointer",fontSize:13}}>
+                    <input
+                      type="checkbox"
+                      data-payment-toggle="bank"
+                      checked={parsePaymentMethodToggle(siteContent.payment_bank_enabled)}
+                      onChange={(e) =>
+                        setSiteContent((s) => ({
+                          ...s,
+                          payment_bank_enabled: paymentToggleToStoredValue(e.target.checked),
+                        }))
+                      }
+                    />
+                    Bank Transfer
+                  </label>
+                  <label style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,cursor:"pointer",fontSize:13}}>
+                    <input
+                      type="checkbox"
+                      data-payment-toggle="cod"
+                      checked={parsePaymentMethodToggle(siteContent.payment_cod_enabled)}
+                      onChange={(e) =>
+                        setSiteContent((s) => ({
+                          ...s,
+                          payment_cod_enabled: paymentToggleToStoredValue(e.target.checked),
+                        }))
+                      }
+                    />
+                    COD / Pay on Delivery
+                  </label>
+                  {parsePaymentMethodToggle(siteContent.payment_bank_enabled) &&
+                    !bankDetailsComplete(
+                      siteContent.bank_account_name,
+                      siteContent.bank_sort_code,
+                      siteContent.bank_account_no
+                    ) && (
+                    <div
+                      data-bank-details-warning="1"
+                      style={{
+                        marginBottom:14,
+                        padding:"10px 12px",
+                        background:"#FFF7ED",
+                        border:"1px solid #FDBA74",
+                        borderRadius:10,
+                        fontSize:12,
+                        color:"#9A3412",
+                        lineHeight:1.5,
+                      }}
+                    >
+                      Bank Transfer is ON, but account name, sort code or account number is empty.
+                      Checkout will treat Bank Transfer as unavailable until those fields are filled below.
+                    </div>
+                  )}
+                  <button
+                    className="btn-primary"
+                    disabled={contentSaving}
+                    data-payment-methods-save="1"
+                    onClick={() => {
+                      const bankOn = parsePaymentMethodToggle(siteContent.payment_bank_enabled);
+                      const codOn = parsePaymentMethodToggle(siteContent.payment_cod_enabled);
+                      const gate = validatePaymentTogglesForSave(bankOn, codOn);
+                      if (!gate.ok) {
+                        setContentMsg(`❌ ${gate.error}`);
+                        setTimeout(() => setContentMsg(""), 4000);
+                        return;
+                      }
+                      void saveContent(["payment_bank_enabled", "payment_cod_enabled"]);
+                    }}
+                  >
+                    {contentSaving ? "Saving..." : "💾 Save Payment Methods"}
+                  </button>
+                  <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
+                    <div style={{marginBottom:16,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Cart &amp; checkout labels</div>
+                    <AdminContentPanel
+                      page="cart"
+                      siteContent={siteContent}
+                      setSiteContent={setSiteContent}
+                      onSave={saveContent}
+                      saving={contentSaving}
+                      saveLabel="💾 Save Cart Labels"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* FOOTER / FAQ / PRODUCTS / TRACKING / BLOG / LEGAL / GLOBAL */}
+              {["footer","faq","products","tracking","blog","legal","global"].includes(activePage) && (
                 <div className="section-card" style={{padding:24}}>
                   <AdminContentPanel
                     page={activePage}

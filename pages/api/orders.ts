@@ -28,6 +28,8 @@ import {
   toDbPaymentMethod,
   type PublicPaymentMethod,
 } from '../../lib/paymentMethod';
+import { isPaymentMethodEffectivelyEnabled } from '../../lib/paymentMethodSettings';
+import { getPaymentMethodSettings } from '../../lib/paymentMethodSettingsServer';
 import { lockAndAuthorizeOrderProducts } from '../../lib/orderProductEligibility';
 
 /** Coupon/order validation failures that must roll back an open transaction. */
@@ -117,6 +119,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     const publicPaymentMethod: PublicPaymentMethod = payment_method;
     const dbPaymentMethod = toDbPaymentMethod(publicPaymentMethod);
+
+    // CMS on/off — fail-safe enabled. Reject before receipt, coupon, DB, or email.
+    const paymentToggles = await getPaymentMethodSettings();
+    if (!isPaymentMethodEffectivelyEnabled(publicPaymentMethod, paymentToggles)) {
+      return res.status(400).json({ error: 'Payment method unavailable.' });
+    }
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Order items are required.' });

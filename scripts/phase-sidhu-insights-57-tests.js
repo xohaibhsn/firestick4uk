@@ -469,6 +469,19 @@ async function main() {
     if (rel === "scripts/phase-windup-59-tests.js") return true;
     if (rel.startsWith("pages/api/admin-insights/")) return true;
     if (rel.startsWith("components/sidhu/insights/")) return true;
+    // F4UK-PAY-CMS-66
+    if (
+      [
+        "lib/paymentMethodSettings.ts",
+        "lib/paymentMethodSettingsServer.ts",
+        "lib/siteContentDefaults.ts",
+        "pages/api/orders.ts",
+        "scripts/phase-pay-cms-66-tests.js",
+        "REPO_AUDIT_REPORT.md",
+      ].includes(rel)
+    ) {
+      return true;
+    }
     // F4UK-HOME-REVIEWS-R1-61
     if (
       [

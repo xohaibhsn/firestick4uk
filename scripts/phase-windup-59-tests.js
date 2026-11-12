@@ -73,6 +73,15 @@ const ALLOWLIST = new Set([
   "scripts/phase-clarity-35-tests.js",
   "scripts/phase-tracking-consent-final-tests.js",
   "scripts/phase-home-reviews-61-tests.js",
+  // F4UK-PAY-CMS-66
+  "lib/paymentMethodSettings.ts",
+  "lib/paymentMethodSettingsServer.ts",
+  "lib/siteContentDefaults.ts",
+  "scripts/phase-pay-cms-66-tests.js",
+  "scripts/phase-cod-restore-54-tests.js",
+  "scripts/phase-ux-batch-51-tests.js",
+  "scripts/phase-ux-fix-53-tests.js",
+  "REPO_AUDIT_REPORT.md",
 ]);
 
 const BASE_SHA = "76067a765b091bbbf0f2d4375c3d17f0b3af53bc";
@@ -326,6 +335,14 @@ function loadTs(rel, stubs = {}) {
 }
 
 function sharedStubs() {
+  const paymentSettingsStub = {
+    getPaymentMethodSettings: async () => ({
+      bankEnabled: true,
+      codEnabled: true,
+      bothOffCorrected: false,
+    }),
+    clearPaymentMethodSettingsCache: () => {},
+  };
   return {
     "../../lib/db": pool,
     "@/lib/db": pool,
@@ -340,6 +357,8 @@ function sharedStubs() {
         telegramUrl: "https://t.me/0",
       }),
     },
+    "../../lib/paymentMethodSettingsServer": paymentSettingsStub,
+    "@/lib/paymentMethodSettingsServer": paymentSettingsStub,
     nodemailer: {
       createTransport: () => ({
         sendMail: async (opts) => {

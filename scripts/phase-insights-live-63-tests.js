@@ -241,6 +241,14 @@ const ALLOWED = new Set([
   "scripts/phase-cod-restore-54-tests.js",
   "scripts/phase-home-reviews-61-tests.js",
   "scripts/phase-sidhu-insights-57-tests.js",
+  // F4UK-PAY-CMS-66
+  "lib/paymentMethodSettings.ts",
+  "lib/paymentMethodSettingsServer.ts",
+  "lib/siteContentDefaults.ts",
+  "pages/api/orders.ts",
+  "app/cart/page.tsx",
+  "scripts/phase-pay-cms-66-tests.js",
+  "REPO_AUDIT_REPORT.md",
 ]);
 let dirty = [];
 let untracked = [];

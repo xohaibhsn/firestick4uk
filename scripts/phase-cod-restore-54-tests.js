@@ -56,7 +56,9 @@ ok(
 ok("no_showCodOption_physical_gate", !/\bshowCodOption\b/.test(cart));
 ok(
   "second_option_gated_only_on_classification_ready",
-  /showSecondPaymentOption\s*=\s*classification\.ready\s*===\s*true/.test(cart) &&
+  /showSecondPaymentOption/.test(cart) &&
+    /paymentToggles\.codEnabled/.test(cart) &&
+    /classification\.ready\s*===\s*true/.test(cart) &&
     /showSecondPaymentOption\s*\?/.test(cart) &&
     /val:\s*["']cod["']\s*as\s*const/.test(cart)
 );
@@ -69,7 +71,9 @@ ok(
 ok(
   "pending_hides_second_option_no_wrong_label_flash",
   /never flashes "Cash on Delivery"/.test(cart) &&
-    /!showSecondPaymentOption && paymentMethod === ["']cod["']/.test(cart)
+    /showSecondPaymentOption/.test(cart) &&
+    /classification\.ready\s*===\s*true/.test(cart) &&
+    /paymentToggles\.codEnabled/.test(cart)
 );
 ok(
   "physical_mixed_cod_keys",
@@ -110,14 +114,14 @@ ok(
 );
 ok(
   "bank_details_gated_on_bank",
-  /\{paymentMethod === ["']bank["'] && \(/.test(cart) &&
+  /\{paymentMethod === ["']bank["'] && bankSelectable && \(/.test(cart) &&
     /data-bank-details=["']1["']/.test(cart)
 );
 ok(
   "copy_buttons_inside_bank_gate",
   (() => {
     const m = cart.match(
-      /\{paymentMethod === ["']bank["'] && \(([\s\S]*?)\n\s*\)\}\s*\n\s*\{paymentMethod === ["']cod["']/
+      /\{paymentMethod === ["']bank["'] && bankSelectable && \(([\s\S]*?)\n\s*\)\}\s*\n\s*\{paymentMethod === ["']cod["']/
     );
     if (!m) return false;
     const block = m[1];
@@ -133,7 +137,7 @@ ok(
   "cod_branch_has_no_bank_copy_or_receipt_upload",
   (() => {
     const m = cart.match(
-      /\{paymentMethod === ["']cod["'] && \(([\s\S]*?)\n\s*\)\}\s*\n\s*<div className=["']summary-body["']/
+      /\{paymentMethod === ["']cod["'] && showSecondPaymentOption && \(([\s\S]*?)\n\s*\)\}\s*/
     );
     if (!m) return false;
     const block = m[1];
@@ -208,6 +212,13 @@ const allow = new Set([
   "scripts/phase-clarity-35-tests.js",
   "scripts/phase-tracking-consent-final-tests.js",
   "scripts/phase-home-reviews-61-tests.js",
+  // F4UK-PAY-CMS-66
+  "lib/paymentMethodSettings.ts",
+  "lib/paymentMethodSettingsServer.ts",
+  "lib/siteContentDefaults.ts",
+  "pages/api/orders.ts",
+  "scripts/phase-pay-cms-66-tests.js",
+  "REPO_AUDIT_REPORT.md",
 ]);
 const unexpected = allTouched.filter((f) => !allow.has(f));
 ok(

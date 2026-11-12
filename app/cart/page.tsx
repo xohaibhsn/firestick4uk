@@ -33,6 +33,10 @@ import {
   uploadReceiptDuringCheckout,
   type ReceiptSelectionState,
 } from "@/lib/receiptCheckoutClient";
+import {
+  bankDetailsComplete,
+  effectivePaymentMethods,
+} from "@/lib/paymentMethodSettings";
 
 type ProductFacts = {
   id: number;
@@ -115,6 +119,9 @@ const navStyles = `
   }
   .remove-btn { min-height:44px; min-width:44px; padding:8px 10px; }
   .upload-receipt-photo-hint { font-size:12px; color:#666666; margin-top:6px; line-height:1.5; }
+  .payment-options-loading { min-height:96px; display:flex; align-items:center; padding:14px 16px; background:#F8F8F8; border:1px solid #E5E5E5; border-radius:12px; color:#666666; font-size:14px; margin-bottom:14px; }
+  .payment-option.is-disabled { opacity:0.55; cursor:not-allowed; pointer-events:none; }
+  .payment-cms-hint { font-size:12px; color:#666666; line-height:1.5; margin:8px 0 12px; }
   .copy-btn-live { font-size:11px; color:#16A34A; min-width:0; }
   .copy-btn-live:not(:empty) { min-width:3.5em; }
   .bank-row-value { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; column-gap:8px; color:#111111; font-weight:600; min-width:0; width:100%; }
@@ -289,7 +296,7 @@ type Step = "cart" | "checkout" | "success";
 export default function CartPage() {
   const { cart, removeFromCart, updateQty, clearCart, total } = useCart();
   const contact = useContactConfig();
-  const { t } = useSiteContent();
+  const { t, sc, loaded: cmsLoaded } = useSiteContent();
   const router = useRouter();
   const [step, setStep] = useState<Step>("cart");
   const [paymentMethod, setPaymentMethod] = useState<"bank" | "cod">("bank");
@@ -484,11 +491,34 @@ export default function CartPage() {
   const effectiveDigitalAck =
     classification.hasDigitalItems && digitalSupplyAcknowledged;
 
+  // CMS payment toggles + bank identity (no hardcoded bank values in fallbacks).
+  // Until SiteContentProvider `loaded`, keep a neutral loading slot (no bank values).
+  const cmsFailed = cmsLoaded && Object.keys(sc).length === 0;
+  const paymentToggles = effectivePaymentMethods(
+    cmsLoaded ? sc.payment_bank_enabled : undefined,
+    cmsLoaded ? sc.payment_cod_enabled : undefined
+  );
+  const bankAccountName = cmsLoaded ? String(sc.bank_account_name || "").trim() : "";
+  const bankSortCode = cmsLoaded ? String(sc.bank_sort_code || "").trim() : "";
+  const bankAccountNo = cmsLoaded ? String(sc.bank_account_no || "").trim() : "";
+  const bankDetailsOk =
+    !cmsFailed &&
+    bankDetailsComplete(bankAccountName, bankSortCode, bankAccountNo);
+  // Bank selectable only when toggle ON and all three details present after load.
+  const bankSelectable =
+    cmsLoaded && paymentToggles.bankEnabled && bankDetailsOk;
+  // Toggle ON but details missing / CMS failed → show disabled unavailable row.
+  const bankShowUnavailable =
+    cmsLoaded && paymentToggles.bankEnabled && !bankDetailsOk;
   // Second payment option (stored/posted value always "cod") on every cart type
   // once classification is ready (digital-only, mixed, physical).
   // Pending strategy: keep the option HIDDEN until ready so a digital-only cart
   // never flashes "Cash on Delivery" then switches to the digital label.
-  const showSecondPaymentOption = classification.ready === true;
+  // Also gated on CMS COD toggle (absent = enabled).
+  const showSecondPaymentOption =
+    cmsLoaded &&
+    paymentToggles.codEnabled &&
+    classification.ready === true;
   const digitalOnlyCart =
     classification.ready &&
     classification.hasDigitalItems &&
@@ -503,11 +533,30 @@ export default function CartPage() {
       )
     : t("cart_pay_cod_sub", "Pay when your order arrives");
 
+  // Preselect first enabled/available method (Bank if selectable, else COD).
   useEffect(() => {
-    if (!showSecondPaymentOption && paymentMethod === "cod") {
-      setPaymentMethod("bank");
+    if (!cmsLoaded) return;
+    const bankOk = paymentToggles.bankEnabled && bankDetailsOk;
+    const codOk = paymentToggles.codEnabled && classification.ready === true;
+    if (paymentMethod === "bank" && !bankOk) {
+      if (codOk) setPaymentMethod("cod");
+      return;
     }
-  }, [showSecondPaymentOption, paymentMethod]);
+    if (paymentMethod === "cod" && !codOk) {
+      if (bankOk) {
+        setPaymentMethod("bank");
+        return;
+      }
+      // COD not ready yet and bank unavailable — stay until classification resolves.
+    }
+  }, [
+    cmsLoaded,
+    paymentToggles.bankEnabled,
+    paymentToggles.codEnabled,
+    bankDetailsOk,
+    classification.ready,
+    paymentMethod,
+  ]);
 
   // Signal sticky checkout bar for WA float hide (mobile checkout only).
   useEffect(() => {
@@ -539,6 +588,11 @@ export default function CartPage() {
   const discountAmount = couponApplied ? couponApplied.discount_amount : 0;
   const grandTotal = Math.round((subtotal + shipping + vatAmount - discountAmount) * 100) / 100;
   const classificationBlocked = !classification.ready || !!classification.error;
+  const paymentOptionsBlocked =
+    !cmsLoaded ||
+    (paymentMethod === "bank" && !bankSelectable) ||
+    (paymentMethod === "cod" && !showSecondPaymentOption) ||
+    (!bankSelectable && !showSecondPaymentOption);
 
   const applyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -920,25 +974,58 @@ export default function CartPage() {
               <div>
                 <div className="form-section">
                   <h3>{t("cart_pay_heading", "Payment Method")}</h3>
+                  {!cmsLoaded ? (
+                    <div
+                      className="payment-options-loading"
+                      data-payment-loading="1"
+                      aria-live="polite"
+                    >
+                      Loading payment options…
+                    </div>
+                  ) : (
+                    <>
                   <div className="payment-options" role="radiogroup" aria-label={t("cart_pay_heading", "Payment Method")}>
                     {[
-                      {val:"bank" as const, label: t("cart_pay_bank", "Bank Transfer"), sub: t("cart_pay_bank_sub", "Transfer to our UK bank & upload receipt")},
+                      ...(bankSelectable
+                        ? [{
+                            val: "bank" as const,
+                            label: t("cart_pay_bank", "Bank Transfer"),
+                            sub: t("cart_pay_bank_sub", "Transfer to our UK bank & upload receipt"),
+                            disabled: false,
+                          }]
+                        : bankShowUnavailable
+                          ? [{
+                              val: "bank" as const,
+                              label: t("cart_pay_bank", "Bank Transfer"),
+                              sub: "Bank transfer temporarily unavailable",
+                              disabled: true,
+                            }]
+                          : []),
                       ...(showSecondPaymentOption
-                        ? [{val:"cod" as const, label: codOptionLabel, sub: codOptionSub}]
+                        ? [{
+                            val: "cod" as const,
+                            label: codOptionLabel,
+                            sub: codOptionSub,
+                            disabled: false,
+                          }]
                         : []),
                     ].map(p => (
                       <label
                         key={p.val}
-                        className={`payment-option ${paymentMethod === p.val ? "selected" : ""}`}
+                        className={`payment-option ${paymentMethod === p.val && !p.disabled ? "selected" : ""}${p.disabled ? " is-disabled" : ""}`}
                         data-payment-option={p.val}
+                        data-payment-disabled={p.disabled ? "1" : "0"}
                         data-digital-only={digitalOnlyCart ? "1" : "0"}
                       >
                         <input
                           type="radio"
                           name="payment_method"
                           value={p.val}
-                          checked={paymentMethod === p.val}
-                          onChange={() => choosePaymentMethod(p.val)}
+                          checked={paymentMethod === p.val && !p.disabled}
+                          disabled={p.disabled}
+                          onChange={() => {
+                            if (!p.disabled) choosePaymentMethod(p.val);
+                          }}
                           aria-label={p.label}
                         />
                         <div>
@@ -948,30 +1035,37 @@ export default function CartPage() {
                       </label>
                     ))}
                   </div>
+                  {(cmsFailed || bankShowUnavailable) && (
+                    <p className="payment-cms-hint" data-payment-cms-hint="1">
+                      {cmsFailed
+                        ? "Payment details could not be loaded. Please contact us on WhatsApp or Telegram if you need help completing your order."
+                        : "Bank transfer is temporarily unavailable. Choose another method or contact us if you need help."}
+                    </p>
+                  )}
 
-                  {paymentMethod === "bank" && (
+                  {paymentMethod === "bank" && bankSelectable && (
                     <>
                       <div className="bank-details" data-bank-details="1">
                         <h4>{t("bank_heading", "Bank Account Details")}</h4>
                         <div className="bank-row bank-row--name">
                           <span>{t("bank_lbl_name", "Account Name")}</span>
                           <span className="bank-row-value">
-                            <span className="bank-row-value__text bank-row-value__text--wrap">{t("bank_account_name", "Robert George Bennett")}</span>
-                            <CopyButton value={t("bank_account_name", "Robert George Bennett")} label="Copy" />
+                            <span className="bank-row-value__text bank-row-value__text--wrap">{bankAccountName}</span>
+                            <CopyButton value={bankAccountName} label="Copy" />
                           </span>
                         </div>
                         <div className="bank-row bank-row--sort">
                           <span>{t("bank_lbl_sort", "Sort Code")}</span>
                           <span className="bank-row-value">
-                            <span className="bank-row-value__text bank-row-value__text--nowrap">{t("bank_sort_code", "60-84-07")}</span>
-                            <CopyButton value={t("bank_sort_code", "60-84-07")} label="Copy" />
+                            <span className="bank-row-value__text bank-row-value__text--nowrap">{bankSortCode}</span>
+                            <CopyButton value={bankSortCode} label="Copy" />
                           </span>
                         </div>
                         <div className="bank-row bank-row--account">
                           <span>{t("bank_lbl_no", "Account No.")}</span>
                           <span className="bank-row-value">
-                            <span className="bank-row-value__text bank-row-value__text--nowrap">{t("bank_account_no", "70745518")}</span>
-                            <CopyButton value={t("bank_account_no", "70745518")} label="Copy" />
+                            <span className="bank-row-value__text bank-row-value__text--nowrap">{bankAccountNo}</span>
+                            <CopyButton value={bankAccountNo} label="Copy" />
                           </span>
                         </div>
                         <div className="bank-row"><span>{t("bank_lbl_ref", "Reference")}</span><span>{t("bank_reference_value", "Your name only")}</span></div>
@@ -1083,7 +1177,7 @@ export default function CartPage() {
                     </>
                   )}
 
-                  {paymentMethod === "cod" && (
+                  {paymentMethod === "cod" && showSecondPaymentOption && (
                     <div className="bank-details" data-cod-note="1">
                       <h4>
                         {digitalOnlyCart
@@ -1092,6 +1186,8 @@ export default function CartPage() {
                       </h4>
                       <div className="bank-row"><span>{t("cart_amount_due", "Amount Due")}</span><span>£{grandTotal.toFixed(2)}</span></div>
                     </div>
+                  )}
+                    </>
                   )}
 
                   <div className="summary-body" style={{background:"rgba(139,0,255,0.05)", borderRadius:"12px", marginBottom:"16px"}}>
@@ -1144,7 +1240,7 @@ export default function CartPage() {
                     className="place-order-btn place-order-btn--inline"
                     data-place-order="inline"
                     data-insights-id="place_order"
-                    disabled={placing || cart.length === 0 || classificationBlocked}
+                    disabled={placing || cart.length === 0 || classificationBlocked || paymentOptionsBlocked}
                     onClick={handleOrder}
                   >
                     {placing ? t("cart_placing", "Placing Order...") : t("cart_place_order", "Place Order →")}
@@ -1184,7 +1280,7 @@ export default function CartPage() {
                 className="place-order-btn"
                 data-place-order="sticky"
                 data-insights-id="place_order"
-                disabled={placing || cart.length === 0 || classificationBlocked}
+                disabled={placing || cart.length === 0 || classificationBlocked || paymentOptionsBlocked}
                 onClick={handleOrder}
               >
                 {placing ? t("cart_placing", "Placing Order...") : t("cart_place_order", "Place Order →")}

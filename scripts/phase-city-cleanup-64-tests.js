@@ -265,6 +265,14 @@ ok(
     "scripts/phase-sidhu-insights-57-tests.js",
     "scripts/phase-tracking-consent-final-tests.js",
     "scripts/phase20g3b-tracking-consent-tests.js",
+    // F4UK-PAY-CMS-66
+    "lib/paymentMethodSettings.ts",
+    "lib/paymentMethodSettingsServer.ts",
+    "lib/siteContentDefaults.ts",
+    "pages/api/orders.ts",
+    "app/cart/page.tsx",
+    "scripts/phase-pay-cms-66-tests.js",
+    "REPO_AUDIT_REPORT.md",
   ]);
   const unexpected = touched.filter((f) => !ALLOWED.has(f));
   ok("diff_allowlist_city_cleanup_64", unexpected.length === 0, unexpected.join(",") || "clean");

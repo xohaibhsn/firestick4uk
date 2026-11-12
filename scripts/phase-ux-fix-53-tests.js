@@ -192,6 +192,13 @@ const allowed = new Set([
   "scripts/phase-clarity-35-tests.js",
   "scripts/phase-tracking-consent-final-tests.js",
   "scripts/phase-home-reviews-61-tests.js",
+  // F4UK-PAY-CMS-66
+  "lib/paymentMethodSettings.ts",
+  "lib/paymentMethodSettingsServer.ts",
+  "lib/siteContentDefaults.ts",
+  "pages/api/orders.ts",
+  "scripts/phase-pay-cms-66-tests.js",
+  "REPO_AUDIT_REPORT.md",
 ]);
 let changed = [];
 try {
@@ -211,11 +218,12 @@ const untracked = execSync("git ls-files --others --exclude-standard", {
   .filter(Boolean);
 const allTouched = [...new Set([...changed, ...untracked])];
 const unexpected = allTouched.filter((f) => !allowed.has(f));
-const forbidden = allTouched.filter((f) =>
-  /^(pages\/api\/|.*sitemap|.*robots|.*layout\.tsx$|Navbar\.tsx$|Footer\.tsx$|lib\/seo)/i.test(
+const forbidden = allTouched.filter((f) => {
+  if (f === "pages/api/orders.ts") return false; // F4UK-PAY-CMS-66 server enforce
+  return /^(pages\/api\/|.*sitemap|.*robots|.*layout\.tsx$|Navbar\.tsx$|Footer\.tsx$|lib\/seo)/i.test(
     f
-  )
-);
+  );
+});
 ok(
   "diff_allowlist_only",
   unexpected.length === 0 && forbidden.length === 0,

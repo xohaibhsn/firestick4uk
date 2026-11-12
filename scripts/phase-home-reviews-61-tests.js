@@ -230,7 +230,15 @@ function sha256File(rel) {
 f === "scripts/phase-insights-live-63-tests.js" ||
       f === "scripts/phase20g3b-tracking-consent-tests.js" ||
       f === "scripts/phase-clarity-35-tests.js" ||
-      f === "scripts/phase-tracking-consent-final-tests.js";
+      f === "scripts/phase-tracking-consent-final-tests.js" ||
+      // F4UK-PAY-CMS-66
+      f === "lib/paymentMethodSettings.ts" ||
+      f === "lib/paymentMethodSettingsServer.ts" ||
+      f === "lib/siteContentDefaults.ts" ||
+      f === "pages/api/orders.ts" ||
+      f === "app/cart/page.tsx" ||
+      f === "scripts/phase-pay-cms-66-tests.js" ||
+      f === "REPO_AUDIT_REPORT.md";
     const unexpected = touched.filter((f) => !allow(f));
     const seoTouched = touched.filter((f) =>
       /^(app\/layout\.tsx|app\/page\.tsx|.*sitemap|.*robots|components\/Navbar|components\/Footer)/i.test(f)

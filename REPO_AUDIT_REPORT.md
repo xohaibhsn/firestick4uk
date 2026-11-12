@@ -160,7 +160,7 @@ The check is `if (approver_role && ...)` — if `approver_role` is **not sent at
 - **Rate limiting is in-memory** — resets on server restart, not suitable for multi-instance/cluster deployments
 - **Admin `sAdminSession` validation** only checks "is it truthy" — not a cryptographic token. Anyone with knowledge of the admin panel can construct the header.
 - **WhatsApp business phone** (`447934519060`) hardcoded in 15+ places — should be a single constant or env var
-- **Bank account details** (`Robert George Bennett`, `60-84-07`, `70745518`) hardcoded in `app/cart/page.tsx` line 488–490 — should be in site settings / env
+- **Bank account details** were previously hardcoded in `app/cart/page.tsx` — remediated in F4UK-PAY-CMS-66 (CMS-only identity fields; no hardcoded account name / sort code / account number in source)
 - **`blog.ts` POST handler**: no validation that `title` exists before INSERT — could create empty blog posts
 
 ---
