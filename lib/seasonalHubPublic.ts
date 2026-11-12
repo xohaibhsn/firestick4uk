@@ -91,7 +91,7 @@ export async function loadPublicSeasonalHubRows(
     const [rows]: any = await queryWithSeasonalUtc(
       db,
       `SELECT id, name, description, short_description, slug, price, badge, image, category, active,
-              lifecycle_mode, shop_listed, season_paused, season_starts_at, season_ends_at, product_version
+              lifecycle_mode, shop_listed, season_paused, season_name, season_starts_at, season_ends_at, product_version
        FROM products WHERE active = 1 AND lifecycle_mode = 'seasonal' ORDER BY id ASC`
     );
     return {
