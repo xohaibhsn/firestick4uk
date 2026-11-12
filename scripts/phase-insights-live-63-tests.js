@@ -259,6 +259,19 @@ const ALLOWED = new Set([
   "scripts/phase-sidhu-insights-56-tests.js",
   "scripts/phase-insights-w2-60-tests.js",
   "scripts/phase-insights-slim-67-tests.js",
+  // F4UK-BLACK-FRIDAY-68
+  "components/product/SeasonalCountdown.tsx",
+  "components/home/SeasonalHomePromoStrip.tsx",
+  "components/Footer.tsx",
+  "lib/seasonalCountdownLabel.ts",
+  "lib/seasonalPriceValidUntil.ts",
+  "lib/adminContentFields.ts",
+  "app/page.tsx",
+  "app/HomeClient.tsx",
+  "app/seasonal-offers/page.tsx",
+  "app/products/[slug]/page.tsx",
+  "app/products/[slug]/ProductDetail.tsx",
+  "scripts/phase-black-friday-68-tests.js",
 ]);
 const SLIM_67_PREFIXES = ["pages/api/admin-insights/", "components/sidhu/insights/"];
 let dirty = [];
@@ -283,14 +296,13 @@ const unexpected = touched.filter(
   (f) => !ALLOWED.has(f) && !SLIM_67_PREFIXES.some((p) => f.startsWith(p))
 );
 ok("diff_allowlist", unexpected.length === 0, unexpected.join(",") || "clean");
+// BF-68 intentionally edits Footer (seasonal link) + home page (promo strip); Navbar/layout/sitemap untouched.
 ok(
   "no_seo_nav_layout_edits",
   !touched.some((f) =>
-    /^(app\/layout\.tsx|components\/Navbar\.tsx|components\/Footer\.tsx|.*sitemap|.*robots)/i.test(
-      f
-    )
+    /^(app\/layout\.tsx|components\/Navbar\.tsx|.*sitemap|.*robots)/i.test(f)
   ),
-  touched.filter((f) => /layout|Navbar|Footer|sitemap|robots/i.test(f)).join(",") ||
+  touched.filter((f) => /layout|Navbar|sitemap|robots/i.test(f)).join(",") ||
     "clean"
 );
 

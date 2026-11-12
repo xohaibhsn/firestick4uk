@@ -41,6 +41,10 @@ export const EXTRA_CONTENT_DEFAULTS: Array<[string, string, string, string, stri
   ['home_remove','Remove','text','home','Remove from Cart Label'],
   ['home_hero_tag',"UK's #1 Firestick Service",'text','home','Main Hero Tag'],
   ['home_why_tag','Why Choose Us','text','home','Why Choose Us Tag'],
+  ['seasonal_promo_text','Seasonal offers are live — limited-time deals','text','home','Seasonal Promo Strip Text'],
+  ['seasonal_promo_cta','View offers','text','home','Seasonal Promo Strip CTA'],
+  ['season_countdown_prefix','Offer ends in','text','settings','Seasonal Countdown Prefix (Live)'],
+  ['season_countdown_upcoming_prefix','Offer starts in','text','settings','Seasonal Countdown Prefix (Upcoming)'],
 
   // About
   ['about_hero_tag','Our Story','text','about','Hero Tag'],

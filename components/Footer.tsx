@@ -3,7 +3,12 @@
 import { useSiteContent } from "@/hooks/useSiteContent";
 import { openTrackingPreferences } from "@/lib/trackingConsent";
 
-export default function Footer() {
+export default function Footer({
+  showSeasonalOffersLink = false,
+}: {
+  /** Server-resolved: only true when seasonal hub is effectivelyPublic. */
+  showSeasonalOffersLink?: boolean;
+} = {}) {
   const { t } = useSiteContent();
   const logo = t("footer_logo_text", t("site_title", "FIRESTICK4UK")).toUpperCase();
   const copy = t("footer_text", "© 2026 Firestick4UK. All rights reserved.");
@@ -18,6 +23,9 @@ export default function Footer() {
     { href: t("footer_terms_link", "/terms"), label: t("footer_terms_text", "Terms & Conditions") },
     { href: t("footer_refund_link", "/refund-policy"), label: t("footer_refund_text", "Refund Policy") },
     { href: t("footer_faq_link", "/faq"), label: t("footer_faq_text", "FAQ") },
+    ...(showSeasonalOffersLink
+      ? [{ href: "/seasonal-offers", label: "Seasonal Offers" }]
+      : []),
   ];
 
   return (

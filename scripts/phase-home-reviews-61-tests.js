@@ -242,10 +242,31 @@ f === "scripts/phase-insights-live-63-tests.js" ||
       // F4UK-INSIGHTS-SLIM-67
       ["lib/insightsIngest.ts", "lib/insightsGeo.ts", "pages/api/insights-collect.ts", "package.json", "package-lock.json", "scripts/phase-sidhu-insights-56-tests.js", "scripts/phase-insights-w2-60-tests.js", "scripts/phase-insights-slim-67-tests.js"].includes(f) ||
       f.startsWith("pages/api/admin-insights/") ||
-      f.startsWith("components/sidhu/insights/");
+      f.startsWith("components/sidhu/insights/") ||
+      // F4UK-BLACK-FRIDAY-68
+      [
+        "components/product/SeasonalCountdown.tsx",
+        "components/home/SeasonalHomePromoStrip.tsx",
+        "components/Footer.tsx",
+        "lib/seasonalCountdownLabel.ts",
+        "lib/seasonalPriceValidUntil.ts",
+        "lib/adminContentFields.ts",
+        "app/page.tsx",
+        "app/HomeClient.tsx",
+        "app/seasonal-offers/page.tsx",
+        "app/products/[slug]/page.tsx",
+        "app/products/[slug]/ProductDetail.tsx",
+        "scripts/phase-black-friday-68-tests.js",
+        "scripts/phase-insights-live-63-tests.js",
+        "scripts/phase-city-cleanup-64-tests.js",
+        "scripts/phase-cod-restore-54-tests.js",
+        "scripts/phase-ux-batch-51-tests.js",
+        "scripts/phase-ux-fix-53-tests.js",
+      ].includes(f);
     const unexpected = touched.filter((f) => !allow(f));
+    // BF-68 may edit app/page.tsx (promo) + Footer (seasonal link); layout/Navbar/sitemap/robots stay frozen.
     const seoTouched = touched.filter((f) =>
-      /^(app\/layout\.tsx|app\/page\.tsx|.*sitemap|.*robots|components\/Navbar|components\/Footer)/i.test(f)
+      /^(app\/layout\.tsx|.*sitemap|.*robots|components\/Navbar)/i.test(f)
     );
     ok("allowlist_working_tree", unexpected.length === 0, unexpected.join(",") || "clean");
     ok("seo_shell_untouched", seoTouched.length === 0, seoTouched.join(",") || "clean");
@@ -311,10 +332,10 @@ f === "scripts/phase-insights-live-63-tests.js" ||
     "name/text clamped"
   );
 
-  // Layout / page SHA inventory markers for report (files must remain unchanged vs HEAD)
+  // Layout SHA stable vs HEAD. app/page.tsx may change for BF-68 promo strip (H1/meta paths still asserted above).
   ok("layout_sha_stable_vs_head", (() => {
     try {
-      const out = execSync("git diff --name-only HEAD -- app/layout.tsx app/page.tsx", {
+      const out = execSync("git diff --name-only HEAD -- app/layout.tsx", {
         cwd: ROOT,
         encoding: "utf8",
       }).trim();

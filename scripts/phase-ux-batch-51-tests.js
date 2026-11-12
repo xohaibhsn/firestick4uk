@@ -324,9 +324,10 @@ const allTouched = [...new Set([...changed, ...untracked])];
 const payCms66ApiAllow = new Set(["pages/api/orders.ts"]);
 // F4UK-INSIGHTS-SLIM-67: Insights ingest/admin API edits are expected in this working tree
 const slim67Api = (n) => n.startsWith("pages/api/admin-insights/") || n === "pages/api/insights-collect.ts";
+const bf68ShellAllow = new Set(["components/Footer.tsx"]);
 const blocked = allTouched.filter((f) => {
   const n = f.replace(/\\/g, "/");
-  if (payCms66ApiAllow.has(n) || slim67Api(n)) return false;
+  if (payCms66ApiAllow.has(n) || slim67Api(n) || bf68ShellAllow.has(n)) return false;
   return forbidden.some((re) => re.test(n));
 });
 ok(
@@ -339,16 +340,25 @@ const allowedPrefixes = [
   "app/cart/",
   "app/products/",
   "app/HomeClient.tsx",
+  "app/page.tsx",
+  "app/seasonal-offers/",
   "app/lib/cartContext.tsx",
   "components/WhatsAppButton.tsx",
   "components/TrackingConsent.tsx",
   "components/MiniCartBar.tsx",
   "components/CopyButton.tsx",
+  "components/Footer.tsx",
+  "components/product/",
+  "components/home/",
   "lib/clipboardCopy.ts",
   "lib/stockBadgeLabel.ts",
+  "lib/seasonalCountdownLabel.ts",
+  "lib/seasonalPriceValidUntil.ts",
+  "lib/adminContentFields.ts",
   "scripts/phase-ux-batch-51-tests.js",
   "scripts/phase-ux-fix-53-tests.js",
   "scripts/phase-cod-restore-54-tests.js",
+  "scripts/phase-black-friday-68-tests.js",
   "lib/homeTestimonials.ts",
   "app/sidhu/page.tsx",
   "scripts/phase-home-reviews-61-tests.js",

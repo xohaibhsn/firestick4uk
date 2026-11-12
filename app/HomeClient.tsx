@@ -7,6 +7,7 @@ import { useCart } from "./lib/cartContext";
 import Navbar from "@/components/Navbar";
 import HeroSlider from "@/components/HeroSlider";
 import Footer from "@/components/Footer";
+import SeasonalHomePromoStrip from "@/components/home/SeasonalHomePromoStrip";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import type { PublicProduct } from "@/lib/publicProductsServer";
 import {
@@ -128,12 +129,24 @@ interface Product {
   image: string | null;
 }
 
+export type SeasonalHomePromoProps = {
+  text: string;
+  cta: string;
+  endsAt?: string | null;
+  showCountdown?: boolean;
+  prefix?: string;
+  upcomingPrefix?: string;
+};
+
 interface HomeClientProps {
   topHeroTitle?: string;
   topHeroSubtitle?: string;
   heroTitle?: string;
   heroSubtitle?: string;
   initialProducts?: PublicProduct[];
+  /** SSR: only set when hub is effectivelyPublic with ≥1 live member. */
+  seasonalPromo?: SeasonalHomePromoProps | null;
+  showSeasonalOffersLink?: boolean;
 }
 
 function productDetailHref(p: Product): string {
@@ -163,6 +176,8 @@ export default function HomeClient({
   heroTitle = "Premium UK Streaming Service",
   heroSubtitle = "Firestick4UK provides premium UK streaming services for Firestick and Android Box users.",
   initialProducts = [],
+  seasonalPromo = null,
+  showSeasonalOffersLink = false,
 }: HomeClientProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [loading, setLoading] = useState(initialProducts.length === 0);
@@ -702,6 +717,17 @@ export default function HomeClient({
 
       <Navbar cartCount={itemCount} cta="cart" />
 
+      {seasonalPromo ? (
+        <SeasonalHomePromoStrip
+          text={seasonalPromo.text}
+          cta={seasonalPromo.cta}
+          endsAt={seasonalPromo.endsAt}
+          showCountdown={seasonalPromo.showCountdown}
+          prefix={seasonalPromo.prefix}
+          upcomingPrefix={seasonalPromo.upcomingPrefix}
+        />
+      ) : null}
+
       <div className="page-wrapper">
         <HeroSlider slides={slides}>
           <div className="slider-hero-inner">
@@ -986,7 +1012,7 @@ export default function HomeClient({
           )}
         </div>
 
-        <Footer />
+        <Footer showSeasonalOffersLink={showSeasonalOffersLink} />
       </div>
 
     </>

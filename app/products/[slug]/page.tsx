@@ -18,12 +18,17 @@ import {
   PRODUCT9_LEGACY_SLUG_REDIRECTS,
 } from "@/lib/productLegacyRedirects";
 import { detectProductSchemaCapability } from "@/lib/productSchemaCapabilityServer";
-import { isPurchasable, resolveSeasonPhase } from "@/lib/productSeasonEligibility";
+import {
+  hasValidWindow,
+  isPurchasable,
+  resolveSeasonPhase,
+} from "@/lib/productSeasonEligibility";
 import { floorSecondUtcMs, normalizeSeasonalUtcFields } from "@/lib/productSeasonLondon";
 import { queryWithSeasonalUtc } from "@/lib/productSeasonalQuery";
 import { toPublicDetailProduct } from "@/lib/productPublicDto";
 import { loadSeasonalAlternativeCards } from "@/lib/productSeasonAlternativesServer";
 import { resolveSeasonalHubPublicState } from "@/lib/seasonalHubPublic";
+import { londonDateYmdFromUtcInstant } from "@/lib/seasonalPriceValidUntil";
 
 interface Product {
   id: number;
@@ -181,7 +186,7 @@ const resolveProduct = cache(async (rawSlug: string): Promise<ResolveResult> => 
 function buildProductJsonLd(
   product: Product,
   productUrl: string,
-  opts: { includeOffer: boolean }
+  opts: { includeOffer: boolean; nowMs?: number }
 ): Record<string, unknown> {
   const description = stripHtml(
     product.short_description || product.description || product.full_description || ""
@@ -200,7 +205,7 @@ function buildProductJsonLd(
 
   // Non-live seasonal: retain Product identity; omit Offer (no fabricated PreOrder/SoldOut).
   if (opts.includeOffer) {
-    ld.offers = {
+    const offer: Record<string, unknown> = {
       "@type": "Offer",
       price: String(Number(product.price).toFixed(2)),
       priceCurrency: "GBP",
@@ -211,6 +216,17 @@ function buildProductJsonLd(
         name: "Firestick4UK",
       },
     };
+    // ONLY seasonal products with a valid window get priceValidUntil (London date of end).
+    // Permanent Offer objects must remain byte-identical to pre-change shape.
+    const life = String(product.lifecycle_mode || "");
+    if (
+      life === "seasonal" &&
+      hasValidWindow(product, opts.nowMs ?? floorSecondUtcMs())
+    ) {
+      const until = londonDateYmdFromUtcInstant(product.season_ends_at);
+      if (until) offer.priceValidUntil = until;
+    }
+    ld.offers = offer;
   }
 
   if (description) ld.description = description;
@@ -320,6 +336,7 @@ export default async function ProductDetailPage({
   const productUrl = `https://firestick4uk.com/products/${canonicalSlug}`;
   const productLd = buildProductJsonLd(product, productUrl, {
     includeOffer: purchasable,
+    nowMs,
   });
 
   return (
@@ -338,6 +355,7 @@ export default async function ProductDetailPage({
         seasonPhase={phase}
         purchasable={purchasable}
         showHubLink={hubState.effectivelyPublic}
+        showSeasonalOffersLink={hubState.effectivelyPublic}
         availableOffers={alts.available}
         upcomingOffers={alts.upcoming}
       />

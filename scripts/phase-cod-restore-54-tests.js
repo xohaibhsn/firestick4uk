@@ -219,6 +219,21 @@ const allow = new Set([
   "pages/api/orders.ts",
   "scripts/phase-pay-cms-66-tests.js",
   "REPO_AUDIT_REPORT.md",
+  // F4UK-BLACK-FRIDAY-68
+  "components/product/SeasonalCountdown.tsx",
+  "components/home/SeasonalHomePromoStrip.tsx",
+  "components/Footer.tsx",
+  "lib/seasonalCountdownLabel.ts",
+  "lib/seasonalPriceValidUntil.ts",
+  "lib/adminContentFields.ts",
+  "app/page.tsx",
+  "app/HomeClient.tsx",
+  "app/seasonal-offers/page.tsx",
+  "app/products/[slug]/page.tsx",
+  "app/products/[slug]/ProductDetail.tsx",
+  "scripts/phase-black-friday-68-tests.js",
+  "scripts/phase-insights-live-63-tests.js",
+  "scripts/phase-city-cleanup-64-tests.js",
 ]);
 // F4UK-INSIGHTS-SLIM-67: Insights files edited in this working tree
 const slim67Files = new Set(["lib/insightsIngest.ts", "lib/insightsGeo.ts", "pages/api/insights-collect.ts", "package.json", "package-lock.json", "scripts/phase-sidhu-insights-56-tests.js", "scripts/phase-insights-w2-60-tests.js", "scripts/phase-insights-slim-67-tests.js"]);

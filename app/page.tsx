@@ -7,6 +7,13 @@ import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import { defaultSocialImages } from "@/lib/socialMetadata";
 import { getDefaultOgImageFromSettings } from "@/lib/socialMetadataServer";
 import { getPublicActiveProducts } from "@/lib/publicProductsServer";
+import { isHubLiveMember } from "@/lib/productSeasonEligibility";
+import {
+  floorSecondUtcMs,
+  parseUtcSqlToMs,
+  utcMsToUtcIso,
+} from "@/lib/productSeasonLondon";
+import { resolveSeasonalHubPublicState } from "@/lib/seasonalHubPublic";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -26,7 +33,11 @@ const getHomeContent = cache(async (): Promise<Record<string, string>> => {
             'home_top_hero_subtitle',
             'home_hero_title',
             'home_hero_subtitle',
-            'home_tagline'
+            'home_tagline',
+            'seasonal_promo_text',
+            'seasonal_promo_cta',
+            'season_countdown_prefix',
+            'season_countdown_upcoming_prefix'
           )`
     );
     const result: Record<string, string> = {};
@@ -75,10 +86,50 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [content, initialProducts] = await Promise.all([
+  const nowMs = floorSecondUtcMs();
+  const [content, initialProducts, hubState] = await Promise.all([
     getHomeContent(),
     getPublicActiveProducts(),
+    resolveSeasonalHubPublicState(pool, { nowMs }),
   ]);
+
+  let seasonalPromo: {
+    text: string;
+    cta: string;
+    endsAt?: string | null;
+    showCountdown?: boolean;
+    prefix?: string;
+    upcomingPrefix?: string;
+  } | null = null;
+
+  if (hubState.effectivelyPublic) {
+    const live = hubState.rows.filter((r: any) =>
+      isHubLiveMember(r, nowMs, hubState.capability)
+    );
+    if (live.length > 0) {
+      let earliestEndMs: number | null = null;
+      let earliestEndRaw: string | null = null;
+      for (const r of live) {
+        const endMs = parseUtcSqlToMs(r.season_ends_at);
+        if (endMs == null) continue;
+        if (earliestEndMs == null || endMs < earliestEndMs) {
+          earliestEndMs = endMs;
+          earliestEndRaw = utcMsToUtcIso(endMs);
+        }
+      }
+      seasonalPromo = {
+        text:
+          content.seasonal_promo_text?.trim() ||
+          "Seasonal offers are live — limited-time deals",
+        cta: content.seasonal_promo_cta?.trim() || "View offers",
+        endsAt: earliestEndRaw,
+        showCountdown: Boolean(earliestEndRaw),
+        prefix: content.season_countdown_prefix?.trim() || "Offer ends in",
+        upcomingPrefix:
+          content.season_countdown_upcoming_prefix?.trim() || "Offer starts in",
+      };
+    }
+  }
 
   return (
     <>
@@ -101,6 +152,8 @@ export default async function HomePage() {
           "Firestick4UK provides premium UK streaming services for Firestick and Android Box users."
         }
         initialProducts={initialProducts}
+        seasonalPromo={seasonalPromo}
+        showSeasonalOffersLink={hubState.effectivelyPublic}
       />
     </>
   );

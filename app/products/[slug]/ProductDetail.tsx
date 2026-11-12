@@ -63,6 +63,7 @@ export default function ProductDetail({
   seasonPhase = "permanent",
   purchasable = true,
   showHubLink = false,
+  showSeasonalOffersLink = false,
   availableOffers = [],
   upcomingOffers = [],
   /** Test-only coherent clock shared with SeasonalCountdown. */
@@ -75,6 +76,7 @@ export default function ProductDetail({
   seasonPhase?: string;
   purchasable?: boolean;
   showHubLink?: boolean;
+  showSeasonalOffersLink?: boolean;
   availableOffers?: SeasonalAltCard[];
   upcomingOffers?: SeasonalAltCard[];
   getNowMs?: () => number;
@@ -525,6 +527,11 @@ export default function ProductDetail({
                   endsAt={product.season_ends_at}
                   onBoundary={onSeasonBoundary}
                   getNowMs={getNowMs}
+                  prefix={t("season_countdown_prefix", "Offer ends in")}
+                  upcomingPrefix={t(
+                    "season_countdown_upcoming_prefix",
+                    "Offer starts in"
+                  )}
                 />
                 <div className="meta-row">
                   <span className="meta-pill" data-stock-badge="1">{stockBadgeLabel(product.stock)}</span>
@@ -660,7 +667,7 @@ export default function ProductDetail({
           </div>
         </div>
       ) : null}
-        <Footer />
+        <Footer showSeasonalOffersLink={showSeasonalOffersLink} />
 
     </>
   );

@@ -238,14 +238,13 @@ ok(
     .filter(Boolean);
   const touched = [...new Set([...dirty, ...untracked])];
   ok("insightsGeo_ts_removed", !fs.existsSync(path.join(ROOT, "lib/insightsGeo.ts")));
+  // BF-68 may touch Footer (seasonal link); layout/Navbar/sitemap must stay clean.
   ok(
     "no_seo_nav_layout_files_changed",
     !touched.some((f) =>
-      /^(app\/layout\.tsx|components\/Navbar\.tsx|components\/Footer\.tsx|app\/sitemap\.ts)/.test(
-        f
-      )
+      /^(app\/layout\.tsx|components\/Navbar\.tsx|app\/sitemap\.ts)/.test(f)
     ),
-    touched.filter((f) => /layout|Navbar|Footer|sitemap/i.test(f)).join(",") || "clean"
+    touched.filter((f) => /layout|Navbar|sitemap/i.test(f)).join(",") || "clean"
   );
 
   const ALLOWED = new Set([
@@ -282,6 +281,19 @@ ok(
     "scripts/phase-sidhu-insights-56-tests.js",
     "scripts/phase-insights-w2-60-tests.js",
     "scripts/phase-insights-slim-67-tests.js",
+    // F4UK-BLACK-FRIDAY-68
+    "components/product/SeasonalCountdown.tsx",
+    "components/home/SeasonalHomePromoStrip.tsx",
+    "components/Footer.tsx",
+    "lib/seasonalCountdownLabel.ts",
+    "lib/seasonalPriceValidUntil.ts",
+    "lib/adminContentFields.ts",
+    "app/page.tsx",
+    "app/HomeClient.tsx",
+    "app/seasonal-offers/page.tsx",
+    "app/products/[slug]/page.tsx",
+    "app/products/[slug]/ProductDetail.tsx",
+    "scripts/phase-black-friday-68-tests.js",
   ]);
   const SLIM_67_PREFIXES = ["pages/api/admin-insights/", "components/sidhu/insights/"];
   const unexpected = touched.filter(

@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { floorSecondUtcMs, parseUtcSqlToMs } from "@/lib/productSeasonLondon";
+import {
+  DEFAULT_COUNTDOWN_PREFIX,
+  DEFAULT_COUNTDOWN_UPCOMING_PREFIX,
+  formatSeasonalCountdownRemaining,
+} from "@/lib/seasonalCountdownLabel";
 
 /**
  * Presentation countdown. On start/end boundary, notifies parent once for
@@ -15,6 +20,8 @@ export default function SeasonalCountdown({
   onBoundary,
   /** Test-only coherent clock; production defaults to wall UTC seconds. */
   getNowMs,
+  prefix = DEFAULT_COUNTDOWN_PREFIX,
+  upcomingPrefix = DEFAULT_COUNTDOWN_UPCOMING_PREFIX,
 }: {
   phase: string;
   show: boolean;
@@ -22,6 +29,8 @@ export default function SeasonalCountdown({
   endsAt?: string | null;
   onBoundary?: (kind: "start" | "end") => void;
   getNowMs?: () => number;
+  prefix?: string;
+  upcomingPrefix?: string;
 }) {
   const readNow = () => (getNowMs ? getNowMs() : floorSecondUtcMs());
   const [nowMs, setNowMs] = useState(() => readNow());
@@ -62,20 +71,12 @@ export default function SeasonalCountdown({
         return;
       }
       const totalSec = Math.floor(diff / 1000);
-      const d = Math.floor(totalSec / 86400);
-      const h = Math.floor((totalSec % 86400) / 3600);
-      const m = Math.floor((totalSec % 3600) / 60);
-      const s = totalSec % 60;
-      const parts = [
-        d > 0 ? `${d}d` : null,
-        `${h}h`,
-        `${m}m`,
-        `${s}s`,
-      ].filter(Boolean);
       setLabel(
-        phase === "upcoming"
-          ? `Opens in ${parts.join(" ")}`
-          : `Ends in ${parts.join(" ")}`
+        formatSeasonalCountdownRemaining(totalSec, {
+          phase: phase === "upcoming" ? "upcoming" : "live",
+          prefix,
+          upcomingPrefix,
+        })
       );
     };
 
@@ -92,7 +93,7 @@ export default function SeasonalCountdown({
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [show, phase, startsAt, endsAt, onBoundary, getNowMs]);
+  }, [show, phase, startsAt, endsAt, onBoundary, getNowMs, prefix, upcomingPrefix]);
 
   if (!show) return null;
   if (phase === "paused" || phase === "ended" || phase === "permanent" || phase === "private") {

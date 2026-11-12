@@ -498,6 +498,30 @@ async function main() {
     ) {
       return true;
     }
+    // F4UK-BLACK-FRIDAY-68
+    if (
+      [
+        "components/product/SeasonalCountdown.tsx",
+        "components/home/SeasonalHomePromoStrip.tsx",
+        "components/Footer.tsx",
+        "lib/seasonalCountdownLabel.ts",
+        "lib/seasonalPriceValidUntil.ts",
+        "lib/adminContentFields.ts",
+        "app/page.tsx",
+        "app/seasonal-offers/page.tsx",
+        "app/products/[slug]/page.tsx",
+        "scripts/phase-black-friday-68-tests.js",
+        "scripts/phase-insights-live-63-tests.js",
+        "scripts/phase-city-cleanup-64-tests.js",
+        "scripts/phase-home-reviews-61-tests.js",
+        "scripts/phase-ux-batch-51-tests.js",
+        "scripts/phase-ux-fix-53-tests.js",
+        "scripts/phase-cod-restore-54-tests.js",
+        "scripts/phase-windup-59-tests.js",
+      ].includes(rel)
+    ) {
+      return true;
+    }
     return false;
   };
   const bad = [...names].filter((n) => !allow(n));

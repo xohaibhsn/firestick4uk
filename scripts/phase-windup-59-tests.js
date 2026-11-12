@@ -98,6 +98,19 @@ const ALLOWLIST = new Set([
   "pages/api/admin-insights/summary.ts",
   "pages/api/admin-insights/click-map.ts",
   "pages/api/admin-insights/page-behaviour.ts",
+  // F4UK-BLACK-FRIDAY-68
+  "components/product/SeasonalCountdown.tsx",
+  "components/home/SeasonalHomePromoStrip.tsx",
+  "components/Footer.tsx",
+  "lib/seasonalCountdownLabel.ts",
+  "lib/seasonalPriceValidUntil.ts",
+  "lib/adminContentFields.ts",
+  "app/page.tsx",
+  "app/seasonal-offers/page.tsx",
+  "app/products/[slug]/page.tsx",
+  "scripts/phase-black-friday-68-tests.js",
+  "scripts/phase-insights-live-63-tests.js",
+  "scripts/phase-city-cleanup-64-tests.js",
 ]);
 
 const BASE_SHA = "76067a765b091bbbf0f2d4375c3d17f0b3af53bc";

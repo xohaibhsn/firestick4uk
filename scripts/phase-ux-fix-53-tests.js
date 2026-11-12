@@ -199,6 +199,22 @@ const allowed = new Set([
   "pages/api/orders.ts",
   "scripts/phase-pay-cms-66-tests.js",
   "REPO_AUDIT_REPORT.md",
+  // F4UK-BLACK-FRIDAY-68
+  "components/product/SeasonalCountdown.tsx",
+  "components/home/SeasonalHomePromoStrip.tsx",
+  "components/Footer.tsx",
+  "lib/seasonalCountdownLabel.ts",
+  "lib/seasonalPriceValidUntil.ts",
+  "lib/adminContentFields.ts",
+  "app/page.tsx",
+  "app/HomeClient.tsx",
+  "app/seasonal-offers/page.tsx",
+  "app/products/[slug]/page.tsx",
+  "app/products/[slug]/ProductDetail.tsx",
+  "scripts/phase-black-friday-68-tests.js",
+  "scripts/phase-insights-live-63-tests.js",
+  "scripts/phase-city-cleanup-64-tests.js",
+  "scripts/phase-cod-restore-54-tests.js",
 ]);
 let changed = [];
 try {
@@ -226,6 +242,7 @@ const slim67 = (f) =>
 const unexpected = allTouched.filter((f) => !allowed.has(f) && !slim67(f));
 const forbidden = allTouched.filter((f) => {
   if (f === "pages/api/orders.ts") return false; // F4UK-PAY-CMS-66 server enforce
+  if (f === "components/Footer.tsx") return false; // F4UK-BLACK-FRIDAY-68 seasonal link
   if (slim67(f)) return false;
   return /^(pages\/api\/|.*sitemap|.*robots|.*layout\.tsx$|Navbar\.tsx$|Footer\.tsx$|lib\/seo)/i.test(
     f

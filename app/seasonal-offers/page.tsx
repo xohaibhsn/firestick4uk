@@ -49,11 +49,29 @@ export default async function SeasonalOffersHubPage() {
 
   // Temporary-failure / unknown flag must not be masked by an early "not published" branch.
   // HTTP remains 200 with robots noindex when not effectivelyPublic (metadata above).
+  // List DTO drops season_name — read names from hub rows for live members.
+  const subtitleNames = Array.from(
+    new Set(
+      state.rows
+        .filter((r: any) => isHubLiveMember(r, nowMs, capability))
+        .map((r: any) => String(r.season_name || "").trim())
+        .filter(Boolean)
+    )
+  );
+
   return (
     <>
       <Navbar />
       <main style={{ maxWidth: 960, margin: "0 auto", padding: "100px 20px 60px" }}>
         <h1 style={{ fontSize: 28, marginBottom: 8 }}>Seasonal Offers</h1>
+        {state.effectivelyPublic && subtitleNames.length > 0 ? (
+          <p
+            data-testid="seasonal-hub-subtitle"
+            style={{ fontSize: 16, color: "#4C1D95", marginBottom: 16, fontWeight: 600 }}
+          >
+            {subtitleNames.join(" · ")}
+          </p>
+        ) : null}
         {state.temporarilyUnavailable || state.storedPublished == null ? (
           <p data-testid="seasonal-hub-unavailable" style={{ color: "#666" }}>
             Seasonal offers are temporarily unavailable. Please try again shortly.
@@ -79,7 +97,7 @@ export default async function SeasonalOffersHubPage() {
           </>
         )}
       </main>
-      <Footer />
+      <Footer showSeasonalOffersLink={state.effectivelyPublic} />
     </>
   );
 }
