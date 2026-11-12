@@ -11,23 +11,18 @@ import {
   setInsightsOptOut,
 } from "@/lib/insightsClient";
 import type {
-  InsightsGeoFileStatus,
   InsightsSettingsResponse,
   InsightsSettingsValues,
 } from "./insightsTypes";
 import {
-  PURPLE,
   ResourceView,
   S,
-  fmtBytes,
   fmtInt,
   fmtUtc,
   useInsightsResource,
 } from "./shared";
 
-const FALLBACK_ATTRIBUTION = { text: "IP Geolocation by DB-IP", url: "https://db-ip.com" } as const;
-
-type BoolKey = "enabled" | "recording_enabled" | "kill_switch" | "geo_city_enabled";
+type BoolKey = "enabled" | "recording_enabled" | "kill_switch";
 type IntKey =
   | "cleanup_min_interval_sec"
   | "detail_retention_days"
@@ -42,11 +37,6 @@ const BOOL_FIELDS: Array<{ key: BoolKey; label: string; help: string }> = [
     help: "Stores visitor sessions and events. Must stay OFF until the privacy text is approved.",
   },
   { key: "kill_switch", label: "Kill switch", help: "Immediately stops all recording when ON." },
-  {
-    key: "geo_city_enabled",
-    label: "City-level geography",
-    help: "Uses the DB-IP City file when present. Default OFF.",
-  },
 ];
 
 const INT_FIELDS: Array<{ key: IntKey; label: string; unit: string }> = [
@@ -56,26 +46,11 @@ const INT_FIELDS: Array<{ key: IntKey; label: string; unit: string }> = [
   { key: "ip_full_retention_days", label: "Full IP retention", unit: "days" },
 ];
 
-function GeoFileRow({ name, status }: { name: string; status: InsightsGeoFileStatus }) {
-  const label = !status.configured
-    ? "Not configured"
-    : status.present
-      ? `Present (${fmtBytes(status.size_bytes)})`
-      : "Configured, file missing";
-  return (
-    <tr>
-      <td style={S.td}>{name}</td>
-      <td style={S.td}>{label}</td>
-    </tr>
-  );
-}
-
 function pickValues(s: InsightsSettingsValues): Record<BoolKey, boolean> & Record<IntKey, number> {
   return {
     enabled: s.enabled,
     recording_enabled: s.recording_enabled,
     kill_switch: s.kill_switch,
-    geo_city_enabled: s.geo_city_enabled,
     cleanup_min_interval_sec: s.cleanup_min_interval_sec,
     detail_retention_days: s.detail_retention_days,
     summary_retention_days: s.summary_retention_days,
@@ -101,10 +76,6 @@ function SettingsBody({
   const [privacyApproved, setPrivacyApproved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
-  const attribution =
-    data.geo.attribution?.text && data.geo.attribution?.url
-      ? data.geo.attribution
-      : FALLBACK_ATTRIBUTION;
 
   const enablingRecording = draft.recording_enabled && !current.recording_enabled;
 
@@ -182,7 +153,6 @@ function SettingsBody({
                   ["Insights enabled", s.enabled ? "ON" : "OFF"],
                   ["Recording enabled", s.recording_enabled ? "ON" : "OFF"],
                   ["Kill switch", s.kill_switch ? "ON (recording stopped)" : "OFF"],
-                  ["City geography", s.geo_city_enabled ? "ON" : "OFF"],
                   ["Recording active now", data.recording_active ? "YES" : "NO"],
                   ["Cleanup minimum interval", `${fmtInt(s.cleanup_min_interval_sec)} seconds`],
                   ["Detailed retention", `${fmtInt(s.detail_retention_days)} days`],
@@ -280,41 +250,6 @@ function SettingsBody({
         <button type="button" style={S.btn} disabled={busy} onClick={() => void save()}>
           {busy ? "Saving…" : "Save settings"}
         </button>
-      </div>
-
-      <div style={S.card}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <h3 style={{ ...S.cardTitle, margin: 0 }}>Geo database files</h3>
-          <button
-            type="button"
-            style={S.btnGhost}
-            disabled={busy}
-            onClick={() => void post({ action: "reload_geo_db" }, "Geo database reloaded.")}
-          >
-            Reload geo DB
-          </button>
-        </div>
-        <div className="sin-table-wrap" style={{ marginTop: 12 }}>
-          <table>
-            <tbody>
-              <GeoFileRow name="Country file" status={data.geo.country} />
-              <GeoFileRow name="ASN file" status={data.geo.asn} />
-              <GeoFileRow name="City file" status={data.geo.city} />
-              <tr>
-                <td style={S.td}>Loaded in memory</td>
-                <td style={S.td}>{data.geo.loaded ? "Yes" : "No (loads on first lookup)"}</td>
-              </tr>
-              <tr>
-                <td style={S.td}>Attribution</td>
-                <td style={S.td}>
-                  <a href={attribution.url} target="_blank" rel="noopener noreferrer" style={{ color: PURPLE }}>
-                    {attribution.text}
-                  </a>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
       </div>
 
       <div style={S.card}>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import KpiGrid from "./KpiGrid";
-import type { InsightsSummaryResponse } from "./insightsTypes";
+import type { InsightsSummaryResponse, InsightsTopPath } from "./insightsTypes";
 import { rangeFromPreset } from "./insightsTypes";
 import {
   IncludeBotsToggle,
@@ -15,6 +15,39 @@ import {
 } from "./shared";
 
 const TOP_N = 5;
+
+function PathTable({ title, rows }: { title: string; rows: InsightsTopPath[] }) {
+  return (
+    <div style={S.card}>
+      <h3 style={S.cardTitle}>{title}</h3>
+      <div className="sin-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style={S.th}>Path</th>
+              <th style={{ ...S.th, textAlign: "right" }}>Sessions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td style={S.td} colSpan={2}>
+                  No data yet
+                </td>
+              </tr>
+            )}
+            {rows.slice(0, TOP_N).map((p) => (
+              <tr key={p.path}>
+                <td style={{ ...S.td, wordBreak: "break-all" }}>{p.path}</td>
+                <td style={S.tdNum}>{fmtInt(p.sessions)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 export default function TodayScreen() {
   const [includeBots, setIncludeBots] = useState(false);
@@ -40,57 +73,15 @@ export default function TodayScreen() {
           return (
             <>
               <NotesList notes={d.notes} />
-              <KpiGrid kpis={k} />
+              <KpiGrid kpis={k} avgEngagedMs={d.avg_engaged_ms} />
               {alerts.length > 0 && (
                 <div role="alert" style={{ ...S.card, background: "#FFF7ED", borderColor: "#FDBA74", fontSize: 13, color: "#9A3412" }}>
                   <strong>Alerts:</strong> {alerts.join(" · ")}
                 </div>
               )}
               <div className="sin-two">
-                <div style={S.card}>
-                  <h3 style={S.cardTitle}>Top countries</h3>
-                  <div className="sin-table-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th style={S.th}>Country</th>
-                          <th style={{ ...S.th, textAlign: "right" }}>Visitors</th>
-                          <th style={{ ...S.th, textAlign: "right" }}>Sessions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {d.top_countries.slice(0, TOP_N).map((c) => (
-                          <tr key={c.country}>
-                            <td style={S.td}>{c.country}</td>
-                            <td style={S.tdNum}>{fmtInt(c.visitors)}</td>
-                            <td style={S.tdNum}>{fmtInt(c.sessions)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                <div style={S.card}>
-                  <h3 style={S.cardTitle}>Top pages</h3>
-                  <div className="sin-table-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th style={S.th}>Path</th>
-                          <th style={{ ...S.th, textAlign: "right" }}>Pageviews</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {d.top_paths.slice(0, TOP_N).map((p) => (
-                          <tr key={p.path}>
-                            <td style={{ ...S.td, wordBreak: "break-all" }}>{p.path}</td>
-                            <td style={S.tdNum}>{fmtInt(p.pageviews)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <PathTable title="Top landing pages" rows={d.top_landings} />
+                <PathTable title="Top exit pages" rows={d.top_exits} />
               </div>
             </>
           );

@@ -217,7 +217,6 @@ async function main() {
     "pages/api/admin-insights/funnel.ts",
     "pages/api/admin-insights/checkout-problems.ts",
     "pages/api/admin-insights/orders-attribution.ts",
-    "pages/api/admin-insights/returning.ts",
     "pages/api/admin-insights/export.ts",
   ];
 
@@ -364,10 +363,14 @@ async function main() {
     role: "super_admin",
     query: { from: "2026-11-01", to: "2026-11-11" },
   });
+  // SLIM-67: nobody (incl. super_admin) receives IP or country
   ok(
-    "attr_sa_sees_ip",
-    res.body?.ip_visible === true &&
-      res.body?.rows?.[0]?.ip_address === "203.0.113.50" &&
+    "attr_sa_no_ip",
+    res.body?.rows?.[0]?.order_id === "ORD1" &&
+      !("ip_address" in res.body.rows[0]) &&
+      !("ip_masked" in res.body.rows[0]) &&
+      !("country" in res.body.rows[0]) &&
+      !("ip_visible" in res.body) &&
       !("customer_email" in (res.body.rows[0] || {})) &&
       !("customer_name" in (res.body.rows[0] || {}))
   );
@@ -395,47 +398,12 @@ async function main() {
   });
   ok(
     "attr_manager_no_ip",
-    res.body?.ip_visible === false &&
-      res.body?.rows?.[0] &&
+    res.body?.rows?.[0] &&
       !("ip_address" in res.body.rows[0]) &&
       !("ip_masked" in res.body.rows[0])
   );
 
-  // Returning maths
-  let call = 0;
-  queryImpl = async (sql) => {
-    call++;
-    const s = String(sql);
-    if (/COUNT\(DISTINCT s\.visitor_id\) AS visitors/.test(s)) {
-      return [[{ visitors: 3, sessions: 5, new_visitors: 2, returning_visitors: 1 }]];
-    }
-    if (/COUNT\(\*\) AS visits/.test(s)) {
-      return [
-        [
-          { visitor_id: "a", visits: 1 },
-          { visitor_id: "b", visits: 2 },
-          { visitor_id: "c", visits: 5 },
-        ],
-      ];
-    }
-    if (/DATEDIFF/.test(s)) return [[{ days_gap: 3 }, { days_gap: 10 }]];
-    return [[]];
-  };
-  res = await invoke("pages/api/admin-insights/returning.ts", {
-    role: "manager",
-    query: { from: "2026-11-01", to: "2026-11-11" },
-  });
-  ok(
-    "returning_totals",
-    res.body?.totals?.visitors === 3 &&
-      res.body?.totals?.returning_visitors === 1 &&
-      res.body?.avg_days_since_last === 6.5
-  );
-  ok(
-    "returning_buckets",
-    (res.body?.visit_count_buckets || []).some((b) => b.label === "1 visit" && b.visitors === 1) &&
-      (res.body?.days_since_last_buckets || []).some((b) => b.label === "2–7 days" && b.visitors === 1)
-  );
+  // SLIM-67: Returning API retired (410 asserted in phase-insights-slim-67-tests.js)
 
   // Export: manager daily + audit; sessions forbidden; SA sessions + CSV injection safe + cap
   auditCalls.length = 0;
@@ -516,11 +484,12 @@ async function main() {
     query: { from: "2026-11-01", to: "2026-11-11", kind: "sessions", max_rows: "10" },
   });
   ok(
-    "export_sa_sessions_ip",
+    "export_sa_sessions_no_ip",
     res.statusCode === 200 &&
       typeof res.body === "string" &&
-      String(res.body).includes("ip_address") &&
-      String(res.body).includes("198.51.100.9")
+      !String(res.body).includes("ip_address") &&
+      !String(res.body).includes("198.51.100.9") &&
+      !String(res.body).includes("country")
   );
   ok("export_sa_audit", auditCalls.length === 1 && auditCalls[0].metadata?.kind === "sessions");
 
@@ -529,7 +498,6 @@ async function main() {
     "pages/api/admin-insights/funnel.ts",
     "pages/api/admin-insights/checkout-problems.ts",
     "pages/api/admin-insights/orders-attribution.ts",
-    "pages/api/admin-insights/returning.ts",
     "pages/api/admin-insights/export.ts",
   ];
   for (const f of newApis) {
@@ -568,7 +536,6 @@ async function main() {
     /Funnel/.test(panel) &&
       /Checkout problems/.test(panel) &&
       /Orders attribution/.test(panel) &&
-      /Returning/.test(panel) &&
       /Export/.test(panel)
   );
   ok(
@@ -577,7 +544,6 @@ async function main() {
       "FunnelScreen.tsx",
       "CheckoutProblemsScreen.tsx",
       "OrdersAttributionScreen.tsx",
-      "ReturningScreen.tsx",
       "ExportScreen.tsx",
     ].every((n) => fs.existsSync(path.join(ROOT, "components/sidhu/insights", n)))
   );

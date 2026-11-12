@@ -65,66 +65,27 @@ export type InsightsTrendPoint = {
   orders: number;
 };
 
+export type InsightsTopPath = { path: string; sessions: number };
+
 export type InsightsSummaryResponse = OkBase & {
   has_data: boolean;
   kpis: InsightsKpis;
+  /** AVG(duration_ms) over sessions with engaged time; null when unavailable (rollup mode / none yet). */
+  avg_engaged_ms: number | null;
   trend: InsightsTrendPoint[];
-  top_countries: Array<{ country: string; country_code: string; visitors: number; sessions: number }>;
   top_paths: Array<{ path: string; pageviews: number; sessions: number }>;
+  top_landings: InsightsTopPath[];
+  top_exits: InsightsTopPath[];
 };
 
-export type InsightsGeoCity = { city: string; visitors: number; sessions: number };
-export type InsightsGeoRegion = { region: string; visitors: number; cities: InsightsGeoCity[] };
-export type InsightsGeoCountry = {
-  country: string;
-  country_code: string;
-  visitors: number;
-  sessions: number;
-  regions: InsightsGeoRegion[];
-};
-
-export type InsightsGeoResponse = OkBase & {
-  has_data: boolean;
-  approximate: true;
-  attribution: { text: string; url: string };
-  geo_city_enabled: boolean;
-  totals: { visitors: number; sessions: number; pageviews: number };
-  countries: InsightsGeoCountry[];
-  rows: Array<{ country: string; region: string; city: string; visitors: number; sessions: number }>;
-  truncated: boolean;
-};
-
-export type InsightsPageRow = {
+export type InsightsJourneyStep = {
+  type: string;
   path: string;
-  pageviews: number;
-  unique_sessions: number;
-  avg_time_on_page_ms: number | null;
-  avg_scroll_depth_pct: number | null;
-  exits: number | null;
-};
-
-export type InsightsPagesResponse = OkBase & {
-  has_data: boolean;
-  rows: InsightsPageRow[];
-  totals: { pageviews: number };
-};
-
-export type InsightsSourceRow = {
-  source_bucket: string;
-  utm_source: string;
-  utm_medium: string;
-  utm_campaign: string;
-  referrer_host: string;
-  sessions: number;
-  visitors: number | null;
-  orders: number;
-  has_gclid: boolean;
-};
-
-export type InsightsSourcesResponse = OkBase & {
-  has_data: boolean;
-  rows: InsightsSourceRow[];
-  totals: { sessions: number };
+  label: string | null;
+  /** Page-view steps only: engaged ms summed from timing events for that page view. */
+  engaged_ms: number | null;
+  /** Page-view steps only: deepest scroll watermark (0-100). */
+  scroll_pct: number | null;
 };
 
 export type InsightsJourney = {
@@ -137,10 +98,6 @@ export type InsightsJourney = {
   device_type: string;
   browser_name: string | null;
   os_name: string | null;
-  country: string;
-  region: string;
-  city: string;
-  network_provider: string | null;
   source_bucket: string;
   utm_source: string | null;
   utm_medium: string | null;
@@ -151,26 +108,17 @@ export type InsightsJourney = {
   pageview_count: number;
   event_count: number;
   has_order: boolean;
-  steps: Array<{ type: string; path: string; label: string | null }>;
+  steps: InsightsJourneyStep[];
   steps_truncated: boolean;
-  /** Present ONLY for super_admin responses. */
-  ip_address?: string | null;
-  ip_masked?: boolean;
+  /** Last clicked element on the exit page (label from allowlisted click props); null if none. */
+  exit_click: { label: string | null; tag: string | null; click_id: string | null } | null;
 };
 
 export type InsightsJourneysResponse = OkBase & {
   has_data: boolean;
-  ip_visible: boolean;
   limit: number;
   rows: InsightsJourney[];
 };
-
-export type InsightsGeoFileStatus = {
-  configured: boolean;
-  present: boolean;
-  size_bytes: number | null;
-};
-
 export type InsightsSettingsValues = {
   enabled: boolean;
   recording_enabled: boolean;
@@ -188,13 +136,6 @@ export type InsightsSettingsResponse = {
   state: "ok";
   settings: InsightsSettingsValues;
   recording_active: boolean;
-  geo: {
-    country: InsightsGeoFileStatus;
-    asn: InsightsGeoFileStatus;
-    city: InsightsGeoFileStatus;
-    loaded: boolean;
-    attribution: { text: string; url: string };
-  };
   cleanup: {
     holder: string | null;
     acquired_at: string | null;
@@ -252,38 +193,58 @@ export type InsightsOrderAttributionRow = {
   medium: string | null;
   referrer_host: string | null;
   landing_path: string;
-  country: string;
   device_type: string;
-  /** Present ONLY for super_admin responses. */
-  ip_address?: string | null;
-  ip_masked?: boolean;
 };
 
 export type InsightsOrdersAttributionResponse = OkBase & {
   has_data: boolean;
-  ip_visible: boolean;
   limit: number;
   rows: InsightsOrderAttributionRow[];
 };
 
-export type InsightsReturningBucket = {
+export type InsightsDevice = "m" | "d";
+
+export type InsightsClickedElement = {
   label: string;
-  visitors: number;
+  tag: string;
+  clicks: number;
 };
 
-export type InsightsReturningResponse = OkBase & {
-  has_data: boolean;
-  totals: {
-    visitors: number;
-    new_visitors: number;
-    returning_visitors: number;
-    sessions: number;
-  };
-  visit_count_buckets: InsightsReturningBucket[];
-  days_since_last_buckets: InsightsReturningBucket[];
-  /** Average days since prior visit among returning visitors in range; null if none. */
-  avg_days_since_last: number | null;
+export type InsightsPageBehaviourRow = {
+  path: string;
+  views: number;
+  /** Total engaged ms for the path / views; null when no timing was recorded. */
+  avg_engaged_ms: number | null;
+  /** Page views that reached each milestone (count) — share of views = count / views. */
+  reach: { m25: number; m50: number; m75: number; m100: number };
+  top_clicks: InsightsClickedElement[];
+  rage_clicks: number;
+  /** Sessions whose exit_path is this path / views; null when not computable. */
+  exit_rate_pct: number | null;
 };
+
+export type InsightsPageBehaviourResponse = OkBase & {
+  has_data: boolean;
+  device: InsightsDevice | "all";
+  path: string | null;
+  truncated: boolean;
+  rows: InsightsPageBehaviourRow[];
+};
+
+export type InsightsClickMapBucket = { x_pct: number; y_pct: number; count: number };
+
+export type InsightsClickMapResponse = OkBase & {
+  has_data: boolean;
+  path: string;
+  device: InsightsDevice;
+  total_clicks: number;
+  truncated: boolean;
+  /** x_pct / y_pct are stored rounded to the nearest 2%. */
+  buckets: InsightsClickMapBucket[];
+};
+
+export const INSIGHTS_MOBILE_WIDTH_PX = 390;
+export const INSIGHTS_DESKTOP_WIDTH_PX = 1280;
 
 export const INSIGHTS_EXPORT_MAX_ROWS = 50_000;
 export const INSIGHTS_EXPORT_DEFAULT_ROWS = 10_000;

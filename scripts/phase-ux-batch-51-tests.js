@@ -322,9 +322,11 @@ const untracked = execSync("git ls-files --others --exclude-standard", {
   .filter(Boolean);
 const allTouched = [...new Set([...changed, ...untracked])];
 const payCms66ApiAllow = new Set(["pages/api/orders.ts"]);
+// F4UK-INSIGHTS-SLIM-67: Insights ingest/admin API edits are expected in this working tree
+const slim67Api = (n) => n.startsWith("pages/api/admin-insights/") || n === "pages/api/insights-collect.ts";
 const blocked = allTouched.filter((f) => {
   const n = f.replace(/\\/g, "/");
-  if (payCms66ApiAllow.has(n)) return false;
+  if (payCms66ApiAllow.has(n) || slim67Api(n)) return false;
   return forbidden.some((re) => re.test(n));
 });
 ok(
@@ -374,6 +376,10 @@ const allowedPrefixes = [
   "pages/api/orders.ts",
   "scripts/phase-pay-cms-66-tests.js",
   "REPO_AUDIT_REPORT.md",
+  // F4UK-INSIGHTS-SLIM-67
+  "components/sidhu/insights/",
+  "pages/api/admin-insights/",
+  "lib/insightsIngest.ts", "lib/insightsGeo.ts", "pages/api/insights-collect.ts", "package.json", "package-lock.json", "scripts/phase-sidhu-insights-56-tests.js", "scripts/phase-insights-w2-60-tests.js", "scripts/phase-insights-slim-67-tests.js",
 ];
 const unexpected = allTouched.filter((f) => {
   const n = f.replace(/\\/g, "/");

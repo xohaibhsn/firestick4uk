@@ -90,8 +90,8 @@ export default function ExportScreen({ adminRole, range, onRange, includeBots, o
       <div style={S.card}>
         <h3 style={S.cardTitle}>Export Insights CSV</h3>
         <p style={{ ...S.muted, marginBottom: 12 }}>
-          Daily summaries for managers and super_admins. Session-level rows are super_admin only (IP columns follow
-          the same rule). Cells are formula-injection safe; every export is audit-logged.
+          Daily summaries for managers and super_admins. Session-level rows are super_admin only and never include
+          IP address or location. Cells are formula-injection safe; every export is audit-logged.
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end", marginBottom: 12 }}>
           <fieldset style={{ border: "none", padding: 0, margin: 0 }}>

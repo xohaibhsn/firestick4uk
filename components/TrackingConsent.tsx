@@ -407,8 +407,8 @@ export default function TrackingConsent() {
                 </label>
                 <p className="tc-row-desc">
                   Helps us understand how the site is used: Google Analytics and
-                  our own site statistics (pages viewed, traffic source,
-                  approximate location from IP, device type, cart and checkout
+                  our own site statistics (pages viewed, traffic source, device
+                  type, clicks, scrolling and time on page, cart and checkout
                   steps; never what you type into forms). Microsoft Clarity only
                   if we switch it on. No effect on cart or checkout.
                 </p>

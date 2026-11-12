@@ -2,7 +2,7 @@
  * Sidhu Insights ingest validation + persistence (1–2 round trips).
  */
 
-import { lookupInsightsGeo, type InsightsGeoResult } from "./insightsGeo";
+import { sanitizeInsightsProps } from "./insightsClient";
 import type { InsightsSettings } from "./insightsSettings";
 
 export const INSIGHTS_MAX_BODY_BYTES = 16384;
@@ -295,11 +295,18 @@ export function validateInsightsCollectBody(
       const propDenied = scanObjectKeys(e.props);
       if (propDenied) return { ok: false, status: 400, code: "form_key_rejected" };
       try {
-        const s = JSON.stringify(e.props);
-        if (s.length > INSIGHTS_PROPS_JSON_MAX) {
+        const raw = JSON.stringify(e.props);
+        if (raw.length > INSIGHTS_PROPS_JSON_MAX) {
           return { ok: false, status: 400, code: "props_too_large" };
         }
-        props_json = s;
+        const clean = sanitizeInsightsProps(e.props);
+        if (clean) {
+          const s = JSON.stringify(clean);
+          if (s.length > INSIGHTS_PROPS_JSON_MAX) {
+            return { ok: false, status: 400, code: "props_too_large" };
+          }
+          props_json = s;
+        }
       } catch {
         return { ok: false, status: 400, code: "bad_props" };
       }
@@ -408,24 +415,20 @@ export function validateInsightsCollectBody(
 export type PersistDeps = {
   query: (sql: string, params?: unknown[]) => Promise<[unknown, unknown?]>;
   settings: InsightsSettings;
+  /** Rate-limit key only; never persisted. */
   ip: string;
   userAgent: string;
-  geo?: InsightsGeoResult;
   now?: Date;
 };
 
 export type PersistResult = { stored: boolean; eventCount: number; skipped?: string };
 
-function sourceBucket(p: ValidatedInsightsPayload): string {
-  if (p.gclid) return "google_ads";
-  if (p.utm_source || p.utm_medium) return "utm";
-  if (p.referrer_host) return "referral";
-  return "direct";
-}
+/** Largest value that fits insights_sessions.duration_ms (INT UNSIGNED). */
+const DURATION_MS_MAX = 4_294_967_295;
 
 /**
  * Persist session upsert + multi-row events + cheap daily rollup increments.
- * Expects recording already gated by caller.
+ * Expects recording already gated by caller. No IP / geo is stored.
  */
 export async function persistInsightsIngest(
   payload: ValidatedInsightsPayload,
@@ -436,9 +439,6 @@ export async function persistInsightsIngest(
   }
 
   const bot = detectInsightsBot(deps.userAgent, payload.client_is_bot);
-  const geo =
-    deps.geo ||
-    lookupInsightsGeo(deps.ip, { geoCityEnabled: deps.settings.geo_city_enabled === true });
   const now = deps.now || new Date();
   const nowIso = now.toISOString().slice(0, 23).replace("T", " ");
   const summaryDate = now.toISOString().slice(0, 10);
@@ -449,8 +449,10 @@ export async function persistInsightsIngest(
   const exitPath = payload.events[payload.events.length - 1].path;
   const orderId =
     payload.events.map((e) => e.order_id).find((x) => !!x) || null;
+  const engagedSum = payload.events.reduce((sum, e) => sum + (e.time_on_page_ms || 0), 0);
+  const durationMs = engagedSum > 0 ? Math.min(engagedSum, DURATION_MS_MAX) : null;
 
-  // Round-trip 1: session upsert
+  // Round-trip 1: session upsert (ip_address / geo columns are always NULL)
   await deps.query(
     `INSERT INTO insights_sessions (
       session_id, visitor_id, started_at, last_seen_at,
@@ -462,24 +464,25 @@ export async function persistInsightsIngest(
       country_code, country_name, region_name, city_name,
       asn, network_provider, geo_source,
       device_type, language, screen_w, screen_h,
-      pageview_count, event_count, order_id, consent_analytics
+      pageview_count, event_count, duration_ms, order_id, consent_analytics
     ) VALUES (
       ?, ?, ?, ?,
       1, 0, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
-      ?, 0,
-      ?, ?, ?, ?,
-      ?, ?, ?,
+      NULL, 0,
+      NULL, NULL, NULL, NULL,
+      NULL, NULL, 'unknown',
       'unknown', ?, ?, ?,
-      ?, ?, ?, 1
+      ?, ?, ?, ?, 1
     )
     ON DUPLICATE KEY UPDATE
       last_seen_at = VALUES(last_seen_at),
       exit_path = VALUES(exit_path),
       pageview_count = pageview_count + VALUES(pageview_count),
       event_count = event_count + VALUES(event_count),
+      duration_ms = LEAST(${DURATION_MS_MAX}, COALESCE(duration_ms, 0) + COALESCE(VALUES(duration_ms), 0)),
       order_id = COALESCE(VALUES(order_id), order_id),
       is_bot = GREATEST(is_bot, VALUES(is_bot))`,
     [
@@ -503,19 +506,12 @@ export async function persistInsightsIngest(
       payload.msclkid,
       payload.wbraid,
       payload.gbraid,
-      deps.ip.slice(0, 45),
-      geo.country_code === "XX" ? null : geo.country_code,
-      geo.country_name === "unknown" ? null : geo.country_name,
-      geo.region_name === "unknown" ? null : geo.region_name,
-      geo.city_name === "unknown" ? null : geo.city_name,
-      geo.asn,
-      geo.network_provider,
-      geo.geo_source,
       payload.language,
       payload.screen_w,
       payload.screen_h,
       pageviews,
       eventCount,
+      durationMs,
       orderId,
     ]
   );
@@ -574,38 +570,6 @@ export async function persistInsightsIngest(
       checkout_starts = checkout_starts + VALUES(checkout_starts),
       place_order_clicks = place_order_clicks + VALUES(place_order_clicks)`,
     [summaryDate, pageviews, bot.is_bot, atc, checkoutStarts, placeOrders]
-  );
-
-  await deps.query(
-    `INSERT INTO insights_geo_daily (
-      summary_date, country_code, country_name, region_name, city_name, sessions, pageviews
-    ) VALUES (?, ?, ?, ?, ?, 1, ?)
-    ON DUPLICATE KEY UPDATE
-      sessions = sessions + 1,
-      pageviews = pageviews + VALUES(pageviews)`,
-    [
-      summaryDate,
-      geo.country_code === "XX" ? "" : geo.country_code,
-      geo.country_name === "unknown" ? "" : geo.country_name,
-      geo.region_name === "unknown" ? "" : geo.region_name,
-      geo.city_name === "unknown" ? "" : geo.city_name,
-      pageviews,
-    ]
-  );
-
-  const bucket = sourceBucket(payload);
-  await deps.query(
-    `INSERT INTO insights_source_daily (
-      summary_date, source_bucket, utm_source, utm_medium, utm_campaign, sessions
-    ) VALUES (?, ?, ?, ?, ?, 1)
-    ON DUPLICATE KEY UPDATE sessions = sessions + 1`,
-    [
-      summaryDate,
-      bucket,
-      payload.utm_source || "",
-      payload.utm_medium || "",
-      payload.utm_campaign || "",
-    ]
   );
 
   // page daily — aggregate by path in this batch

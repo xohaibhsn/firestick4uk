@@ -14,7 +14,6 @@ import {
   persistInsightsIngest,
   validateInsightsCollectBody,
 } from "../../lib/insightsIngest";
-import { lookupInsightsGeo } from "../../lib/insightsGeo";
 import { scheduleInsightsRetention } from "../../lib/insightsRetention";
 
 export const config = {
@@ -111,15 +110,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const pool = (await import("../../lib/db")).default;
-    const geo = lookupInsightsGeo(ip, { geoCityEnabled: settings.geo_city_enabled === true });
     const ua = String(req.headers["user-agent"] || "");
 
+    // IP is used for rate limiting above only; persist never stores it.
     await persistInsightsIngest(validated.payload, {
       query: (sql, params) => pool.query(sql, params as never[]),
       settings,
       ip,
       userAgent: ua,
-      geo,
     });
 
     // Opportunistic retention — do not await past scheduling

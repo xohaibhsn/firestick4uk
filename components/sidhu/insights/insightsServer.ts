@@ -131,6 +131,13 @@ export function botClause(alias: "s", includeBots: boolean): string {
   return includeBots ? "" : ` AND ${alias}.is_bot = 0`;
 }
 
+/** Session-level device bucket from screen_w (<768 = mobile). Static SQL, alias is a trusted constant. */
+export function deviceClause(alias: "s", device: "m" | "d" | null): string {
+  if (device === "m") return ` AND ${alias}.screen_w IS NOT NULL AND ${alias}.screen_w < 768`;
+  if (device === "d") return ` AND (${alias}.screen_w IS NULL OR ${alias}.screen_w >= 768)`;
+  return "";
+}
+
 /**
  * Detail tables (sessions/events) only exist for detail_retention_days.
  * Older ranges fall back to daily rollup tables (bots cannot be separated there).
@@ -203,13 +210,30 @@ export function rangeOrReject(req: NextApiRequest, res: NextApiResponse): Parsed
   return parsed.range;
 }
 
-export function normUnknown(v: unknown): string {
-  const s = String(v ?? "").trim();
-  if (!s || s.toLowerCase() === "unknown") return "Unknown";
+/** props_json comes back parsed (JSON column) or as text depending on the driver/DB. */
+export function parseEventProps(raw: unknown): Record<string, unknown> | null {
+  if (raw == null) return null;
+  let v: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      v = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+}
+
+/** Required `path` query param: must be a site path (no scheme/host/query), max 512 chars. */
+export function parsePathParam(v: string | string[] | undefined): string | null {
+  const raw = Array.isArray(v) ? v[0] : v;
+  const s = String(raw ?? "").trim();
+  if (!s || s.length > 512 || !s.startsWith("/") || s.startsWith("//")) return null;
+  if (/[?#\s\\]/.test(s) || /[\u0000-\u001f]/.test(s)) return null;
   return s;
 }
 
-/** SQL expressions that collapse NULL / '' / 'unknown' to 'Unknown' (static strings, no user input). */
-export const SQL_COUNTRY = "COALESCE(NULLIF(NULLIF(s.country_name,''),'unknown'),'Unknown')";
-export const SQL_REGION = "COALESCE(NULLIF(NULLIF(s.region_name,''),'unknown'),'Unknown')";
-export const SQL_CITY = "COALESCE(NULLIF(NULLIF(s.city_name,''),'unknown'),'Unknown')";
+export function parseDeviceParam(v: string | string[] | undefined): "m" | "d" | null {
+  const raw = String(Array.isArray(v) ? v[0] : v ?? "").trim().toLowerCase();
+  return raw === "m" || raw === "d" ? raw : null;
+}

@@ -77,7 +77,6 @@ const settings = read("components/sidhu/insights/SettingsScreen.tsx");
 const beacon = read("components/SidhuInsightsBeacon.tsx");
 const clientSrc = read("lib/insightsClient.ts");
 const clarityTests = read("scripts/phase-clarity-35-tests.js");
-const geoSrc = read("lib/insightsGeo.ts");
 
 // 1) Opt-out key constant
 ok(
@@ -224,7 +223,7 @@ ok(
   ) && !/\["diff",\s*"6292b55390318c2c55f31fa8cd17f5fa7cb034bd",\s*"--"/.test(clarityTests)
 );
 
-// 12) insightsGeo.ts unchanged vs HEAD parent when only our files dirty — byte check vs origin
+// 12) SLIM-67: insightsGeo.ts removed (was unchanged before); no SEO/nav/layout edits
 {
   const dirty = execSync("git diff --name-only HEAD", { cwd: ROOT, encoding: "utf8" })
     .split(/\r?\n/)
@@ -238,7 +237,7 @@ ok(
     .map((s) => s.trim().replace(/\\/g, "/"))
     .filter(Boolean);
   const touched = [...new Set([...dirty, ...untracked])];
-  ok("insightsGeo_ts_unchanged", !touched.includes("lib/insightsGeo.ts"));
+  ok("insightsGeo_ts_removed", !fs.existsSync(path.join(ROOT, "lib/insightsGeo.ts")));
   ok(
     "no_seo_nav_layout_files_changed",
     !touched.some((f) =>
@@ -273,8 +272,21 @@ ok(
     "app/cart/page.tsx",
     "scripts/phase-pay-cms-66-tests.js",
     "REPO_AUDIT_REPORT.md",
+    // F4UK-INSIGHTS-SLIM-67
+    "lib/insightsIngest.ts",
+    "lib/insightsGeo.ts",
+    "pages/api/insights-collect.ts",
+    "components/TrackingConsent.tsx",
+    "package.json",
+    "package-lock.json",
+    "scripts/phase-sidhu-insights-56-tests.js",
+    "scripts/phase-insights-w2-60-tests.js",
+    "scripts/phase-insights-slim-67-tests.js",
   ]);
-  const unexpected = touched.filter((f) => !ALLOWED.has(f));
+  const SLIM_67_PREFIXES = ["pages/api/admin-insights/", "components/sidhu/insights/"];
+  const unexpected = touched.filter(
+    (f) => !ALLOWED.has(f) && !SLIM_67_PREFIXES.some((p) => f.startsWith(p))
+  );
   ok("diff_allowlist_city_cleanup_64", unexpected.length === 0, unexpected.join(",") || "clean");
 }
 

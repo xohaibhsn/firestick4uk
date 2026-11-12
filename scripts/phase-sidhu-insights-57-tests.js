@@ -187,8 +187,12 @@ async function main() {
   ok("attr_no_token", !JSON.stringify(attr).includes("secret"));
 
   // ── Payload denylist + caps + batching ───────────────────────────────────
-  const denied = client.sanitizeProps({ email: "a@b.c", qty: 2, product_id: 9 });
-  ok("props_strips_email", denied && denied.email === undefined && denied.qty === 2);
+  // SLIM-67: allowlist — email stripped and unknown keys (qty, product_id) dropped; known keys kept
+  const denied = client.sanitizeProps({ email: "a@b.c", qty: 2, product_id: 9, total: 5 });
+  ok(
+    "props_strips_email",
+    denied && denied.email === undefined && denied.qty === undefined && denied.total === 5
+  );
 
   const events = [];
   for (let i = 0; i < 12; i++) {
@@ -329,9 +333,8 @@ async function main() {
   // ── Admin APIs: source contracts ─────────────────────────────────────────
   const adminFiles = [
     "pages/api/admin-insights/summary.ts",
-    "pages/api/admin-insights/geo.ts",
-    "pages/api/admin-insights/pages.ts",
-    "pages/api/admin-insights/sources.ts",
+    "pages/api/admin-insights/page-behaviour.ts",
+    "pages/api/admin-insights/click-map.ts",
     "pages/api/admin-insights/journeys.ts",
     "pages/api/admin-insights/settings.ts",
   ];
@@ -371,46 +374,18 @@ async function main() {
 
   if (fs.existsSync(path.join(ROOT, "pages/api/admin-insights/journeys.ts"))) {
     const j = read("pages/api/admin-insights/journeys.ts");
-    ok(
-      "journeys_ip_super_admin_only",
-      /canViewInsightsIp/.test(j) || /super_admin/.test(j)
-    );
+    // SLIM-67: journeys never select or return IP
+    ok("journeys_no_ip", !/ip_address|ip_masked|canViewInsightsIp/.test(j));
   }
 
   if (fs.existsSync(path.join(ROOT, "pages/api/admin-insights/settings.ts"))) {
     const s = read("pages/api/admin-insights/settings.ts");
     ok("settings_audit", /recordAdminAudit/.test(s));
-    ok("settings_reload_geo", /reloadInsightsGeo/.test(s));
+    ok("settings_no_reload_geo", !/reloadInsightsGeo|reload_geo_db|insightsGeo/.test(s));
   }
 
-  // Geography phrase + DB-IP
-  const geoUiCandidates = [
-    "components/sidhu/insights/GeographyScreen.tsx",
-    "components/sidhu/insights/InsightsGeography.tsx",
-    "components/sidhu/insights/InsightsPanel.tsx",
-  ];
-  let geoUi = "";
-  for (const c of geoUiCandidates) {
-    if (fs.existsSync(path.join(ROOT, c))) geoUi += read(c) + "\n";
-  }
-  // Also scan folder
-  const insightsDir = path.join(ROOT, "components/sidhu/insights");
-  if (fs.existsSync(insightsDir)) {
-    for (const name of fs.readdirSync(insightsDir)) {
-      if (/\.(tsx|ts|jsx|js)$/.test(name)) {
-        geoUi += read(path.join("components/sidhu/insights", name)) + "\n";
-      }
-    }
-  }
-  ok(
-    "geography_phrase",
-    /In this period,\s*\$?\{?.*visitors from/.test(geoUi) ||
-      /In this period,/.test(geoUi)
-  );
-  ok(
-    "dbip_attribution_link",
-    /IP Geolocation by DB-IP/.test(geoUi) && /https:\/\/db-ip\.com/.test(geoUi)
-  );
+  // SLIM-67: Geography screen + DB-IP attribution removed
+  ok("geography_screen_removed", !fs.existsSync(path.join(ROOT, "components/sidhu/insights/GeographyScreen.tsx")));
 
   // Sidhu page minimal hook
   if (fs.existsSync(path.join(ROOT, "app/sidhu/page.tsx"))) {
@@ -452,6 +427,20 @@ async function main() {
     if (rel === "app/layout.tsx") return true;
     if (rel === "app/sidhu/page.tsx") return true;
     if (rel === "scripts/phase-sidhu-insights-57-tests.js") return true;
+    // F4UK-INSIGHTS-SLIM-67
+    if (
+      [
+        "lib/insightsIngest.ts",
+        "lib/insightsGeo.ts",
+        "pages/api/insights-collect.ts",
+        "package.json",
+        "package-lock.json",
+        "scripts/phase-sidhu-insights-56-tests.js",
+        "scripts/phase-insights-slim-67-tests.js",
+      ].includes(rel)
+    ) {
+      return true;
+    }
     if (rel === "scripts/phase-insights-w2-60-tests.js") return true;
     // F4UK-W4-INSIGHTS-LIVE-63
     if (rel === "components/TrackingConsent.tsx") return true;

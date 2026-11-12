@@ -6,20 +6,11 @@
  * `insights.settings_update` (metadata holds flags/numbers only — no PII).
  *
  * Missing tables => 200 { installed:false, state:"not_installed" } (never 500).
- *
- * Geo "reload" uses reloadInsightsGeo() from lib/insightsGeo.ts (clears the in-memory MMDB readers).
  */
-import fs from "fs";
 import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "@/lib/db";
 import { getRequestMeta, requireAdminPermission } from "@/lib/adminAuth";
 import { actorFromIdentity, recordAdminAudit } from "@/lib/adminAudit";
-import {
-  DBIP_ATTRIBUTION_TEXT,
-  DBIP_ATTRIBUTION_URL,
-  insightsGeoHasLoadedReaders,
-  reloadInsightsGeo,
-} from "@/lib/insightsGeo";
 import { clearInsightsSettingsCache } from "@/lib/insightsSettings";
 import {
   isMissingTableError,
@@ -28,7 +19,6 @@ import {
 import {
   INSIGHTS_NOT_INSTALLED,
   INSIGHTS_SETTINGS_BOUNDS,
-  type InsightsGeoFileStatus,
   type InsightsSettingsResponse,
   type InsightsSettingsValues,
 } from "@/components/sidhu/insights/insightsTypes";
@@ -40,12 +30,7 @@ const INT_KEYS = [
   "summary_retention_days",
   "ip_full_retention_days",
 ] as const;
-const ALLOWED_BODY_KEYS = new Set<string>([
-  ...BOOL_KEYS,
-  ...INT_KEYS,
-  "action",
-  "confirm_privacy_approved",
-]);
+const ALLOWED_BODY_KEYS = new Set<string>([...BOOL_KEYS, ...INT_KEYS, "confirm_privacy_approved"]);
 
 type BoolKey = (typeof BOOL_KEYS)[number];
 type IntKey = (typeof INT_KEYS)[number];
@@ -59,17 +44,6 @@ function asBool(v: unknown, fallback: boolean): boolean {
 function asInt(v: unknown, fallback: number): number {
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
-}
-
-function geoFileStatus(envName: string): InsightsGeoFileStatus {
-  const p = String(process.env[envName] || "").trim();
-  if (!p) return { configured: false, present: false, size_bytes: null };
-  try {
-    const st = fs.statSync(p);
-    return { configured: true, present: st.isFile(), size_bytes: st.isFile() ? st.size : null };
-  } catch {
-    return { configured: true, present: false, size_bytes: null };
-  }
 }
 
 async function readSettings(): Promise<InsightsSettingsValues> {
@@ -132,13 +106,6 @@ async function buildPayload(): Promise<InsightsSettingsResponse> {
     settings,
     recording_active:
       settings.enabled === true && settings.kill_switch !== true && settings.recording_enabled === true,
-    geo: {
-      country: geoFileStatus("INSIGHTS_DBIP_COUNTRY_PATH"),
-      asn: geoFileStatus("INSIGHTS_DBIP_ASN_PATH"),
-      city: geoFileStatus("INSIGHTS_DBIP_CITY_PATH"),
-      loaded: insightsGeoHasLoadedReaders(),
-      attribution: { text: DBIP_ATTRIBUTION_TEXT, url: DBIP_ATTRIBUTION_URL },
-    },
     cleanup,
     bounds: INSIGHTS_SETTINGS_BOUNDS,
   };
@@ -146,10 +113,8 @@ async function buildPayload(): Promise<InsightsSettingsResponse> {
 
 type Validated =
   | { ok: false; error: string; code?: string }
-  | { ok: true; action: "reload_geo_db" }
   | {
       ok: true;
-      action: null;
       changed: Partial<Record<BoolKey, boolean>> & Partial<Record<IntKey, number>>;
     };
 
@@ -163,14 +128,6 @@ function validateBody(body: unknown, current: InsightsSettingsValues): Validated
   }
 
   const settingKeysPresent = [...BOOL_KEYS, ...INT_KEYS].filter((k) => k in b);
-
-  if ("action" in b) {
-    if (b.action !== "reload_geo_db") return { ok: false, error: "Unsupported action." };
-    if (settingKeysPresent.length > 0 || "confirm_privacy_approved" in b) {
-      return { ok: false, error: "action cannot be combined with setting fields." };
-    }
-    return { ok: true, action: "reload_geo_db" };
-  }
 
   if ("confirm_privacy_approved" in b && typeof b.confirm_privacy_approved !== "boolean") {
     return { ok: false, error: "confirm_privacy_approved must be a boolean." };
@@ -217,7 +174,7 @@ function validateBody(body: unknown, current: InsightsSettingsValues): Validated
     }
   }
 
-  return { ok: true, action: null, changed };
+  return { ok: true, changed };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -245,21 +202,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const meta = getRequestMeta(req);
     const actor = actorFromIdentity(admin);
-
-    if (v.action === "reload_geo_db") {
-      reloadInsightsGeo();
-      clearInsightsSettingsCache();
-      await recordAdminAudit({
-        actor,
-        action: "insights.settings_update",
-        entityType: "insights_settings",
-        entityId: "reload_geo_db",
-        summary: "Insights geo database reloaded",
-        metadata: { action: "reload_geo_db" },
-        ip: meta.ip,
-      });
-      return res.status(200).json({ ok: true, action: "reload_geo_db", ...(await buildPayload()) });
-    }
 
     const keys = Object.keys(v.changed);
     const updatedBy = admin.staffId ? `staff:${admin.staffId}` : "master";

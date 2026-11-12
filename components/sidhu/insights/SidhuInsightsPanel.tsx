@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Sidhu Insights — Phase 1 + Phase 2 screens.
+ * Sidhu Insights screens.
  * Fetches /api/admin-insights/* with credentials. Settings is shown only with insights.settings.
  * Export is shown only with insights.export.
  */
@@ -10,43 +10,34 @@ import { hasAdminPermission, type AdminRoleName } from "@/lib/adminPermissions";
 import { rangeFromPreset, type InsightsRangeState } from "./insightsTypes";
 import { InsightsStyles } from "./shared";
 import TodayScreen from "./TodayScreen";
-import OverviewScreen from "./OverviewScreen";
-import SourcesScreen from "./SourcesScreen";
-import GeographyScreen from "./GeographyScreen";
-import PagesScreen from "./PagesScreen";
 import JourneysScreen from "./JourneysScreen";
+import PageBehaviourScreen from "./PageBehaviourScreen";
+import ClickMapScreen from "./ClickMapScreen";
 import FunnelScreen from "./FunnelScreen";
 import CheckoutProblemsScreen from "./CheckoutProblemsScreen";
 import OrdersAttributionScreen from "./OrdersAttributionScreen";
-import ReturningScreen from "./ReturningScreen";
 import ExportScreen from "./ExportScreen";
 import SettingsScreen from "./SettingsScreen";
 
 type View =
   | "today"
-  | "overview"
-  | "sources"
-  | "geography"
-  | "pages"
   | "journeys"
+  | "behaviour"
+  | "clickmap"
   | "funnel"
   | "checkout"
   | "orders"
-  | "returning"
   | "export"
   | "settings";
 
 const VIEWS: Array<{ id: View; label: string }> = [
   { id: "today", label: "Today" },
-  { id: "overview", label: "Overview" },
-  { id: "sources", label: "Sources" },
-  { id: "geography", label: "Geography" },
-  { id: "pages", label: "Pages" },
   { id: "journeys", label: "Journeys" },
+  { id: "behaviour", label: "Page behaviour" },
+  { id: "clickmap", label: "Click map" },
   { id: "funnel", label: "Funnel" },
   { id: "checkout", label: "Checkout problems" },
   { id: "orders", label: "Orders attribution" },
-  { id: "returning", label: "Returning" },
   { id: "export", label: "Export" },
   { id: "settings", label: "Settings" },
 ];
@@ -88,15 +79,12 @@ export default function SidhuInsightsPanel({ adminRole }: { adminRole: AdminRole
       </nav>
 
       {active === "today" && <TodayScreen />}
-      {active === "overview" && <OverviewScreen {...shared} />}
-      {active === "sources" && <SourcesScreen {...shared} />}
-      {active === "geography" && <GeographyScreen {...shared} />}
-      {active === "pages" && <PagesScreen {...shared} />}
-      {active === "journeys" && <JourneysScreen adminRole={adminRole} {...shared} />}
+      {active === "journeys" && <JourneysScreen {...shared} />}
+      {active === "behaviour" && <PageBehaviourScreen {...shared} />}
+      {active === "clickmap" && <ClickMapScreen {...shared} />}
       {active === "funnel" && <FunnelScreen {...shared} />}
       {active === "checkout" && <CheckoutProblemsScreen {...shared} />}
-      {active === "orders" && <OrdersAttributionScreen adminRole={adminRole} {...shared} />}
-      {active === "returning" && <ReturningScreen {...shared} />}
+      {active === "orders" && <OrdersAttributionScreen {...shared} />}
       {active === "export" && canExport && <ExportScreen adminRole={adminRole} {...shared} />}
       {active === "settings" && canSettings && <SettingsScreen />}
     </div>

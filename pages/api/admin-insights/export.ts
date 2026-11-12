@@ -1,7 +1,7 @@
 /**
  * GET /api/admin-insights/export — CSV export of daily summaries / sessions.
  * Permission: insights.export (manager + super_admin).
- * kind=daily (default) for all exporters; kind=sessions requires super_admin.
+ * kind=daily (default) for all exporters; kind=sessions requires super_admin. No IP / geo columns.
  * Max rows clamped to 50_000. UTF-8 BOM. Formula-injection safe cells.
  * Audit-logs every successful export (who/when/range/row count).
  * Missing tables => 200 JSON { installed:false, state:"not_installed" } (never 500 stack).
@@ -10,9 +10,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getRequestMeta, requireAdminPermission } from "@/lib/adminAuth";
 import { recordAdminAudit } from "@/lib/adminAudit";
-import { canViewInsightsIp } from "@/lib/adminPermissions";
 import {
-  SQL_COUNTRY,
   botClause,
   isMissingTableError,
   num,
@@ -55,7 +53,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const maxRows = parseExportMaxRows(req.query.max_rows ?? req.query.limit);
-  const ipVisible = canViewInsightsIp(admin.role as "super_admin" | "manager" | "writer");
   const bots = botClause("s", range.includeBots);
 
   try {
@@ -110,7 +107,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       header = [
         "started_at",
         "device_type",
-        "country",
         "landing_path",
         "utm_source",
         "utm_medium",
@@ -122,14 +118,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         "pageview_count",
         "order_id",
       ];
-      if (ipVisible) header.push("ip_address", "ip_masked");
       lines.push(csvRow(header));
 
-      const ipCols = ipVisible ? ", s.ip_address AS ip_address, s.ip_masked AS ip_masked" : "";
       const rows = await qrows<Record<string, unknown>>(
         `SELECT DATE_FORMAT(s.started_at, '%Y-%m-%dT%H:%i:%sZ') AS started_at,
                 s.device_type AS device_type,
-                ${SQL_COUNTRY} AS c_name,
                 s.landing_path AS landing_path,
                 s.utm_source AS utm_source,
                 s.utm_medium AS utm_medium,
@@ -139,7 +132,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 s.is_returning AS is_returning,
                 s.is_bot AS is_bot,
                 s.pageview_count AS pageview_count,
-                s.order_id AS order_id${ipCols}
+                s.order_id AS order_id
            FROM insights_sessions s
           WHERE s.started_at >= ? AND s.started_at < ?${bots}
           ORDER BY s.started_at DESC
@@ -150,7 +143,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const cols: unknown[] = [
           r.started_at,
           r.device_type,
-          r.c_name,
           r.landing_path,
           r.utm_source,
           r.utm_medium,
@@ -162,9 +154,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           num(r.pageview_count),
           r.order_id || "",
         ];
-        if (ipVisible) {
-          cols.push(r.ip_address || "", num(r.ip_masked));
-        }
         lines.push(csvRow(cols));
       }
       rowCount = rows.length;
@@ -184,7 +173,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         row_count: rowCount,
         max_rows: maxRows,
         include_bots: range.includeBots,
-        ip_included: kind === "sessions" && ipVisible,
       },
       ip,
     });

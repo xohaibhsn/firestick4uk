@@ -372,92 +372,11 @@ async function main() {
     settings: s4,
     ip: "1.2.3.4",
     userAgent: "Mozilla/5.0",
-    geo: {
-      country_code: "GB",
-      country_name: "United Kingdom",
-      region_name: "England",
-      city_name: "unknown",
-      asn: 123,
-      network_provider: "Example",
-      geo_source: "country_lite",
-    },
   });
   ok("ingest_persist_writes", writeCalls >= 2, "calls=" + writeCalls);
 
-  // ── Geo ──────────────────────────────────────────────────────────────────
-  const httpOrig = http.request;
-  const httpsOrig = https.request;
-  let httpCalls = 0;
-  http.request = function () {
-    httpCalls++;
-    throw new Error("unexpected http");
-  };
-  https.request = function () {
-    httpCalls++;
-    throw new Error("unexpected https");
-  };
-
-  cache.clear();
-  const geoMod = loadTsModule("lib/insightsGeo.ts");
-  ok("geo_not_loaded_at_import", geoMod.insightsGeoHasLoadedReaders() === false);
-  ok(
-    "geo_attribution",
-    geoMod.DBIP_ATTRIBUTION.text === "IP Geolocation by DB-IP" &&
-      geoMod.DBIP_ATTRIBUTION.url === "https://db-ip.com"
-  );
-  geoMod.__resetInsightsGeoForTests();
-  const miss = geoMod.lookupInsightsGeo("8.8.8.8", { geoCityEnabled: false });
-  ok(
-    "geo_missing_file_fallback",
-    miss.geo_source === "missing_file" &&
-      miss.country_name === "unknown" &&
-      miss.city_name === "unknown"
-  );
-  ok("geo_no_external_http", httpCalls === 0);
-
-  // City gated: with flag off, injected city reader must not be used for city
-  geoMod.__resetInsightsGeoForTests();
-  let cityGets = 0;
-  const cityReader = {
-    get: () => {
-      cityGets++;
-      return {
-        country: { iso_code: "GB", names: { en: "United Kingdom" } },
-        city: { names: { en: "London" } },
-        subdivisions: [{ names: { en: "England" } }],
-      };
-    },
-  };
-  const countryReader = {
-    get: () => ({ country: { iso_code: "GB", names: { en: "United Kingdom" } } }),
-  };
-  const gated = geoMod.lookupInsightsGeo("8.8.8.8", {
-    geoCityEnabled: false,
-    countryPath: "/tmp/country.mmdb",
-    cityPath: "/tmp/city.mmdb",
-    createReader: () => countryReader,
-    readFileSync: () => Buffer.from("x"),
-    existsSync: () => true,
-  });
-  ok("geo_city_gated_off", gated.city_name === "unknown" && cityGets === 0);
-
-  geoMod.__resetInsightsGeoForTests();
-  const withCity = geoMod.lookupInsightsGeo("8.8.8.8", {
-    geoCityEnabled: true,
-    cityPath: "/tmp/city.mmdb",
-    createReader: () => cityReader,
-    readFileSync: () => Buffer.from("x"),
-    existsSync: () => true,
-  });
-  ok(
-    "geo_city_gated_on",
-    withCity.geo_source === "city_lite" && withCity.city_name === "London" && cityGets >= 1,
-    JSON.stringify(withCity) + " gets=" + cityGets
-  );
-
-  http.request = httpOrig;
-  https.request = httpsOrig;
-
+  // ── Geo (removed by F4UK-INSIGHTS-SLIM-67: no IP geolocation lib) ───────
+  ok("geo_lib_removed", !fs.existsSync(path.join(ROOT, "lib/insightsGeo.ts")));
   // ── Retention ────────────────────────────────────────────────────────────
   const ret = loadTsModule("lib/insightsRetention.ts");
   ok("retention_mask_ipv4", ret.maskInsightsIp("203.0.113.45") === "203.0.113.0");
@@ -678,7 +597,6 @@ async function main() {
     "scripts/migrate-sidhu-insights.js",
     "lib/insightsSettings.ts",
     "lib/insightsIngest.ts",
-    "lib/insightsGeo.ts",
     "lib/insightsRetention.ts",
     "pages/api/insights-collect.ts",
     "lib/adminPermissions.ts",
@@ -687,9 +605,9 @@ async function main() {
     ok("file_" + f.replace(/\W+/g, "_"), fs.existsSync(path.join(ROOT, f)));
   }
 
-  // mmdb-lib pin
+  // mmdb-lib removed with the geo lib
   const pkg = JSON.parse(read("package.json"));
-  ok("dep_mmdb_lib_pinned", pkg.dependencies["mmdb-lib"] === "3.0.5");
+  ok("dep_mmdb_lib_removed", pkg.dependencies["mmdb-lib"] === undefined);
 
   console.log(`\n=== phase-sidhu-insights-56: ${passed} passed, ${failed} failed ===`);
   process.exit(failed ? 1 : 0);

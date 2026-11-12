@@ -238,7 +238,11 @@ f === "scripts/phase-insights-live-63-tests.js" ||
       f === "pages/api/orders.ts" ||
       f === "app/cart/page.tsx" ||
       f === "scripts/phase-pay-cms-66-tests.js" ||
-      f === "REPO_AUDIT_REPORT.md";
+      f === "REPO_AUDIT_REPORT.md" ||
+      // F4UK-INSIGHTS-SLIM-67
+      ["lib/insightsIngest.ts", "lib/insightsGeo.ts", "pages/api/insights-collect.ts", "package.json", "package-lock.json", "scripts/phase-sidhu-insights-56-tests.js", "scripts/phase-insights-w2-60-tests.js", "scripts/phase-insights-slim-67-tests.js"].includes(f) ||
+      f.startsWith("pages/api/admin-insights/") ||
+      f.startsWith("components/sidhu/insights/");
     const unexpected = touched.filter((f) => !allow(f));
     const seoTouched = touched.filter((f) =>
       /^(app\/layout\.tsx|app\/page\.tsx|.*sitemap|.*robots|components\/Navbar|components\/Footer)/i.test(f)

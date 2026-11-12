@@ -82,6 +82,22 @@ const ALLOWLIST = new Set([
   "scripts/phase-ux-batch-51-tests.js",
   "scripts/phase-ux-fix-53-tests.js",
   "REPO_AUDIT_REPORT.md",
+  // F4UK-INSIGHTS-SLIM-67
+  "lib/insightsIngest.ts",
+  "lib/insightsGeo.ts",
+  "pages/api/insights-collect.ts",
+  "package.json",
+  "package-lock.json",
+  "scripts/phase-sidhu-insights-56-tests.js",
+  "scripts/phase-insights-slim-67-tests.js",
+  "pages/api/admin-insights/geo.ts",
+  "pages/api/admin-insights/pages.ts",
+  "pages/api/admin-insights/sources.ts",
+  "pages/api/admin-insights/journeys.ts",
+  "pages/api/admin-insights/settings.ts",
+  "pages/api/admin-insights/summary.ts",
+  "pages/api/admin-insights/click-map.ts",
+  "pages/api/admin-insights/page-behaviour.ts",
 ]);
 
 const BASE_SHA = "76067a765b091bbbf0f2d4375c3d17f0b3af53bc";

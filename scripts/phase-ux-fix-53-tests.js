@@ -217,9 +217,16 @@ const untracked = execSync("git ls-files --others --exclude-standard", {
   .map((s) => s.trim().replace(/\\/g, "/"))
   .filter(Boolean);
 const allTouched = [...new Set([...changed, ...untracked])];
-const unexpected = allTouched.filter((f) => !allowed.has(f));
+// F4UK-INSIGHTS-SLIM-67: Insights files edited in this working tree
+const slim67Files = new Set(["lib/insightsIngest.ts", "lib/insightsGeo.ts", "pages/api/insights-collect.ts", "package.json", "package-lock.json", "scripts/phase-sidhu-insights-56-tests.js", "scripts/phase-insights-w2-60-tests.js", "scripts/phase-insights-slim-67-tests.js"]);
+const slim67 = (f) =>
+  slim67Files.has(f) ||
+  f.startsWith("pages/api/admin-insights/") ||
+  f.startsWith("components/sidhu/insights/");
+const unexpected = allTouched.filter((f) => !allowed.has(f) && !slim67(f));
 const forbidden = allTouched.filter((f) => {
   if (f === "pages/api/orders.ts") return false; // F4UK-PAY-CMS-66 server enforce
+  if (slim67(f)) return false;
   return /^(pages\/api\/|.*sitemap|.*robots|.*layout\.tsx$|Navbar\.tsx$|Footer\.tsx$|lib\/seo)/i.test(
     f
   );

@@ -1,5 +1,5 @@
 /**
- * GET /api/admin-insights/summary — KPIs for Today / Overview.
+ * GET /api/admin-insights/summary — KPIs for Today (sessions, pageviews, engaged time, funnel counts, top landing/exit pages).
  * Permission: insights.view (manager + super_admin). Parameterised SQL only.
  * Query: from, to (YYYY-MM-DD), range (today|7d|30d|90d), include_bots (default 0). Max 366 days.
  * Missing tables => 200 { installed:false, state:"not_installed" }.
@@ -9,11 +9,10 @@ import pool from "@/lib/db";
 import { getInsightsSettings } from "@/lib/insightsSettings";
 import { scheduleInsightsRetention, type InsightsPoolLike } from "@/lib/insightsRetention";
 import {
-  SQL_COUNTRY,
   botClause,
   handleInsightsGet,
-  normUnknown,
   num,
+  numOrNull,
   qrows,
   rangeOrReject,
   resolveDataSource,
@@ -37,7 +36,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let kpis: InsightsKpis;
     let trend: InsightsTrendPoint[];
-    let topCountries: InsightsSummaryResponse["top_countries"];
+    let avgEngagedMs: number | null = null;
+    let topLandings: InsightsSummaryResponse["top_landings"] = [];
+    let topExits: InsightsSummaryResponse["top_exits"] = [];
     let topPaths: InsightsSummaryResponse["top_paths"];
 
     if (source === "detail") {
@@ -47,7 +48,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 COALESCE(SUM(s.pageview_count), 0) AS pageviews,
                 COALESCE(SUM(s.order_id IS NOT NULL), 0) AS orders,
                 COALESCE(SUM(s.is_new_visitor = 1), 0) AS new_sessions,
-                COALESCE(SUM(s.is_returning = 1), 0) AS returning_sessions
+                COALESCE(SUM(s.is_returning = 1), 0) AS returning_sessions,
+                AVG(s.duration_ms) AS avg_engaged_ms
            FROM insights_sessions s
           WHERE s.started_at >= ? AND s.started_at < ?${bots}`,
         sessionWindow
@@ -100,24 +102,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         orders: num(r.orders),
       }));
 
-      const countryRows = await qrows<Record<string, unknown>>(
-        `SELECT ${SQL_COUNTRY} AS c_name,
-                COALESCE(MAX(NULLIF(s.country_code,'')), '') AS c_code,
-                COUNT(DISTINCT s.visitor_id) AS visitors,
-                COUNT(*) AS sessions
+      avgEngagedMs = numOrNull(sess?.avg_engaged_ms);
+
+      const landingRows = await qrows<Record<string, unknown>>(
+        `SELECT s.landing_path AS p, COUNT(*) AS sessions
            FROM insights_sessions s
           WHERE s.started_at >= ? AND s.started_at < ?${bots}
-          GROUP BY c_name
-          ORDER BY visitors DESC, sessions DESC
+            AND s.landing_path IS NOT NULL
+          GROUP BY s.landing_path
+          ORDER BY sessions DESC
           LIMIT ${TOP_LIMIT}`,
         sessionWindow
       );
-      topCountries = countryRows.map((r) => ({
-        country: normUnknown(r.c_name),
-        country_code: String(r.c_code || ""),
-        visitors: num(r.visitors),
-        sessions: num(r.sessions),
-      }));
+      topLandings = landingRows.map((r) => ({ path: String(r.p || "/"), sessions: num(r.sessions) }));
+
+      const exitRows = await qrows<Record<string, unknown>>(
+        `SELECT s.exit_path AS p, COUNT(*) AS sessions
+           FROM insights_sessions s
+          WHERE s.started_at >= ? AND s.started_at < ?${bots}
+            AND s.exit_path IS NOT NULL
+          GROUP BY s.exit_path
+          ORDER BY sessions DESC
+          LIMIT ${TOP_LIMIT}`,
+        sessionWindow
+      );
+      topExits = exitRows.map((r) => ({ path: String(r.p || "/"), sessions: num(r.sessions) }));
 
       const pathRows = await qrows<Record<string, unknown>>(
         `SELECT e.path AS p,
@@ -187,25 +196,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         orders: num(r.orders_attributed),
       }));
 
-      const countryRows = await qrows<Record<string, unknown>>(
-        `SELECT COALESCE(NULLIF(country_name,''),'Unknown') AS c_name,
-                COALESCE(MAX(NULLIF(country_code,'')), '') AS c_code,
-                COALESCE(SUM(CASE WHEN visitors > 0 THEN visitors ELSE sessions END), 0) AS visitors,
-                COALESCE(SUM(sessions), 0) AS sessions
-           FROM insights_geo_daily
-          WHERE summary_date >= ? AND summary_date <= ?
-          GROUP BY c_name
-          ORDER BY visitors DESC, sessions DESC
-          LIMIT ${TOP_LIMIT}`,
-        dateWindow
-      );
-      topCountries = countryRows.map((r) => ({
-        country: normUnknown(r.c_name),
-        country_code: String(r.c_code || ""),
-        visitors: num(r.visitors),
-        sessions: num(r.sessions),
-      }));
-
       const pathRows = await qrows<Record<string, unknown>>(
         `SELECT path AS p,
                 COALESCE(SUM(pageviews), 0) AS pageviews,
@@ -245,9 +235,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       notes,
       has_data: kpis.sessions > 0 || kpis.pageviews > 0,
       kpis,
+      avg_engaged_ms: avgEngagedMs,
       trend,
-      top_countries: topCountries,
       top_paths: topPaths,
+      top_landings: topLandings,
+      top_exits: topExits,
     };
     return payload;
   });

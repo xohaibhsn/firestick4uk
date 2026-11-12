@@ -3,7 +3,8 @@
  * No network side effects at import time.
  *
  * Client-safe copies of ingest constants live here (do NOT import lib/insightsIngest —
- * that module pulls insightsGeo → Node `fs` into the browser bundle).
+ * it is server-side ingest code). The props allowlist sanitizer lives here and is
+ * reused by the server ingest so both sides agree on the shape.
  */
 
 import {
@@ -89,7 +90,17 @@ export const INSIGHTS_BATCH_FLUSH_MS = 2000;
 /** Stop sending after this many consecutive 204s in one page session (disabled ingest). */
 export const INSIGHTS_CONSECUTIVE_204_STOP = 5;
 
-export const INSIGHTS_SCROLL_MARKS = [25, 50, 75, 90, 100] as const;
+export const INSIGHTS_SCROLL_MARKS = [25, 50, 75, 100] as const;
+
+export const INSIGHTS_MAX_CLICKS_PER_PAGE = 30;
+export const INSIGHTS_CLICK_LABEL_MAX = 40;
+export const INSIGHTS_CLICK_TAG_MAX = 32;
+export const INSIGHTS_CLICK_MAX_DEPTH = 6;
+export const INSIGHTS_RAGE_MIN_CLICKS = 3;
+export const INSIGHTS_RAGE_WINDOW_MS = 1000;
+export const INSIGHTS_RAGE_RADIUS_PX = 30;
+export const INSIGHTS_MOBILE_MAX_WIDTH = 768;
+export const INSIGHTS_CART_ITEMS_MAX = 40;
 
 export const INSIGHTS_CLICK_TAXONOMY: Record<string, string> = {
   cart_add: "cart_add",
@@ -400,21 +411,194 @@ export function containsDeniedFormKey(key: string): boolean {
   return INSIGHTS_FORM_KEY_DENYLIST.some((d) => k === d || k.includes(d));
 }
 
+const SCROLL_MILESTONE_KEYS = ["m25", "m50", "m75", "m100"] as const;
+
+function cleanText(v: unknown, max: number): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.replace(/\s+/g, " ").trim();
+  if (!s) return null;
+  return s.slice(0, max);
+}
+
+function cleanCartItems(v: unknown): Array<{ id: string | number; qty: number }> | null {
+  if (!Array.isArray(v)) return null;
+  const out: Array<{ id: string | number; qty: number }> = [];
+  for (const row of v) {
+    if (out.length >= INSIGHTS_CART_ITEMS_MAX) break;
+    let id: unknown;
+    let qty: unknown = 1;
+    if (row && typeof row === "object" && !Array.isArray(row)) {
+      id = (row as { id?: unknown }).id;
+      qty = (row as { qty?: unknown }).qty ?? 1;
+    } else {
+      id = row;
+    }
+    let cleanId: string | number | null = null;
+    if (typeof id === "number" && Number.isFinite(id)) cleanId = id;
+    else if (typeof id === "string" && id.trim()) cleanId = id.trim().slice(0, 64);
+    if (cleanId === null) continue;
+    const q = Number(qty);
+    out.push({ id: cleanId, qty: Number.isFinite(q) && q > 0 ? Math.min(Math.floor(q), 999) : 1 });
+  }
+  return out.length ? out : null;
+}
+
+/**
+ * Props allowlist: only known keys survive, each validated for type/length.
+ * Click: tag, label, x_pct, y_pct, vw, rage(true only). Scroll: m25..m100. Cart: items, total.
+ * Returns undefined when nothing is left.
+ */
+export function sanitizeInsightsProps(props: unknown): Record<string, unknown> | undefined {
+  if (!props || typeof props !== "object" || Array.isArray(props)) return undefined;
+  const src = props as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+
+  const tag = cleanText(src.tag, INSIGHTS_CLICK_TAG_MAX);
+  if (tag && /^[a-z][a-z0-9-]*$/i.test(tag)) out.tag = tag;
+
+  const label = cleanText(src.label, INSIGHTS_CLICK_LABEL_MAX);
+  if (label && !isEmailLike(label)) out.label = label;
+
+  for (const k of ["x_pct", "y_pct"] as const) {
+    const n = src[k];
+    if (typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 100) out[k] = n;
+  }
+
+  if (src.vw === "m" || src.vw === "d") out.vw = src.vw;
+  if (src.rage === true) out.rage = true;
+
+  for (const k of SCROLL_MILESTONE_KEYS) {
+    if (typeof src[k] === "boolean") out[k] = src[k];
+  }
+
+  const items = cleanCartItems(src.items);
+  if (items) out.items = items;
+  const total = src.total;
+  if (typeof total === "number" && Number.isFinite(total) && total >= 0 && total <= 10_000_000) {
+    out.total = Math.round(total * 100) / 100;
+  }
+
+  return Object.keys(out).length ? out : undefined;
+}
+
 export function sanitizeProps(
   props: Record<string, unknown> | null | undefined
 ): Record<string, unknown> | undefined {
-  if (!props || typeof props !== "object") return undefined;
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(props)) {
-    if (containsDeniedFormKey(k)) continue;
-    if (v == null) continue;
-    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
-      out[k] = typeof v === "string" ? v.slice(0, 256) : v;
-    } else if (Array.isArray(v) && v.every((x) => typeof x === "number" || typeof x === "string")) {
-      out[k] = v.slice(0, 40);
-    }
+  return sanitizeInsightsProps(props);
+}
+
+export function roundPctTo2(pct: number): number {
+  if (typeof pct !== "number" || !Number.isFinite(pct)) return 0;
+  const clamped = Math.max(0, Math.min(100, pct));
+  return Math.round(clamped / 2) * 2;
+}
+
+type ClickTargetLike = {
+  tagName?: string;
+  parentElement?: ClickTargetLike | null;
+  getAttribute?: (name: string) => string | null;
+};
+
+function attrOf(node: ClickTargetLike, name: string): string | null {
+  try {
+    return typeof node.getAttribute === "function" ? node.getAttribute(name) : null;
+  } catch {
+    return null;
   }
-  return Object.keys(out).length ? out : undefined;
+}
+
+function matchesClickable(node: ClickTargetLike): boolean {
+  const tag = String(node.tagName || "").toUpperCase();
+  if (tag === "A" || tag === "BUTTON" || tag === "SUMMARY") return true;
+  if (attrOf(node, "role") === "button") return true;
+  if (tag === "LABEL" && attrOf(node, "for") != null) return true;
+  return attrOf(node, "data-insights-id") != null;
+}
+
+/** Nearest clickable ancestor (a, button, [role=button], summary, label[for], [data-insights-id]) within 6 levels. */
+export function findClickableInsightsTarget<T extends ClickTargetLike>(el: T | null | undefined): T | null {
+  let node: ClickTargetLike | null | undefined = el;
+  for (let depth = 0; node && depth <= INSIGHTS_CLICK_MAX_DEPTH; depth++, node = node.parentElement) {
+    if (matchesClickable(node)) return node as T;
+  }
+  return null;
+}
+
+export function isClickableInsightsTarget(el: ClickTargetLike | null | undefined): boolean {
+  return findClickableInsightsTarget(el) !== null;
+}
+
+function sameOriginPath(href: string, origin: string): string | null {
+  const raw = href.trim();
+  if (!raw) return null;
+  if (raw.startsWith("/") && !raw.startsWith("//")) return raw.split(/[?#]/)[0] || "/";
+  if (!origin) return null;
+  try {
+    const u = new URL(raw, origin);
+    if (u.origin !== origin) return null;
+    return u.pathname || "/";
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Click label: data-insights-id → aria-label → same-origin link path (no query/hash) → button text.
+ * Never reads form field values; field elements and containers of fields yield no text label.
+ */
+export function buildClickLabel(
+  el: (ClickTargetLike & { innerText?: string; textContent?: string | null; querySelector?: (s: string) => unknown }) | null | undefined,
+  opts?: { origin?: string }
+): string | null {
+  if (!el) return null;
+  const tag = String(el.tagName || "").toUpperCase();
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return null;
+
+  const finish = (raw: string | null): string | null => {
+    const s = cleanText(raw, INSIGHTS_CLICK_LABEL_MAX);
+    if (!s || isEmailLike(s)) return null;
+    return s;
+  };
+
+  const dataId = finish(attrOf(el, "data-insights-id"));
+  if (dataId) return dataId;
+  const aria = finish(attrOf(el, "aria-label"));
+  if (aria) return aria;
+
+  if (tag === "A") {
+    const href = attrOf(el, "href");
+    const origin =
+      opts?.origin ?? (typeof location !== "undefined" && location ? String(location.origin || "") : "");
+    return href ? finish(sameOriginPath(href, origin)) : null;
+  }
+
+  try {
+    if (typeof el.querySelector === "function" && el.querySelector("input, textarea, select")) return null;
+  } catch {
+    return null;
+  }
+  const text = typeof el.innerText === "string" ? el.innerText : el.textContent;
+  return finish(typeof text === "string" ? text : null);
+}
+
+export type InsightsClickSample = { t: number; x: number; y: number };
+
+/** True when `click` plus earlier samples make 3+ clicks within 1s and 30px of it. */
+export function detectRageClick(
+  history: readonly InsightsClickSample[],
+  click: InsightsClickSample
+): boolean {
+  let n = 1;
+  for (const h of history) {
+    const dt = click.t - h.t;
+    if (dt < 0 || dt > INSIGHTS_RAGE_WINDOW_MS) continue;
+    if (Math.hypot(click.x - h.x, click.y - h.y) <= INSIGHTS_RAGE_RADIUS_PX) n += 1;
+  }
+  return n >= INSIGHTS_RAGE_MIN_CLICKS;
+}
+
+export function viewportBucket(innerWidth: number): "m" | "d" {
+  return innerWidth < INSIGHTS_MOBILE_MAX_WIDTH ? "m" : "d";
 }
 
 export function isEmailLike(value: string): boolean {
@@ -636,6 +820,22 @@ export type InsightsRuntimeHooks = {
   clearSchedule: (id: number | ReturnType<typeof setTimeout>) => void;
   onFlushResult?: (result: InsightsTransportResult) => void;
   transport?: typeof sendInsightsPayload;
+  /** Document visibility; engaged time only accumulates while true. Defaults to always visible. */
+  isVisible?: () => boolean;
+};
+
+export type InsightsClickInput = {
+  /** Event type: "click" or a taxonomy type (cart_add, checkout_place_order, ...). */
+  t: string;
+  clickId: string;
+  tag: string;
+  label: string | null;
+  xPct: number;
+  yPct: number;
+  vw: "m" | "d";
+  /** Document-space px (rage detection only; never sent). */
+  x: number;
+  y: number;
 };
 
 export type InsightsController = {
@@ -647,6 +847,16 @@ export type InsightsController = {
   getQueueLength: () => number;
   getConsecutive204s: () => number;
   handlePathChange: (pathname: string) => void;
+  /** Visibility tick: pauses/resumes the engaged-time clock. */
+  setVisible: (visible: boolean) => void;
+  /** Engaged ms for the current page view so far. */
+  getEngagedMs: () => number;
+  /** Hidden / pagehide: pause clock, emit pending timing (no page_view) and flush. */
+  pageHidden: () => void;
+  /** Scroll depth sample (0-100); emits a watermark event when a new mark is crossed. */
+  recordScroll: (depthPct: number) => void;
+  /** Click capture: enforces max 30 per page view and rage detection. */
+  recordClick: (input: InsightsClickInput) => boolean;
   /** Test/inspection: whether network is allowed. */
   networkAllowed: () => boolean;
 };
@@ -658,6 +868,13 @@ export function createInsightsController(hooks: InsightsRuntimeHooks): InsightsC
   let attribution: InsightsAttribution | null = null;
   let pageStartedAt = 0;
   let scrollMax = 0;
+  let engagedAccum = 0;
+  let engagedStartedAt: number | null = null;
+  let engagedEmitted = 0;
+  let milestonesReported = new Set<number>();
+  let clickCount = 0;
+  let clickHistory: InsightsClickSample[] = [];
+  let rageBurst: InsightsClickSample | null = null;
   let consecutive204 = 0;
   let stoppedFor204 = false;
   let lastPath = "/";
@@ -756,24 +973,133 @@ export function createInsightsController(hooks: InsightsRuntimeHooks): InsightsC
     }
   };
 
+  const isVisibleNow = () => {
+    try {
+      return hooks.isVisible ? hooks.isVisible() !== false : true;
+    } catch {
+      return true;
+    }
+  };
+
+  const getEngagedMs = () => {
+    if (!pageStartedAt) return 0;
+    const live = engagedStartedAt != null ? Math.max(0, hooks.now() - engagedStartedAt) : 0;
+    return engagedAccum + live;
+  };
+
+  const setVisible = (visible: boolean) => {
+    if (!pageStartedAt) return;
+    if (visible) {
+      if (engagedStartedAt == null) engagedStartedAt = hooks.now();
+    } else if (engagedStartedAt != null) {
+      engagedAccum += Math.max(0, hooks.now() - engagedStartedAt);
+      engagedStartedAt = null;
+    }
+  };
+
+  /** Emits engaged-ms delta + newly reached milestone flags (once per mark). No page_view. */
+  const emitPageTiming = () => {
+    if (!pageStartedAt) return;
+    const total = getEngagedMs();
+    const delta = Math.max(0, total - engagedEmitted);
+    const fresh: Record<string, boolean> = {};
+    for (const m of INSIGHTS_SCROLL_MARKS) {
+      if (scrollMax >= m && !milestonesReported.has(m)) {
+        milestonesReported.add(m);
+        fresh[`m${m}`] = true;
+      }
+    }
+    const hasMilestones = Object.keys(fresh).length > 0;
+    if (delta <= 0 && !hasMilestones) return;
+    engagedEmitted = total;
+    const event: InsightsClientEvent = {
+      t: "scroll_depth",
+      ts: new Date(hooks.now()).toISOString(),
+      path: lastPath,
+      time_on_page_ms: Math.floor(delta),
+      scroll_depth_pct: scrollMax || 0,
+    };
+    if (hasMilestones) event.props = fresh;
+    enqueue(event);
+  };
+
   const closePageTiming = () => {
     if (!pageStartedAt) return;
-    const ms = Math.max(0, hooks.now() - pageStartedAt);
-    // Timing/scroll watermark only — do not emit a second page_view (avoids double-count).
+    setVisible(false);
+    emitPageTiming();
+    pageStartedAt = 0;
+    engagedStartedAt = null;
+  };
+
+  const recordScroll = (depthPct: number) => {
+    if (!pageStartedAt || !networkAllowed()) return;
+    const hit = nextScrollWatermark(scrollMax, depthPct, INSIGHTS_SCROLL_MARKS);
+    if (hit == null) return;
+    scrollMax = hit;
     enqueue({
       t: "scroll_depth",
       ts: new Date(hooks.now()).toISOString(),
       path: lastPath,
-      time_on_page_ms: ms,
-      scroll_depth_pct: scrollMax || 0,
+      scroll_depth_pct: hit,
     });
-    pageStartedAt = 0;
+  };
+
+  const recordClick = (input: InsightsClickInput): boolean => {
+    if (!pageStartedAt || !networkAllowed()) return false;
+    if (clickCount >= INSIGHTS_MAX_CLICKS_PER_PAGE) return false;
+    const sample: InsightsClickSample = { t: hooks.now(), x: input.x, y: input.y };
+
+    if (rageBurst) {
+      const stillBurst =
+        sample.t - rageBurst.t <= INSIGHTS_RAGE_WINDOW_MS &&
+        Math.hypot(sample.x - rageBurst.x, sample.y - rageBurst.y) <= INSIGHTS_RAGE_RADIUS_PX;
+      if (stillBurst) {
+        rageBurst = sample;
+        return false;
+      }
+      rageBurst = null;
+    }
+
+    const rage = detectRageClick(clickHistory, sample);
+    clickHistory = clickHistory
+      .filter((h) => sample.t - h.t <= INSIGHTS_RAGE_WINDOW_MS)
+      .concat(sample)
+      .slice(-INSIGHTS_RAGE_MIN_CLICKS * 2);
+    if (rage) {
+      rageBurst = sample;
+      clickHistory = [];
+    }
+
+    clickCount += 1;
+    const props: Record<string, unknown> = {
+      tag: input.tag,
+      x_pct: roundPctTo2(input.xPct),
+      y_pct: roundPctTo2(input.yPct),
+      vw: input.vw,
+    };
+    if (input.label) props.label = input.label;
+    if (rage) props.rage = true;
+    enqueue({
+      t: input.t,
+      ts: new Date(sample.t).toISOString(),
+      path: lastPath,
+      click_id: input.clickId,
+      props: sanitizeInsightsProps(props),
+    });
+    return true;
   };
 
   const startPage = (pathname: string) => {
     lastPath = pathname || "/";
     pageStartedAt = hooks.now();
     scrollMax = 0;
+    engagedAccum = 0;
+    engagedEmitted = 0;
+    engagedStartedAt = isVisibleNow() ? pageStartedAt : null;
+    milestonesReported = new Set<number>();
+    clickCount = 0;
+    clickHistory = [];
+    rageBurst = null;
     enqueue({
       t: "page_view",
       ts: new Date(hooks.now()).toISOString(),
@@ -843,10 +1169,21 @@ export function createInsightsController(hooks: InsightsRuntimeHooks): InsightsC
       else if (queue.length) flush({ force: false });
       queue = [];
       pageStartedAt = 0;
+      engagedStartedAt = null;
     },
     isRunning: () => running,
     enqueue,
     flush,
+    setVisible,
+    getEngagedMs,
+    pageHidden() {
+      if (!running || !pageStartedAt) return;
+      setVisible(false);
+      emitPageTiming();
+      flush();
+    },
+    recordScroll,
+    recordClick,
     getQueueLength: () => queue.length,
     getConsecutive204s: () => consecutive204,
     handlePathChange(pathname: string) {

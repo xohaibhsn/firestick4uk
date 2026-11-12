@@ -220,7 +220,13 @@ const allow = new Set([
   "scripts/phase-pay-cms-66-tests.js",
   "REPO_AUDIT_REPORT.md",
 ]);
-const unexpected = allTouched.filter((f) => !allow.has(f));
+// F4UK-INSIGHTS-SLIM-67: Insights files edited in this working tree
+const slim67Files = new Set(["lib/insightsIngest.ts", "lib/insightsGeo.ts", "pages/api/insights-collect.ts", "package.json", "package-lock.json", "scripts/phase-sidhu-insights-56-tests.js", "scripts/phase-insights-w2-60-tests.js", "scripts/phase-insights-slim-67-tests.js"]);
+const slim67 = (f) =>
+  slim67Files.has(f) ||
+  f.startsWith("pages/api/admin-insights/") ||
+  f.startsWith("components/sidhu/insights/");
+const unexpected = allTouched.filter((f) => !allow.has(f) && !slim67(f));
 ok(
   "diff_allowlist",
   unexpected.length === 0,

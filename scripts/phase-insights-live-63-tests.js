@@ -71,7 +71,7 @@ function loadTs(rel, stubs = {}) {
 const BANNER =
   "Privacy choices. We use optional analytics (including our own first-party site statistics) and advertising technologies to understand site use and measure ads. Essential features (cart, checkout, login) work without them. You can change this anytime via Privacy choices in the footer.";
 const ANALYTICS_DESC =
-  "Helps us understand how the site is used: Google Analytics and our own site statistics (pages viewed, traffic source, approximate location from IP, device type, cart and checkout steps; never what you type into forms). Microsoft Clarity only if we switch it on. No effect on cart or checkout.";
+  "Helps us understand how the site is used: Google Analytics and our own site statistics (pages viewed, traffic source, device type, clicks, scrolling and time on page, cart and checkout steps; never what you type into forms). Microsoft Clarity only if we switch it on. No effect on cart or checkout.";
 
 const consent = read("components/TrackingConsent.tsx");
 const consentNorm = consent.replace(/\s+/g, " ");
@@ -94,7 +94,8 @@ ok(
   "copy_analytics_row_updated",
   consentNorm.includes(ANALYTICS_DESC.replace(/\s+/g, " ")) ||
     (/our own site statistics/.test(consentNorm) &&
-      /approximate location from IP/.test(consentNorm) &&
+      /clicks, scrolling and time on page/.test(consentNorm) &&
+      !/approximate location from IP/.test(consentNorm) &&
       /Microsoft Clarity only if we switch it on/.test(consentNorm) &&
       /never what you type into forms/.test(consentNorm))
 );
@@ -249,7 +250,17 @@ const ALLOWED = new Set([
   "app/cart/page.tsx",
   "scripts/phase-pay-cms-66-tests.js",
   "REPO_AUDIT_REPORT.md",
+  // F4UK-INSIGHTS-SLIM-67
+  "lib/insightsIngest.ts",
+  "lib/insightsGeo.ts",
+  "pages/api/insights-collect.ts",
+  "package.json",
+  "package-lock.json",
+  "scripts/phase-sidhu-insights-56-tests.js",
+  "scripts/phase-insights-w2-60-tests.js",
+  "scripts/phase-insights-slim-67-tests.js",
 ]);
+const SLIM_67_PREFIXES = ["pages/api/admin-insights/", "components/sidhu/insights/"];
 let dirty = [];
 let untracked = [];
 try {
@@ -268,7 +279,9 @@ try {
   ok("git_inventory", false, String(e.message || e));
 }
 const touched = [...new Set([...dirty, ...untracked])];
-const unexpected = touched.filter((f) => !ALLOWED.has(f));
+const unexpected = touched.filter(
+  (f) => !ALLOWED.has(f) && !SLIM_67_PREFIXES.some((p) => f.startsWith(p))
+);
 ok("diff_allowlist", unexpected.length === 0, unexpected.join(",") || "clean");
 ok(
   "no_seo_nav_layout_edits",

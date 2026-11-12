@@ -18,18 +18,29 @@ import {
   type TrackingConsentPreference,
 } from "@/lib/trackingConsent";
 import {
-  INSIGHTS_SCROLL_MARKS,
+  buildClickLabel,
   clearInsightsSessionId,
   createInsightsController,
+  findClickableInsightsTarget,
   hasGlobalPrivacyControl,
   isInsightsExcludedPath,
-  nextScrollWatermark,
   resolveClickTaxonomyId,
+  roundPctTo2,
   sanitizeSearchTerm,
   scrollDepthPercent,
   shouldRecordInsights,
+  viewportBucket,
   type InsightsController,
 } from "@/lib/insightsClient";
+
+function clickEventType(clickId: string | null): string {
+  if (!clickId) return "click";
+  if (clickId.startsWith("pay_method")) return "checkout_payment";
+  if (clickId === "place_order") return "checkout_place_order";
+  if (clickId === "cart_add") return "cart_add";
+  if (clickId === "cart_view") return "cart_view";
+  return "click";
+}
 
 function scheduleIdle(fn: () => void, ms = 0): number | ReturnType<typeof setTimeout> {
   if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
@@ -58,7 +69,6 @@ export default function SidhuInsightsBeacon() {
   const pathname = usePathname() || "/";
   const controllerRef = useRef<InsightsController | null>(null);
   const preferenceRef = useRef<TrackingConsentPreference | null>(null);
-  const scrollMaxRef = useRef(0);
 
   // Mount once: controller + global listeners
   useEffect(() => {
@@ -78,6 +88,7 @@ export default function SidhuInsightsBeacon() {
       }),
       localStorage: window.localStorage,
       sessionStorage: window.sessionStorage,
+      isVisible: () => document.visibilityState !== "hidden",
       now: () => Date.now(),
       schedule: (fn: () => void, ms?: number) => scheduleIdle(fn, ms ?? 0),
       clearSchedule: (id: number | ReturnType<typeof setTimeout>) => clearIdle(id),
@@ -114,32 +125,51 @@ export default function SidhuInsightsBeacon() {
       maybeStart(next);
     };
 
+    // Engaged time: the controller only accumulates while the tab is visible.
     const onVisibility = () => {
-      if (document.visibilityState === "hidden") controller.flush();
+      if (document.visibilityState === "hidden") controller.pageHidden();
+      else controller.setVisible(true);
     };
     const onPageHide = () => {
-      controller.flush();
+      controller.pageHidden();
     };
 
-    const onClick = (ev: Event) => {
+    // Capture-phase click capture: element identity + position only, never field values.
+    const onClick = (ev: MouseEvent) => {
       if (!controller.isRunning() || !controller.networkAllowed()) return;
       const target = ev.target;
       if (!(target instanceof Element)) return;
-      const clickId = resolveClickTaxonomyId(target);
-      if (!clickId) return;
-      controller.enqueue({
-        t: clickId.startsWith("pay_method")
-          ? "checkout_payment"
-          : clickId === "place_order"
-            ? "checkout_place_order"
-            : clickId === "cart_add"
-              ? "cart_add"
-              : clickId === "cart_view"
-                ? "cart_view"
-                : "click",
-        ts: new Date().toISOString(),
-        path: window.location.pathname || "/",
-        click_id: clickId,
+      const taxonomyId = resolveClickTaxonomyId(target);
+      const clickable = findClickableInsightsTarget(target);
+      if (!taxonomyId && !clickable) return;
+      const el: Element = clickable || target;
+
+      const docEl = document.documentElement;
+      const docW = Math.max(docEl?.scrollWidth || 0, docEl?.clientWidth || 0, window.innerWidth || 0, 1);
+      const docH = Math.max(
+        docEl?.scrollHeight || 0,
+        document.body?.scrollHeight || 0,
+        window.innerHeight || 0,
+        1
+      );
+      let pageX = ev.pageX;
+      let pageY = ev.pageY;
+      if (ev.detail === 0 || (ev.clientX === 0 && ev.clientY === 0)) {
+        const r = el.getBoundingClientRect();
+        pageX = r.left + r.width / 2 + (window.scrollX || 0);
+        pageY = r.top + r.height / 2 + (window.scrollY || 0);
+      }
+
+      controller.recordClick({
+        t: clickEventType(taxonomyId),
+        clickId: taxonomyId || "el",
+        tag: el.tagName.toLowerCase(),
+        label: buildClickLabel(el as HTMLElement, { origin: window.location.origin }),
+        xPct: roundPctTo2((pageX / docW) * 100),
+        yPct: roundPctTo2((pageY / docH) * 100),
+        vw: viewportBucket(window.innerWidth || 0),
+        x: pageX,
+        y: pageY,
       });
     };
 
@@ -154,15 +184,7 @@ export default function SidhuInsightsBeacon() {
           ),
           window.innerHeight || 0
         );
-        const hit = nextScrollWatermark(scrollMaxRef.current, depth, INSIGHTS_SCROLL_MARKS);
-        if (hit == null) return;
-        scrollMaxRef.current = hit;
-        controller.enqueue({
-          t: "scroll_depth",
-          ts: new Date().toISOString(),
-          path: window.location.pathname || "/",
-          scroll_depth_pct: hit,
-        });
+        controller.recordScroll(depth);
       });
     };
 
@@ -237,7 +259,7 @@ export default function SidhuInsightsBeacon() {
     window.addEventListener(TRACKING_CONSENT_CHANGED_EVENT, onConsentChanged as EventListener);
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onPageHide);
-    document.addEventListener("click", onClick, true);
+    document.addEventListener("click", onClick, { capture: true, passive: true });
     document.addEventListener("click", onSearchClick, true);
     document.addEventListener("keydown", onKeyDown, true);
     window.addEventListener("scroll", onScrollWatermark, { passive: true });
@@ -265,7 +287,6 @@ export default function SidhuInsightsBeacon() {
   useEffect(() => {
     const controller = controllerRef.current;
     if (!controller) return;
-    scrollMaxRef.current = 0;
     const pref = preferenceRef.current ?? readTrackingConsent();
     const gpc = hasGlobalPrivacyControl();
 
