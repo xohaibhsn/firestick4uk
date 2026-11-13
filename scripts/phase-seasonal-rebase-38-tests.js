@@ -190,8 +190,8 @@ ok(
     /await\s+uploadReceiptDuringCheckout/.test(cart)
 );
 ok(
-  "cart_data_clarity_mask_root",
-  /data-clarity-mask\s*=\s*["']True["']/.test(cart)
+  "cart_no_data_clarity_mask_root",
+  !/data-clarity-mask/.test(cart)
 );
 
 byteIdenticalToPristine(
@@ -201,9 +201,8 @@ byteIdenticalToPristine(
 
 const layout = read("app/layout.tsx");
 ok(
-  "layout_mounts_MicrosoftClarity",
-  /import\s+MicrosoftClarity/.test(layout) &&
-    /<MicrosoftClarity\s*\/>/.test(layout)
+  "layout_does_not_mount_MicrosoftClarity",
+  !/MicrosoftClarity/.test(layout) && !/clarity\.ms/.test(layout)
 );
 ok(
   "layout_mounts_TrackingConsent",
@@ -280,9 +279,13 @@ ok(
 );
 
 byteIdenticalToPristine("lib/paymentMethod.ts", "paymentMethod_file");
-byteIdenticalToPristine("lib/clarityGating.ts", "clarityGating_file");
-byteIdenticalToPristine("lib/clarityConsent.ts", "clarityConsent_file");
-byteIdenticalToPristine("lib/clarityConfig.ts", "clarityConfig_file");
+ok(
+  "clarity_modules_removed",
+  !fs.existsSync(path.join(ROOT, "lib/clarityGating.ts")) &&
+    !fs.existsSync(path.join(ROOT, "lib/clarityConsent.ts")) &&
+    !fs.existsSync(path.join(ROOT, "lib/clarityConfig.ts")) &&
+    !fs.existsSync(path.join(ROOT, "components/MicrosoftClarity.tsx"))
+);
 
 console.log("");
 console.log(`RESULT  passed=${passed} failed=${failed}`);

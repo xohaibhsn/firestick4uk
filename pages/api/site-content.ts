@@ -26,10 +26,6 @@ import {
   invalidatePublicCmsCache,
 } from '../../lib/publicCmsDataServer';
 import {
-  sanitizeClaritySiteContentMap,
-  validateClarityCmsUpdate,
-} from '../../lib/clarityConfig';
-import {
   SEASONAL_HUB_PUBLISHED_KEY,
   validateSeasonalHubPublicationWrite,
 } from '../../lib/seasonalHubPublic';
@@ -92,7 +88,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { page } = req.query;
       if (page === 'all') {
         const result = await getCachedPublicSiteContentAll();
-        return res.status(200).json(sanitizeClaritySiteContentMap(result));
+        return res.status(200).json(result);
       }
       let query = 'SELECT content_key, content_value, content_type, page_name, label FROM site_content';
       const params: any[] = [];
@@ -101,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const [rows]: any = await pool.query(query, params);
       const result: Record<string,string> = {};
       for (const r of rows) result[r.content_key] = r.content_value || '';
-      return res.status(200).json(sanitizeClaritySiteContentMap(result));
+      return res.status(200).json(result);
     }
 
     if (req.method === 'POST') {
@@ -155,17 +151,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           error: 'Forbidden',
           message: 'You do not have permission for this action.',
         });
-      }
-
-      for (const u of updateList) {
-        const validated = validateClarityCmsUpdate(u.key, u.value);
-        if (!validated.ok) {
-          return res.status(400).json({
-            error: validated.error || 'Invalid Clarity setting',
-            key: u.key,
-          });
-        }
-        u.value = validated.value;
       }
 
       const hubGate = await assertSeasonalHubWritesAllowed(updateList);
@@ -383,14 +368,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const before = await loadKeysSnapshot([ck]);
-      const clarityPut = validateClarityCmsUpdate(ck, String(content_value ?? ''));
-      if (!clarityPut.ok) {
-        return res.status(400).json({
-          error: clarityPut.error || 'Invalid Clarity setting',
-          key: ck,
-        });
-      }
-      const nextVal = clarityPut.value;
+      const nextVal = String(content_value ?? '');
       const hubGate = await assertSeasonalHubWritesAllowed([{ key: ck, value: nextVal }]);
       if (!hubGate.ok) {
         return res.status(hubGate.status).json({ error: hubGate.error, code: 'seasonal_hub_publish_rejected' });

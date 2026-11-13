@@ -207,6 +207,8 @@ const allow = new Set([
   "scripts/phase-insights-live-63-tests.js",
   "scripts/phase20g3b-tracking-consent-tests.js",
   "scripts/phase-clarity-35-tests.js",
+  "scripts/retired/phase-clarity-35-tests.js",
+  "scripts/phase-proc-clarity-71-tests.js",
   "scripts/phase-tracking-consent-final-tests.js",
   "scripts/phase-home-reviews-61-tests.js",
   // F4UK-PAY-CMS-66

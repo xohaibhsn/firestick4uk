@@ -227,6 +227,7 @@ function sha256File(rel) {
 f === "scripts/phase-insights-live-63-tests.js" ||
       f === "scripts/phase20g3b-tracking-consent-tests.js" ||
       f === "scripts/phase-clarity-35-tests.js" ||
+      f === "scripts/retired/phase-clarity-35-tests.js" ||
       f === "scripts/phase-tracking-consent-final-tests.js" ||
       // F4UK-PAY-CMS-66
       f === "lib/paymentMethodSettings.ts" ||

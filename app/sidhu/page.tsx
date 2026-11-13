@@ -332,6 +332,12 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminDropOpen, setAdminDropOpen] = useState(false);
+  const [serverRuntime, setServerRuntime] = useState<any>(null);
+  const [serverRuntimeLoading, setServerRuntimeLoading] = useState(false);
+  const [serverRuntimeError, setServerRuntimeError] = useState("");
+  const [serverRuntimeFetchedAt, setServerRuntimeFetchedAt] = useState(0);
+  const [serverRuntimeCooldownUntil, setServerRuntimeCooldownUntil] = useState(0);
+  const [serverRuntimeNow, setServerRuntimeNow] = useState(0);
   const [orders, setOrders] = useState<any[]>([]);
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [ordersTotalPages, setOrdersTotalPages] = useState(1);
@@ -1039,6 +1045,54 @@ export default function AdminPage() {
     loadAuditLog(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedIn, tab, adminRole]);
+
+  const loadServerRuntime = (opts?: { force?: boolean }) => {
+    if (adminRole !== "super_admin") return;
+    const now = Date.now();
+    if (!opts?.force && serverRuntimeCooldownUntil && now < serverRuntimeCooldownUntil) {
+      return;
+    }
+    setServerRuntimeLoading(true);
+    setServerRuntimeError("");
+    fetch("/api/admin-server-runtime", { credentials: "include", cache: "no-store" })
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        if (r.status === 401) {
+          handleSessionExpired();
+          return;
+        }
+        if (r.status === 403) {
+          setServerRuntimeError(data.message || data.error || "Forbidden");
+          return;
+        }
+        if (!r.ok) {
+          setServerRuntimeError(data.error || "Failed to load server runtime");
+          return;
+        }
+        const fetchedAt = Date.now();
+        setServerRuntime(data);
+        setServerRuntimeFetchedAt(fetchedAt);
+        setServerRuntimeCooldownUntil(fetchedAt + 30_000);
+        setServerRuntimeNow(fetchedAt);
+      })
+      .catch(() => setServerRuntimeError("Failed to load server runtime"))
+      .finally(() => setServerRuntimeLoading(false));
+  };
+
+  useEffect(() => {
+    if (!loggedIn || tab !== "settings" || adminRole !== "super_admin") return;
+    loadServerRuntime({ force: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn, tab, adminRole]);
+
+  useEffect(() => {
+    if (!loggedIn || tab !== "settings" || adminRole !== "super_admin") return;
+    if (!serverRuntimeCooldownUntil) return;
+    const tick = () => setServerRuntimeNow(Date.now());
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [loggedIn, tab, adminRole, serverRuntimeCooldownUntil]);
 
   // Refresh all site_content when Site Settings or Content Editor opens
   useEffect(() => {
@@ -5959,6 +6013,123 @@ export default function AdminPage() {
               <div className="section-header" style={{marginBottom:24}}>
                 <div className="section-title">Site Settings</div>
               </div>
+
+              {adminRole === "super_admin" && (
+                <div
+                  data-testid="server-runtime-panel"
+                  style={{
+                    marginBottom: 28,
+                    padding: 18,
+                    borderRadius: 12,
+                    border: "1px solid #E5E5E5",
+                    background: "#FAFAFA",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: "#111" }}>Server</div>
+                      <div style={{ fontSize: 12, color: "#666", marginTop: 4, lineHeight: 1.45 }}>
+                        Read-only process threads for this hosting account. Plan limit: 200 threads (static). Refresh at most every 30 seconds.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={
+                        serverRuntimeLoading ||
+                        (serverRuntimeCooldownUntil > 0 && serverRuntimeNow < serverRuntimeCooldownUntil)
+                      }
+                      onClick={() => loadServerRuntime()}
+                      data-testid="server-runtime-refresh"
+                    >
+                      {serverRuntimeLoading ? "Refreshing…" : "Refresh"}
+                    </button>
+                  </div>
+                  {serverRuntimeError && (
+                    <div style={{ fontSize: 13, color: "#b91c1c", marginBottom: 10 }}>{serverRuntimeError}</div>
+                  )}
+                  {serverRuntime && serverRuntime.available === false && (
+                    <div style={{ fontSize: 13, color: "#666" }}>/proc is not available on this host.</div>
+                  )}
+                  {serverRuntime && serverRuntime.available !== false && serverRuntime.self && (
+                    <>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
+                          gap: 10,
+                          marginBottom: 14,
+                        }}
+                      >
+                        {[
+                          ["PID", serverRuntime.self.pid],
+                          ["Node", serverRuntime.self.node],
+                          ["Uptime (s)", serverRuntime.self.uptimeSec],
+                          ["Threads", serverRuntime.self.threads],
+                          ["RSS (MB)", serverRuntime.self.memory?.rssMb],
+                          ["Heap (MB)", serverRuntime.self.memory?.heapUsedMb],
+                          ["CPUs", serverRuntime.self.cpuCount],
+                          ["Load", Array.isArray(serverRuntime.self.loadavg) ? serverRuntime.self.loadavg.map((n: number) => Number(n).toFixed(2)).join(" / ") : "—"],
+                        ].map(([label, value]) => (
+                          <div key={String(label)} style={{ background: "#fff", border: "1px solid #EEE", borderRadius: 8, padding: "10px 12px" }}>
+                            <div style={{ fontSize: 11, color: "#888" }}>{label}</div>
+                            <div style={{ fontSize: 14, fontWeight: 650, color: "#111", marginTop: 2 }}>{String(value ?? "—")}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 13, marginBottom: 10, color: "#111" }}>
+                        Account threads: <strong>{serverRuntime.totalThreads ?? 0}</strong>
+                        {" / "}
+                        plan limit <strong>{serverRuntime.planThreadLimit ?? 200}</strong>
+                      </div>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: "#fff" }} data-testid="server-runtime-table">
+                          <thead>
+                            <tr style={{ textAlign: "left", borderBottom: "1px solid #E5E5E5", color: "#666" }}>
+                              <th style={{ padding: "8px 6px" }}>PID</th>
+                              <th style={{ padding: "8px 6px" }}>Name</th>
+                              <th style={{ padding: "8px 6px" }}>Threads</th>
+                              <th style={{ padding: "8px 6px" }}>RSS (MB)</th>
+                              <th style={{ padding: "8px 6px" }}>Site</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              const rows = Array.isArray(serverRuntime.processes) ? [...serverRuntime.processes] : [];
+                              const groups = new Map<string, any[]>();
+                              for (const row of rows) {
+                                const key = row.site || "(no site)";
+                                if (!groups.has(key)) groups.set(key, []);
+                                groups.get(key)!.push(row);
+                              }
+                              for (const list of groups.values()) {
+                                list.sort((a: any, b: any) => (b.threads || 0) - (a.threads || 0) || a.pid - b.pid);
+                              }
+                              return [...groups.entries()]
+                                .sort((a, b) => {
+                                  const maxA = Math.max(0, ...a[1].map((r: any) => r.threads || 0));
+                                  const maxB = Math.max(0, ...b[1].map((r: any) => r.threads || 0));
+                                  return maxB - maxA || a[0].localeCompare(b[0]);
+                                })
+                                .flatMap(([, list]) => list);
+                            })()
+                              .map((row: any) => (
+                                <tr key={row.pid} style={{ borderBottom: "1px solid #F0F0F0" }}>
+                                  <td style={{ padding: "7px 6px" }}>{row.pid}</td>
+                                  <td style={{ padding: "7px 6px" }}>{row.name}</td>
+                                  <td style={{ padding: "7px 6px" }}>{row.threads}</td>
+                                  <td style={{ padding: "7px 6px" }}>{row.vmRssMb}</td>
+                                  <td style={{ padding: "7px 6px" }}>{row.site || "—"}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
               {contentMsg && (
                 <div
                   style={{
@@ -6408,79 +6579,6 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="modal-field" style={{marginTop:24,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
-                  <label style={{fontWeight:700,fontSize:14,color:"#111"}}>Microsoft Clarity</label>
-                  <div style={{fontSize:11,color:"#888888",marginBottom:12,lineHeight:1.5}}>
-                    Heatmaps and session recordings. Off by default. Loads only on firestick4uk.com after analytics consent, never on /sidhu, /cart, /api, or /order-tracking. Project ID must be 6–20 alphanumeric characters. Do not paste Clarity scripts into any free-form HTML field.
-                  </div>
-                  <label style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,cursor:"pointer",fontSize:13}}>
-                    <input
-                      type="checkbox"
-                      checked={siteContent.clarity_enabled === "1" || siteContent.clarity_enabled === "true" || siteContent.clarity_enabled === "on"}
-                      onChange={(e) =>
-                        setSiteContent((s) => ({
-                          ...s,
-                          clarity_enabled: e.target.checked ? "1" : "0",
-                        }))
-                      }
-                    />
-                    Enable Microsoft Clarity
-                  </label>
-                  <div className="modal-field">
-                    <label>Clarity Project ID</label>
-                    <input
-                      className="modal-field"
-                      style={{width:"100%"}}
-                      value={siteContent.clarity_project_id || ""}
-                      onChange={(e) =>
-                        setSiteContent((s) => ({
-                          ...s,
-                          clarity_project_id: e.target.value.trim(),
-                        }))
-                      }
-                      placeholder="e.g. abc12xyz"
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </div>
-                  <div className="modal-field">
-                    <label>Clarity Dashboard URL (optional)</label>
-                    <input
-                      className="modal-field"
-                      style={{width:"100%"}}
-                      value={siteContent.clarity_dashboard_url || ""}
-                      onChange={(e) =>
-                        setSiteContent((s) => ({
-                          ...s,
-                          clarity_dashboard_url: e.target.value.trim(),
-                        }))
-                      }
-                      placeholder="https://clarity.microsoft.com/projects/view/..."
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                    {siteContent.clarity_dashboard_url &&
-                      String(siteContent.clarity_dashboard_url).startsWith(
-                        "https://clarity.microsoft.com/"
-                      ) && (
-                        <a
-                          href={siteContent.clarity_dashboard_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: "inline-block",
-                            marginTop: 8,
-                            fontSize: 13,
-                            color: "#5B21B6",
-                            fontWeight: 600,
-                          }}
-                        >
-                          Open Clarity dashboard →
-                        </a>
-                      )}
-                  </div>
-                </div>
-
                 <div
                   data-testid="seasonal-hub-publish-control"
                   style={{
@@ -6521,7 +6619,7 @@ export default function AdminPage() {
                     {contentSaving ? "Saving..." : "Save hub publication"}
                   </button>
                 </div>
-                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_meta_description","site_logo_url","og_default_image","whatsapp_icon_url","clarity_enabled","clarity_project_id","clarity_dashboard_url","ads_conv_label_purchase","ads_conv_label_whatsapp"])}>                  {contentSaving?"Saving...":"💾 Save Settings"}
+                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_meta_description","site_logo_url","og_default_image","whatsapp_icon_url","ads_conv_label_purchase","ads_conv_label_whatsapp"])}>                  {contentSaving?"Saving...":"💾 Save Settings"}
                 </button>
               </div>
             </div>

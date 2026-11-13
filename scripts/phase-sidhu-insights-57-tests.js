@@ -102,7 +102,6 @@ function makeMemoryStorage() {
 async function main() {
   const client = loadTsModule("lib/insightsClient.ts", {
     "./insightsIngest": loadTsModule("lib/insightsIngest.ts"),
-    "./clarityGating": loadTsModule("lib/clarityGating.ts"),
     "./trackingConsent": loadTsModule("lib/trackingConsent.ts"),
   });
 
@@ -446,6 +445,7 @@ async function main() {
     if (rel === "scripts/phase-insights-live-63-tests.js") return true;
     if (rel === "scripts/phase20g3b-tracking-consent-tests.js") return true;
     if (rel === "scripts/phase-clarity-35-tests.js") return true;
+    if (rel === "scripts/retired/phase-clarity-35-tests.js") return true;
     if (rel === "scripts/phase-tracking-consent-final-tests.js") return true;
     if (rel === "scripts/phase-home-reviews-61-tests.js") return true;
     if (rel === "scripts/phase-ux-batch-51-tests.js") return true;

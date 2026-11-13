@@ -1060,7 +1060,7 @@ async function main() {
   // ── H. Consent copy, version, and SEO/nav/layout untouched ───────────────
   const consent = read("components/TrackingConsent.tsx").replace(/\s+/g, " ");
   const DESC =
-    "Helps us understand how the site is used: Google Analytics and our own site statistics (pages viewed, traffic source, device type, clicks, scrolling and time on page, cart and checkout steps; never what you type into forms). Microsoft Clarity only if we switch it on. No effect on cart or checkout.";
+    "Helps us understand how the site is used: Google Analytics and our own site statistics (pages viewed, traffic source, device type, clicks, scrolling and time on page, cart and checkout steps; never what you type into forms). No effect on cart or checkout.";
   ok("consent_analytics_copy_new", consent.includes(DESC) && !/approximate location from IP/.test(consent));
   ok(
     "consent_banner_text_unchanged",

@@ -239,9 +239,9 @@ export default function ContactPage() {
         {/* FORM + INFO */}
         <div className="contact-layout">
           {/* FORM */}
-          <div className="contact-form-box" data-clarity-mask="True">
+          <div className="contact-form-box">
             {submitted ? (
-              <div className="form-success" data-clarity-mask="True">
+              <div className="form-success">
                 <span className="success-icon">✅</span>
                 <div className="success-title">{t("contact_success_title", "Message Sent!")}</div>
                 <p className="success-sub">{t("contact_success_body", "Thank you for reaching out. We will get back to you within 24 hours. For urgent queries, please WhatsApp us or message us on Telegram directly.")}</p>

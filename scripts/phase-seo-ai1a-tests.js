@@ -631,17 +631,20 @@ const healthyProductRow = {
   );
   ok(
     "AH_no_provider_request_in_useEffect_load",
-    !/admin-seo-ai/.test(
-      panelSrc.slice(
-        panelSrc.indexOf("useEffect(()"),
-        panelSrc.indexOf("const can =")
-      )
-    ) &&
-      !/admin-seo-ai/.test(
-        panelSrc.slice(panelSrc.indexOf("const load ="), panelSrc.indexOf("useEffect(()"))
-      ) &&
-      /admin-seo-overview/.test(panelSrc) &&
-      /const explainIssue/.test(panelSrc)
+    (() => {
+      const loadIdx = panelSrc.indexOf("const load =");
+      const canIdx = panelSrc.indexOf("const can =", loadIdx);
+      const loadBody =
+        loadIdx >= 0 && canIdx > loadIdx
+          ? panelSrc.slice(loadIdx, canIdx)
+          : "";
+      return (
+        loadBody.length > 0 &&
+        !/admin-seo-ai/.test(loadBody) &&
+        /admin-seo-overview/.test(loadBody) &&
+        /const explainIssue/.test(panelSrc)
+      );
+    })()
   );
   ok(
     "AI_request_payload_only_provider_task_issueId",

@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import fs from "fs";
 import path from "path";
+import sharp from "sharp";
 import { requireAdmin } from "../../lib/adminAuth";
 import { canUploadPurpose, resolveUploadPurpose } from "../../lib/adminPermissions";
 import { recordMediaAsset } from "../../lib/mediaLibraryServer";
@@ -11,6 +12,10 @@ import {
   parseDataUrlImage,
   sanitizeUploadFilename,
 } from "../../lib/imageUploadValidation";
+
+/** Cap libvips worker threads for this Hostinger account (HOST-PROC-2). */
+sharp.concurrency(1);
+sharp.cache(false);
 
 export const config = {
   api: { bodyParser: { sizeLimit: "12mb" } },
@@ -135,7 +140,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (!preserveImage) {
         try {
-          const sharp = (await import("sharp")).default;
           const webpName = stamped.replace(/\.[^.]+$/, ".webp");
           await sharp(parsed.data.buffer)
             .resize(800, 800, { fit: "inside", withoutEnlargement: true })

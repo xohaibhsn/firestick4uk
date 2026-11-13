@@ -6,7 +6,6 @@ import WhatsAppButton from "@/components/WhatsAppButton";
 import MiniCartBar from "@/components/MiniCartBar";
 import TrackingConsent from "@/components/TrackingConsent";
 import AdsConversionTracking from "@/components/AdsConversionTracking";
-import MicrosoftClarity from "@/components/MicrosoftClarity";
 import SidhuInsightsBeacon from "@/components/SidhuInsightsBeacon";
 import JsonLd from "@/components/JsonLd";
 import { SiteContentProvider } from "@/components/SiteContentProvider";
@@ -176,7 +175,6 @@ export default async function RootLayout({
           </CartProvider>
           <TrackingConsent />
           <AdsConversionTracking />
-          <MicrosoftClarity />
           <SidhuInsightsBeacon />
           <WhatsAppButton />
         </SiteContentProvider>

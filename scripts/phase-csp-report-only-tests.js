@@ -9,7 +9,7 @@ let passed = 0;
 let failed = 0;
 
 const TESTED_CSP =
-  "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.googleadservices.com https://www.google.com https://*.clarity.ms; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src 'self' https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; media-src 'self'; manifest-src 'self';";
+  "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.googleadservices.com https://www.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src 'self' https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; media-src 'self'; manifest-src 'self';";
 
 function ok(name, condition, detail = "") {
   if (condition) {
@@ -62,8 +62,9 @@ function assertCandidateDirectives(prefix, policy) {
     ].every((origin) => directives.get("script-src")?.includes(origin))
   );
   ok(
-    `${prefix}_clarity_script_origin`,
-    directives.get("script-src")?.includes("https://*.clarity.ms")
+    `${prefix}_no_clarity_script_origin`,
+    !directives.get("script-src")?.some((s) => /clarity/i.test(s)) &&
+      !/clarity\.ms/i.test(policy || "")
   );
   ok(
     `${prefix}_google_fonts_origins`,
@@ -83,8 +84,8 @@ function assertCandidateDirectives(prefix, policy) {
     directives.get("base-uri")?.join(" ") === "'self'"
   );
   ok(
-    `${prefix}_frame_ancestors_none`,
-    directives.get("frame-ancestors")?.join(" ") === "'none'"
+    `${prefix}_frame_ancestors_self`,
+    directives.get("frame-ancestors")?.join(" ") === "'self'"
   );
   ok(
     `${prefix}_form_action_self`,
@@ -154,13 +155,11 @@ ok(
   /firestick_tracking_consent_v1/.test(read("lib/trackingConsent.ts"))
 );
 ok(
-  "clarity_loader_is_separate_client_component",
-  /MicrosoftClarity/.test(read("app/layout.tsx")) &&
-    /"use client"/.test(read("components/MicrosoftClarity.tsx")) &&
-    /clarity\.ms\/tag\//.test(read("lib/clarityGating.ts"))
+  "clarity_loader_removed_from_layout",
+  !/MicrosoftClarity/.test(read("app/layout.tsx")) &&
+    !fs.existsSync(path.join(ROOT, "components/MicrosoftClarity.tsx")) &&
+    !fs.existsSync(path.join(ROOT, "lib/clarityGating.ts"))
 );
-// next.config CSP bytes intentionally change for Clarity script-src only;
-// unrelated header blocks must remain byte-identical to HEAD.
 ok(
   "non_csp_next_config_surface_unchanged_shape",
   /generateEtags:\s*false/.test(nextConfig) &&

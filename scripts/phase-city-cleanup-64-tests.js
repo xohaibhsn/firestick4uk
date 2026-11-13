@@ -41,15 +41,6 @@ function loadTs(rel, extra = {}) {
     if (id === "./trackingConsent" || id.endsWith("/trackingConsent")) {
       return loadTs("lib/trackingConsent.ts");
     }
-    if (id === "./clarityGating" || id.endsWith("/clarityGating")) {
-      return loadTs("lib/clarityGating.ts");
-    }
-    if (id === "./clarityConfig" || id.endsWith("/clarityConfig")) {
-      return loadTs("lib/clarityConfig.ts");
-    }
-    if (id === "./clarityConsent" || id.endsWith("/clarityConsent")) {
-      return loadTs("lib/clarityConsent.ts");
-    }
     if (extra[id]) return extra[id];
     return require(id);
   };
@@ -79,7 +70,7 @@ const sidhu = read("app/sidhu/page.tsx");
 const settings = read("components/sidhu/insights/SettingsScreen.tsx");
 const beacon = read("components/SidhuInsightsBeacon.tsx");
 const clientSrc = read("lib/insightsClient.ts");
-const clarityTests = read("scripts/phase-clarity-35-tests.js");
+const clarityTests = read("scripts/retired/phase-clarity-35-tests.js");
 
 // 1) Opt-out key constant
 ok(
@@ -250,6 +241,7 @@ ok(
     "app/sidhu/page.tsx",
     "components/sidhu/insights/SettingsScreen.tsx",
     "scripts/phase-clarity-35-tests.js",
+    "scripts/retired/phase-clarity-35-tests.js",
     "scripts/phase-city-cleanup-64-tests.js",
     "scripts/phase-insights-live-63-tests.js",
     "scripts/phase-windup-59-tests.js",

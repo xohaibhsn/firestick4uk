@@ -74,7 +74,7 @@ function loadTs(rel, stubs = {}) {
 const BANNER =
   "Privacy choices. We use optional analytics (including our own first-party site statistics) and advertising technologies to understand site use and measure ads. Essential features (cart, checkout, login) work without them. You can change this anytime via Privacy choices in the footer.";
 const ANALYTICS_DESC =
-  "Helps us understand how the site is used: Google Analytics and our own site statistics (pages viewed, traffic source, device type, clicks, scrolling and time on page, cart and checkout steps; never what you type into forms). Microsoft Clarity only if we switch it on. No effect on cart or checkout.";
+  "Helps us understand how the site is used: Google Analytics and our own site statistics (pages viewed, traffic source, device type, clicks, scrolling and time on page, cart and checkout steps; never what you type into forms). No effect on cart or checkout.";
 
 const consent = read("components/TrackingConsent.tsx");
 const consentNorm = consent.replace(/\s+/g, " ");
@@ -99,7 +99,7 @@ ok(
     (/our own site statistics/.test(consentNorm) &&
       /clicks, scrolling and time on page/.test(consentNorm) &&
       !/approximate location from IP/.test(consentNorm) &&
-      /Microsoft Clarity only if we switch it on/.test(consentNorm) &&
+      !/Microsoft Clarity only if we switch it on/.test(consentNorm) &&
       /never what you type into forms/.test(consentNorm))
 );
 
@@ -118,7 +118,6 @@ ok(
 const tc = loadTs("lib/trackingConsent.ts");
 const ic = loadTs("lib/insightsClient.ts", {
   "./insightsIngest": {},
-  "./clarityGating": loadTs("lib/clarityGating.ts"),
   "./trackingConsent": tc,
 });
 
@@ -238,6 +237,7 @@ const ALLOWED = new Set([
   "scripts/phase-insights-live-63-tests.js",
   "scripts/phase20g3b-tracking-consent-tests.js",
   "scripts/phase-clarity-35-tests.js",
+  "scripts/retired/phase-clarity-35-tests.js",
   "scripts/phase-tracking-consent-final-tests.js",
   "scripts/phase-windup-59-tests.js",
   "scripts/phase-ux-batch-51-tests.js",

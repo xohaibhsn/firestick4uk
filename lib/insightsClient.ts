@@ -7,12 +7,38 @@
  * reused by the server ingest so both sides agree on the shape.
  */
 
-import {
-  CLARITY_EXCLUDED_QUERY_CONTAINS,
-  CLARITY_EXCLUDED_QUERY_EQUALS,
-  CLARITY_QUERY_ALLOWLIST,
-} from "./clarityGating";
 import { readTrackingConsent } from "./trackingConsent";
+
+/** Query keys that strip when the lower-cased key CONTAINS the token. */
+const SENSITIVE_QUERY_CONTAINS = [
+  "order",
+  "email",
+  "token",
+  "receipt",
+  "phone",
+  "address",
+] as const;
+
+/** Query keys that strip only on exact equality (lower-cased). */
+const SENSITIVE_QUERY_EQUALS = ["id", "ref"] as const;
+
+/** Marketing / listing keys that must not strip. */
+const QUERY_ALLOWLIST = [
+  "gclid",
+  "fbclid",
+  "msclkid",
+  "wbraid",
+  "gbraid",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "q",
+  "page",
+  "sort",
+  "category",
+] as const;
 
 export const INSIGHTS_EXCLUDED_PATH_PREFIXES = [
   "/sidhu",
@@ -334,9 +360,9 @@ export function touchSessionActivity(storage: Storage, nowMs = Date.now()): void
 function isSensitiveQueryKey(key: string): boolean {
   const k = String(key || "").toLowerCase();
   if (!k) return false;
-  if ((CLARITY_QUERY_ALLOWLIST as readonly string[]).includes(k)) return false;
-  if ((CLARITY_EXCLUDED_QUERY_EQUALS as readonly string[]).includes(k)) return true;
-  return (CLARITY_EXCLUDED_QUERY_CONTAINS as readonly string[]).some((tok) =>
+  if ((QUERY_ALLOWLIST as readonly string[]).includes(k)) return false;
+  if ((SENSITIVE_QUERY_EQUALS as readonly string[]).includes(k)) return true;
+  return (SENSITIVE_QUERY_CONTAINS as readonly string[]).some((tok) =>
     k.includes(tok)
   );
 }

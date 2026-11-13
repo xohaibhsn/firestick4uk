@@ -125,7 +125,7 @@ export default function CartSuccessPage() {
       <>
         <style>{styles}</style>
         <Navbar cta="none" />
-        <div className="page" data-clarity-mask="True">
+        <div className="page">
           <div className="container" style={{ textAlign: 'center', paddingTop: 60 }}>
             <div style={{ fontSize: 52, marginBottom: 16 }}>🛒</div>
             <h2 className="title">{t("success_none_title", "No order found")}</h2>
@@ -146,7 +146,7 @@ export default function CartSuccessPage() {
 
       <Navbar cta="none" />
 
-      <div className="page" data-clarity-mask="True">
+      <div className="page">
         <div className="container">
 
           {/* Animated checkmark */}

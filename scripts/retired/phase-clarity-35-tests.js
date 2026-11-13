@@ -1,3 +1,6 @@
+﻿/**
+ * retired 13 Nov 2026 — Clarity removed (F4UK-PROC-CLARITY-71)
+ */
 /**
  * F4UK-BEHAVIOUR-ANALYTICS-35 — Microsoft Clarity gating, exclusions,
  * consent mapping, CMS validation, and SSR absence checks.

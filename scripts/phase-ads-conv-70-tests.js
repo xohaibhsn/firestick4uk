@@ -578,27 +578,22 @@ const ADS70_ALLOW = new Set([
   "scripts/phase-insights-slim-67-tests.js",
 ]);
 
+// TEST-HYG-1: scoped to ADS-70 commit range (not working tree)
+const ADS70_RANGE_BASE = "5c46c586b088bb3e84ff72c59b1f07c7991f3a07";
+const ADS70_RANGE_END = "b5183239d2ac6d7e421396efbae85f4af8611f97";
 let dirtyNames = [];
 try {
-  dirtyNames = execSync("git diff --name-only", { cwd: ROOT, encoding: "utf8" })
+  dirtyNames = execSync(
+    `git diff --name-only ${ADS70_RANGE_BASE}..${ADS70_RANGE_END}`,
+    { cwd: ROOT, encoding: "utf8" }
+  )
     .split(/\r?\n/)
     .map((s) => s.trim().replace(/\\/g, "/"))
     .filter(Boolean);
 } catch (e) {
   ok("diff_allowlist_ads70", false, String(e.message || e));
 }
-let untracked = [];
-try {
-  untracked = execSync("git ls-files --others --exclude-standard", {
-    cwd: ROOT,
-    encoding: "utf8",
-  })
-    .split(/\r?\n/)
-    .map((s) => s.trim().replace(/\\/g, "/"))
-    .filter(Boolean);
-} catch {
-  untracked = [];
-}
+const untracked = [];
 const touched = [...new Set([...dirtyNames, ...untracked])];
 const unexpected = touched.filter((f) => !ADS70_ALLOW.has(f));
 ok(

@@ -188,7 +188,7 @@ export default function OrderTrackingPage() {
 
       <Navbar cta="shop" shopHref="/" />
 
-      <div className="page-wrapper" data-clarity-mask="True">
+      <div className="page-wrapper">
         <div className="page-header">
           <div className="section-tag">✦ {t("track_tag", "Order Tracking")}</div>
           <h1 className="page-title">{t("track_title", "Track Your Order")}</h1>

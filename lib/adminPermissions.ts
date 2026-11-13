@@ -152,9 +152,6 @@ export const SUPER_ADMIN_SITE_SETTINGS_KEYS = new Set<string>([
   "whatsapp_number",
   "contact_phone",
   "contact_telegram",
-  "clarity_enabled",
-  "clarity_project_id",
-  "clarity_dashboard_url",
   "ads_conv_label_purchase",
   "ads_conv_label_whatsapp",
   /** Seasonal offers hub publication (default unpublished). */
