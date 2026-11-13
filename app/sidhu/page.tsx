@@ -52,6 +52,7 @@ import {
   mapImageBriefSlotsToUi,
   mapProductReviewToUi,
   mapProviderSuggestionsToUi,
+  parseStrictPriceGbp,
   type ProductAiFactsState,
   type ProductAiProviderChoice,
   type ProductAiUiState,
@@ -2257,16 +2258,20 @@ export default function AdminPage() {
   };
 
   const saveProduct = async () => {
-    const rawPrice = String(editProduct.price).replace(/[^0-9.]/g, "");
+    const parsedPrice = parseStrictPriceGbp(editProduct.price);
     const slug = (editProduct.slug || toSlug(editProduct.name)).trim();
     if (!editProduct.name.trim()) return;
     if (!slug) return;
     if (productSaving) return;
+    if (parsedPrice === undefined) {
+      setProductMsg("❌ Enter a valid price (non-negative number, max 2 decimal places).");
+      return;
+    }
     const payload = {
       name: editProduct.name,
       slug,
       description: editProduct.short_description || "",
-      price: rawPrice,
+      price: String(parsedPrice),
       category: editProduct.category,
       badge: null,
       image: editProduct.image || null,

@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { randomInt } from 'crypto';
 import { RL_GENERAL, getClientIp } from '../../lib/rateLimit';
 import pool from '../../lib/db';
 import nodemailer from 'nodemailer';
@@ -33,6 +34,11 @@ import {
 import { isPaymentMethodEffectivelyEnabled } from '../../lib/paymentMethodSettings';
 import { getPaymentMethodSettings } from '../../lib/paymentMethodSettingsServer';
 import { lockAndAuthorizeOrderProducts } from '../../lib/orderProductEligibility';
+
+/** ORD- + Date.now() + 3 random digits (fits orders.order_id VARCHAR(20)). */
+export function generateOrderId(nowMs: number = Date.now()): string {
+  return 'ORD-' + String(nowMs) + String(randomInt(0, 1000)).padStart(3, '0');
+}
 
 /** Coupon/order validation failures that must roll back an open transaction. */
 class OrderValidationError extends Error {
@@ -168,7 +174,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const uniqueIds = [...qtyById.keys()];
     const rawCoupon = normalizeCouponCode(coupon_code);
     const customerNotes = typeof notes === 'string' ? notes : '';
-    const order_id = 'ORD-' + Date.now();
+    const order_id = generateOrderId();
     // Contact/SMTP stay outside the short DB transaction.
     const contact = await getContactConfig();
 
@@ -193,6 +199,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
       if (!authorized.ok) {
         throw new OrderValidationError(authorized.error);
+      }
+
+      // Re-check CMS payment toggles inside the TX (early check is a fast path only).
+      const paymentTogglesTx = await getPaymentMethodSettings({ db: conn, ttlMs: 0 });
+      if (!isPaymentMethodEffectivelyEnabled(publicPaymentMethod, paymentTogglesTx)) {
+        throw new OrderValidationError('Payment method unavailable.');
       }
 
       authoritativeItems = [];

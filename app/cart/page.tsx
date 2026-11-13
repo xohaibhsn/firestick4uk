@@ -350,6 +350,7 @@ export default function CartPage() {
   const receiptUiStatus = receiptStatusLabel(receiptSelection);
   const [paymentReference, setPaymentReference] = useState("");
   const [placing, setPlacing] = useState(false);
+  const placingRef = useRef(false);
   const [orderError, setOrderError] = useState("");
   const receiptInputId = useId();
 
@@ -711,6 +712,8 @@ export default function CartPage() {
 
   const handleOrder = async () => {
     if (cart.length === 0) return;
+    // Ignore repeat clicks until the in-flight request finishes (sync + disabled UI).
+    if (placingRef.current || placing) return;
     setOrderError("");
     setAckError("");
 
@@ -765,6 +768,7 @@ export default function CartPage() {
       return;
     }
 
+    placingRef.current = true;
     setPlacing(true);
 
     try {
@@ -792,6 +796,7 @@ export default function CartPage() {
                             ? "bank_upload_err_read"
                             : "bank_upload_err_failed";
           setOrderError(t(key, RECEIPT_ERROR_DEFAULTS[kind]));
+          placingRef.current = false;
           setPlacing(false);
           return;
         }
@@ -917,6 +922,7 @@ export default function CartPage() {
     } catch {
       setOrderError(t("cart_err_network", "Network error. Please check your connection and try again."));
     }
+    placingRef.current = false;
     setPlacing(false);
   };
 

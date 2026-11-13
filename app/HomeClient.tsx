@@ -24,6 +24,7 @@ import {
   type HomeTestimonialsSection,
   type PublishableHomeTestimonial,
 } from "@/lib/homeTestimonials";
+import { hydrateProductFactsCatalog } from "@/lib/cartClassification";
 
 const REVIEW_TEXT_PREVIEW_CHARS = 180;
 
@@ -220,10 +221,17 @@ export default function HomeClient({
   const reviewsTrackRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (initialProducts.length === 0) {
+    if (initialProducts.length > 0) {
+      hydrateProductFactsCatalog(initialProducts);
+    } else {
       fetch('/api/products')
         .then(res => res.json())
-        .then(data => { setProducts(Array.isArray(data) ? data : []); setLoading(false); })
+        .then(data => {
+          const list = Array.isArray(data) ? data : [];
+          hydrateProductFactsCatalog(list);
+          setProducts(list);
+          setLoading(false);
+        })
         .catch(() => setLoading(false));
     }
     fetch('/api/sections?page=home')

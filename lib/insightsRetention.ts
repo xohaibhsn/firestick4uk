@@ -309,7 +309,7 @@ export async function runInsightsRetention(deps: RetentionDeps): Promise<Retenti
 
 /** Fire-and-forget after ingest — never blocks the HTTP response. */
 export function scheduleInsightsRetention(deps: RetentionDeps): void {
-  void runInsightsRetention(deps).catch(() => {
-    /* swallow */
+  void runInsightsRetention(deps).catch((err: { code?: string; name?: string } | null) => {
+    console.error("[insights-retention] failed", err?.code || err?.name || "error");
   });
 }

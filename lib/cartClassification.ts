@@ -163,6 +163,18 @@ export function __resetCartClassificationCacheForTests(): void {
   inflight = null;
 }
 
+/**
+ * Seed the shared mini-cart catalog from an already-fetched products payload
+ * so MiniCartBar does not issue a second GET /api/products on the same page view.
+ */
+export function hydrateProductFactsCatalog(list: unknown): Map<number, CartProductFacts> {
+  const map = buildProductFactsMap(list);
+  const cache: CatalogCache = { map, fetchedAt: Date.now() };
+  moduleCatalog = cache;
+  writeSessionCatalog(cache);
+  return map;
+}
+
 function abortError(): Error {
   const err = new Error("Aborted");
   err.name = "AbortError";
