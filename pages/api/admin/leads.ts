@@ -2,8 +2,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { getRequestMeta, requireAdminPermission } from '@/lib/adminAuth';
 import { recordAdminAudit } from '@/lib/adminAudit';
+import { setAdminNoStore } from '@/lib/adminNoStore';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'GET') setAdminNoStore(res);
   const admin = await requireAdminPermission(req, res, 'leads.manage');
   if (!admin) return;
 

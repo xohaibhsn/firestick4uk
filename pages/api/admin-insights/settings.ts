@@ -11,6 +11,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "@/lib/db";
 import { getRequestMeta, requireAdminPermission } from "@/lib/adminAuth";
 import { actorFromIdentity, recordAdminAudit } from "@/lib/adminAudit";
+import { setAdminNoStore } from "@/lib/adminNoStore";
 import { clearInsightsSettingsCache } from "@/lib/insightsSettings";
 import {
   isMissingTableError,
@@ -187,7 +188,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const admin = await requireAdminPermission(req, res, "insights.settings");
   if (!admin) return;
 
-  res.setHeader("Cache-Control", "no-store");
+  setAdminNoStore(res);
 
   try {
     if (req.method === "GET") {

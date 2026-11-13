@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "../../lib/db";
 import { requireAdminPermission } from "../../lib/adminAuth";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 import {
   canViewRevisionEntity,
   getRevisionById,
@@ -18,6 +19,7 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
 /** List or detail CMS content revisions — metadata by default; snapshot only for ?id=. */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+  setAdminNoStore(res);
 
   const admin = await requireAdminPermission(req, res, "revisions.view", { mutate: false });
   if (!admin) return;

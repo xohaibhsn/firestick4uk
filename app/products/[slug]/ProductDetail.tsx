@@ -13,6 +13,9 @@ import SeasonalCountdown from "@/components/product/SeasonalCountdown";
 import SeasonalAlternativeCards, {
   type SeasonalAltCard,
 } from "@/components/product/SeasonalAlternativeCards";
+import CurrentSeasonalOffers, {
+  type CurrentSeasonalOfferCard,
+} from "@/components/product/CurrentSeasonalOffers";
 import { floorSecondUtcMs, parseUtcSqlToMs } from "@/lib/productSeasonLondon";
 import {
   bindCoordinatorProduct,
@@ -66,6 +69,9 @@ export default function ProductDetail({
   showSeasonalOffersLink = false,
   availableOffers = [],
   upcomingOffers = [],
+  currentSeasonalOffers = [],
+  currentSeasonalOffersEnabled = true,
+  currentSeasonalOffersHeading = "🔥 Current Seasonal Offers",
   /** Test-only coherent clock shared with SeasonalCountdown. */
   getNowMs,
   /** Test-only fetch boundary (production uses global fetch). */
@@ -79,6 +85,9 @@ export default function ProductDetail({
   showSeasonalOffersLink?: boolean;
   availableOffers?: SeasonalAltCard[];
   upcomingOffers?: SeasonalAltCard[];
+  currentSeasonalOffers?: CurrentSeasonalOfferCard[];
+  currentSeasonalOffersEnabled?: boolean;
+  currentSeasonalOffersHeading?: string;
   getNowMs?: () => number;
   fetchImpl?: typeof fetch;
 }) {
@@ -591,6 +600,14 @@ export default function ProductDetail({
                     Seasonal offers hub
                   </a>
                 ) : null}
+                <CurrentSeasonalOffers
+                  enabled={currentSeasonalOffersEnabled}
+                  heading={
+                    t("pd_seasonal_offers_heading", currentSeasonalOffersHeading) ||
+                    currentSeasonalOffersHeading
+                  }
+                  offers={currentSeasonalOffers}
+                />
               </div>
             </div>
           </>

@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "../../lib/db";
 import { requireAdminPermission } from "../../lib/adminAuth";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 import { canViewMediaPurpose } from "../../lib/mediaLibrary";
 import { findMediaUsageByUrl } from "../../lib/mediaUsage";
 
@@ -15,6 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+  setAdminNoStore(res);
 
   const admin = await requireAdminPermission(req, res, "media.view", { mutate: false });
   if (!admin) return;

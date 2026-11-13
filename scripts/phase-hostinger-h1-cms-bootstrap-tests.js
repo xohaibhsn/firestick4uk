@@ -137,8 +137,12 @@ ok(
 
 ok(
   "sidhu_admin_page_all_untouched",
-  // be4e137 lazy-load: single gated fetch when settings/pages tab opens (was fan-out >=2)
-  (sidhu.match(/site-content\?page=all/g) || []).length === 1 &&
+  // be4e137 lazy-load when settings/pages opens; UX-72 adds one post-save background refetch
+  // (still not a mount-time fan-out). Allow 1–2 page=all GETs; keep tab gate.
+  (() => {
+    const n = (sidhu.match(/site-content\?page=all/g) || []).length;
+    return n >= 1 && n <= 2;
+  })() &&
     /tab !== ["']settings["']\s*&&\s*tab !== ["']pages["']/.test(sidhu)
 );
 

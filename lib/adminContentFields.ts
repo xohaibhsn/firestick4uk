@@ -285,6 +285,8 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
         { key: "pd_view_cart_link", label: "View cart URL" },
         { key: "pd_about_heading", label: "About heading" },
         { key: "pd_included_heading", label: "Included heading" },
+        { key: "pd_seasonal_offers_enabled", label: "Show seasonal offers block (1 = on, 0 = off)" },
+        { key: "pd_seasonal_offers_heading", label: "Seasonal offers heading" },
       ],
     },
   ],

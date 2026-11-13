@@ -12,6 +12,7 @@ import {
   wouldLeaveZeroActiveSuperAdmins,
 } from "../../lib/adminAuth";
 import { recordAdminAudit } from "../../lib/adminAudit";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 
 function parseActive(value: unknown, fallback = 1): 0 | 1 {
   if (value === undefined || value === null || value === "") return fallback as 0 | 1;
@@ -34,6 +35,7 @@ function safeStaffRow(row: any) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === "GET") setAdminNoStore(res);
   const admin = await requireAdminPermission(req, res, "staff.manage");
   if (!admin) return;
 

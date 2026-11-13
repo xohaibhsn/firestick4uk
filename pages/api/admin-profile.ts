@@ -12,9 +12,11 @@ import {
   destroyAdminSessionByToken,
 } from "../../lib/adminAuth";
 import { recordAdminAudit } from "../../lib/adminAudit";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 
 /** Own profile + password change for authenticated admin. */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === "GET") setAdminNoStore(res);
   const admin = await requireAdmin(req, res);
   if (!admin) return;
 

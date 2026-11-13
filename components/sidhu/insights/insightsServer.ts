@@ -9,6 +9,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "@/lib/db";
 import { requireAdminPermission, type AdminIdentity } from "@/lib/adminAuth";
+import { setAdminNoStore } from "@/lib/adminNoStore";
 import type { AdminPermission, AdminRoleName } from "@/lib/adminPermissions";
 import { getInsightsSettings } from "@/lib/insightsSettings";
 import {
@@ -184,7 +185,7 @@ export async function handleInsightsGet(
   const admin = await requireAdminPermission(req, res, permission);
   if (!admin) return;
 
-  res.setHeader("Cache-Control", "no-store");
+  setAdminNoStore(res);
   try {
     const payload = await fn({ admin, role: admin.role as AdminRoleName, req });
     if (res.writableEnded || res.headersSent) return;

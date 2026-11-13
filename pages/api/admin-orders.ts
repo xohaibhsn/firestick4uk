@@ -6,6 +6,7 @@ import {
   type AdminIdentity,
 } from "../../lib/adminAuth";
 import { recordAdminAudit } from "../../lib/adminAudit";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 import {
   hasAdminPermission,
   type AdminRoleName,
@@ -193,6 +194,7 @@ async function handleOrderList(req: NextApiRequest, res: NextApiResponse) {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method === "GET") {
+      setAdminNoStore(res);
       if (req.query.customers === "1") {
         const custAdmin = await requireAdminPermission(req, res, "customers.view", {
           mutate: false,

@@ -42,6 +42,7 @@ export const EXTRA_CONTENT_DEFAULTS: Array<[string, string, string, string, stri
   ['home_why_tag','Why Choose Us','text','home','Why Choose Us Tag'],
   ['seasonal_promo_text','Seasonal offers are live — limited-time deals','text','home','Seasonal Promo Strip Text'],
   ['seasonal_promo_cta','View offers','text','home','Seasonal Promo Strip CTA'],
+  ['home_product_ids','','text','home','Home Page Product IDs (ordered, comma-separated, max 8)'],
   ['season_countdown_prefix','Offer ends in','text','settings','Seasonal Countdown Prefix (Live)'],
   ['season_countdown_upcoming_prefix','Offer starts in','text','settings','Seasonal Countdown Prefix (Upcoming)'],
 
@@ -157,6 +158,8 @@ export const EXTRA_CONTENT_DEFAULTS: Array<[string, string, string, string, stri
   ['pd_view_cart_link','/cart','text','products','View Cart URL'],
   ['pd_about_heading','About This Product','text','products','About Heading'],
   ['pd_included_heading','What\'s Included','text','products','Included Heading'],
+  ['pd_seasonal_offers_enabled','1','text','products','Show Seasonal Offers Block (1 = on, 0 = off)'],
+  ['pd_seasonal_offers_heading','🔥 Current Seasonal Offers','text','products','Seasonal Offers Heading'],
 
   // Cart / checkout
   ['cart_tag','Your Cart','text','cart','Cart Tag'],

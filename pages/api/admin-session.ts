@@ -1,9 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getAdminSession, publicAdminIdentity } from "../../lib/adminAuth";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 
 /** Current admin identity from HttpOnly session cookie. */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+  setAdminNoStore(res);
 
   try {
     const identity = await getAdminSession(req);

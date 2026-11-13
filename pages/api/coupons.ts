@@ -3,6 +3,7 @@ import { RL_GENERAL, getClientIp } from '../../lib/rateLimit';
 import pool from '../../lib/db';
 import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
+import { setAdminNoStore } from '../../lib/adminNoStore';
 import {
   calculateCouponDiscount,
   normalizeCouponCode,
@@ -74,6 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!admin) return;
 
     if (req.method === 'GET') {
+      setAdminNoStore(res);
       const [rows] = await pool.query('SELECT * FROM coupons ORDER BY created_at DESC');
       return res.status(200).json(Array.isArray(rows)?rows:[]);
     }

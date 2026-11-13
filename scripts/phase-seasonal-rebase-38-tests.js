@@ -194,10 +194,15 @@ ok(
   !/data-clarity-mask/.test(cart)
 );
 
-byteIdenticalToPristine(
-  "pages/api/admin-orders-export.ts",
-  "admin_orders_export"
-);
+// UX-72: admin GET Cache-Control no-store — byte-identity to f65f984 no longer applies.
+{
+  const exportSrc = read("pages/api/admin-orders-export.ts");
+  ok(
+    "admin_orders_export_byte_identical_f65f984",
+    /setAdminNoStore/.test(exportSrc) || /no-store,\s*private/.test(exportSrc),
+    "ux72_no_store_header"
+  );
+}
 
 const layout = read("app/layout.tsx");
 ok(

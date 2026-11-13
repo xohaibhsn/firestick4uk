@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "../../lib/db";
 import { requireAdminPermission } from "../../lib/adminAuth";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = Number(value);
@@ -11,6 +12,7 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
 /** Super Admin only — paginated admin activity log. */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+  setAdminNoStore(res);
 
   const admin = await requireAdminPermission(req, res, "audit.view", { mutate: false });
   if (!admin) return;

@@ -579,7 +579,81 @@ export default function AdminPage() {
       .catch(() => {});
   };
 
-  const loadOrders = async (page?: number, overrides?: OrderFilterOverrides) => {
+  /** Dashboard "recent orders" list (page 1, limit 10). Returns a promise so callers can await it. */
+  const refreshRecentOrders = async () => {
+    if (!can("orders.view")) return;
+    try {
+      const r = await fetch("/api/admin-orders?page=1&limit=10", { credentials: "include" });
+      if (r.status === 401) { handleSessionExpired(); return; }
+      if (r.status === 403) { showPermError(); return; }
+      const data = await r.json().catch(() => null);
+      if (Array.isArray(data?.items)) {
+        setRecentOrders(data.items.map((o: any) => mapOrderRow(o)));
+      }
+    } catch {
+      /* keep existing list on transient failure */
+    }
+  };
+
+  /** Promise-returning variant of refreshDashSummary (used by the auto-refresh loop). */
+  const refreshDashSummaryAsync = async () => {
+    if (!can("orders.view")) return;
+    try {
+      const r = await fetch("/api/admin-orders?summary=1", { credentials: "include" });
+      if (r.status === 401) { handleSessionExpired(); return; }
+      if (r.status === 403) { showPermError(); return; }
+      const data = await r.json().catch(() => null);
+      if (data && !data.error) setDashSummary(data);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const REVENUE_ORDER_STATUSES = ["confirmed", "dispatched", "delivered"];
+  const parseMoney = (v: unknown) => {
+    const n = parseFloat(String(v ?? "0").replace(/[£,\s]/g, ""));
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  /** Optimistically adjust dashboard summary counters for an order delete / status change. */
+  const applyOrderSummaryDelta = (opts: {
+    removed?: { status: string; total: string };
+    statusChange?: { from: string; to: string; total: string };
+    customerRemoved?: boolean;
+  }) => {
+    setDashSummary((prev: any) => {
+      if (!prev) return prev;
+      const next = { ...prev };
+      const bump = (key: string, delta: number) => {
+        if (next[key] == null) return;
+        next[key] = Math.max(0, Number(next[key]) + delta);
+      };
+      if (opts.removed) {
+        const { status, total } = opts.removed;
+        bump("total_orders", -1);
+        if (status === "pending") bump("pending_orders", -1);
+        if (status === "delivered") bump("delivered_orders", -1);
+        if (REVENUE_ORDER_STATUSES.includes(status)) bump("confirmed_revenue", -parseMoney(total));
+        if (opts.customerRemoved) bump("customer_count", -1);
+      }
+      if (opts.statusChange) {
+        const { from, to, total } = opts.statusChange;
+        if (from !== to) {
+          if (from === "pending") bump("pending_orders", -1);
+          if (to === "pending") bump("pending_orders", 1);
+          if (from === "delivered") bump("delivered_orders", -1);
+          if (to === "delivered") bump("delivered_orders", 1);
+          const wasRev = REVENUE_ORDER_STATUSES.includes(from);
+          const isRev = REVENUE_ORDER_STATUSES.includes(to);
+          if (wasRev && !isRev) bump("confirmed_revenue", -parseMoney(total));
+          if (!wasRev && isRev) bump("confirmed_revenue", parseMoney(total));
+        }
+      }
+      return next;
+    });
+  };
+
+  const loadOrders = async (page?: number, overrides?: OrderFilterOverrides, silent = false) => {
     if (!can("orders.view")) return;
     const p = page ?? ordersPage;
     const q = overrides?.q !== undefined ? overrides.q : orderQ;
@@ -595,8 +669,10 @@ export default function AdminPage() {
       dateTo
     );
     setOrdersHasFilters(hasFilters);
-    setOrdersLoading(true);
-    setOrdersError("");
+    if (!silent) {
+      setOrdersLoading(true);
+      setOrdersError("");
+    }
     const params = new URLSearchParams();
     params.set("page", String(p));
     params.set("limit", String(ORDERS_PER_PAGE));
@@ -608,9 +684,11 @@ export default function AdminPage() {
     try {
       const r = await fetch(`/api/admin-orders?${params.toString()}`, { credentials: "include" });
       if (r.status === 401) { handleSessionExpired(); return; }
-      if (r.status === 403) { showPermError(); setOrdersError("You do not have permission to view orders."); return; }
+      if (r.status === 403) { showPermError(); if (!silent) setOrdersError("You do not have permission to view orders."); return; }
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
+        // Background refresh: keep the existing rows on transient failure.
+        if (silent) return;
         setOrdersError(data?.error || "Failed to load orders");
         setOrders([]);
         setOrdersTotal(0);
@@ -623,10 +701,12 @@ export default function AdminPage() {
       setOrdersTotalPages(Math.max(1, Number(data?.pagination?.totalPages || 1)));
       setOrdersPage(Number(data?.pagination?.page || p));
     } catch {
-      setOrdersError("Failed to load orders");
-      setOrders([]);
+      if (!silent) {
+        setOrdersError("Failed to load orders");
+        setOrders([]);
+      }
     } finally {
-      setOrdersLoading(false);
+      if (!silent) setOrdersLoading(false);
     }
   };
 
@@ -870,20 +950,7 @@ export default function AdminPage() {
           })
           .then((data) => { if (data && !data.error) setDashSummary(data); })
           .catch(() => {});
-        fetch("/api/admin-orders?page=1&limit=10", { credentials: "include" })
-          .then((r) => {
-            if (r.status === 401) { handleSessionExpired(); return null; }
-            if (r.status === 403) { showPermError(); return null; }
-            return r.json();
-          })
-          .then((data) => {
-            if (Array.isArray(data?.items)) {
-              setRecentOrders(data.items.map((o: any) => mapOrderRow(o)));
-            } else {
-              setRecentOrders([]);
-            }
-          })
-          .catch(() => {});
+        void refreshRecentOrders();
       } else {
         setDashSummary(null);
         setRecentOrders([]);
@@ -1003,6 +1070,74 @@ export default function AdminPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedIn, tab, adminRole]);
+
+  // Home page products panel (Content → Home) needs the products list.
+  useEffect(() => {
+    if (!loggedIn || tab !== "pages" || activePage !== "home") return;
+    if (!can("content.manage") || !can("products.view")) return;
+    if (products.length === 0 && !productsLoading) loadProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn, tab, activePage, adminRole]);
+
+  // Light auto-refresh (CMS-RT-1): every 60s while the tab is visible, refresh dashboard summary,
+  // recent orders and the Orders tab list. Pauses when document.hidden, never overlaps (lock ref),
+  // and is skipped while any edit/detail modal is open so in-progress edits are never disturbed.
+  const autoRefreshLockRef = useRef(false);
+  const autoRefreshBlockedRef = useRef(false);
+  const lastAutoRefreshAtRef = useRef(0);
+  const autoRefreshTickRef = useRef<() => Promise<void>>(async () => {});
+  const autoRefreshBlocked = !!(
+    orderModal ||
+    receiptModal ||
+    productModal ||
+    blogModal ||
+    faqModal ||
+    staffModal ||
+    staffResetModal ||
+    staffConfirm ||
+    profileModal ||
+    sectionModal ||
+    leadModal
+  );
+  useEffect(() => {
+    autoRefreshBlockedRef.current = autoRefreshBlocked;
+  }, [autoRefreshBlocked]);
+  useEffect(() => {
+    autoRefreshTickRef.current = async () => {
+      if (!can("orders.view")) return;
+      await Promise.allSettled([
+        refreshDashSummaryAsync(),
+        refreshRecentOrders(),
+        loadOrders(ordersPage || 1, undefined, true),
+      ]);
+    };
+  });
+  useEffect(() => {
+    if (!loggedIn) return;
+    lastAutoRefreshAtRef.current = Date.now();
+    const tick = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (autoRefreshBlockedRef.current) return;
+      if (autoRefreshLockRef.current) return;
+      autoRefreshLockRef.current = true;
+      try {
+        await autoRefreshTickRef.current();
+        lastAutoRefreshAtRef.current = Date.now();
+      } finally {
+        autoRefreshLockRef.current = false;
+      }
+    };
+    const id = window.setInterval(() => { void tick(); }, 60000);
+    const onVisibility = () => {
+      // Catch up when the tab becomes visible again if the last refresh is stale (modal/lock guards still apply).
+      if (!document.hidden && Date.now() - lastAutoRefreshAtRef.current >= 60000) void tick();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [loggedIn]);
 
   // Keep current tab within role permissions (no hidden-tab bypass via state)
   useEffect(() => {
@@ -1143,6 +1278,24 @@ export default function AdminPage() {
     }
     setContentMsg(res.success ? "✅ Saved!" : `❌ ${res.error || "Save failed"}`);
     setTimeout(() => setContentMsg(""), 4000);
+    if (res.success) {
+      // Local state first: the saved keys (incl. overrides) become the in-memory values immediately.
+      const savedValues: Record<string, string> = {};
+      for (const u of updates) savedValues[u.key] = String(u.value ?? "");
+      setSiteContent((s) => ({ ...s, ...savedValues }));
+      // Background reconcile — only touch the keys we just saved so other unsaved edits survive.
+      fetch("/api/site-content?page=all", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (!d || typeof d !== "object") return;
+          const fresh: Record<string, string> = {};
+          for (const k of keys) {
+            if (typeof (d as any)[k] === "string") fresh[k] = (d as any)[k];
+          }
+          if (Object.keys(fresh).length) setSiteContent((s) => ({ ...s, ...fresh }));
+        })
+        .catch(() => {});
+    }
   };
 
   const uploadFaviconAdmin = async (file: File) => {
@@ -1405,6 +1558,18 @@ export default function AdminPage() {
       .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setStaffUsers(d); }).catch(()=>{});
   };
 
+  /** Background refetch helpers (never replace the list with a non-array / error payload). */
+  const loadCoupons = () =>
+    fetch("/api/coupons", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => { if (Array.isArray(d)) setCoupons(d); })
+      .catch(() => {});
+  const loadFaqs = () =>
+    fetch("/api/faqs?admin=true", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => { if (Array.isArray(d)) setFaqs(d); })
+      .catch(() => {});
+
   const saveStaff = async () => {
     if (!staffForm.name.trim()||!staffForm.email.trim()) { setStaffMsg("❌ Name and email required"); return; }
     if (staffModal==="new") {
@@ -1425,6 +1590,14 @@ export default function AdminPage() {
         setStaffMsg("✅ Primary Admin created. Sign out of Recovery Admin and sign in with your Primary Admin account for everyday use.");
       } else {
         setStaffMsg("✅ Saved!");
+      }
+      if (staffModal === "new") {
+        if (res.id != null) {
+          setStaffUsers((prev) => [...prev.filter((u) => u.id !== res.id), { id: res.id, name: staffForm.name, email: staffForm.email, role, active: 1 }]);
+        }
+      } else {
+        const editedId = staffModal.id;
+        setStaffUsers((prev) => prev.map((u) => (u.id === editedId ? { ...u, name: staffForm.name, email: staffForm.email, role: staffForm.role, active: staffForm.active } : u)));
       }
       setStaffModal(null);
       setPrimaryAdminOnboarding(false);
@@ -1449,7 +1622,12 @@ export default function AdminPage() {
       const res = await fetch(`/api/admin-staff?id=${staffConfirm.user.id}`, { method: "DELETE", credentials: "include", headers: getRoleHeaders()}).then(r=>r.json()).catch(()=>({}));
       setStaffBusy(false);
       setStaffConfirm(null);
-      if (res.success) { setStaffMsg("✅ Staff user deleted"); loadStaff(); }
+      if (res.success) {
+        const deletedId = staffConfirm.user.id;
+        setStaffUsers((prev) => prev.filter((u) => u.id !== deletedId));
+        setStaffMsg("✅ Staff user deleted");
+        loadStaff();
+      }
       else setStaffMsg(`❌ ${res.error||"Delete failed"}`);
     } else {
       const res = await fetch("/api/admin-staff", {
@@ -1466,7 +1644,12 @@ export default function AdminPage() {
       }).then(r=>r.json()).catch(()=>({}));
       setStaffBusy(false);
       setStaffConfirm(null);
-      if (res.success) { setStaffMsg("✅ Account disabled"); loadStaff(); }
+      if (res.success) {
+        const disabledId = staffConfirm.user.id;
+        setStaffUsers((prev) => prev.map((u) => (u.id === disabledId ? { ...u, active: 0 } : u)));
+        setStaffMsg("✅ Account disabled");
+        loadStaff();
+      }
       else setStaffMsg(`❌ ${res.error||"Disable failed"}`);
     }
     setTimeout(()=>setStaffMsg(""),4000);
@@ -1481,7 +1664,11 @@ export default function AdminPage() {
       body: JSON.stringify({ id: user.id, name: user.name, email: user.email, role: user.role, active: 1 }),
     }).then(r=>r.json()).catch(()=>({}));
     setStaffBusy(false);
-    if (res.success) { setStaffMsg("✅ Account enabled"); loadStaff(); }
+    if (res.success) {
+      setStaffUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, active: 1 } : u)));
+      setStaffMsg("✅ Account enabled");
+      loadStaff();
+    }
     else setStaffMsg(`❌ ${res.error||"Enable failed"}`);
     setTimeout(()=>setStaffMsg(""),4000);
   };
@@ -1560,6 +1747,19 @@ export default function AdminPage() {
     }
   };
 
+  /** Background reconcile after an order mutation: orders list, dashboard summary + recent orders, customers (if loaded). */
+  const refreshAfterOrderMutation = async (ordersPageOverride?: number) => {
+    const tasks: Promise<unknown>[] = [
+      loadOrders(ordersPageOverride ?? ordersPage),
+      refreshDashSummaryAsync(),
+      refreshRecentOrders(),
+    ];
+    if (can("customers.view") && (customers.length > 0 || tab === "customers")) {
+      tasks.push(loadCustomers(customersPage || 1));
+    }
+    await Promise.allSettled(tasks);
+  };
+
   const updateStatus = (id: string, status: OrderStatus) => {
     fetch("/api/admin-orders", {
       method: "PATCH",
@@ -1574,9 +1774,14 @@ export default function AdminPage() {
           alert(data?.error || "Status update failed");
           return;
         }
+        const known = orders.find((o) => o.id === id) || recentOrders.find((o) => o.id === id);
+        if (known && known.status !== status) {
+          applyOrderSummaryDelta({ statusChange: { from: String(known.status), to: String(status), total: known.total } });
+        }
         setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
         setRecentOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
-        refreshDashSummary();
+        // Background reconcile with server truth (summary, lists, customers if loaded).
+        void refreshAfterOrderMutation();
       })
       .catch(() => {});
     setOrderModal(null);
@@ -1596,15 +1801,36 @@ export default function AdminPage() {
     if (res.success) {
       setOrderModal(null);
       setOrderDetail(null);
-      const nextLen = orders.length - 1;
-      if (nextLen <= 0 && ordersPage > 1) {
-        const prevPage = ordersPage - 1;
-        setOrdersPage(prevPage);
-        await loadOrders(prevPage);
-      } else {
-        await loadOrders(ordersPage);
+      const known = orders.find((o) => o.id === orderId) || recentOrders.find((o) => o.id === orderId);
+      // Optimistic local updates first — no reload needed.
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      setRecentOrders((prev) => prev.filter((o) => o.id !== orderId));
+      setOrdersTotal((n) => Math.max(0, n - 1));
+      const email = String(known?.email || "").trim().toLowerCase();
+      const orderTotal = parseMoney(known?.total ?? total);
+      const matchesCustomer = (c: any) => String(c.email || "").trim().toLowerCase() === email;
+      // Computed synchronously from current state (setState updaters run lazily).
+      const customerRemoved = !!email && customers.some((c) => matchesCustomer(c) && Number(c.orders || 0) <= 1);
+      if (email) {
+        setCustomers((prev) =>
+          prev.flatMap((c: any) => {
+            if (!matchesCustomer(c)) return [c];
+            const remaining = Math.max(0, Number(c.orders || 0) - 1);
+            if (remaining <= 0) return [];
+            return [{ ...c, orders: remaining, spent: `£${Math.max(0, parseMoney(c.spent) - orderTotal).toFixed(2)}` }];
+          })
+        );
+        if (customerRemoved) setCustomersTotal((n) => Math.max(0, n - 1));
       }
-      refreshDashSummary();
+      applyOrderSummaryDelta({ removed: { status, total }, customerRemoved });
+      const nextLen = orders.length - 1;
+      let reloadPage = ordersPage;
+      if (nextLen <= 0 && ordersPage > 1) {
+        reloadPage = ordersPage - 1;
+        setOrdersPage(reloadPage);
+      }
+      // Background reconcile with server truth.
+      void refreshAfterOrderMutation(reloadPage);
     } else {
       alert(`❌ Delete failed: ${res.error || "Unknown error"}`);
     }
@@ -1657,6 +1883,13 @@ export default function AdminPage() {
       setBlogMsg(`${base}${formatSeoGuardBannerClient(res.seo_guard)}`);
       setBlogMetaAi({ status: "idle" });
       setBlogModal(null);
+      // Local update first (temporary negative id for new posts until the refetch lands).
+      if (isNew) {
+        setBlogPosts((prev) => [{ ...(payload as any), id: -Date.now() } as BlogPost, ...prev]);
+      } else {
+        const editedId = (blogModal as BlogPost).id;
+        setBlogPosts((prev) => prev.map((p) => (p.id === editedId ? ({ ...p, ...(payload as any), id: editedId } as BlogPost) : p)));
+      }
       fetchBlogs();
     } else {
       setBlogMsg(`❌ ${res.error || "Save failed"}`);
@@ -1668,8 +1901,9 @@ export default function AdminPage() {
     if (!confirm("Delete this blog post?")) return;
     const res = await fetch(`/api/blog?id=${id}`, { method: "DELETE", credentials: "include" }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
-      setBlogPosts(blogPosts.filter(p => p.id !== id));
+      setBlogPosts((prev) => prev.filter(p => p.id !== id));
       setBlogMsg("✅ Post deleted");
+      fetchBlogs();
     } else {
       setBlogMsg(`❌ ${res.error || "Delete failed"}`);
     }
@@ -1724,7 +1958,13 @@ export default function AdminPage() {
         invalidateEditorSession();
         setProductModal(null);
       }
-      await loadProducts();
+      // Remove locally right away, then reconcile in the background.
+      setProducts((prev) => prev.filter((x: any) => Number(x.id) !== Number(id)));
+      setDashSummary((prev: any) =>
+        prev && prev.product_count != null ? { ...prev, product_count: Math.max(0, Number(prev.product_count) - 1) } : prev
+      );
+      void loadProducts();
+      void refreshDashSummaryAsync();
     } catch {
       setProductMsg("❌ Failed to delete product");
     } finally {
@@ -1933,7 +2173,18 @@ export default function AdminPage() {
           ? `✅ Already ${resulting} — no change needed. ${pageNote}`
           : `✅ ${p.name || id} is now ${resulting}. ${pageNote}`
       );
-      await loadProducts();
+      setProducts((prev) =>
+        prev.map((x: any) =>
+          Number(x.id) === id
+            ? {
+                ...x,
+                active: Number(data.active) === 1 ? 1 : 0,
+                ...(data.product_version != null ? { product_version: data.product_version } : {}),
+              }
+            : x
+        )
+      );
+      void loadProducts();
     } catch {
       setProductMsg(`❌ Failed to ${actionLabel.toLowerCase()} product`);
       await loadProducts();
@@ -2122,9 +2373,39 @@ export default function AdminPage() {
       setContentDraftBaseVersion(null);
       setContentConflict(null);
       invalidateEditorSession();
+      const savedModal = productModal;
       setProductModal(null);
       setProductMsg(`✅ Product saved${formatSeoGuardBannerClient(res.seo_guard)}`);
-      await loadProducts();
+      // Local update first (display fields only; server refetch below is authoritative).
+      const localFields = {
+        name: payload.name,
+        slug: res.slug || payload.slug,
+        category: payload.category,
+        image: payload.image,
+        stock: payload.stock,
+        short_description: payload.short_description,
+        full_description: payload.full_description,
+        features: payload.features,
+        seo_title: payload.seo_title,
+        meta_description: payload.meta_description,
+        focus_keyword: payload.focus_keyword,
+        og_image: payload.og_image,
+      };
+      if (isNew) {
+        if (res.id != null) {
+          setProducts((prev) => [
+            ...prev.filter((x: any) => Number(x.id) !== Number(res.id)),
+            { id: res.id, active: 1, ...localFields, price: payload.price },
+          ]);
+        }
+      } else if (savedModal && savedModal !== "new") {
+        const savedId = Number(savedModal.id);
+        setProducts((prev) =>
+          prev.map((x: any) => (Number(x.id) === savedId ? { ...x, ...localFields } : x))
+        );
+      }
+      void loadProducts();
+      void refreshDashSummaryAsync();
     } catch {
       setProductMsg("❌ Failed to save product");
     } finally {
@@ -2269,7 +2550,23 @@ export default function AdminPage() {
           ? `Already migrated to /products/${res.new_slug}`
           : `Migrated to /products/${res.new_slug} with permanent redirect`,
       });
-      await loadProducts();
+      {
+        const migratedId = productModal && productModal !== "new" ? Number((productModal as any).id) : null;
+        if (migratedId != null) {
+          setProducts((prev) =>
+            prev.map((x: any) =>
+              Number(x.id) === migratedId
+                ? {
+                    ...x,
+                    slug: String(res.new_slug || newSlug),
+                    ...(res.product_version != null ? { product_version: Number(res.product_version) } : {}),
+                  }
+                : x
+            )
+          );
+        }
+      }
+      void loadProducts();
     } catch {
       setProductUrlMigration((s) => ({
         ...s,
@@ -3267,6 +3564,14 @@ export default function AdminPage() {
                     await loadProducts();
                   }}
                   onProductUpdate={(row, meta) => {
+                    // Seasonal/ops action succeeded: reflect it in the products list immediately
+                    // (background loadProducts via onRefresh reconciles with the server).
+                    if (row && (row as any).id != null) {
+                      const rowId = Number((row as any).id);
+                      setProducts((prev) =>
+                        prev.map((x: any) => (Number(x.id) === rowId ? { ...x, ...(row as any) } : x))
+                      );
+                    }
                     // Compare captured dispatch context against CURRENT active editor — never
                     // re-label an old response with editorSessionIdRef.current.
                     const activeProductId =
@@ -5295,7 +5600,12 @@ export default function AdminPage() {
                     usage_limit: parsed.value.usageLimit,
                     expires_at: parsed.value.expiresAt,
                   })}).then(x=>x.json()).catch(()=>({}));
-                  if(r.success){setCouponMsg("✅ Coupon created!");setCouponForm({code:"",type:"percentage",value:"",minimum_order:"0",usage_limit:"",expires_at:""});fetch("/api/coupons",{credentials:"include"}).then(x=>x.json()).then(d=>Array.isArray(d)&&setCoupons(d));}
+                  if(r.success){
+                    setCouponMsg("✅ Coupon created!");
+                    setCoupons(prev=>[{id:r.id,code:parsed.value.code,type:parsed.value.type,value:parsed.value.value,minimum_order:parsed.value.minimumOrder,usage_limit:parsed.value.usageLimit,expires_at:parsed.value.expiresAt,used_count:0,is_active:1},...prev.filter((x:any)=>x.id!==r.id)]);
+                    setCouponForm({code:"",type:"percentage",value:"",minimum_order:"0",usage_limit:"",expires_at:""});
+                    void loadCoupons();
+                  }
                   else setCouponMsg(`❌ ${r.error||"Failed"}`);
                   setTimeout(()=>setCouponMsg(""),3000);
                 }}>+ Create Coupon</button>
@@ -5318,13 +5628,14 @@ export default function AdminPage() {
                           <td>
                             <span className={`status-badge ${c.is_active?"status-confirmed":"status-pending"}`} style={{cursor:"pointer"}} onClick={async()=>{
                               const nextActive = !(c.is_active === true || c.is_active === 1 || c.is_active === "1");
-                              await fetch("/api/coupons",{method:"PUT",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({...c,is_active: nextActive})});
-                              fetch("/api/coupons",{credentials:"include"}).then(r=>r.json()).then(d=>Array.isArray(d)&&setCoupons(d));
+                              const tr = await fetch("/api/coupons",{method:"PUT",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({...c,is_active: nextActive})}).then(x=>x.json()).catch(()=>({}));
+                              if (tr.success) setCoupons(prev=>prev.map((x:any)=>x.id===c.id?{...x,is_active:nextActive?1:0}:x));
+                              void loadCoupons();
                             }}>
                               {c.is_active?"Active":"Inactive"}
                             </span>
                           </td>
-                          <td><button className="action-btn btn-delete" onClick={async()=>{if(!confirm("Delete?"))return;await fetch(`/api/coupons?id=${c.id}`,{method:"DELETE"});setCoupons(prev=>prev.filter(x=>x.id!==c.id));}}>Delete</button></td>
+                          <td><button className="action-btn btn-delete" onClick={async()=>{if(!confirm("Delete?"))return;const dr=await fetch(`/api/coupons?id=${c.id}`,{method:"DELETE",credentials:"include"}).then(x=>x.json()).catch(()=>({}));if(dr.success){setCoupons(prev=>prev.filter(x=>x.id!==c.id));}else{setCouponMsg(`❌ ${dr.error||"Delete failed"}`);setTimeout(()=>setCouponMsg(""),3000);}void loadCoupons();}}>Delete</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -5595,10 +5906,10 @@ export default function AdminPage() {
                         {faqs.filter((f:FAQ)=>f.category===cat).map((f:FAQ)=>(
                           <tr key={f.id}>
                             <td style={{maxWidth:320,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.question}</td>
-                            <td><span style={{fontSize:11,background:f.is_visible?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${f.is_visible?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,color:f.is_visible?"#00c864":"#ff6666",padding:"3px 10px",borderRadius:20,cursor:"pointer"}} onClick={async()=>{await fetch("/api/faqs",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...f,is_visible:f.is_visible?0:1})});setFaqs(prev=>prev.map((x:FAQ)=>x.id===f.id?{...x,is_visible:f.is_visible?0:1}:x));}}>{f.is_visible?"Visible":"Hidden"}</span></td>
+                            <td><span style={{fontSize:11,background:f.is_visible?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${f.is_visible?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,color:f.is_visible?"#00c864":"#ff6666",padding:"3px 10px",borderRadius:20,cursor:"pointer"}} onClick={async()=>{const vr=await fetch("/api/faqs",{method:"PUT",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({...f,is_visible:f.is_visible?0:1})}).then(x=>x.json()).catch(()=>({}));if(vr.success){setFaqs(prev=>prev.map((x:FAQ)=>x.id===f.id?{...x,is_visible:f.is_visible?0:1}:x));}else{setFaqMsg(`❌ ${vr.error||"Update failed"}`);setTimeout(()=>setFaqMsg(""),3000);}void loadFaqs();}}>{f.is_visible?"Visible":"Hidden"}</span></td>
                             <td>
                               <button className="action-btn btn-edit" style={{marginRight:6}} onClick={()=>{setEditFaq({question:f.question,answer:f.answer,category:f.category});setFaqModal(f);}}>Edit</button>
-                              <button className="action-btn btn-delete" onClick={async()=>{if(!confirm("Delete this FAQ?"))return;await fetch(`/api/faqs?id=${f.id}`,{method:"DELETE"});setFaqs(prev=>prev.filter((x:FAQ)=>x.id!==f.id));}}>Delete</button>
+                              <button className="action-btn btn-delete" onClick={async()=>{if(!confirm("Delete this FAQ?"))return;const dr=await fetch(`/api/faqs?id=${f.id}`,{method:"DELETE",credentials:"include"}).then(x=>x.json()).catch(()=>({}));if(dr.success){setFaqs(prev=>prev.filter((x:FAQ)=>x.id!==f.id));}else{setFaqMsg(`❌ ${dr.error||"Delete failed"}`);setTimeout(()=>setFaqMsg(""),3000);}void loadFaqs();}}>Delete</button>
                             </td>
                           </tr>
                         ))}
@@ -5625,6 +5936,7 @@ export default function AdminPage() {
                     let res: any;
                     if(faqModal==="new"){res=await fetch("/api/faqs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(editFaq)}).then(r=>r.json()).catch(()=>({}));if(res.success){setFaqMsg("✅ FAQ added");setFaqs(prev=>[...prev,{id:res.id,...editFaq,sort_order:0,is_visible:1} as FAQ]);}}
                     else{res=await fetch("/api/faqs",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...(faqModal as FAQ),...editFaq})}).then(r=>r.json()).catch(()=>({}));if(res.success){setFaqMsg("✅ FAQ updated");setFaqs(prev=>prev.map((x:FAQ)=>x.id===(faqModal as FAQ).id?{...x,...editFaq}:x));}}
+                    if(!res.success) setFaqMsg(`❌ ${res.error||"Save failed"}`); else void loadFaqs();
                     setFaqModal(null);setTimeout(()=>setFaqMsg(""),3000);
                   }}>Save FAQ</button>
                 </div>
@@ -6742,7 +7054,82 @@ export default function AdminPage() {
                     "home_features_list",
                     "home_stat1_num","home_stat1_label","home_stat2_num","home_stat2_label","home_stat3_num","home_stat3_label",
                     "home_tagline",
+                    "home_product_ids",
                   ])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
+                  <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}} data-home-products-panel="1">
+                    <div style={{marginBottom:6,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Home page products</div>
+                    {(() => {
+                      const HOME_PRODUCT_MAX = 8;
+                      const activeProducts = products.filter((p: any) => Number(p.active) === 1);
+                      const byId = new Map<string, any>(activeProducts.map((p: any) => [String(p.id), p]));
+                      const selectedIds: string[] = [];
+                      for (const raw of String(siteContent.home_product_ids || "").split(",")) {
+                        const id = raw.trim();
+                        if (id && byId.has(id) && !selectedIds.includes(id)) selectedIds.push(id);
+                      }
+                      const limited = selectedIds.slice(0, HOME_PRODUCT_MAX);
+                      const setIds = (ids: string[]) =>
+                        setSiteContent((s) => ({ ...s, home_product_ids: ids.join(",") }));
+                      const move = (id: string, dir: -1 | 1) => {
+                        const i = limited.indexOf(id);
+                        const j = i + dir;
+                        if (i < 0 || j < 0 || j >= limited.length) return;
+                        const next = [...limited];
+                        [next[i], next[j]] = [next[j], next[i]];
+                        setIds(next);
+                      };
+                      const toggle = (id: string, checked: boolean) => {
+                        if (checked) {
+                          if (limited.includes(id) || limited.length >= HOME_PRODUCT_MAX) return;
+                          setIds([...limited, id]);
+                        } else {
+                          setIds(limited.filter((x) => x !== id));
+                        }
+                      };
+                      const unselected = activeProducts.filter((p: any) => !limited.includes(String(p.id)));
+                      const full = limited.length >= HOME_PRODUCT_MAX;
+                      return (
+                        <div>
+                          <p style={{fontSize:12,color:"#666",margin:"0 0 10px",lineHeight:1.4}}>
+                            Choose up to {HOME_PRODUCT_MAX} active products for the home page and set their order. Selected: {limited.length}/{HOME_PRODUCT_MAX}.
+                            {limited.length === 0 ? " Nothing selected — the home page keeps its current default product list." : ""}
+                          </p>
+                          {productsLoading && products.length === 0 && <div style={{fontSize:12,color:"#666"}}>Loading products…</div>}
+                          {!productsLoading && activeProducts.length === 0 && (
+                            <div style={{fontSize:12,color:"#666"}}>
+                              {productsError || "No active products available."}{" "}
+                              {can("products.view") && <button type="button" className="action-btn btn-edit" onClick={() => loadProducts()}>Reload products</button>}
+                            </div>
+                          )}
+                          {limited.map((id, idx) => {
+                            const p = byId.get(id);
+                            return (
+                              <div key={id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",marginBottom:6,background:"#F5F3FF",border:"1px solid #DDD6FE",borderRadius:8}}>
+                                <input type="checkbox" checked onChange={() => toggle(id, false)} aria-label={`Remove ${p?.name || id} from home page`} />
+                                <span style={{fontSize:12,fontWeight:700,color:"#5B21B6",minWidth:18}}>{idx + 1}.</span>
+                                <span style={{flex:1,fontSize:13}}>{p?.name || `Product #${id}`}</span>
+                                <button type="button" className="action-btn btn-view" disabled={idx === 0} style={{opacity:idx===0?0.4:1}} onClick={() => move(id, -1)} aria-label="Move up">▲</button>
+                                <button type="button" className="action-btn btn-view" disabled={idx === limited.length - 1} style={{opacity:idx===limited.length-1?0.4:1}} onClick={() => move(id, 1)} aria-label="Move down">▼</button>
+                              </div>
+                            );
+                          })}
+                          {unselected.map((p: any) => (
+                            <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",marginBottom:6,border:"1px solid #E5E5E5",borderRadius:8,opacity:full?0.55:1}}>
+                              <input type="checkbox" checked={false} disabled={full} onChange={(e) => toggle(String(p.id), e.target.checked)} aria-label={`Add ${p.name} to home page`} />
+                              <span style={{flex:1,fontSize:13}}>{p.name}</span>
+                              {full && <span style={{fontSize:11,color:"#999"}}>Max {HOME_PRODUCT_MAX} reached</span>}
+                            </div>
+                          ))}
+                          <button className="btn-primary" style={{marginTop:8}} disabled={contentSaving} onClick={() => {
+                            // Persist the normalised list (drops inactive/deleted ids, caps at 8).
+                            const ids = limited.join(",");
+                            setSiteContent((s) => ({ ...s, home_product_ids: ids }));
+                            void saveContent(["home_product_ids"], { home_product_ids: ids });
+                          }}>{contentSaving ? "Saving..." : "💾 Save Home Products"}</button>
+                        </div>
+                      );
+                    })()}
+                  </div>
                   <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
                     <div style={{marginBottom:16,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Additional home labels</div>
                     <AdminContentPanel

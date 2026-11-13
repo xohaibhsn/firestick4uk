@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
 import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
+import { setAdminNoStore } from '../../lib/adminNoStore';
 import { recordContentRevision } from '../../lib/contentRevisions';
 import {
   getCachedPublicVisibleSections,
@@ -47,6 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'GET') {
       const { page, all } = req.query;
       if (all) {
+        setAdminNoStore(res);
         const admin = await requireAdminPermission(req, res, 'page_builder.manage', { mutate: false });
         if (!admin) return;
       }

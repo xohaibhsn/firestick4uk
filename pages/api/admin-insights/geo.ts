@@ -3,8 +3,9 @@
  * Always 410 Gone; no data access.
  */
 import type { NextApiRequest, NextApiResponse } from "next";
+import { setAdminNoStore } from "@/lib/adminNoStore";
 
 export default function handler(_req: NextApiRequest, res: NextApiResponse) {
-  res.setHeader("Cache-Control", "no-store");
+  setAdminNoStore(res);
   res.status(410).json({ error: "gone" });
 }

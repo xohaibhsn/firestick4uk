@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "../../lib/db";
 import { requireAdminPermission } from "../../lib/adminAuth";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 import {
   MEDIA_LIBRARY_PURPOSES,
   canViewMediaPurpose,
@@ -17,6 +18,7 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
 /** Authenticated CMS Media Library listing — role-filtered server-side. */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+  setAdminNoStore(res);
 
   const admin = await requireAdminPermission(req, res, "media.view", { mutate: false });
   if (!admin) return;

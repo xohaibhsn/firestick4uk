@@ -34,7 +34,9 @@ export async function getPublicActiveProducts(): Promise<PublicProduct[]> {
     const list = (Array.isArray(rows) ? rows : []).map((r: any) =>
       normalizeSeasonalUtcFields(r)
     );
-    return filterSalesCardRows(list, nowMs, capability).map((r) => toPublicListProduct(r));
+    return filterSalesCardRows(list, nowMs, capability).map((r) =>
+      toPublicListProduct(r, { nowMs, capability })
+    );
   } catch {
     return [];
   }

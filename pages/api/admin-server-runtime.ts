@@ -4,6 +4,7 @@
  */
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdminRole } from "../../lib/adminAuth";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 import { getCachedServerRuntime } from "../../lib/serverRuntime";
 
 /**
@@ -59,7 +60,7 @@ function assertSameOriginGet(req: NextApiRequest): boolean {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  setAdminNoStore(res);
 
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });

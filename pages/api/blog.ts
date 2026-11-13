@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
 import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
+import { setAdminNoStore } from '../../lib/adminNoStore';
 import { recordContentRevision, snapshotBlog } from '../../lib/contentRevisions';
 import { invalidateSitemapCache } from '../../lib/hostingerResourceInvalidation';
 import { runPostSaveSeoGuard } from '../../lib/postSaveSeoGuard';
@@ -34,6 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // CMS list / id: require blog.manage (read-safe; no CSRF mutate).
+      setAdminNoStore(res);
       admin = await requireAdminPermission(req, res, 'blog.manage', { mutate: false });
       if (!admin) return;
 

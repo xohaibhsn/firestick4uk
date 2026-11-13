@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getRequestMeta, requireAdminPermission } from "../../lib/adminAuth";
 import { recordAdminAudit } from "../../lib/adminAudit";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 import { validateRedirectFields, safeRedirectRow } from "../../lib/urlRedirects";
 import {
   createRedirect,
@@ -24,6 +25,7 @@ function changedFields(
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === "GET") setAdminNoStore(res);
   // Auth + permission + same-origin BEFORE any url_redirects query.
   const admin = await requireAdminPermission(req, res, "redirects.manage");
   if (!admin) return;

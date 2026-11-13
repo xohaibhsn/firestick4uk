@@ -10,6 +10,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getRequestMeta, requireAdminPermission } from "@/lib/adminAuth";
 import { recordAdminAudit } from "@/lib/adminAudit";
+import { setAdminNoStore } from "@/lib/adminNoStore";
 import {
   botClause,
   isMissingTableError,
@@ -34,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const admin = await requireAdminPermission(req, res, "insights.export");
   if (!admin) return;
 
-  res.setHeader("Cache-Control", "no-store");
+  setAdminNoStore(res);
 
   const parsed = parseDateRange(req.query);
   if (!parsed.ok) {

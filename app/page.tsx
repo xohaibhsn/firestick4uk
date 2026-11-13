@@ -14,6 +14,7 @@ import {
   utcMsToUtcIso,
 } from "@/lib/productSeasonLondon";
 import { resolveSeasonalHubPublicState } from "@/lib/seasonalHubPublic";
+import { resolveHomeProducts } from "@/lib/homeProductOrder";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -37,7 +38,8 @@ const getHomeContent = cache(async (): Promise<Record<string, string>> => {
             'seasonal_promo_text',
             'seasonal_promo_cta',
             'season_countdown_prefix',
-            'season_countdown_upcoming_prefix'
+            'season_countdown_upcoming_prefix',
+            'home_product_ids'
           )`
     );
     const result: Record<string, string> = {};
@@ -87,11 +89,15 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function HomePage() {
   const nowMs = floorSecondUtcMs();
-  const [content, initialProducts, hubState] = await Promise.all([
+  const [content, allProducts, hubState] = await Promise.all([
     getHomeContent(),
     getPublicActiveProducts(),
     resolveSeasonalHubPublicState(pool, { nowMs }),
   ]);
+  const initialProducts = resolveHomeProducts(
+    allProducts,
+    content.home_product_ids
+  );
 
   let seasonalPromo: {
     text: string;

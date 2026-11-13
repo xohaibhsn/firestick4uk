@@ -3,6 +3,7 @@
  * Never leak SELECT * admin/ops fields to public clients.
  */
 import {
+  isHubLiveMember,
   isPurchasable,
   isSalesCardEligible,
   resolveSeasonPhase,
@@ -34,9 +35,17 @@ export type PublicListProduct = {
   badge: string | null;
   image: string | null;
   category: string;
+  /** Only present when seasonal AND currently live (hub member / purchasable). */
+  season_ends_at?: string;
+  season_phase?: "live";
 };
 
-export type PublicDetailProduct = PublicListProduct & {
+export type PublicListSeasonOpts = {
+  nowMs: number;
+  capability: SchemaCapability;
+};
+
+export type PublicDetailProduct = Omit<PublicListProduct, "season_ends_at" | "season_phase"> & {
   stock?: string | null;
   full_description?: string | null;
   features?: string | null;
@@ -65,9 +74,12 @@ function pick<T extends string>(row: Record<string, unknown>, keys: readonly T[]
   return out;
 }
 
-export function toPublicListProduct(row: Record<string, unknown>): PublicListProduct {
+export function toPublicListProduct(
+  row: Record<string, unknown>,
+  opts?: PublicListSeasonOpts
+): PublicListProduct {
   const base = pick(row, PUBLIC_LIST_FIELDS);
-  return {
+  const out: PublicListProduct = {
     id: Number(base.id),
     name: String(base.name || ""),
     description: String(base.description || ""),
@@ -78,6 +90,16 @@ export function toPublicListProduct(row: Record<string, unknown>): PublicListPro
     image: (base.image as string | null) ?? null,
     category: String(base.category || ""),
   };
+  // Live seasonal only: add season_ends_at + season_phase. All other products stay
+  // byte-identical to the legacy list shape (no extra keys).
+  if (opts && isHubLiveMember(row, opts.nowMs, opts.capability)) {
+    const ends = utcFieldIso(row.season_ends_at);
+    if (ends) {
+      out.season_ends_at = ends;
+      out.season_phase = "live";
+    }
+  }
+  return out;
 }
 
 function utcFieldIso(value: unknown): string | null {

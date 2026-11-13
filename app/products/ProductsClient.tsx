@@ -6,6 +6,7 @@ import { useCart } from "../lib/cartContext";
 import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import SeasonalCardCountdown from "@/components/product/SeasonalCardCountdown";
 import { useContactConfig } from "@/hooks/useContactConfig";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import { fillVars } from "@/lib/cms";
@@ -30,6 +31,8 @@ interface Product {
   badge: string | null;
   image: string | null;
   category: string;
+  season_ends_at?: string;
+  season_phase?: "live";
 }
 
 function productDetailHref(p: Product): string {
@@ -55,6 +58,7 @@ export default function ProductsClient({
   const [loadError, setLoadError] = useState(false);
   const [added, setAdded] = useState<number | null>(null);
   const [hoveringId, setHoveringId] = useState<number | null>(null);
+  const [endedOfferIds, setEndedOfferIds] = useState<Record<number, true>>({});
   const [filter, setFilter] = useState("All");
   const [sort, setSort] = useState("featured");
   const [minPrice, setMinPrice] = useState("");
@@ -407,26 +411,40 @@ export default function ProductsClient({
                       ),
                     }}
                   />
+                  {p.season_phase === "live" && p.season_ends_at ? (
+                    <SeasonalCardCountdown
+                      endsAt={p.season_ends_at}
+                      phase={p.season_phase}
+                      onEnded={() =>
+                        setEndedOfferIds((prev) =>
+                          prev[p.id] ? prev : { ...prev, [p.id]: true }
+                        )
+                      }
+                    />
+                  ) : null}
                   <div className="product-footer">
                     <div className="product-price">£{Number(p.price).toFixed(2)}</div>
                     {(()=>{
                       const inCart=cart.some(i=>i.id===p.id);
                       const hovering=hoveringId===p.id;
+                      const offerEnded=Boolean(endedOfferIds[p.id]);
                       return(
                       <button
                         className="add-btn"
                         data-insights-id="cart_add"
-                        style={{background:inCart?(hovering?"#DC2626":"#16A34A"):"#5B21B6",cursor:inCart&&!hovering?"default":"pointer"}}
+                        disabled={offerEnded}
+                        style={{background:offerEnded?"#9CA3AF":inCart?(hovering?"#DC2626":"#16A34A"):"#5B21B6",cursor:offerEnded?"not-allowed":inCart&&!hovering?"default":"pointer"}}
                         onMouseEnter={()=>inCart&&setHoveringId(p.id)}
                         onMouseLeave={()=>setHoveringId(null)}
                         onClick={e=>{
                           e.stopPropagation();
                           e.preventDefault();
+                          if (offerEnded) return;
                           if (inCart) removeFromCart(p.id);
                           else handleAddToCart(p);
                         }}
                       >
-                        {inCart?(hovering?`✕ ${t("products_remove", "Remove")}`:`✅ ${t("products_added", "Added!")}`):t("products_add_cart", "Add to Cart →")}
+                        {offerEnded?"Offer ended":inCart?(hovering?`✕ ${t("products_remove", "Remove")}`:`✅ ${t("products_added", "Added!")}`):t("products_add_cart", "Add to Cart →")}
                       </button>
                       );
                     })()}

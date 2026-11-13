@@ -20,15 +20,22 @@ import {
 import { detectProductSchemaCapability } from "@/lib/productSchemaCapabilityServer";
 import {
   hasValidWindow,
+  isHubLiveMember,
   isPurchasable,
   resolveSeasonPhase,
 } from "@/lib/productSeasonEligibility";
-import { floorSecondUtcMs, normalizeSeasonalUtcFields } from "@/lib/productSeasonLondon";
+import {
+  floorSecondUtcMs,
+  normalizeSeasonalUtcFields,
+  parseUtcSqlToMs,
+  utcMsToUtcIso,
+} from "@/lib/productSeasonLondon";
 import { queryWithSeasonalUtc } from "@/lib/productSeasonalQuery";
-import { toPublicDetailProduct } from "@/lib/productPublicDto";
+import { toPublicDetailProduct, toPublicListProduct } from "@/lib/productPublicDto";
 import { loadSeasonalAlternativeCards } from "@/lib/productSeasonAlternativesServer";
 import { resolveSeasonalHubPublicState } from "@/lib/seasonalHubPublic";
 import { londonDateYmdFromUtcInstant } from "@/lib/seasonalPriceValidUntil";
+import { pickCurrentSeasonalOffers } from "@/lib/homeProductOrder";
 
 interface Product {
   id: number;
@@ -333,6 +340,43 @@ export default async function ProductDetailPage({
     capability,
   });
 
+  let seasonalOffersEnabled = true;
+  let seasonalOffersHeading = "🔥 Current Seasonal Offers";
+  try {
+    const [cmsRows]: any = await pool.query(
+      `SELECT content_key, content_value FROM site_content
+       WHERE content_key IN ('pd_seasonal_offers_enabled', 'pd_seasonal_offers_heading')`
+    );
+    for (const r of cmsRows || []) {
+      if (r.content_key === "pd_seasonal_offers_enabled") {
+        seasonalOffersEnabled = String(r.content_value ?? "1").trim() !== "0";
+      }
+      if (r.content_key === "pd_seasonal_offers_heading") {
+        const h = String(r.content_value || "").trim();
+        if (h) seasonalOffersHeading = h;
+      }
+    }
+  } catch {
+    /* defaults */
+  }
+
+  const liveMembers = hubState.rows
+    .filter((r: any) => isHubLiveMember(r, nowMs, hubState.capability))
+    .map((r: any) => {
+      const list = toPublicListProduct(r, { nowMs, capability: hubState.capability });
+      const endMs = parseUtcSqlToMs(r.season_ends_at);
+      return {
+        ...list,
+        season_ends_at: list.season_ends_at || (endMs != null ? utcMsToUtcIso(endMs) : null),
+        season_phase: "live" as const,
+      };
+    });
+  const currentSeasonalOffers = pickCurrentSeasonalOffers(
+    liveMembers,
+    Number(product.id),
+    3
+  );
+
   const productUrl = `https://firestick4uk.com/products/${canonicalSlug}`;
   const productLd = buildProductJsonLd(product, productUrl, {
     includeOffer: purchasable,
@@ -358,6 +402,9 @@ export default async function ProductDetailPage({
         showSeasonalOffersLink={hubState.effectivelyPublic}
         availableOffers={alts.available}
         upcomingOffers={alts.upcoming}
+        currentSeasonalOffers={currentSeasonalOffers}
+        currentSeasonalOffersEnabled={seasonalOffersEnabled}
+        currentSeasonalOffersHeading={seasonalOffersHeading}
       />
     </>
   );

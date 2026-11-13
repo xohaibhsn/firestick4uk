@@ -126,7 +126,7 @@ ok(
 );
 ok(
   "runtime_api_no_store",
-  /Cache-Control["']\s*,\s*["']no-store/.test(apiSrc)
+  /Cache-Control["']\s*,\s*["']no-store/.test(apiSrc) || /setAdminNoStore\(res\)/.test(apiSrc)
 );
 ok(
   "runtime_api_same_origin_check",

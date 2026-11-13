@@ -223,7 +223,9 @@ ok(
 const cdSrc = read("components/product/SeasonalCountdown.tsx");
 ok(
   "countdown_uses_formatter",
-  /formatSeasonalCountdownRemaining/.test(cdSrc) &&
+  // UX-72: boxes use splitCountdownParts; legacy text formatter still exported.
+  (/formatSeasonalCountdownRemaining/.test(cdSrc) ||
+    /splitCountdownParts/.test(cdSrc)) &&
     /prefix/.test(cdSrc) &&
     /upcomingPrefix/.test(cdSrc)
 );

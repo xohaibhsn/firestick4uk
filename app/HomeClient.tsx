@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar";
 import HeroSlider from "@/components/HeroSlider";
 import Footer from "@/components/Footer";
 import SeasonalHomePromoStrip from "@/components/home/SeasonalHomePromoStrip";
+import SeasonalCardCountdown from "@/components/product/SeasonalCardCountdown";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import type { PublicProduct } from "@/lib/publicProductsServer";
 import {
@@ -127,6 +128,8 @@ interface Product {
   price: number | string;
   badge: string | null;
   image: string | null;
+  season_ends_at?: string;
+  season_phase?: "live";
 }
 
 export type SeasonalHomePromoProps = {
@@ -183,6 +186,7 @@ export default function HomeClient({
   const [loading, setLoading] = useState(initialProducts.length === 0);
   const [searchTerm, setSearchTerm] = useState("");
   const [hoveringId, setHoveringId] = useState<number | null>(null);
+  const [endedOfferIds, setEndedOfferIds] = useState<Record<number, true>>({});
   const [slides, setSlides] = useState<string[]>([]);
   const [featureList, setFeatureList] = useState<string[]>([]);
   const { sc: cmsData, t } = useSiteContent();
@@ -816,26 +820,40 @@ export default function HomeClient({
                       ),
                     }}
                   />
+                  {p.season_phase === "live" && p.season_ends_at ? (
+                    <SeasonalCardCountdown
+                      endsAt={p.season_ends_at}
+                      phase={p.season_phase}
+                      onEnded={() =>
+                        setEndedOfferIds((prev) =>
+                          prev[p.id] ? prev : { ...prev, [p.id]: true }
+                        )
+                      }
+                    />
+                  ) : null}
                   <div className="product-footer">
                     <div className="product-price">£{Number(p.price).toFixed(2)}</div>
                     {(() => {
                       const inCart = cart.some(i => i.id === p.id);
                       const hovering = hoveringId === p.id;
+                      const offerEnded = Boolean(endedOfferIds[p.id]);
                       return (
                       <button
                         className="add-btn"
                         data-insights-id="cart_add"
-                        style={{background: inCart ? (hovering ? "#DC2626" : "#16A34A") : "#5B21B6", cursor: inCart && !hovering ? "default" : "pointer"}}
+                        disabled={offerEnded}
+                        style={{background: offerEnded ? "#9CA3AF" : inCart ? (hovering ? "#DC2626" : "#16A34A") : "#5B21B6", cursor: offerEnded ? "not-allowed" : inCart && !hovering ? "default" : "pointer"}}
                         onMouseEnter={() => inCart && setHoveringId(p.id)}
                         onMouseLeave={() => setHoveringId(null)}
                         onClick={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
+                          if (offerEnded) return;
                           if (inCart) removeFromCart(p.id);
                           else handleAddToCart(p);
                         }}
                       >
-                        {inCart ? (hovering ? t("home_remove", "Remove") : t("home_added", "Added!")) : t("home_add_cart", "Add to Cart →")}
+                        {offerEnded ? "Offer ended" : inCart ? (hovering ? t("home_remove", "Remove") : t("home_added", "Added!")) : t("home_add_cart", "Add to Cart →")}
                       </button>
                       );
                     })()}

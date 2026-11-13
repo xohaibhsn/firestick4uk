@@ -5,6 +5,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
+import { setAdminNoStore } from "@/lib/adminNoStore";
 import {
   hasAdminPermission,
   type AdminRoleName,
@@ -39,6 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+  setAdminNoStore(res);
 
   const admin = await requireAdmin(req, res, { mutate: false });
   if (!admin) return;

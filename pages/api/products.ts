@@ -89,7 +89,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       normalizeSeasonalUtcFields(r)
     );
     const eligible = filterSalesCardRows(list, nowMs, capability);
-    return res.status(200).json(eligible.map((r) => toPublicListProduct(r)));
+    return res.status(200).json(
+      eligible.map((r) => toPublicListProduct(r, { nowMs, capability }))
+    );
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }

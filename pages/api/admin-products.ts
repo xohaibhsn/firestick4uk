@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '../../lib/db';
 import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
+import { setAdminNoStore } from '../../lib/adminNoStore';
 import { recordContentRevision, snapshotProduct } from '../../lib/contentRevisions';
 import { invalidateSitemapCache } from '../../lib/hostingerResourceInvalidation';
 import {
@@ -129,6 +130,7 @@ function pricesEqual(a: unknown, b: unknown): boolean {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'GET') setAdminNoStore(res);
   const admin = await requireAdminPermission(req, res, 'products.manage');
   if (!admin) return;
 
