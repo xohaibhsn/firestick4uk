@@ -157,10 +157,25 @@ export default async function RootLayout({
           href="https://fonts.gstatic.com"
           crossOrigin="anonymous"
         />
+        {/* Non-blocking Google Fonts (same families; display=swap). Avoids ~700ms render-block without next/font build fetch. */}
         <link
+          id="f4uk-fonts"
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+          media="print"
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){var el=document.getElementById('f4uk-fonts');if(!el)return;function a(){el.media='all';}el.addEventListener('load',a);if(el.sheet)a();})();",
+          }}
+        />
+        <noscript>
+          <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+          />
+        </noscript>
         <meta
           name="google-site-verification"
           content="bE3BpMEsptGDckTW4IX1nVwGibbaaiphTCCbQp9y-FY"

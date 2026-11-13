@@ -25,6 +25,7 @@ import {
   type PublishableHomeTestimonial,
 } from "@/lib/homeTestimonials";
 import { hydrateProductFactsCatalog } from "@/lib/cartClassification";
+import { productCardSrc } from "@/lib/cloudinaryDelivery";
 
 const REVIEW_TEXT_PREVIEW_CHARS = 180;
 
@@ -149,6 +150,8 @@ interface HomeClientProps {
   heroTitle?: string;
   heroSubtitle?: string;
   initialProducts?: PublicProduct[];
+  /** SSR hero slide URLs so LCP image is in the first HTML response. */
+  initialSlides?: string[];
   /** SSR: only set when hub is effectivelyPublic with ≥1 live member. */
   seasonalPromo?: SeasonalHomePromoProps | null;
   showSeasonalOffersLink?: boolean;
@@ -181,6 +184,7 @@ export default function HomeClient({
   heroTitle = "Premium UK Streaming Service",
   heroSubtitle = "Firestick4UK provides premium UK streaming services for Firestick and Android Box users.",
   initialProducts = [],
+  initialSlides = [],
   seasonalPromo = null,
   showSeasonalOffersLink = false,
 }: HomeClientProps) {
@@ -191,7 +195,9 @@ export default function HomeClient({
   const [endedOfferIds, setEndedOfferIds] = useState<Record<number, true>>({});
   const [promoEnded, setPromoEnded] = useState(false);
   const promoActive = Boolean(seasonalPromo) && !promoEnded;
-  const [slides, setSlides] = useState<string[]>([]);
+  const [slides, setSlides] = useState<string[]>(() =>
+    (initialSlides || []).filter((u) => typeof u === "string" && !!u.trim())
+  );
   const [featureList, setFeatureList] = useState<string[]>([]);
   const { sc: cmsData, t } = useSiteContent();
   const [featuresHtml, setFeaturesHtml] = useState("");
@@ -794,8 +800,9 @@ export default function HomeClient({
           ) : products.length === 0 ? (
             <div className="loading">{t("home_empty", "No products found.")}</div>
           ) : (
-            products.slice(0, 8).map((p) => {
+            products.slice(0, 8).map((p, idx) => {
               const href = productDetailHref(p);
+              const aboveFold = idx < 4;
               return (
               <div className="product-card" key={p.id}>
                 <a href={href} className="product-image-link">
@@ -806,7 +813,14 @@ export default function HomeClient({
                       </span>
                     )}
                     {p.image ? (
-                      <img src={p.image} alt={p.name} />
+                      <img
+                        src={productCardSrc(p.image)}
+                        alt={p.name}
+                        width={600}
+                        height={600}
+                        loading={aboveFold ? "eager" : "lazy"}
+                        decoding="async"
+                      />
                     ) : (
                       <div className="image-placeholder">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">

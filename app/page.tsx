@@ -19,6 +19,7 @@ import {
   applySeasonalPromoText,
   DEFAULT_SEASONAL_PROMO_CTA,
 } from "@/lib/seasonalCountdownLabel";
+import { heroSlideSrc } from "@/lib/cloudinaryDelivery";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -43,7 +44,11 @@ const getHomeContent = cache(async (): Promise<Record<string, string>> => {
             'seasonal_promo_cta',
             'season_countdown_prefix',
             'season_countdown_upcoming_prefix',
-            'home_product_ids'
+            'home_product_ids',
+            'hero_slide_1',
+            'hero_slide_2',
+            'hero_slide_3',
+            'hero_slide_4'
           )`
     );
     const result: Record<string, string> = {};
@@ -153,8 +158,28 @@ export default async function HomePage() {
     }
   }
 
+  const initialSlides = [
+    content.hero_slide_1,
+    content.hero_slide_2,
+    content.hero_slide_3,
+    content.hero_slide_4,
+  ]
+    .map((u) => (typeof u === "string" ? u.trim() : ""))
+    .filter(Boolean);
+  const lcpPreloadHref = initialSlides[0]
+    ? heroSlideSrc(initialSlides[0])
+    : null;
+
   return (
     <>
+      {lcpPreloadHref ? (
+        <link
+          rel="preload"
+          as="image"
+          href={lcpPreloadHref}
+          fetchPriority="high"
+        />
+      ) : null}
       <BreadcrumbSchema
         items={[{ name: "Home", url: "https://firestick4uk.com" }]}
       />
@@ -174,6 +199,7 @@ export default async function HomePage() {
           "Firestick4UK provides premium UK streaming services for Firestick and Android Box users."
         }
         initialProducts={initialProducts}
+        initialSlides={initialSlides}
         seasonalPromo={seasonalPromo}
         showSeasonalOffersLink={hubState.effectivelyPublic}
       />

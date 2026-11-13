@@ -11,6 +11,7 @@ import { useContactConfig } from "@/hooks/useContactConfig";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import { fillVars } from "@/lib/cms";
 import type { PublicProduct } from "@/lib/publicProductsServer";
+import { productCardSrc } from "@/lib/cloudinaryDelivery";
 
 const cardDescXss = {
   whiteList: {
@@ -374,8 +375,9 @@ export default function ProductsClient({
               </button>
             </div>
           ) : (
-            filtered.map((p) => {
+            filtered.map((p, idx) => {
               const href = productDetailHref(p);
+              const aboveFold = idx < 4;
               return (
               <div className="product-card" key={p.id}>
                 <a href={href} className="product-image-link">
@@ -386,7 +388,15 @@ export default function ProductsClient({
                       </span>
                     )}
                     {p.image ? (
-                      <img src={p.image} alt={p.name} loading="lazy" />
+                      <img
+                        src={productCardSrc(p.image)}
+                        alt={p.name}
+                        width={600}
+                        height={600}
+                        loading={aboveFold ? "eager" : "lazy"}
+                        decoding="async"
+                        fetchPriority={idx === 0 ? "high" : undefined}
+                      />
                     ) : (
                       <div className="image-placeholder">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">

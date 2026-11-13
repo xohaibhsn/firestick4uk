@@ -105,6 +105,9 @@ export default function Navbar({
       <img
         src={logo}
         alt={labels.alt}
+        width={180}
+        height={36}
+        decoding="async"
         style={{ height: 36, width: "auto", objectFit: "contain", display: "block" }}
       />
     </a>

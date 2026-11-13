@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { heroSlideSrc } from "@/lib/cloudinaryDelivery";
 
 export interface HeroSliderProps {
   slides: string[];
   children: ReactNode;
 }
+
+/** Intrinsic ratio of current Cloudinary hero assets (1920×1072). */
+const HERO_W = 1920;
+const HERO_H = 1072;
 
 export default function HeroSlider({ slides, children }: HeroSliderProps) {
   const [index, setIndex] = useState(0);
@@ -31,9 +36,11 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
           <button
             key={i}
             type="button"
+            role="tab"
             className={`hero-slider-dot${i === index ? " active" : ""}`}
             aria-label={`Go to slide ${i + 1}`}
             aria-selected={i === index}
+            tabIndex={i === index ? 0 : -1}
             onClick={() => setIndex(i)}
           />
         ))}
@@ -186,15 +193,23 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
 
       <div className="hero-slider-stage">
         {hasSlides &&
-          slides.map((src, i) => (
-            <img
-              key={`${src}-${i}`}
-              src={src}
-              alt=""
-              className={`hero-slider-slide${i === index ? " active" : ""}`}
-              draggable={false}
-            />
-          ))}
+          slides.map((src, i) => {
+            const isLcp = i === 0;
+            return (
+              <img
+                key={`${src}-${i}`}
+                src={heroSlideSrc(src)}
+                alt=""
+                width={HERO_W}
+                height={HERO_H}
+                className={`hero-slider-slide${i === index ? " active" : ""}`}
+                draggable={false}
+                loading={isLcp ? "eager" : "lazy"}
+                decoding={isLcp ? "sync" : "async"}
+                fetchPriority={isLcp ? "high" : "low"}
+              />
+            );
+          })}
 
         <div className="hero-slider-overlay" aria-hidden />
 
