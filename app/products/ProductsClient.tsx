@@ -304,7 +304,7 @@ export default function ProductsClient({
         </div>
       </Navbar>
 
-      <div className="page-wrapper">
+      <main className="page-wrapper">
         <div className="page-header">
           <div className="section-tag">✦ {t("products_tag", "Our Store")}</div>
           <h1 className="page-title">{t("products_title", "All")} <span>Products</span></h1>
@@ -466,7 +466,7 @@ export default function ProductsClient({
           )}
         </div>
         <Footer />
-      </div>
+      </main>
 
     </>
   );

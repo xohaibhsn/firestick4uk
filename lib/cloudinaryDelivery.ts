@@ -77,10 +77,29 @@ export function cloudinaryDeliveryUrl(
   return `${prefix}${transforms.join(",")}/${assetPath}`;
 }
 
-/** Hero slides — capped for mobile LCP (≈2×780). */
+/** Hero slide widths for responsive srcset (c_limit — same crop as heroSlideSrc). */
+export const HERO_SRCSET_WIDTHS = [480, 768, 1024, 1366, 1600] as const;
+
+/** Hero slides — default/fallback src capped at 1600 (≈2×780). */
 export function heroSlideSrc(src: string): string {
   return cloudinaryDeliveryUrl(src, { width: 1600 });
 }
+
+/**
+ * Responsive srcset for hero slides from the same Cloudinary asset.
+ * Non-Cloudinary URLs return "" (caller keeps single src, no srcSet).
+ */
+export function heroSlideSrcSet(src: string): string {
+  const raw = String(src || "").trim();
+  if (!raw) return "";
+  if (!CLOUDINARY_UPLOAD.test(raw)) return "";
+  return HERO_SRCSET_WIDTHS.map(
+    (w) => `${cloudinaryDeliveryUrl(raw, { width: w })} ${w}w`
+  ).join(", ");
+}
+
+/** Hero is full-bleed (width: 100%) — sizes matches rendered width. */
+export const HERO_SIZES = "100vw";
 
 /** Product card / grid thumbs. */
 export function productCardSrc(src: string): string {

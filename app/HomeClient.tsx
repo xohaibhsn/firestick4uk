@@ -749,7 +749,7 @@ export default function HomeClient({
         />
       ) : null}
 
-      <div className={`page-wrapper${promoActive ? " page-wrapper--promo" : ""}`}>
+      <main className={`page-wrapper${promoActive ? " page-wrapper--promo" : ""}`}>
         <HeroSlider slides={slides}>
           <div className="slider-hero-inner">
             <h1>{formatHeroTitle(topHeroTitle)}</h1>
@@ -1056,7 +1056,7 @@ export default function HomeClient({
         </div>
 
         <Footer showSeasonalOffersLink={showSeasonalOffersLink} />
-      </div>
+      </main>
 
     </>
   );

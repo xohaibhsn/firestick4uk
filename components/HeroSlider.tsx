@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { heroSlideSrc } from "@/lib/cloudinaryDelivery";
+import {
+  heroSlideSrc,
+  heroSlideSrcSet,
+  HERO_SIZES,
+} from "@/lib/cloudinaryDelivery";
 
 export interface HeroSliderProps {
   slides: string[];
@@ -195,10 +199,14 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
         {hasSlides &&
           slides.map((src, i) => {
             const isLcp = i === 0;
+            const srcSet = heroSlideSrcSet(src);
             return (
               <img
                 key={`${src}-${i}`}
                 src={heroSlideSrc(src)}
+                {...(srcSet
+                  ? { srcSet, sizes: HERO_SIZES }
+                  : {})}
                 alt=""
                 width={HERO_W}
                 height={HERO_H}

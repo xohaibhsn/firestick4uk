@@ -19,7 +19,11 @@ import {
   applySeasonalPromoText,
   DEFAULT_SEASONAL_PROMO_CTA,
 } from "@/lib/seasonalCountdownLabel";
-import { heroSlideSrc } from "@/lib/cloudinaryDelivery";
+import {
+  heroSlideSrc,
+  heroSlideSrcSet,
+  HERO_SIZES,
+} from "@/lib/cloudinaryDelivery";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -166,17 +170,24 @@ export default async function HomePage() {
   ]
     .map((u) => (typeof u === "string" ? u.trim() : ""))
     .filter(Boolean);
-  const lcpPreloadHref = initialSlides[0]
-    ? heroSlideSrc(initialSlides[0])
-    : null;
+  const lcpSrc = initialSlides[0] ? heroSlideSrc(initialSlides[0]) : null;
+  const lcpSrcSet = initialSlides[0] ? heroSlideSrcSet(initialSlides[0]) : "";
 
   return (
     <>
-      {lcpPreloadHref ? (
+      {lcpSrcSet ? (
         <link
           rel="preload"
           as="image"
-          href={lcpPreloadHref}
+          imageSrcSet={lcpSrcSet}
+          imageSizes={HERO_SIZES}
+          fetchPriority="high"
+        />
+      ) : lcpSrc ? (
+        <link
+          rel="preload"
+          as="image"
+          href={lcpSrc}
           fetchPriority="high"
         />
       ) : null}

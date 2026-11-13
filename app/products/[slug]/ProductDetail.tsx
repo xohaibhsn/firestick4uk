@@ -460,7 +460,7 @@ export default function ProductDetail({
 
       <Navbar cartCount={itemCount} cta="cart" />
 
-      <div className="page-wrap">
+      <main className="page-wrap">
         {loading ? (
           <div className="loading-state">Loading product...</div>
         ) : !product ? (
@@ -612,7 +612,7 @@ export default function ProductDetail({
             </div>
           </>
         )}
-      </div>
+      </main>
 
       {product && (product.full_description || featureList.length > 0) && (
         <div className="product-sections">
