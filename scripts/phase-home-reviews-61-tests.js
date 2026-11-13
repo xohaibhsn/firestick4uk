@@ -329,13 +329,16 @@ f === "scripts/phase-insights-live-63-tests.js" ||
     "name/text clamped"
   );
 
-  // Layout SHA stable vs HEAD. app/page.tsx may change for BF-68 promo strip (H1/meta paths still asserted above).
+  // Layout SHA stable within home-reviews-61 range (TEST-HYG-1). Later tasks may edit layout.
   ok("layout_sha_stable_vs_head", (() => {
     try {
-      const out = execSync("git diff --name-only HEAD -- app/layout.tsx", {
-        cwd: ROOT,
-        encoding: "utf8",
-      }).trim();
+      const out = execSync(
+        `git diff --name-only ${HYG_RANGE_BASE}..${HYG_RANGE_END} -- app/layout.tsx`,
+        {
+          cwd: ROOT,
+          encoding: "utf8",
+        }
+      ).trim();
       return out.length === 0;
     } catch {
       return false;

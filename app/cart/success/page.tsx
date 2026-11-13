@@ -5,6 +5,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useContactConfig } from "@/hooks/useContactConfig";
 import { useSiteContent } from "@/hooks/useSiteContent";
+import { useSiteContentContext } from "@/components/SiteContentProvider";
+import { firePurchase } from "@/lib/adsConversions";
 
 const styles = `
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -87,6 +89,7 @@ export default function CartSuccessPage() {
   const [ready, setReady] = useState(false);
   const contact = useContactConfig();
   const { t } = useSiteContent();
+  const { sc, loaded: cmsLoaded } = useSiteContentContext();
 
   useEffect(() => {
     try {
@@ -95,6 +98,25 @@ export default function CartSuccessPage() {
     } catch {}
     setReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!snap || !cmsLoaded) return;
+    const items = Array.isArray(snap.items)
+      ? snap.items.map((item) => ({
+          item_id: String(item.id || ""),
+          item_name: String(item.name || ""),
+          price: Number(item.price),
+          quantity: Number(item.qty),
+        }))
+      : undefined;
+    firePurchase({
+      orderId: String(snap.orderId || ""),
+      value: Number(snap.grandTotal),
+      currency: "GBP",
+      items,
+      contentMap: sc as Record<string, string>,
+    });
+  }, [snap, cmsLoaded, sc]);
 
   if (!ready) return null;
 

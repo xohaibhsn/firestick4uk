@@ -6368,6 +6368,47 @@ export default function AdminPage() {
                   </div>
                 )}
                 <div className="modal-field" style={{marginTop:24,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
+                  <label style={{fontWeight:700,fontSize:14,color:"#111"}}>Tracking</label>
+                  <div style={{fontSize:11,color:"#888888",marginBottom:12,lineHeight:1.5}}>
+                    Google Ads conversion labels. Paste only the label part after AW-18404353244/. Empty or invalid labels disable that conversion. Fires only after the visitor accepts advertising cookies; never on /sidhu.
+                  </div>
+                  <div className="modal-field">
+                    <label>Ads conversion label — Website order (purchase)</label>
+                    <input
+                      className="modal-field"
+                      style={{width:"100%"}}
+                      value={siteContent.ads_conv_label_purchase || ""}
+                      onChange={(e) =>
+                        setSiteContent((s) => ({
+                          ...s,
+                          ads_conv_label_purchase: e.target.value.trim(),
+                        }))
+                      }
+                      placeholder="Paste only the label part after AW-18404353244/"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </div>
+                  <div className="modal-field">
+                    <label>Ads conversion label — WhatsApp contact</label>
+                    <input
+                      className="modal-field"
+                      style={{width:"100%"}}
+                      value={siteContent.ads_conv_label_whatsapp || ""}
+                      onChange={(e) =>
+                        setSiteContent((s) => ({
+                          ...s,
+                          ads_conv_label_whatsapp: e.target.value.trim(),
+                        }))
+                      }
+                      placeholder="Paste only the label part after AW-18404353244/"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </div>
+                </div>
+
+                <div className="modal-field" style={{marginTop:24,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
                   <label style={{fontWeight:700,fontSize:14,color:"#111"}}>Microsoft Clarity</label>
                   <div style={{fontSize:11,color:"#888888",marginBottom:12,lineHeight:1.5}}>
                     Heatmaps and session recordings. Off by default. Loads only on firestick4uk.com after analytics consent, never on /sidhu, /cart, /api, or /order-tracking. Project ID must be 6–20 alphanumeric characters. Do not paste Clarity scripts into any free-form HTML field.
@@ -6480,7 +6521,7 @@ export default function AdminPage() {
                     {contentSaving ? "Saving..." : "Save hub publication"}
                   </button>
                 </div>
-                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_meta_description","site_logo_url","og_default_image","whatsapp_icon_url","clarity_enabled","clarity_project_id","clarity_dashboard_url"])}>                  {contentSaving?"Saving...":"💾 Save Settings"}
+                <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_meta_description","site_logo_url","og_default_image","whatsapp_icon_url","clarity_enabled","clarity_project_id","clarity_dashboard_url","ads_conv_label_purchase","ads_conv_label_whatsapp"])}>                  {contentSaving?"Saving...":"💾 Save Settings"}
                 </button>
               </div>
             </div>

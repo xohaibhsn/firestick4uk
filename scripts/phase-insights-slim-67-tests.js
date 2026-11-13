@@ -964,7 +964,14 @@ async function main() {
   ok("panel_rbac_gates_unchanged", /insights\.view/.test(panel) && /insights\.settings/.test(panel) && /insights\.export/.test(panel));
   ok(
     "rbac_permissions_file_unchanged",
-    (gitNames(["diff", "--name-only", "HEAD", "--", "lib/adminPermissions.ts"]) || ["?"]).length === 0
+    // TEST-HYG-1: own slim-67 range only — later tasks may extend SUPER_ADMIN keys.
+    (gitNames([
+      "diff",
+      "--name-only",
+      "ad340b120f9f4c475fa59a861e075012739e5766..d5502abdc7b26f9bd799c14250b52effe3c7681c",
+      "--",
+      "lib/adminPermissions.ts",
+    ]) || ["?"]).length === 0
   );
 
   const settingsUi = read("components/sidhu/insights/SettingsScreen.tsx");

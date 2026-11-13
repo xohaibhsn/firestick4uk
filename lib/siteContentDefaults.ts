@@ -5,6 +5,8 @@ export const EXTRA_CONTENT_DEFAULTS: Array<[string, string, string, string, stri
   ['clarity_enabled','0','text','settings','Microsoft Clarity Enabled'],
   ['clarity_project_id','','text','settings','Microsoft Clarity Project ID'],
   ['clarity_dashboard_url','','url','settings','Microsoft Clarity Dashboard URL'],
+  ['ads_conv_label_purchase','','text','settings','Google Ads Conversion Label (Purchase)'],
+  ['ads_conv_label_whatsapp','','text','settings','Google Ads Conversion Label (WhatsApp)'],
   ['nav_logo_alt','Firestick4UK','text','settings','Navbar Logo Alt'],
   ['nav_logo_text','FIRESTICK4UK','text','settings','Navbar Text Logo'],
   ['nav_cart_label','Cart','text','settings','Navbar Cart Button'],
