@@ -140,9 +140,8 @@ ok(
 ok(
   "cart_checks_identity_before_receipt_upload",
   (() => {
-    // Stale assertion looked for inline "/api/upload-receipt"; Task-29 extracted
-    // uploadReceiptDuringCheckout which POSTs /api/upload-receipt in the helper.
-    const idCheck = cart.indexOf("hasMeaningfulCustomerIdentity");
+    // Contact gate: validateCheckoutContact (email+phone) before receipt upload / orders POST.
+    const idCheck = cart.indexOf("validateCheckoutContact");
     const upload = cart.indexOf("uploadReceiptDuringCheckout");
     const ordersCall = cart.indexOf('fetch("/api/orders"');
     const receiptClient = exists("lib/receiptCheckoutClient.ts")
@@ -158,7 +157,9 @@ ok(
 );
 ok(
   "cart_shows_identity_error_ui",
-  /CUSTOMER_IDENTITY_REQUIRED_MSG/.test(cart) && /setOrderError/.test(cart)
+  /validateCheckoutContact/.test(cart) &&
+    /cart_err_email_required|cart_err_phone_required/.test(cart) &&
+    /setFieldErrors/.test(cart)
 );
 
 ok(

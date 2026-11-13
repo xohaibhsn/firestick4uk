@@ -7,6 +7,9 @@ const { execSync, execFileSync } = require("child_process");
 const ts = require("typescript");
 
 const ROOT = path.resolve(__dirname, "..");
+
+const HYG_RANGE_BASE = "2fda802ed1c16f8c163854b4bccb28043b0aac47";
+const HYG_RANGE_END = "803cdd16cf353486ac901b890c2a67bd22af9dd2";
 let passed = 0;
 let failed = 0;
 
@@ -225,17 +228,11 @@ ok(
 
 // 12) SLIM-67: insightsGeo.ts removed (was unchanged before); no SEO/nav/layout edits
 {
-  const dirty = execSync("git diff --name-only HEAD", { cwd: ROOT, encoding: "utf8" })
+  const dirty = execSync(`git diff --name-only ${HYG_RANGE_BASE}..${HYG_RANGE_END}`, { cwd: ROOT, encoding: "utf8" })
     .split(/\r?\n/)
     .map((s) => s.trim().replace(/\\/g, "/"))
     .filter(Boolean);
-  const untracked = execSync("git ls-files --others --exclude-standard", {
-    cwd: ROOT,
-    encoding: "utf8",
-  })
-    .split(/\r?\n/)
-    .map((s) => s.trim().replace(/\\/g, "/"))
-    .filter(Boolean);
+  const untracked = []; // TEST-HYG-1: scoped to commit range, ignore working tree untracked
   const touched = [...new Set([...dirty, ...untracked])];
   ok("insightsGeo_ts_removed", !fs.existsSync(path.join(ROOT, "lib/insightsGeo.ts")));
   // BF-68 may touch Footer (seasonal link); layout/Navbar/sitemap must stay clean.

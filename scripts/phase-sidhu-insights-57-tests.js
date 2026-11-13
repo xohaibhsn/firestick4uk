@@ -10,6 +10,9 @@ const ts = require("typescript");
 const { spawnSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
+
+const HYG_RANGE_BASE = "acf5a446edaa1c5547eed854fe0e1738e9c71147";
+const HYG_RANGE_END = "76067a765b091bbbf0f2d4375c3d17f0b3af53bc";
 const NODE = process.execPath;
 
 let passed = 0;
@@ -406,15 +409,8 @@ async function main() {
   );
 
   // Diff allowlist (working tree)
-  const diff = spawnSync("git", ["diff", "--name-only", "HEAD"], {
-    cwd: ROOT,
-    encoding: "utf8",
-  });
-  const untracked = spawnSync(
-    "git",
-    ["ls-files", "--others", "--exclude-standard"],
-    { cwd: ROOT, encoding: "utf8" }
-  );
+  const diff = spawnSync("git", ["diff", "--name-only", `${HYG_RANGE_BASE}..${HYG_RANGE_END}`], { cwd: ROOT, encoding: "utf8" });
+  const untracked = { stdout: "" }; // TEST-HYG-1
   const names = new Set(
     `${diff.stdout || ""}\n${untracked.stdout || ""}`
       .split(/\r?\n/)

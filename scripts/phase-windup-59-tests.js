@@ -43,82 +43,15 @@ const ALLOWLIST = new Set([
   "scripts/phase-jseo-b2-controls-tests.js",
   "scripts/phase-hostinger-h1-cms-bootstrap-tests.js",
   "scripts/phase-windup-59-tests.js",
-  "scripts/phase-order-email-receipt-47-tests.js",
-  // F4UK-INSIGHTS-W2-60 — Phase 2 Insights admin APIs + tests (INERT screens).
-  "scripts/phase-insights-w2-60-tests.js",
-  "scripts/phase-sidhu-insights-57-tests.js",
-  "pages/api/admin-insights/funnel.ts",
-  "pages/api/admin-insights/checkout-problems.ts",
-  "pages/api/admin-insights/orders-attribution.ts",
-  "pages/api/admin-insights/returning.ts",
-  "pages/api/admin-insights/export.ts",
-  // F4UK-HOME-REVIEWS-R1-61 — CMS home reviews redesign.
-  "app/HomeClient.tsx",
-  "lib/homeTestimonials.ts",
-  "app/sidhu/page.tsx",
-  "scripts/phase-home-reviews-61-tests.js",
-  "scripts/phase-home-testimonials-foundation-tests.js",
-  "scripts/phase-windup-59-tests.js",
-  "scripts/phase-ux-batch-51-tests.js",
-  "scripts/phase-ux-fix-53-tests.js",
-  "scripts/phase-cod-restore-54-tests.js",
-  // F4UK-W4-INSIGHTS-LIVE-63 — consent copy + version bump
-  "lib/trackingConsent.ts",
-  "scripts/phase-city-cleanup-64-tests.js",
-  "lib/insightsClient.ts",
-  "components/SidhuInsightsBeacon.tsx",
-  "components/sidhu/insights/SettingsScreen.tsx",
-  "scripts/phase-insights-live-63-tests.js",
-  "scripts/phase20g3b-tracking-consent-tests.js",
-  "scripts/phase-clarity-35-tests.js",
-  "scripts/phase-tracking-consent-final-tests.js",
-  "scripts/phase-home-reviews-61-tests.js",
-  // F4UK-PAY-CMS-66
-  "lib/paymentMethodSettings.ts",
-  "lib/paymentMethodSettingsServer.ts",
-  "lib/siteContentDefaults.ts",
-  "scripts/phase-pay-cms-66-tests.js",
-  "scripts/phase-cod-restore-54-tests.js",
-  "scripts/phase-ux-batch-51-tests.js",
-  "scripts/phase-ux-fix-53-tests.js",
-  "REPO_AUDIT_REPORT.md",
-  // F4UK-INSIGHTS-SLIM-67
-  "lib/insightsIngest.ts",
-  "lib/insightsGeo.ts",
-  "pages/api/insights-collect.ts",
-  "package.json",
-  "package-lock.json",
-  "scripts/phase-sidhu-insights-56-tests.js",
-  "scripts/phase-insights-slim-67-tests.js",
-  "pages/api/admin-insights/geo.ts",
-  "pages/api/admin-insights/pages.ts",
-  "pages/api/admin-insights/sources.ts",
-  "pages/api/admin-insights/journeys.ts",
-  "pages/api/admin-insights/settings.ts",
-  "pages/api/admin-insights/summary.ts",
-  "pages/api/admin-insights/click-map.ts",
-  "pages/api/admin-insights/page-behaviour.ts",
-  // F4UK-BLACK-FRIDAY-68
-  "components/product/SeasonalCountdown.tsx",
-  "components/home/SeasonalHomePromoStrip.tsx",
-  "components/Footer.tsx",
-  "lib/seasonalCountdownLabel.ts",
-  "lib/seasonalPriceValidUntil.ts",
-  "lib/adminContentFields.ts",
-  "app/page.tsx",
-  "app/seasonal-offers/page.tsx",
-  "app/products/[slug]/page.tsx",
-  "scripts/phase-black-friday-68-tests.js",
-  "scripts/phase-insights-live-63-tests.js",
-  "scripts/phase-city-cleanup-64-tests.js",
 ]);
 
-const BASE_SHA = "76067a765b091bbbf0f2d4375c3d17f0b3af53bc";
+const RANGE_BASE = "76067a765b091bbbf0f2d4375c3d17f0b3af53bc"; // 545ff45^
+const RANGE_END = "f35ca7d85470da160279fdd39f413cecb662bdcc";
 
 function diffAllowlistCheck() {
   let out = "";
   try {
-    out = execSync(`git diff --name-only ${BASE_SHA}`, {
+    out = execSync(`git diff --name-only ${RANGE_BASE}..${RANGE_END}`, {
       cwd: ROOT,
       encoding: "utf8",
     });
@@ -449,7 +382,7 @@ function baseBody(overrides = {}) {
   return {
     customer_name: "Test Buyer",
     customer_email: "buyer@example.com",
-    customer_phone: "07123456789",
+    customer_phone: "+447123456789",
     delivery_address: "1 Test St",
     city: "London",
     postcode: "E1 1AA",

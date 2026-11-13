@@ -13,6 +13,8 @@ const ts = require("typescript");
 const { execSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
+const HYG_RANGE_BASE = "803cdd16cf353486ac901b890c2a67bd22af9dd2";
+const HYG_RANGE_END = "ad340b120f9f4c475fa59a861e075012739e5766";
 
 let passed = 0;
 let failed = 0;
@@ -321,7 +323,7 @@ const seoNavAllowDirty = new Set(["components/Footer.tsx"]);
 for (const f of seoNavFiles) {
   let dirty = false;
   try {
-    const d = execSync(`git diff --name-only HEAD -- ${f}`, {
+    const d = execSync(`git diff --name-only ${HYG_RANGE_BASE}..${HYG_RANGE_END} -- ${f}`, {
       cwd: ROOT,
       encoding: "utf8",
     }).trim();
@@ -503,7 +505,7 @@ function baseBody(overrides = {}) {
   return {
     customer_name: "Test Buyer",
     customer_email: "buyer@example.com",
-    customer_phone: "07123456789",
+    customer_phone: "+447123456789",
     delivery_address: "1 Test St",
     city: "London",
     postcode: "E1 1AA",

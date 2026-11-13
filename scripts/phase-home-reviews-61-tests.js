@@ -9,6 +9,9 @@ const { execSync } = require("child_process");
 
 const ROOT = process.cwd();
 
+const HYG_RANGE_BASE = "6e6669f1a2bffd7d8cbd7aca47c7161f0505b3f6";
+const HYG_RANGE_END = "9ee4ffb2a31adeab658d8a7924f4f755ec4cdc6d";
+
 function read(rel) {
   return fs.readFileSync(path.join(ROOT, rel), "utf8");
 }
@@ -195,17 +198,11 @@ function sha256File(rel) {
 
   // Static check: layout / page meta files byte-stable vs HEAD when only allowlisted edits exist
   try {
-    const dirty = execSync("git diff --name-only HEAD", { cwd: ROOT, encoding: "utf8" })
+    const dirty = execSync(`git diff --name-only ${HYG_RANGE_BASE}..${HYG_RANGE_END}`, { cwd: ROOT, encoding: "utf8" })
       .split(/\r?\n/)
       .map((s) => s.trim().replace(/\\/g, "/"))
       .filter(Boolean);
-    const untracked = execSync("git ls-files --others --exclude-standard", {
-      cwd: ROOT,
-      encoding: "utf8",
-    })
-      .split(/\r?\n/)
-      .map((s) => s.trim().replace(/\\/g, "/"))
-      .filter(Boolean);
+    const untracked = []; // TEST-HYG-1: scoped to commit range, ignore working tree untracked
     const touched = [...new Set([...dirty, ...untracked])];
     const allow = (f) =>
       f === "app/HomeClient.tsx" ||

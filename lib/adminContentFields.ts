@@ -315,6 +315,7 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
         { key: "cart_lbl_name", label: "Name label" },
         { key: "cart_lbl_email", label: "Email label" },
         { key: "cart_lbl_phone", label: "Phone label" },
+        { key: "cart_lbl_phone_country", label: "Phone country code label" },
         { key: "cart_lbl_address", label: "Address label" },
         { key: "cart_lbl_city", label: "City label" },
         { key: "cart_lbl_postcode", label: "Postcode label" },
@@ -421,6 +422,10 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
         },
         { key: "cart_retry", label: "Retry button" },
         { key: "cart_wa_btn", label: "WhatsApp help button" },
+        { key: "cart_err_email_required", label: "Email required error" },
+        { key: "cart_err_email_invalid", label: "Email invalid error" },
+        { key: "cart_err_phone_required", label: "Phone required error" },
+        { key: "cart_err_phone_invalid", label: "Phone invalid error" },
         {
           key: "cart_err_unavailable",
           label: "Unavailable error",

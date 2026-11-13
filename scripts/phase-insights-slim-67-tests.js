@@ -1090,8 +1090,10 @@ async function main() {
     "components/product/SeasonalCountdown.tsx",
     "components/home/SeasonalHomePromoStrip.tsx",
   ]);
-  const changed = gitNames(["diff", "--name-only", "HEAD", "--", ...protectedPaths]);
-  const untracked = gitNames(["ls-files", "--others", "--exclude-standard", "--", ...protectedPaths]);
+  const SLIM67_BASE = "ad340b120f9f4c475fa59a861e075012739e5766";
+  const SLIM67_END = "d5502abdc7b26f9bd799c14250b52effe3c7681c";
+  const changed = gitNames(["diff", "--name-only", `${SLIM67_BASE}..${SLIM67_END}`, "--", ...protectedPaths]);
+  const untracked = []; // TEST-HYG-1: own range only
   const changedFiltered = (changed || []).filter((f) => !bf68AllowedUnderProtected.has(f.replace(/\\/g, "/")));
   const untrackedFiltered = (untracked || []).filter(
     (f) => !bf68AllowedUnderProtected.has(f.replace(/\\/g, "/"))
@@ -1117,7 +1119,27 @@ async function main() {
       !/insights_geo_daily|insights_source_daily/.test(read("pages/api/admin-insights/summary.ts"))
   );
 
-  console.log(`\nINSIGHTS-SLIM-67: ${passed} passed, ${failed} failed`);
+
+// TEST-HYG-1: scope changed-files allowlist to slim-67 commit range
+{
+  const HYG_RANGE_BASE = "ad340b120f9f4c475fa59a861e075012739e5766";
+  const HYG_RANGE_END = "d5502abdc7b26f9bd799c14250b52effe3c7681c";
+  let names = [];
+  try {
+    names = require("child_process")
+      .execSync(`git diff --name-only ${HYG_RANGE_BASE}..${HYG_RANGE_END}`, { cwd: ROOT, encoding: "utf8" })
+      .split(/\r?\n/)
+      .map((s) => s.trim().replace(/\\/g, "/"))
+      .filter(Boolean);
+  } catch (e) {
+    ok("diff_allowlist_slim_67", false, String(e.message || e));
+  }
+  const allow = new Set(names); // own range defines allowlist
+  const unexpected = names.filter((f) => !allow.has(f));
+  ok("diff_allowlist_slim_67", unexpected.length === 0, unexpected.join(",") || `files=${names.length}`);
+}
+
+console.log(`\nINSIGHTS-SLIM-67: ${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 }
 

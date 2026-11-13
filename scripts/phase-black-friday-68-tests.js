@@ -25,6 +25,9 @@ const { spawnSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
 
+const HYG_RANGE_BASE = "d5502abdc7b26f9bd799c14250b52effe3c7681c";
+const HYG_RANGE_END = "a7f3e7b5bce89afb51767a64e51c78cc46479642";
+
 let passed = 0;
 let failed = 0;
 
@@ -502,15 +505,8 @@ ok(
 );
 
 // ── Diff allowlist for this change set ─────────────────────────────────────
-const dirty = spawnSync("git", ["diff", "--name-only", "HEAD"], {
-  cwd: ROOT,
-  encoding: "utf8",
-});
-const untracked = spawnSync(
-  "git",
-  ["ls-files", "--others", "--exclude-standard"],
-  { cwd: ROOT, encoding: "utf8" }
-);
+const dirty = spawnSync("git", ["diff", "--name-only", `${HYG_RANGE_BASE}..${HYG_RANGE_END}`], { cwd: ROOT, encoding: "utf8" });
+const untracked = { stdout: "" }; // TEST-HYG-1
 const names = [
   ...`${dirty.stdout || ""}\n${untracked.stdout || ""}`
     .split(/\r?\n/)

@@ -21,7 +21,9 @@ import {
 import {
   CUSTOMER_IDENTITY_REQUIRED_MSG,
   hasMeaningfulCustomerIdentity,
+  normalizeCheckoutPhoneForStorage,
   normalizeOrderCustomerIdentity,
+  validateCheckoutContact,
 } from '../../lib/orderCustomerIdentity';
 import {
   isPublicPaymentMethod,
@@ -103,16 +105,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } = req.body;
     // Client total / discount_amount / vat_amount / item.price / item.name are intentionally ignored.
 
-    const { customer_name, customer_email, customer_phone } =
-      normalizeOrderCustomerIdentity({
-        customer_name: rawCustomerName,
-        customer_email: rawCustomerEmail,
-        customer_phone: rawCustomerPhone,
-      });
+    const identity = normalizeOrderCustomerIdentity({
+      customer_name: rawCustomerName,
+      customer_email: rawCustomerEmail,
+      customer_phone: rawCustomerPhone,
+    });
+    const { customer_name, customer_email } = identity;
+    let { customer_phone } = identity;
 
     if (!hasMeaningfulCustomerIdentity({ customer_name, customer_email, customer_phone })) {
       return res.status(400).json({ error: CUSTOMER_IDENTITY_REQUIRED_MSG });
     }
+
+    // Email + phone mandatory (E.164). Reject before payment / receipt / coupon / DB / email.
+    const checkoutContact = validateCheckoutContact({
+      customer_email,
+      customer_phone,
+    });
+    if (!checkoutContact.ok) {
+      return res.status(400).json({
+        error: checkoutContact.message,
+        field: checkoutContact.field,
+        code: checkoutContact.code,
+      });
+    }
+    customer_phone = normalizeCheckoutPhoneForStorage(customer_phone);
 
     if (!isPublicPaymentMethod(payment_method)) {
       return res.status(400).json({ error: 'Invalid payment method.' });

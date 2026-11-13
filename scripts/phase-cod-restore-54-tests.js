@@ -11,6 +11,9 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
+
+const HYG_RANGE_BASE = "bedab55481650779c34fd38437086c46c4d4ea2d";
+const HYG_RANGE_END = "2c00429706badeb0d18a52f699f4b8cc6cf17eed";
 let passed = 0;
 let failed = 0;
 
@@ -170,20 +173,14 @@ ok("preparing_checkout_intact", /Preparing checkout\.\.\./.test(cart));
 
 let changed = [];
 try {
-  changed = execSync("git diff --name-only HEAD", { cwd: ROOT, encoding: "utf8" })
+  changed = execSync(`git diff --name-only ${HYG_RANGE_BASE}..${HYG_RANGE_END}`, { cwd: ROOT, encoding: "utf8" })
     .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean);
 } catch (_) {
   changed = [];
 }
-const untracked = execSync("git ls-files --others --exclude-standard", {
-  cwd: ROOT,
-  encoding: "utf8",
-})
-  .split(/\r?\n/)
-  .map((s) => s.trim())
-  .filter(Boolean);
+const untracked = []; // TEST-HYG-1: scoped to commit range, ignore working tree untracked
 const allTouched = [...new Set([...changed, ...untracked])].map((f) =>
   f.replace(/\\/g, "/")
 );

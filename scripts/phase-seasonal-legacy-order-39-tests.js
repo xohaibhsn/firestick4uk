@@ -323,7 +323,7 @@ function baseBody(overrides = {}) {
   return {
     customer_name: "Test Buyer",
     customer_email: "buyer@example.com",
-    customer_phone: "07123456789",
+    customer_phone: "+447123456789",
     delivery_address: "1 Test St",
     city: "London",
     postcode: "E1 1AA",

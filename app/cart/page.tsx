@@ -1,6 +1,6 @@
 "use client";
 export const dynamic = 'force-dynamic';
-import { useEffect, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "../lib/cartContext";
 import Navbar from "@/components/Navbar";
@@ -15,10 +15,19 @@ import {
   isDigitalProduct,
 } from "@/lib/productFulfilment";
 import {
-  CUSTOMER_IDENTITY_REQUIRED_MSG,
-  hasMeaningfulCustomerIdentity,
   normalizeOrderCustomerIdentity,
+  validateCheckoutContact,
+  type CheckoutContactValidation,
 } from "@/lib/orderCustomerIdentity";
+import {
+  DEFAULT_PHONE_COUNTRY_DIAL,
+  PHONE_COUNTRY_CODES,
+  flagEmoji,
+  isValidE164,
+  isValidPhoneForCountryRules,
+  matchCountryFromE164,
+  normalizePhoneE164,
+} from "@/lib/phoneCountryCodes";
 import {
   RECEIPT_ACCEPT_ATTR,
   RECEIPT_ERROR_DEFAULTS,
@@ -48,6 +57,34 @@ type ProductFacts = {
 
 const UNRESOLVED_CART_MSG =
   "One or more items in your cart are no longer available. Please remove them and try again.";
+
+// Phone country select: GB/IE/US first, separator, then remaining entries A–Z by name.
+const PHONE_COUNTRY_TOP = PHONE_COUNTRY_CODES.slice(0, 3);
+const PHONE_COUNTRY_REST = PHONE_COUNTRY_CODES.slice(3)
+  .slice()
+  .sort((a, b) => a.name.localeCompare(b.name));
+const DEFAULT_PHONE_ISO =
+  PHONE_COUNTRY_CODES.find((c) => c.dial === DEFAULT_PHONE_COUNTRY_DIAL)?.iso2 || "GB";
+
+// Valid probes so one field can be checked with validateCheckoutContact in isolation.
+const CONTACT_PROBE_EMAIL = "probe@example.com";
+const CONTACT_PROBE_PHONE = "+447911123456";
+
+function formatPhonePreview(e164: string): string {
+  const country = matchCountryFromE164(e164);
+  if (!country) return e164;
+  const rest = e164.slice(1 + country.dial.length);
+  let grouped = rest;
+  if (rest.length === 10) {
+    grouped =
+      country.dial === "1"
+        ? `${rest.slice(0, 3)} ${rest.slice(3, 6)} ${rest.slice(6)}`
+        : `${rest.slice(0, 4)} ${rest.slice(4, 7)} ${rest.slice(7)}`;
+  } else if (rest.length > 4) {
+    grouped = `${rest.slice(0, 3)} ${rest.slice(3)}`;
+  }
+  return `+${country.dial} ${grouped}`;
+}
 
 const navStyles = `
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -197,6 +234,13 @@ const navStyles = `
   .form-group input:focus, .form-group textarea:focus { border-color:#5B21B6; box-shadow:0 0 0 3px rgba(91,33,182,0.1); }
   .form-group input::placeholder, .form-group textarea::placeholder { color:#AAAAAA; }
   .form-group textarea { resize:vertical; min-height:80px; }
+  .form-group .req-star { color:#B91C1C; margin-left:3px; }
+  .form-group input[aria-invalid="true"], .form-group select[aria-invalid="true"] { border-color:#DC2626; }
+  .field-error { color:#B91C1C; font-size:12px; line-height:1.4; margin-top:6px; }
+  .phone-row { display:flex; gap:8px; align-items:stretch; width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
+  .phone-row select { flex:0 0 7.5rem; width:7.5rem; min-width:7.5rem; max-width:42%; min-height:44px; box-sizing:border-box; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:9px; padding:11px 8px; color:#111111; font-family:var(--font-body); font-size:14px; text-overflow:ellipsis; }
+  .form-group .phone-row input { flex:1 1 0; width:auto; min-width:0; max-width:100%; box-sizing:border-box; }
+  .phone-preview { font-size:12px; color:#666666; margin-top:6px; line-height:1.4; overflow-wrap:anywhere; }
 
   /* PAYMENT */
   .payment-options { display:flex; flex-direction:column; gap:10px; margin-bottom:18px; }
@@ -343,6 +387,68 @@ export default function CartPage() {
   const [form, setForm] = useState({
     name: "", email: "", phone: "", address: "", city: "", postcode: "", notes: ""
   });
+
+  // Checkout contact: phone is entered as country select + national number; form.phone stays E.164.
+  const [phoneDial, setPhoneDial] = useState(DEFAULT_PHONE_COUNTRY_DIAL);
+  const [phoneIso, setPhoneIso] = useState(DEFAULT_PHONE_ISO);
+  const [phoneNational, setPhoneNational] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; phone?: string }>({});
+
+  const contactMessage = (res: CheckoutContactValidation): string | undefined => {
+    if (res.ok) return undefined;
+    const key =
+      res.field === "email"
+        ? res.code === "required" ? "cart_err_email_required" : "cart_err_email_invalid"
+        : res.code === "required" ? "cart_err_phone_required" : "cart_err_phone_invalid";
+    return t(key, res.message);
+  };
+
+  const emailFieldError = (email: string): string | undefined => {
+    const res = validateCheckoutContact({ customer_email: email, customer_phone: CONTACT_PROBE_PHONE });
+    return !res.ok && res.field === "email" ? contactMessage(res) : undefined;
+  };
+
+  const phoneFieldError = (e164: string): string | undefined => {
+    const res = validateCheckoutContact({ customer_email: CONTACT_PROBE_EMAIL, customer_phone: e164 });
+    return !res.ok && res.field === "phone" ? contactMessage(res) : undefined;
+  };
+
+  const handlePhoneCountryChange = (iso: string) => {
+    const entry = PHONE_COUNTRY_CODES.find((c) => c.iso2 === iso);
+    if (!entry) return;
+    setPhoneIso(entry.iso2);
+    setPhoneDial(entry.dial);
+    setForm((f) => ({ ...f, phone: normalizePhoneE164(entry.dial, phoneNational) }));
+    setFieldErrors((prev) => ({ ...prev, phone: undefined }));
+  };
+
+  const handlePhoneNationalChange = (value: string) => {
+    const compact = value.replace(/[\s\-().]/g, "");
+    setFieldErrors((prev) => ({ ...prev, phone: undefined }));
+    if (compact.startsWith("+") || compact.startsWith("00")) {
+      const intl = normalizePhoneE164("", value);
+      const match = intl ? matchCountryFromE164(intl) : undefined;
+      if (intl && match) {
+        // Keep the current select entry when it shares the dial (e.g. +1 / +44 territories).
+        const entry = match.dial === phoneDial
+          ? PHONE_COUNTRY_CODES.find((c) => c.iso2 === phoneIso) || match
+          : match;
+        setPhoneIso(entry.iso2);
+        setPhoneDial(match.dial);
+        setPhoneNational(intl.slice(1 + match.dial.length));
+        setForm((f) => ({ ...f, phone: intl }));
+        return;
+      }
+      setPhoneNational(value);
+      setForm((f) => ({ ...f, phone: intl }));
+      return;
+    }
+    setPhoneNational(value);
+    setForm((f) => ({ ...f, phone: normalizePhoneE164(phoneDial, value) }));
+  };
+
+  const phonePreviewValid =
+    isValidE164(form.phone) && isValidPhoneForCountryRules(form.phone);
 
   // Coupon state
   const [couponCode, setCouponCode] = useState("");
@@ -619,15 +725,33 @@ export default function CartPage() {
       return;
     }
 
+    // Mandatory email + international phone (E.164) gate — before receipt upload / submit.
+    const e164 = normalizePhoneE164(phoneDial, phoneNational);
+    setForm((f) => ({ ...f, phone: e164 }));
+    const contactCheck = validateCheckoutContact({
+      customer_email: form.email,
+      customer_phone: e164,
+    });
+    if (!contactCheck.ok) {
+      const errors: { email?: string; phone?: string } = {
+        email: emailFieldError(form.email),
+        phone: phoneFieldError(e164),
+      };
+      if (!errors.email && !errors.phone) {
+        errors[contactCheck.field] = contactMessage(contactCheck);
+      }
+      setFieldErrors(errors);
+      const firstId = errors.email ? "checkout-email" : "checkout-phone";
+      document.getElementById(firstId)?.focus();
+      return;
+    }
+    setFieldErrors({});
+
     const identity = normalizeOrderCustomerIdentity({
       customer_name: form.name,
       customer_email: form.email,
-      customer_phone: form.phone,
+      customer_phone: e164,
     });
-    if (!hasMeaningfulCustomerIdentity(identity)) {
-      setOrderError(CUSTOMER_IDENTITY_REQUIRED_MSG);
-      return;
-    }
 
     // Rejected selection must not silently become "no receipt" on bank checkout.
     if (paymentMethod === "bank" && receiptSelectionBlocksBankSubmit(receiptSelection)) {
@@ -907,11 +1031,16 @@ export default function CartPage() {
                   {[
                     {label: t("cart_lbl_name", "Full Name"), key:"name", type:"text", placeholder:"John Smith", name:"name", autoComplete:"name", inputMode: undefined as string | undefined, autoCapitalize:"words", enterKeyHint:"next"},
                     {label: t("cart_lbl_email", "Email Address"), key:"email", type:"email", placeholder:"john@example.com", name:"email", autoComplete:"email", inputMode:"email", autoCapitalize:"off", enterKeyHint:"next"},
-                    {label: t("cart_lbl_phone", "WhatsApp / Phone"), key:"phone", type:"tel", placeholder:contact.phone, name:"tel", autoComplete:"tel", inputMode:"tel", autoCapitalize:"off", enterKeyHint:"next"},
                     {label: t("cart_lbl_address", "Delivery Address"), key:"address", type:"text", placeholder:"123 High Street", name:"street-address", autoComplete:"street-address", inputMode: undefined, autoCapitalize:"sentences", enterKeyHint:"next"},
-                  ].map(f => (
-                    <div className="form-group" key={f.key}>
-                      <label htmlFor={`checkout-${f.key}`}>{f.label}</label>
+                  ].map(f => {
+                    const isEmail = f.key === "email";
+                    return (
+                    <Fragment key={f.key}>
+                    <div className="form-group">
+                      <label htmlFor={`checkout-${f.key}`}>
+                        {f.label}
+                        {isEmail && <span className="req-star" aria-hidden="true">*</span>}
+                      </label>
                       <input
                         id={`checkout-${f.key}`}
                         type={f.type}
@@ -922,10 +1051,73 @@ export default function CartPage() {
                         enterKeyHint={f.enterKeyHint as "next" | "done" | undefined}
                         placeholder={f.placeholder}
                         value={(form as any)[f.key]}
-                        onChange={e => setForm({...form, [f.key]: e.target.value})}
+                        onChange={e => {
+                          setForm({...form, [f.key]: e.target.value});
+                          if (isEmail && fieldErrors.email) setFieldErrors(prev => ({...prev, email: undefined}));
+                        }}
+                        {...(isEmail ? {
+                          "aria-required": true as const,
+                          "aria-invalid": fieldErrors.email ? true : undefined,
+                          "aria-describedby": fieldErrors.email ? "checkout-email-error" : undefined,
+                          onBlur: () => setFieldErrors(prev => ({...prev, email: emailFieldError(form.email)})),
+                        } : {})}
                       />
+                      {isEmail && fieldErrors.email && (
+                        <div id="checkout-email-error" className="field-error" role="alert">{fieldErrors.email}</div>
+                      )}
                     </div>
-                  ))}
+                    {isEmail && (
+                    <div className="form-group" role="group" aria-labelledby="checkout-phone-label">
+                      <label id="checkout-phone-label" htmlFor="checkout-phone">
+                        {t("cart_lbl_phone", "WhatsApp / Phone")}
+                        <span className="req-star" aria-hidden="true">*</span>
+                      </label>
+                      <div className="phone-row">
+                        <select
+                          id="checkout-phone-country"
+                          name="tel-country-code"
+                          aria-label={t("cart_lbl_phone_country", "Country code")}
+                          value={phoneIso}
+                          onChange={e => handlePhoneCountryChange(e.target.value)}
+                        >
+                          {PHONE_COUNTRY_TOP.map(c => (
+                            <option key={c.iso2} value={c.iso2}>{flagEmoji(c.iso2)} +{c.dial}</option>
+                          ))}
+                          <option disabled value="">────────</option>
+                          {PHONE_COUNTRY_REST.map(c => (
+                            <option key={c.iso2} value={c.iso2}>{flagEmoji(c.iso2)} +{c.dial} {c.name}</option>
+                          ))}
+                        </select>
+                        <input
+                          id="checkout-phone"
+                          type="tel"
+                          name="tel"
+                          inputMode="tel"
+                          autoComplete="tel-national"
+                          autoCapitalize="off"
+                          enterKeyHint="next"
+                          placeholder="7123 456 789"
+                          aria-required={true}
+                          aria-invalid={fieldErrors.phone ? true : undefined}
+                          aria-describedby={fieldErrors.phone ? "checkout-phone-error" : phonePreviewValid ? "checkout-phone-preview" : undefined}
+                          value={phoneNational}
+                          onChange={e => handlePhoneNationalChange(e.target.value)}
+                          onBlur={() => setFieldErrors(prev => ({...prev, phone: phoneFieldError(normalizePhoneE164(phoneDial, phoneNational))}))}
+                        />
+                      </div>
+                      {fieldErrors.phone && (
+                        <div id="checkout-phone-error" className="field-error" role="alert">{fieldErrors.phone}</div>
+                      )}
+                      {!fieldErrors.phone && phonePreviewValid && (
+                        <div id="checkout-phone-preview" className="phone-preview">
+                          {t("cart_phone_preview", "We'll contact you on")} {formatPhonePreview(form.phone)}
+                        </div>
+                      )}
+                    </div>
+                    )}
+                    </Fragment>
+                    );
+                  })}
                   <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px"}}>
                     <div className="form-group">
                       <label htmlFor="checkout-city">{t("cart_lbl_city", "City")}</label>

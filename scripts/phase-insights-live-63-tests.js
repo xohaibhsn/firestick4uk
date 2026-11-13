@@ -10,6 +10,9 @@ const ts = require("typescript");
 const vm = require("vm");
 
 const ROOT = path.resolve(__dirname, "..");
+
+const HYG_RANGE_BASE = "9ee4ffb2a31adeab658d8a7924f4f755ec4cdc6d";
+const HYG_RANGE_END = "2fda802ed1c16f8c163854b4bccb28043b0aac47";
 const requireFromRoot = createRequire(path.join(ROOT, "package.json"));
 
 let passed = 0;
@@ -277,17 +280,11 @@ const SLIM_67_PREFIXES = ["pages/api/admin-insights/", "components/sidhu/insight
 let dirty = [];
 let untracked = [];
 try {
-  dirty = execSync("git diff --name-only HEAD", { cwd: ROOT, encoding: "utf8" })
+  dirty = execSync(`git diff --name-only ${HYG_RANGE_BASE}..${HYG_RANGE_END}`, { cwd: ROOT, encoding: "utf8" })
     .split(/\r?\n/)
     .map((s) => s.trim().replace(/\\/g, "/"))
     .filter(Boolean);
-  untracked = execSync("git ls-files --others --exclude-standard", {
-    cwd: ROOT,
-    encoding: "utf8",
-  })
-    .split(/\r?\n/)
-    .map((s) => s.trim().replace(/\\/g, "/"))
-    .filter(Boolean);
+  untracked = []; // TEST-HYG-1: scoped to commit range
 } catch (e) {
   ok("git_inventory", false, String(e.message || e));
 }

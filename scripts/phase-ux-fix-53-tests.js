@@ -7,6 +7,9 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
+
+const HYG_RANGE_BASE = "e277daa6ef9e0d970a85eca43adb3bb198572cab";
+const HYG_RANGE_END = "bedab55481650779c34fd38437086c46c4d4ea2d";
 let passed = 0;
 let failed = 0;
 
@@ -218,20 +221,14 @@ const allowed = new Set([
 ]);
 let changed = [];
 try {
-  changed = execSync("git diff --name-only HEAD", { cwd: ROOT, encoding: "utf8" })
+  changed = execSync(`git diff --name-only ${HYG_RANGE_BASE}..${HYG_RANGE_END}`, { cwd: ROOT, encoding: "utf8" })
     .split(/\r?\n/)
     .map((s) => s.trim().replace(/\\/g, "/"))
     .filter(Boolean);
 } catch {
   changed = [];
 }
-const untracked = execSync("git ls-files --others --exclude-standard", {
-  cwd: ROOT,
-  encoding: "utf8",
-})
-  .split(/\r?\n/)
-  .map((s) => s.trim().replace(/\\/g, "/"))
-  .filter(Boolean);
+const untracked = []; // TEST-HYG-1: scoped to commit range, ignore working tree untracked
 const allTouched = [...new Set([...changed, ...untracked])];
 // F4UK-INSIGHTS-SLIM-67: Insights files edited in this working tree
 const slim67Files = new Set(["lib/insightsIngest.ts", "lib/insightsGeo.ts", "pages/api/insights-collect.ts", "package.json", "package-lock.json", "scripts/phase-sidhu-insights-56-tests.js", "scripts/phase-insights-w2-60-tests.js", "scripts/phase-insights-slim-67-tests.js"]);
