@@ -15,6 +15,10 @@ import {
 } from "@/lib/productSeasonLondon";
 import { resolveSeasonalHubPublicState } from "@/lib/seasonalHubPublic";
 import { resolveHomeProducts } from "@/lib/homeProductOrder";
+import {
+  applySeasonalPromoText,
+  DEFAULT_SEASONAL_PROMO_CTA,
+} from "@/lib/seasonalCountdownLabel";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -102,10 +106,8 @@ export default async function HomePage() {
   let seasonalPromo: {
     text: string;
     cta: string;
+    href: string;
     endsAt?: string | null;
-    showCountdown?: boolean;
-    prefix?: string;
-    upcomingPrefix?: string;
   } | null = null;
 
   if (hubState.effectivelyPublic) {
@@ -113,26 +115,40 @@ export default async function HomePage() {
       isHubLiveMember(r, nowMs, hubState.capability)
     );
     if (live.length > 0) {
-      let earliestEndMs: number | null = null;
-      let earliestEndRaw: string | null = null;
+      let earliest: {
+        endMs: number;
+        endRaw: string;
+        slug: string;
+        seasonName: string;
+      } | null = null;
       for (const r of live) {
         const endMs = parseUtcSqlToMs(r.season_ends_at);
         if (endMs == null) continue;
-        if (earliestEndMs == null || endMs < earliestEndMs) {
-          earliestEndMs = endMs;
-          earliestEndRaw = utcMsToUtcIso(endMs);
+        if (earliest == null || endMs < earliest.endMs) {
+          earliest = {
+            endMs,
+            endRaw: utcMsToUtcIso(endMs),
+            slug: String(r.slug || "").trim(),
+            seasonName: String(r.season_name || "").trim(),
+          };
         }
       }
+      const singleSlug =
+        live.length === 1
+          ? String(live[0]?.slug || earliest?.slug || "").trim()
+          : "";
+      const href =
+        live.length === 1 && singleSlug
+          ? `/products/${singleSlug}`
+          : "/seasonal-offers";
       seasonalPromo = {
-        text:
-          content.seasonal_promo_text?.trim() ||
-          "Seasonal offers are live — limited-time deals",
-        cta: content.seasonal_promo_cta?.trim() || "View offers",
-        endsAt: earliestEndRaw,
-        showCountdown: Boolean(earliestEndRaw),
-        prefix: content.season_countdown_prefix?.trim() || "Offer ends in",
-        upcomingPrefix:
-          content.season_countdown_upcoming_prefix?.trim() || "Offer starts in",
+        text: applySeasonalPromoText(
+          content.seasonal_promo_text,
+          earliest?.seasonName
+        ),
+        cta: content.seasonal_promo_cta?.trim() || DEFAULT_SEASONAL_PROMO_CTA,
+        href,
+        endsAt: earliest?.endRaw ?? null,
       };
     }
   }

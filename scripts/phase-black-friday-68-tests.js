@@ -258,7 +258,8 @@ ok(
   "cms_defaults_promo_keys",
   /seasonal_promo_text/.test(defaults) &&
     /seasonal_promo_cta/.test(defaults) &&
-    /Seasonal offers are live/.test(defaults)
+    (/\{season\} deal is live/.test(defaults) ||
+      /Seasonal offers are live/.test(defaults))
 );
 const adminFields = read("lib/adminContentFields.ts");
 ok(
@@ -384,13 +385,17 @@ ok(
 );
 ok(
   "promo_link_target",
-  /href="\/seasonal-offers"/.test(promoStrip) &&
-    /data-testid="seasonal-home-promo-cta"/.test(promoStrip)
+  /data-testid="seasonal-home-promo"/.test(promoStrip) &&
+    /data-testid="seasonal-home-promo-cta"/.test(promoStrip) &&
+    (/href=\{href\}/.test(promoStrip) || /href=/.test(promoStrip)) &&
+    !/"DAYS"/.test(promoStrip) &&
+    !/SeasonalCountdown/.test(promoStrip)
 );
 ok(
   "promo_above_hero_not_in_h1",
   /SeasonalHomePromoStrip/.test(homeClient) &&
-    /seasonalPromo \? \(/.test(homeClient) &&
+    (/seasonalPromo \? \(/.test(homeClient) ||
+      /seasonalPromo && !promoEnded \? \(/.test(homeClient)) &&
     homeClient.indexOf("SeasonalHomePromoStrip") < homeClient.indexOf("<h1>")
 );
 ok(

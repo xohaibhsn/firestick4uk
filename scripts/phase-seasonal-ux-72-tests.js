@@ -503,6 +503,7 @@ const UX72_ALLOW = new Set([
   "components/product/SeasonalCardCountdown.tsx",
   "components/product/SeasonalCountdown.tsx",
   "components/product/CurrentSeasonalOffers.tsx",
+  "components/home/SeasonalHomePromoStrip.tsx",
   "components/sidhu/insights/insightsServer.ts",
   "app/page.tsx",
   "app/HomeClient.tsx",
@@ -518,6 +519,7 @@ const UX72_ALLOW = new Set([
   "scripts/phase-seasonal-ux-72-tests.js",
   "scripts/phase-proc-clarity-71-tests.js",
   "scripts/phase-black-friday-68-tests.js",
+  "scripts/phase-promo-bar-75-tests.js",
   "scripts/phase-seasonal-rebase-38-tests.js",
   "scripts/phase-hostinger-h1-cms-bootstrap-tests.js",
 ]);

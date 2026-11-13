@@ -31,16 +31,44 @@ export function splitCountdownParts(totalSec: number): {
 }
 
 /**
+ * Compact time fragment: "18d 03:12:45" (hide "0d"). Shared by card + home bar.
+ * When remaining ≤ 0 → "0:00:00".
+ */
+export function formatSeasonalCompactHms(totalSec: number): string {
+  const sec = Math.floor(totalSec);
+  if (sec <= 0) return "0:00:00";
+  const { days, hours, mins, secs } = splitCountdownParts(sec);
+  const hms = `${pad2(hours)}:${pad2(mins)}:${pad2(secs)}`;
+  if (days > 0) return `${days}d ${hms}`;
+  return hms;
+}
+
+/**
  * Compact card countdown: "⏳ Ends in 18d 03:12:45" (hide "0d").
  * When remaining ≤ 0 → "Offer ended".
  */
 export function formatSeasonalCardCountdown(totalSec: number): string {
   const sec = Math.floor(totalSec);
   if (sec <= 0) return "Offer ended";
-  const { days, hours, mins, secs } = splitCountdownParts(sec);
-  const hms = `${pad2(hours)}:${pad2(mins)}:${pad2(secs)}`;
-  if (days > 0) return `⏳ Ends in ${days}d ${hms}`;
-  return `⏳ Ends in ${hms}`;
+  return `⏳ Ends in ${formatSeasonalCompactHms(sec)}`;
+}
+
+/** Default home announcement copy when CMS seasonal_promo_text is empty. */
+export const DEFAULT_SEASONAL_PROMO_TEXT = "{season} deal is live";
+/** Default home announcement CTA when CMS seasonal_promo_cta is empty. */
+export const DEFAULT_SEASONAL_PROMO_CTA = "Shop now";
+
+/**
+ * Replace `{season}` tokens with the season name (empty → "Seasonal").
+ * Does not mutate stored CMS values — apply only at render time.
+ */
+export function applySeasonalPromoText(
+  stored: string | null | undefined,
+  seasonName: string | null | undefined
+): string {
+  const raw = String(stored ?? "").trim() || DEFAULT_SEASONAL_PROMO_TEXT;
+  const season = String(seasonName ?? "").trim() || "Seasonal";
+  return raw.replace(/\{season\}/gi, season);
 }
 
 /**

@@ -7,7 +7,10 @@ import { useCart } from "./lib/cartContext";
 import Navbar from "@/components/Navbar";
 import HeroSlider from "@/components/HeroSlider";
 import Footer from "@/components/Footer";
-import SeasonalHomePromoStrip from "@/components/home/SeasonalHomePromoStrip";
+import SeasonalHomePromoStrip, {
+  HOME_NAV_OFFSET_PX,
+  HOME_PROMO_BAR_HEIGHT_PX,
+} from "@/components/home/SeasonalHomePromoStrip";
 import SeasonalCardCountdown from "@/components/product/SeasonalCardCountdown";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import type { PublicProduct } from "@/lib/publicProductsServer";
@@ -135,10 +138,8 @@ interface Product {
 export type SeasonalHomePromoProps = {
   text: string;
   cta: string;
+  href: string;
   endsAt?: string | null;
-  showCountdown?: boolean;
-  prefix?: string;
-  upcomingPrefix?: string;
 };
 
 interface HomeClientProps {
@@ -187,6 +188,8 @@ export default function HomeClient({
   const [searchTerm, setSearchTerm] = useState("");
   const [hoveringId, setHoveringId] = useState<number | null>(null);
   const [endedOfferIds, setEndedOfferIds] = useState<Record<number, true>>({});
+  const [promoEnded, setPromoEnded] = useState(false);
+  const promoActive = Boolean(seasonalPromo) && !promoEnded;
   const [slides, setSlides] = useState<string[]>([]);
   const [featureList, setFeatureList] = useState<string[]>([]);
   const { sc: cmsData, t } = useSiteContent();
@@ -340,7 +343,8 @@ export default function HomeClient({
         .nav-cta:hover { background:#1A1A1A !important; }
         .hamburger { display:none; flex-direction:column; gap:5px; cursor:pointer; background:none; border:none; padding:5px; z-index:101; }
         .hamburger span { display:block; width:25px; height:2px; background:#111111; border-radius:2px; }
-        .page-wrapper { position:relative; z-index:1; padding-top:80px; background:#FFFFFF; }
+        .page-wrapper { position:relative; z-index:1; padding-top:${HOME_NAV_OFFSET_PX}px; background:#FFFFFF; }
+        .page-wrapper--promo { padding-top:${HOME_NAV_OFFSET_PX + HOME_PROMO_BAR_HEIGHT_PX}px; }
         /* SEO HERO — clean, above products */
         /* SEO HERO SLIDER */
         .home-seo-hero { display:none; }
@@ -721,18 +725,17 @@ export default function HomeClient({
 
       <Navbar cartCount={itemCount} cta="cart" />
 
-      {seasonalPromo ? (
+      {seasonalPromo && !promoEnded ? (
         <SeasonalHomePromoStrip
           text={seasonalPromo.text}
           cta={seasonalPromo.cta}
+          href={seasonalPromo.href}
           endsAt={seasonalPromo.endsAt}
-          showCountdown={seasonalPromo.showCountdown}
-          prefix={seasonalPromo.prefix}
-          upcomingPrefix={seasonalPromo.upcomingPrefix}
+          onEnded={() => setPromoEnded(true)}
         />
       ) : null}
 
-      <div className="page-wrapper">
+      <div className={`page-wrapper${promoActive ? " page-wrapper--promo" : ""}`}>
         <HeroSlider slides={slides}>
           <div className="slider-hero-inner">
             <h1>{formatHeroTitle(topHeroTitle)}</h1>
