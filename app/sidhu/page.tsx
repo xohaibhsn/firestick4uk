@@ -533,9 +533,10 @@ export default function AdminPage() {
 
   const mapOrderRow = (o: any) => ({
     id: o.order_id,
-    customer: o.customer_name,
-    email: o.customer_email,
-    phone: o.customer_phone,
+    // Legacy rows may have empty/NULL identity fields — show em dash, never blank/"undefined".
+    customer: o.customer_name || "—",
+    email: o.customer_email || "—",
+    phone: o.customer_phone || "—",
     items: o.items_list || o.payment_method || "—",
     total: `£${parseFloat(o.total || 0).toFixed(2)}`,
     status: o.status,
@@ -548,7 +549,7 @@ export default function AdminPage() {
       : "—",
     receipt: !!o.receipt_path,
     receipt_path: o.receipt_path || "",
-    address: [o.delivery_address, o.city, o.postcode].filter(Boolean).join(", "),
+    address: [o.delivery_address, o.city, o.postcode].filter(Boolean).join(", ") || "—",
     payment: o.payment_method || "",
     payment_reference: o.payment_reference || "",
     city: o.city || "",

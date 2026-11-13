@@ -151,11 +151,12 @@ export default function OrderTrackingPage() {
           status: o.status,
           items,
           total: parseFloat(o.total),
-          name: o.customer_name,
-          email: o.customer_email,
-          phone: o.customer_phone,
-          address: [o.delivery_address, o.city, o.postcode].filter(Boolean).join(", "),
-          date: o.created_at ? new Date(o.created_at).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" }) : "",
+          // Legacy empty/NULL identity — clear em dash (never blank/"undefined").
+          name: o.customer_name || "—",
+          email: o.customer_email || "—",
+          phone: o.customer_phone || "—",
+          address: [o.delivery_address, o.city, o.postcode].filter(Boolean).join(", ") || "—",
+          date: o.created_at ? new Date(o.created_at).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" }) : "—",
         });
       } else {
         setNotFound(true);
@@ -270,11 +271,11 @@ export default function OrderTrackingPage() {
                 {/* Customer Info */}
                 <div className="customer-info">
                   <h4>Delivery Details</h4>
-                  <div className="info-row"><span>Name</span><span>{result.name}</span></div>
-                  <div className="info-row"><span>Email</span><span>{result.email}</span></div>
-                  <div className="info-row"><span>Phone</span><span>{result.phone}</span></div>
-                  <div className="info-row"><span>Address</span><span>{result.address}</span></div>
-                  <div className="info-row"><span>Order Date</span><span>{result.date}</span></div>
+                  <div className="info-row"><span>Name</span><span>{result.name || "—"}</span></div>
+                  <div className="info-row"><span>Email</span><span>{result.email || "—"}</span></div>
+                  <div className="info-row"><span>Phone</span><span>{result.phone || "—"}</span></div>
+                  <div className="info-row"><span>Address</span><span>{result.address || "—"}</span></div>
+                  <div className="info-row"><span>Order Date</span><span>{result.date || "—"}</span></div>
                 </div>
               </div>
             </div>
