@@ -1,5 +1,5 @@
 /**
- * CSP tested candidate — enforcing and report-only alignment invariants.
+ * CSP enforcing policy invariants (report-only duplicate removed in ADS-CSP-77).
  */
 const fs = require("fs");
 const path = require("path");
@@ -9,7 +9,7 @@ let passed = 0;
 let failed = 0;
 
 const TESTED_CSP =
-  "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.googleadservices.com https://www.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src 'self' https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; media-src 'self'; manifest-src 'self';";
+  "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.googleadservices.com https://www.google.com https://googleads.g.doubleclick.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src 'self' https://www.googletagmanager.com https://td.doubleclick.net https://bid.g.doubleclick.net; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; media-src 'self'; manifest-src 'self';";
 
 function ok(name, condition, detail = "") {
   if (condition) {
@@ -59,6 +59,7 @@ function assertCandidateDirectives(prefix, policy) {
       "https://www.googletagmanager.com",
       "https://www.googleadservices.com",
       "https://www.google.com",
+      "https://googleads.g.doubleclick.net",
     ].every((origin) => directives.get("script-src")?.includes(origin))
   );
   ok(
@@ -72,8 +73,10 @@ function assertCandidateDirectives(prefix, policy) {
       directives.get("font-src")?.includes("https://fonts.gstatic.com")
   );
   ok(
-    `${prefix}_google_frame_origin`,
-    directives.get("frame-src")?.includes("https://www.googletagmanager.com")
+    `${prefix}_google_frame_origins`,
+    directives.get("frame-src")?.includes("https://www.googletagmanager.com") &&
+      directives.get("frame-src")?.includes("https://td.doubleclick.net") &&
+      directives.get("frame-src")?.includes("https://bid.g.doubleclick.net")
   );
   ok(
     `${prefix}_object_src_none`,
@@ -130,12 +133,11 @@ const reportOnlyValues = headerValues(
 );
 
 ok("one_enforcing_csp_header", enforcingValues.length === 1);
-ok("one_report_only_csp_header", reportOnlyValues.length === 1);
+ok("zero_report_only_csp_header", reportOnlyValues.length === 0);
 ok("enforcing_csp_equals_tested_candidate", enforcingValues[0] === TESTED_CSP);
-ok("report_only_csp_equals_tested_candidate", reportOnlyValues[0] === TESTED_CSP);
 ok(
-  "enforcing_equals_report_only",
-  enforcingValues[0] === reportOnlyValues[0]
+  "report_only_header_absent_from_next_config",
+  !/Content-Security-Policy-Report-Only/.test(nextConfig)
 );
 ok(
   "security_headers_remain_global",
@@ -143,7 +145,6 @@ ok(
 );
 
 assertCandidateDirectives("enforcing", enforcingValues[0]);
-assertCandidateDirectives("report_only", reportOnlyValues[0]);
 
 ok(
   "tracking_consent_component_still_gates_gtag",

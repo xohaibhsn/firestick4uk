@@ -144,6 +144,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
     return res.status(200).send(csv);
   } catch (error: any) {
-    return res.status(500).json({ error: error?.message || "Export failed" });
+    console.error(
+      "[admin-orders-export] export failed",
+      error?.code || error?.name || "error"
+    );
+    return res.status(500).json({ error: "Export failed" });
   }
 }

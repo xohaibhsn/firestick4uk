@@ -522,6 +522,10 @@ const UX72_ALLOW = new Set([
   "scripts/phase-promo-bar-75-tests.js",
   "scripts/phase-seasonal-rebase-38-tests.js",
   "scripts/phase-hostinger-h1-cms-bootstrap-tests.js",
+  // F4UK-ADS-CSP-77
+  "next.config.ts",
+  "scripts/phase-ads-csp-77-tests.js",
+  "scripts/phase-csp-report-only-tests.js",
 ]);
 function ux72Allowed(f) {
   if (UX72_ALLOW.has(f)) return true;
