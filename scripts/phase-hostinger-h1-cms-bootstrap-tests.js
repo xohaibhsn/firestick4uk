@@ -65,9 +65,10 @@ ok(
 ok(
   "root_layout_mounts_provider_once",
   /SiteContentProvider/.test(layout) &&
-    (layout.match(/<SiteContentProvider>/g) || []).length === 1 &&
+    (layout.match(/<SiteContentProvider(?:\s[^>]*)?>/g) || []).length === 1 &&
     /<WhatsAppButton\s*\/>/.test(layout) &&
-    layout.indexOf("<SiteContentProvider>") < layout.indexOf("<WhatsAppButton")
+    layout.search(/<SiteContentProvider(?:\s[^>]*)?>/) <
+      layout.indexOf("<WhatsAppButton")
 );
 ok(
   "provider_wraps_cart_and_whatsapp",

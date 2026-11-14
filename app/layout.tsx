@@ -10,6 +10,7 @@ import SidhuInsightsBeacon from "@/components/SidhuInsightsBeacon";
 import JsonLd from "@/components/JsonLd";
 import { SiteContentProvider } from "@/components/SiteContentProvider";
 import { getContactConfig } from "@/lib/contact-config";
+import { getPublicSiteContent } from "@/lib/publicSiteContentServer";
 import {
   defaultSocialImages,
   resolveDefaultOgImage,
@@ -131,6 +132,15 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const settings = await getSiteSettings();
   const contact = await getContactConfig();
+  // SSR seed for PriceDisplay: VAT toggle + suffix text (fail → {} → no suffix).
+  const vatSeed = await getPublicSiteContent([
+    "prices_include_vat",
+    "price_incl_vat_suffix",
+  ]);
+  const initialSiteContent =
+    Object.prototype.hasOwnProperty.call(vatSeed, "prices_include_vat")
+      ? vatSeed
+      : undefined;
   const logoUrl = settings.site_logo_url || "https://firestick4uk.com/logo.png";
   const organizationLd = {
     "@context": "https://schema.org",
@@ -183,7 +193,7 @@ export default async function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <JsonLd data={organizationLd} />
-        <SiteContentProvider>
+        <SiteContentProvider initialContent={initialSiteContent}>
           <CartProvider>
             {children}
             <MiniCartBar />

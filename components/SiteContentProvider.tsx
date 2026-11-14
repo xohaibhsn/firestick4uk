@@ -17,13 +17,32 @@ type SiteContentContextValue = {
 
 const SiteContentContext = createContext<SiteContentContextValue | null>(null);
 
+type SiteContentProviderProps = {
+  children: ReactNode;
+  /**
+   * Optional SSR seed (e.g. prices_include_vat + price_incl_vat_suffix).
+   * When provided, `loaded` starts true so first paint matches hydration.
+   * Client still fetches page=all and merges/replaces with the full map.
+   */
+  initialContent?: SiteContentMap;
+};
+
 /**
  * Single public storefront CMS bootstrap.
  * Performs ONE GET /api/site-content?page=all for the whole tree.
  */
-export function SiteContentProvider({ children }: { children: ReactNode }) {
-  const [sc, setSc] = useState<SiteContentMap>({});
-  const [loaded, setLoaded] = useState(false);
+export function SiteContentProvider({
+  children,
+  initialContent,
+}: SiteContentProviderProps) {
+  const seeded =
+    initialContent &&
+    typeof initialContent === "object" &&
+    !Array.isArray(initialContent)
+      ? initialContent
+      : null;
+  const [sc, setSc] = useState<SiteContentMap>(() => seeded || {});
+  const [loaded, setLoaded] = useState(() => Boolean(seeded));
 
   useEffect(() => {
     let cancelled = false;
