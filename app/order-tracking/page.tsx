@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useContactConfig } from "@/hooks/useContactConfig";
@@ -32,12 +32,16 @@ const styles = `
   .page-title span { color:#5B21B6; }
   .page-sub { color:#555555; font-size:15px; line-height:1.7; }
   .search-section { max-width:600px; margin:0 auto; padding:30px 24px 0; }
-  .search-box { display:flex; gap:12px; }
-  .search-input { flex:1; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:50px; padding:16px 24px; color:#111111; font-family:var(--font-body); font-size:15px; outline:none; transition:all 0.2s; }
+  .search-fields { display:flex; flex-direction:column; gap:14px; }
+  .field-label { display:block; font-size:12px; font-weight:600; letter-spacing:1px; text-transform:uppercase; color:#555555; margin-bottom:8px; }
+  .field-help { font-size:12px; color:#777777; margin-top:6px; line-height:1.4; }
+  .search-box { display:flex; gap:12px; align-items:stretch; }
+  .search-input { flex:1; width:100%; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:50px; padding:16px 24px; color:#111111; font-family:var(--font-body); font-size:15px; outline:none; transition:all 0.2s; }
   .search-input::placeholder { color:#999999; }
   .search-input:focus { border-color:#5B21B6; box-shadow:0 0 0 3px rgba(91,33,182,0.1); }
   .search-btn { background:#5B21B6; color:#FFFFFF; border:none; padding:16px 32px; border-radius:50px; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
   .search-btn:hover { background:#4C1D95; transform:translateY(-1px); }
+  .search-btn:disabled { opacity:0.7; cursor:wait; transform:none; }
   .error-msg { text-align:center; margin-top:20px; color:#DC2626; font-size:14px; }
   .result-section { max-width:700px; margin:40px auto; padding:0 24px; }
   .order-card { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:16px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08); animation:fadeInUp 0.5s ease; }
@@ -80,10 +84,10 @@ const styles = `
   .step-time { font-size:11px; color:#5B21B6; margin-top:4px; }
   .customer-info { background:#F9F9F9; border:1px solid #E5E5E5; border-radius:12px; padding:20px; margin-top:20px; }
   .customer-info h4 { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#666666; margin-bottom:14px; font-weight:600; }
-  .info-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #F0F0F0; font-size:13px; }
+  .info-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #F0F0F0; font-size:13px; gap:12px; }
   .info-row:last-child { border:none; }
   .info-row span:first-child { color:#666666; }
-  .info-row span:last-child { color:#111111; font-weight:500; }
+  .info-row span:last-child { color:#111111; font-weight:500; text-align:right; }
   .help-section { max-width:700px; margin:0 auto 80px; padding:0 24px; }
   .help-card { background:#111111; border-radius:16px; padding:28px 32px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
   .help-text h4 { font-family:var(--font-display); font-size:16px; margin-bottom:6px; color:#FFFFFF; }
@@ -108,20 +112,39 @@ const styles = `
 `;
 
 type OrderResult = {
-  id: string; status: "pending" | "confirmed" | "dispatched" | "delivered";
+  id: string;
+  status: "pending" | "confirmed" | "dispatched" | "delivered";
   items: { name: string; price: number; qty: number }[];
-  total: number; name: string; email: string; phone: string; address: string; date: string;
+  total: number;
+  currency: string;
+  paymentMethod: string;
+  name: string;
+  email: string;
+  phone: string;
+  postcode: string;
+  date: string;
 };
 
 const statusOrder = ["pending", "confirmed", "dispatched", "delivered"];
 
 export default function OrderTrackingPage() {
   const [query, setQuery] = useState("");
+  const [email, setEmail] = useState("");
   const [result, setResult] = useState<OrderResult | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [searching, setSearching] = useState(false);
   const contact = useContactConfig();
   const { t } = useSiteContent();
+
+  // Prefill from query string (?order_id=&email=) without changing email templates.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const oid = (sp.get("order_id") || sp.get("orderId") || "").trim();
+    const em = (sp.get("email") || "").trim();
+    if (oid) setQuery(oid);
+    if (em) setEmail(em);
+  }, []);
 
   const statusSteps = [
     { key: "pending", icon: "🕐", title: t("track_step1_title", "Order Received"), desc: t("track_step1_desc", "We have received your order and payment receipt.") },
@@ -131,16 +154,22 @@ export default function OrderTrackingPage() {
   ];
 
   const handleSearch = async () => {
-    const trimmed = query.trim();
-    if (!trimmed) return;
+    const trimmedId = query.trim();
+    const trimmedEmail = email.trim();
+    if (!trimmedId || !trimmedEmail) return;
     setSearching(true);
     setResult(null);
     setNotFound(false);
     try {
-      const res = await fetch(`/api/track?order_id=${encodeURIComponent(trimmed)}`);
+      const params = new URLSearchParams({
+        order_id: trimmedId,
+        email: trimmedEmail,
+      });
+      const res = await fetch(`/api/track?${params.toString()}`);
       const data = await res.json();
       if (res.ok && data.order) {
         const o = data.order;
+        const c = o.customer || {};
         const items = (data.items || []).map((it: any) => ({
           name: it.product_name,
           price: parseFloat(it.price),
@@ -151,11 +180,13 @@ export default function OrderTrackingPage() {
           status: o.status,
           items,
           total: parseFloat(o.total),
-          // Legacy empty/NULL identity — clear em dash (never blank/"undefined").
-          name: o.customer_name || "—",
-          email: o.customer_email || "—",
-          phone: o.customer_phone || "—",
-          address: [o.delivery_address, o.city, o.postcode].filter(Boolean).join(", ") || "—",
+          currency: o.currency || "GBP",
+          paymentMethod: o.payment_method || "—",
+          // Masked contact from API — clear em dash for any empty field.
+          name: c.name || "—",
+          email: c.email || "—",
+          phone: c.phone || "—",
+          postcode: c.postcode || "—",
           date: o.created_at ? new Date(o.created_at).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" }) : "—",
         });
       } else {
@@ -197,18 +228,47 @@ export default function OrderTrackingPage() {
         </div>
 
         <div className="search-section">
-          <div className="search-box">
-            <input
-              className="search-input"
-              type="text"
-              placeholder={t("track_placeholder", "e.g. FK44-62305")}
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleSearch()}
-            />
-            <button className="search-btn" onClick={handleSearch} disabled={searching}>{searching ? t("track_searching", "Searching...") : t("track_btn", "Track Order")}</button>
+          <div className="search-fields">
+            <div>
+              <label className="field-label" htmlFor="track-order-id">Order ID</label>
+              <input
+                id="track-order-id"
+                className="search-input"
+                type="text"
+                placeholder={t("track_placeholder", "e.g. FK44-62305")}
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSearch()}
+                autoComplete="off"
+                required
+              />
+            </div>
+            <div>
+              <label className="field-label" htmlFor="track-email">{t("track_email_label", "Email used for the order")}</label>
+              <input
+                id="track-email"
+                className="search-input"
+                type="email"
+                placeholder={t("track_email_placeholder", "you@example.com")}
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSearch()}
+                autoComplete="email"
+                required
+              />
+              <p className="field-help">{t("track_email_help", "Use the same email address you entered at checkout.")}</p>
+            </div>
+            <div className="search-box">
+              <button className="search-btn" onClick={handleSearch} disabled={searching || !query.trim() || !email.trim()}>
+                {searching ? t("track_searching", "Searching...") : t("track_btn", "Track Order")}
+              </button>
+            </div>
           </div>
-          {notFound && <p className="error-msg">❌ {t("track_not_found", "Order not found. Please check your Order ID and try again.")}</p>}
+          {notFound && (
+            <p className="error-msg">
+              ❌ {t("track_not_found", "Order not found. Please check your Order ID and email, then try again.")}
+            </p>
+          )}
         </div>
 
         {result && (
@@ -223,7 +283,6 @@ export default function OrderTrackingPage() {
               </div>
 
               <div className="order-card-body">
-                {/* Items */}
                 <div className="order-items">
                   <h4>Items Ordered</h4>
                   {result.items.map((item, i) => (
@@ -238,7 +297,6 @@ export default function OrderTrackingPage() {
                   </div>
                 </div>
 
-                {/* Progress */}
                 <div className="progress-section">
                   <h4>Order Progress</h4>
                   <div className="steps">
@@ -268,13 +326,13 @@ export default function OrderTrackingPage() {
                   </div>
                 </div>
 
-                {/* Customer Info */}
                 <div className="customer-info">
-                  <h4>Delivery Details</h4>
+                  <h4>Order Details</h4>
                   <div className="info-row"><span>Name</span><span>{result.name || "—"}</span></div>
                   <div className="info-row"><span>Email</span><span>{result.email || "—"}</span></div>
                   <div className="info-row"><span>Phone</span><span>{result.phone || "—"}</span></div>
-                  <div className="info-row"><span>Address</span><span>{result.address || "—"}</span></div>
+                  <div className="info-row"><span>Postcode</span><span>{result.postcode || "—"}</span></div>
+                  <div className="info-row"><span>Payment</span><span>{result.paymentMethod || "—"}</span></div>
                   <div className="info-row"><span>Order Date</span><span>{result.date || "—"}</span></div>
                 </div>
               </div>
@@ -282,7 +340,6 @@ export default function OrderTrackingPage() {
           </div>
         )}
 
-        {/* Help */}
         <div className="help-section" style={{ marginTop: result ? "24px" : "50px" }}>
           <div className="help-card">
             <div className="help-text">

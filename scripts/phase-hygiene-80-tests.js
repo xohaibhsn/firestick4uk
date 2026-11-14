@@ -175,9 +175,10 @@ function loadTs(rel, stubs = {}) {
   );
   ok(
     "B5_tracking_dash_on_null_identity",
-    /name:\s*o\.customer_name\s*\|\|\s*"—"/.test(tracking) &&
-      /email:\s*o\.customer_email\s*\|\|\s*"—"/.test(tracking) &&
-      /phone:\s*o\.customer_phone\s*\|\|\s*"—"/.test(tracking)
+    // MULTI-91: tracking UI shows masked contact from API; still uses em-dash for empty.
+    /name:\s*c\.name\s*\|\|\s*"—"/.test(tracking) &&
+      /email:\s*c\.email\s*\|\|\s*"—"/.test(tracking) &&
+      /phone:\s*c\.phone\s*\|\|\s*"—"/.test(tracking)
   );
   ok(
     "B5_csv_null_to_empty_string",

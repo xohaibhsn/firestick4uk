@@ -154,7 +154,8 @@ ok(
   "P2_auto_refresh_is_guarded_60s",
   // 16a0887 (instant updates): single 60s tick, visible-tab only, skipped while modals are open, no overlap, orders.view only.
   /window\.setInterval\(\(\) => \{ void tick\(\); \}, 60000\)/.test(sidhu) &&
-    /document\.hidden/.test(sidhu) &&
+    /document\.visibilityState\s*!==\s*["']visible["']/.test(sidhu) &&
+    /document\.visibilityState\s*===\s*["']visible["']/.test(sidhu) &&
     /autoRefreshBlockedRef\.current/.test(sidhu) &&
     /autoRefreshLockRef\.current/.test(sidhu) &&
     /autoRefreshTickRef\.current = async \(\) => \{\s*if \(!can\("orders\.view"\)\) return;/.test(sidhu)

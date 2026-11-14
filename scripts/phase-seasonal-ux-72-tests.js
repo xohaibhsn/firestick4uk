@@ -346,7 +346,11 @@ ok(
 ok("sidhu_deleteOrder_calls_refreshAfterOrderMutation", /refreshAfterOrderMutation\(/.test(deleteOrderBlock));
 ok("sidhu_refreshAfterOrderMutation_defined", /const refreshAfterOrderMutation = async/.test(sidhuSrc));
 ok("sidhu_auto_refresh_60000", /setInterval\(\(\)\s*=>\s*\{\s*void tick\(\);\s*\},\s*60000\)/.test(sidhuSrc));
-ok("sidhu_auto_refresh_pauses_when_hidden", /document\.hidden/.test(sidhuSrc));
+ok(
+  "sidhu_auto_refresh_pauses_when_hidden",
+  /document\.visibilityState\s*!==\s*["']visible["']/.test(sidhuSrc) &&
+    /document\.visibilityState\s*===\s*["']visible["']/.test(sidhuSrc)
+);
 ok(
   "sidhu_home_product_ids_panel",
   /"home_product_ids"/.test(sidhuSrc) && /siteContent\.home_product_ids/.test(sidhuSrc)

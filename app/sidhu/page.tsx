@@ -1118,7 +1118,8 @@ export default function AdminPage() {
     if (!loggedIn) return;
     lastAutoRefreshAtRef.current = Date.now();
     const tick = async () => {
-      if (typeof document !== "undefined" && document.hidden) return;
+      // Only refresh while this admin tab is actually visible (no background polling).
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       if (autoRefreshBlockedRef.current) return;
       if (autoRefreshLockRef.current) return;
       autoRefreshLockRef.current = true;
@@ -1131,8 +1132,8 @@ export default function AdminPage() {
     };
     const id = window.setInterval(() => { void tick(); }, 60000);
     const onVisibility = () => {
-      // Catch up when the tab becomes visible again if the last refresh is stale (modal/lock guards still apply).
-      if (!document.hidden && Date.now() - lastAutoRefreshAtRef.current >= 60000) void tick();
+      // Refresh once when the tab becomes visible again if the last refresh is stale (modal/lock guards still apply).
+      if (document.visibilityState === "visible" && Date.now() - lastAutoRefreshAtRef.current >= 60000) void tick();
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
