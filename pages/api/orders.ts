@@ -34,8 +34,14 @@ import {
 } from '../../lib/paymentMethod';
 import { isPaymentMethodEffectivelyEnabled } from '../../lib/paymentMethodSettings';
 import { getPaymentMethodSettings } from '../../lib/paymentMethodSettingsServer';
-import { getPricesIncludeVat } from '../../lib/pricesIncludeVatServer';
+import {
+  getPricesIncludeVat,
+  isPricesIncludeVatReadError,
+} from '../../lib/pricesIncludeVatServer';
 import { lockAndAuthorizeOrderProducts } from '../../lib/orderProductEligibility';
+
+const PRICING_UNAVAILABLE_MSG =
+  'Pricing temporarily unavailable. Please try again.';
 
 /** ORD- + Date.now() + 3 random digits (fits orders.order_id VARCHAR(20)). */
 export function generateOrderId(nowMs: number = Date.now()): string {
@@ -151,8 +157,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Payment method unavailable.' });
     }
 
-    // VAT mode — fail-safe OFF (additive VAT). Same value used for pricing math below.
-    const pricesIncludeVat = await getPricesIncludeVat();
+    // VAT mode — early read is a fast path only. On read error (unknown), do not
+    // decide OFF (would overcharge when prices are already inclusive); proceed to TX.
+    let pricesIncludeVatEarly: boolean | undefined;
+    try {
+      pricesIncludeVatEarly = await getPricesIncludeVat();
+    } catch (err) {
+      if (!isPricesIncludeVatReadError(err)) throw err;
+      pricesIncludeVatEarly = undefined;
+    }
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Order items are required.' });
@@ -192,7 +205,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let shipping = 0;
     let vatAmount = 0;
     let hasDigital = false;
-    let orderPricesIncludeVat = pricesIncludeVat;
+    let orderPricesIncludeVat =
+      typeof pricesIncludeVatEarly === 'boolean' ? pricesIncludeVatEarly : false;
 
     const conn = await pool.getConnection();
     try {
@@ -214,7 +228,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Re-read VAT mode inside TX (authoritative for this order).
-      orderPricesIncludeVat = await getPricesIncludeVat({ db: conn, ttlMs: 0 });
+      // Unknown/error → roll back + 503; never INSERT or email with a guessed OFF.
+      try {
+        orderPricesIncludeVat = await getPricesIncludeVat({ db: conn, ttlMs: 0 });
+      } catch (vatErr) {
+        if (isPricesIncludeVatReadError(vatErr)) {
+          throw new OrderValidationError(PRICING_UNAVAILABLE_MSG, 503);
+        }
+        throw vatErr;
+      }
 
       authoritativeItems = [];
       for (const id of uniqueIds) {

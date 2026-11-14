@@ -1,6 +1,9 @@
 /**
  * Server-only reader for CMS prices_include_vat.
- * Short TTL cache; fail-safe = OFF (additive VAT / today's behaviour).
+ * Short TTL cache on successful reads only.
+ * Read errors are NOT cached and do NOT fail-safe to OFF (would overcharge
+ * when prices are already VAT-inclusive). Callers must treat unknown as
+ * "do not decide" — orders API returns 503 inside the transaction.
  */
 
 import {
@@ -18,12 +21,32 @@ type CacheEntry = { at: number; value: boolean };
 
 let cache: CacheEntry | null = null;
 
+/** Typed error: CMS read failed — setting is unknown; do not assume OFF. */
+export class PricesIncludeVatReadError extends Error {
+  constructor(message = "prices_include_vat read failed") {
+    super(message);
+    this.name = "PricesIncludeVatReadError";
+  }
+}
+
+export function isPricesIncludeVatReadError(err: unknown): boolean {
+  return (
+    err instanceof PricesIncludeVatReadError ||
+    (typeof err === "object" &&
+      err !== null &&
+      (err as { name?: unknown }).name === "PricesIncludeVatReadError")
+  );
+}
+
 export function clearPricesIncludeVatCache(): void {
   cache = null;
 }
 
 /**
- * Read prices_include_vat. Fail-safe: any error ⇒ OFF.
+ * Read prices_include_vat.
+ * - Missing row / empty / garbage ⇒ OFF (deliberate, same as today).
+ * - Successful read ⇒ cache + return boolean.
+ * - Read ERROR ⇒ do NOT cache; throw PricesIncludeVatReadError.
  * Optional `db` injection for tests.
  */
 export async function getPricesIncludeVat(opts?: {
@@ -34,8 +57,6 @@ export async function getPricesIncludeVat(opts?: {
   const now = opts?.nowMs ?? Date.now();
   const ttl = opts?.ttlMs ?? PRICES_INCLUDE_VAT_CACHE_TTL_MS;
   if (cache && now - cache.at < ttl) return cache.value;
-
-  const failSafe = false;
 
   try {
     const db =
@@ -53,8 +74,10 @@ export async function getPricesIncludeVat(opts?: {
     );
     cache = { at: now, value };
     return value;
-  } catch {
-    cache = { at: now, value: failSafe };
-    return failSafe;
+  } catch (err) {
+    if (isPricesIncludeVatReadError(err)) throw err;
+    throw new PricesIncludeVatReadError(
+      err instanceof Error ? err.message : "prices_include_vat read failed"
+    );
   }
 }

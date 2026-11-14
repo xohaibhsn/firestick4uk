@@ -96,6 +96,8 @@ export function formatGbp(amount: number): string {
  * Mini-bar amount text.
  * Ready + classified → £grandTotal (shipping included exactly as /cart).
  * Pending / error / unknown → "£subtotal + VAT" when ex-VAT; plain £subtotal when inclusive.
+ * Callers must pass pricesIncludeVat only after CMS has loaded; while CMS is
+ * unloaded, MiniCartBar shows "Calculating…" instead of calling this helper.
  */
 export function formatMiniCartAmountText(opts: {
   subtotal: number;

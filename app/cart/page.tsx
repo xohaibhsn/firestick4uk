@@ -1006,13 +1006,22 @@ export default function CartPage() {
             </div>
             <div className="order-summary">
               <div className="summary-header"><h3>{t("cart_summary", "Order Summary")}</h3></div>
-              <div className="summary-body">
+              <div className="summary-body" data-cart-totals={cmsLoaded ? "ready" : "pending"}>
+                {!cmsLoaded ? (
+                  <div className="summary-row" data-totals-loading="1" aria-live="polite">
+                    <span>{t("cart_totals_calculating", "Calculating…")}</span>
+                    <span>…</span>
+                  </div>
+                ) : (
+                  <>
                 <div className="summary-row"><span>{t("cart_subtotal", "Subtotal")}</span><span>£{subtotal.toFixed(2)}</span></div>
                 <div className="summary-row"><span>{t("cart_shipping", "Shipping")}</span><span>{shipping === 0 ? t("cart_shipping_free", "Free") : `£${shipping.toFixed(2)}`}</span></div>
                 <div className="summary-row"><span>{vatLineLabel}</span><span>£{vatAmount.toFixed(2)}</span></div>
                 {couponApplied && <div className="summary-row" style={{color:"#00c864"}}><span>{t("cart_discount", "Discount")} ({couponApplied.code})</span><span>-£{discountAmount.toFixed(2)}</span></div>}
                 <hr className="summary-divider" />
                 <div className="summary-row summary-total"><span>{t("cart_total", "Total")}</span><span>£{grandTotal.toFixed(2)}</span></div>
+                  </>
+                )}
               </div>
               {/* Coupon input */}
               <div style={{padding:"0 20px 16px"}}>
@@ -1411,13 +1420,22 @@ export default function CartPage() {
                     </>
                   )}
 
-                  <div className="summary-body" style={{background:"rgba(139,0,255,0.05)", borderRadius:"12px", marginBottom:"16px"}}>
+                  <div className="summary-body" style={{background:"rgba(139,0,255,0.05)", borderRadius:"12px", marginBottom:"16px"}} data-cart-totals={cmsLoaded ? "ready" : "pending"}>
+                    {!cmsLoaded ? (
+                      <div className="summary-row" data-totals-loading="1" aria-live="polite">
+                        <span>{t("cart_totals_calculating", "Calculating…")}</span>
+                        <span>…</span>
+                      </div>
+                    ) : (
+                      <>
                     <div className="summary-row"><span>{t("cart_subtotal", "Subtotal")}</span><span>£{subtotal.toFixed(2)}</span></div>
                     <div className="summary-row"><span>{t("cart_shipping", "Shipping")}</span><span>{shipping === 0 ? t("cart_shipping_free", "Free") : `£${shipping.toFixed(2)}`}</span></div>
                     <div className="summary-row"><span>{vatLineLabel}</span><span>£{vatAmount.toFixed(2)}</span></div>
                     {couponApplied && <div className="summary-row" style={{color:"#00c864"}}><span>{t("cart_discount", "Discount")} ({couponApplied.code})</span><span>-£{discountAmount.toFixed(2)}</span></div>}
                     <hr className="summary-divider" />
                     <div className="summary-row summary-total"><span>{t("cart_total", "Total")}</span><span>£{grandTotal.toFixed(2)}</span></div>
+                      </>
+                    )}
                   </div>
                   <div style={{background:"rgba(91,33,182,0.08)",border:"1px solid rgba(91,33,182,0.2)",borderRadius:"12px",padding:"12px 14px",fontSize:"13px",lineHeight:1.6,color:"#444444",marginBottom:"16px"}}>
                     {t("cart_activation", "Subscription services are active within 1 hour of payment confirmation.")}
@@ -1494,8 +1512,12 @@ export default function CartPage() {
               role="region"
               aria-label="Place order"
             >
-              <div className="sticky-place-order__total">
-                Total <strong>£{grandTotal.toFixed(2)}</strong>
+              <div className="sticky-place-order__total" data-sticky-total={cmsLoaded ? "ready" : "pending"}>
+                {cmsLoaded ? (
+                  <>Total <strong>£{grandTotal.toFixed(2)}</strong></>
+                ) : (
+                  <span data-totals-loading="1">{t("cart_totals_calculating", "Calculating…")}</span>
+                )}
               </div>
               <button
                 className="place-order-btn"

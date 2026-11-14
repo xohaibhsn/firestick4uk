@@ -67,23 +67,24 @@ export default function MiniCartBar() {
     classification && classification.ready && !classification.error
   );
 
-  const amountText = useMemo(
-    () =>
-      formatMiniCartAmountText({
-        subtotal: total,
-        cartLength: cart.length,
-        classificationReady,
-        hasPhysicalItems: classification?.hasPhysicalItems === true,
-        pricesIncludeVat,
-      }),
-    [
-      total,
-      cart.length,
+  const amountText = useMemo(() => {
+    // Until CMS loads, do not guess OFF and show a VAT-added total.
+    if (!cmsLoaded) return "Calculating…";
+    return formatMiniCartAmountText({
+      subtotal: total,
+      cartLength: cart.length,
       classificationReady,
-      classification?.hasPhysicalItems,
+      hasPhysicalItems: classification?.hasPhysicalItems === true,
       pricesIncludeVat,
-    ]
-  );
+    });
+  }, [
+    cmsLoaded,
+    total,
+    cart.length,
+    classificationReady,
+    classification?.hasPhysicalItems,
+    pricesIncludeVat,
+  ]);
 
   useEffect(() => {
     if (!mounted) return;
