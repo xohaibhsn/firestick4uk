@@ -10,6 +10,7 @@ import { toPublicListProduct, type PublicListProduct } from "@/lib/productPublic
 import { resolveSeasonalHubPublicState } from "@/lib/seasonalHubPublic";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import PriceDisplay from "@/components/PriceDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -124,7 +125,7 @@ function Section({
             <a href={`/products/${p.slug || p.id}`} style={{ color: "#5B21B6", fontWeight: 600 }}>
               {p.name}
             </a>
-            <div style={{ fontSize: 14, marginTop: 4 }}>£{Number(p.price).toFixed(2)}</div>
+            <div style={{ fontSize: 14, marginTop: 4 }}><PriceDisplay price={p.price} /></div>
           </li>
         ))}
       </ul>

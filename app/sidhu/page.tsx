@@ -6937,6 +6937,48 @@ export default function AdminPage() {
                     {contentSaving ? "Saving..." : "Save hub publication"}
                   </button>
                 </div>
+
+                <div
+                  data-testid="prices-include-vat-control"
+                  style={{
+                    marginTop: 18,
+                    padding: "14px 16px",
+                    borderRadius: 12,
+                    border: "1px solid #DDD6FE",
+                    background: "#F5F3FF",
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>VAT-inclusive prices</div>
+                  <p style={{ fontSize: 13, color: "#4C1D95", marginBottom: 10, lineHeight: 1.45 }}>
+                    Default OFF. When ON, product prices are treated as final VAT-inclusive amounts:
+                    cart total = subtotal − discount + shipping (VAT is shown as included, not added on top).
+                    Turn this on only after updating product prices to old × 1.2.
+                  </p>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                    <input
+                      type="checkbox"
+                      data-prices-include-vat-toggle="1"
+                      checked={String(siteContent.prices_include_vat || "") === "1"}
+                      onChange={(e) =>
+                        setSiteContent((s: any) => ({
+                          ...s,
+                          prices_include_vat: e.target.checked ? "1" : "0",
+                        }))
+                      }
+                    />
+                    Prices include VAT
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ marginTop: 10 }}
+                    disabled={contentSaving}
+                    data-testid="prices-include-vat-save"
+                    onClick={() => saveContent(["prices_include_vat"])}
+                  >
+                    {contentSaving ? "Saving..." : "Save VAT price mode"}
+                  </button>
+                </div>
                 <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_meta_description","site_logo_url","og_default_image","whatsapp_icon_url","ads_conv_label_purchase","ads_conv_label_whatsapp"])}>                  {contentSaving?"Saving...":"💾 Save Settings"}
                 </button>
               </div>

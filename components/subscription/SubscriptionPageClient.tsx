@@ -8,6 +8,7 @@ import { useCart } from "@/app/lib/cartContext";
 import { cms } from "@/lib/cms";
 import { fixContentLinkRels } from "@/lib/seoLinks";
 import { looksLikeHtml } from "@/lib/contentHtml";
+import PriceDisplay from "@/components/PriceDisplay";
 
 type CardItem = { icon?: string; title: string; desc: string; step?: string };
 
@@ -292,7 +293,7 @@ export default function SubscriptionPageClient({
                     <div className="plan-body">
                       {p.badge ? <span className="plan-badge">{p.badge}</span> : null}
                       <h3 className="plan-name">{p.name}</h3>
-                      <p className="plan-price">£{Number(p.price).toFixed(2)}</p>
+                      <p className="plan-price"><PriceDisplay price={p.price} /></p>
                       {desc ? <p className="plan-desc">{desc}</p> : null}
                       {feats.length > 0 ? (
                         <ul className="plan-feats">

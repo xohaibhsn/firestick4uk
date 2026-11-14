@@ -26,6 +26,7 @@ import {
 } from "@/lib/homeTestimonials";
 import { hydrateProductFactsCatalog } from "@/lib/cartClassification";
 import { productCardSrc } from "@/lib/cloudinaryDelivery";
+import PriceDisplay from "@/components/PriceDisplay";
 
 const REVIEW_TEXT_PREVIEW_CHARS = 180;
 
@@ -857,7 +858,7 @@ export default function HomeClient({
                     />
                   ) : null}
                   <div className="product-footer">
-                    <div className="product-price">£{Number(p.price).toFixed(2)}</div>
+                    <div className="product-price"><PriceDisplay price={p.price} /></div>
                     {(() => {
                       const inCart = cart.some(i => i.id === p.id);
                       const hovering = hoveringId === p.id;

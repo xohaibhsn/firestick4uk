@@ -308,6 +308,8 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
         { key: "cart_shipping", label: "Shipping label" },
         { key: "cart_shipping_free", label: "Free shipping label" },
         { key: "cart_vat_label", label: "VAT display label (text only)" },
+        { key: "cart_vat_included_label", label: "VAT included label (when prices include VAT)" },
+        { key: "price_incl_vat_suffix", label: "Price incl. VAT suffix" },
         { key: "cart_discount", label: "Discount label" },
         { key: "cart_total", label: "Total label" },
         { key: "cart_coupon_ph", label: "Coupon placeholder" },

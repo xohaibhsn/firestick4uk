@@ -7,6 +7,7 @@ import { useContactConfig } from "@/hooks/useContactConfig";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import { useSiteContentContext } from "@/components/SiteContentProvider";
 import { firePurchase } from "@/lib/adsConversions";
+import { parsePricesIncludeVat } from "@/lib/pricesIncludeVat";
 
 const styles = `
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -216,7 +217,11 @@ export default function CartSuccessPage() {
                 <span className="breakdown-value">{snap.shipping === 0 ? t("cart_shipping_free", "Free") : `£${Number(snap.shipping).toFixed(2)}`}</span>
               </div>
               <div className="breakdown-row">
-                <span className="breakdown-label">{t("cart_vat_label", "VAT (20%)")}</span>
+                <span className="breakdown-label">
+                  {parsePricesIncludeVat(sc.prices_include_vat)
+                    ? t("cart_vat_included_label", "Includes VAT (20%)")
+                    : t("cart_vat_label", "VAT (20%)")}
+                </span>
                 <span className="breakdown-value">£{Number(snap.vatAmount).toFixed(2)}</span>
               </div>
               {snap.couponApplied && snap.discountAmount > 0 && (

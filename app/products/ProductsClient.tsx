@@ -12,6 +12,7 @@ import { useSiteContent } from "@/hooks/useSiteContent";
 import { fillVars } from "@/lib/cms";
 import type { PublicProduct } from "@/lib/publicProductsServer";
 import { productCardSrc } from "@/lib/cloudinaryDelivery";
+import PriceDisplay from "@/components/PriceDisplay";
 
 const cardDescXss = {
   whiteList: {
@@ -281,7 +282,7 @@ export default function ProductsClient({
                   {r.image ? <img src={r.image} alt={r.name} style={{width:40,height:40,borderRadius:6,objectFit:"cover",border:"1px solid #E5E5E5"}} loading="lazy" /> : <div style={{width:40,height:40,borderRadius:6,background:"#F5F5F5",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>📦</div>}
                   <div style={{flex:1,overflow:"hidden"}}>
                     <div style={{fontSize:13,fontWeight:600,color:"#111",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.name}</div>
-                    <div style={{fontSize:11,color:"#888"}}>{r.category} · £{Number(r.price).toFixed(2)}</div>
+                    <div style={{fontSize:11,color:"#888"}}>{r.category} · <PriceDisplay price={r.price} /></div>
                   </div>
                 </a>
               ))}
@@ -433,7 +434,7 @@ export default function ProductsClient({
                     />
                   ) : null}
                   <div className="product-footer">
-                    <div className="product-price">£{Number(p.price).toFixed(2)}</div>
+                    <div className="product-price"><PriceDisplay price={p.price} /></div>
                     {(()=>{
                       const inCart=cart.some(i=>i.id===p.id);
                       const hovering=hoveringId===p.id;

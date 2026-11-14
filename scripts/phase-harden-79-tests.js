@@ -174,6 +174,14 @@ function loadTs(rel, stubs = {}) {
       }),
       clearPaymentMethodSettingsCache: () => {},
     },
+    "../../lib/pricesIncludeVatServer": {
+      getPricesIncludeVat: async () => false,
+      clearPricesIncludeVatCache: () => {},
+    },
+    "@/lib/pricesIncludeVatServer": {
+      getPricesIncludeVat: async () => false,
+      clearPricesIncludeVatCache: () => {},
+    },
     nodemailer: { createTransport: () => ({ sendMail: async () => ({}) }) },
   });
 
@@ -492,6 +500,14 @@ function loadTs(rel, stubs = {}) {
       },
       "../../lib/paymentMethodSettingsServer": pay,
       "@/lib/paymentMethodSettingsServer": pay,
+      "../../lib/pricesIncludeVatServer": {
+        getPricesIncludeVat: async () => false,
+        clearPricesIncludeVatCache: () => {},
+      },
+      "@/lib/pricesIncludeVatServer": {
+        getPricesIncludeVat: async () => false,
+        clearPricesIncludeVatCache: () => {},
+      },
       nodemailer: {
         createTransport: () => ({ sendMail: async () => ({}) }),
       },

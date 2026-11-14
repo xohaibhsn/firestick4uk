@@ -46,6 +46,12 @@ import {
   bankDetailsComplete,
   effectivePaymentMethods,
 } from "@/lib/paymentMethodSettings";
+import { parsePricesIncludeVat } from "@/lib/pricesIncludeVat";
+import {
+  calculateGrandTotal,
+  extractVatFromInclusiveGrandTotal,
+  roundMoney,
+} from "@/lib/orderPricing";
 
 type ProductFacts = {
   id: number;
@@ -681,6 +687,9 @@ export default function CartPage() {
     };
   }, [step, keyboardOpen]);
 
+  const pricesIncludeVat = parsePricesIncludeVat(
+    cmsLoaded ? sc.prices_include_vat : undefined
+  );
   const shipping =
     cart.length === 0
       ? 0
@@ -691,9 +700,21 @@ export default function CartPage() {
           })
         : PHYSICAL_SHIPPING_GBP;
   const subtotal = total;
-  const vatAmount = Math.round(subtotal * 0.20 * 100) / 100;
   const discountAmount = couponApplied ? couponApplied.discount_amount : 0;
-  const grandTotal = Math.round((subtotal + shipping + vatAmount - discountAmount) * 100) / 100;
+  const vatAmountExVat = roundMoney(subtotal * 0.2);
+  const grandTotal = calculateGrandTotal({
+    subtotal,
+    shipping,
+    vatAmount: pricesIncludeVat ? 0 : vatAmountExVat,
+    discountAmount,
+    pricesIncludeVat,
+  });
+  const vatAmount = pricesIncludeVat
+    ? extractVatFromInclusiveGrandTotal(grandTotal)
+    : vatAmountExVat;
+  const vatLineLabel = pricesIncludeVat
+    ? t("cart_vat_included_label", "Includes VAT (20%)")
+    : t("cart_vat_label", "VAT (20%)");
   const classificationBlocked = !classification.ready || !!classification.error;
   const paymentOptionsBlocked =
     !cmsLoaded ||
@@ -888,7 +909,9 @@ export default function CartPage() {
           '',
           `💰 *Subtotal:* £${authSubtotal.toFixed(2)}`,
           `🚚 *Shipping:* ${authShipping === 0 ? 'Free' : '£' + authShipping.toFixed(2)}`,
-          `🧾 *VAT (20%):* £${authVat.toFixed(2)}`,
+          pricesIncludeVat || p.prices_include_vat
+            ? `🧾 *${t("cart_vat_included_label", "Includes VAT (20%)")}:* £${authVat.toFixed(2)}`
+            : `🧾 *VAT (20%):* £${authVat.toFixed(2)}`,
           authCouponApplied ? `🎟️ *Discount (${authCouponApplied.code}):* -£${authDiscount.toFixed(2)}` : null,
           `💵 *Total: £${authTotal.toFixed(2)}*`,
           '',
@@ -986,7 +1009,7 @@ export default function CartPage() {
               <div className="summary-body">
                 <div className="summary-row"><span>{t("cart_subtotal", "Subtotal")}</span><span>£{subtotal.toFixed(2)}</span></div>
                 <div className="summary-row"><span>{t("cart_shipping", "Shipping")}</span><span>{shipping === 0 ? t("cart_shipping_free", "Free") : `£${shipping.toFixed(2)}`}</span></div>
-                <div className="summary-row"><span>{t("cart_vat_label", "VAT (20%)")}</span><span>£{vatAmount.toFixed(2)}</span></div>
+                <div className="summary-row"><span>{vatLineLabel}</span><span>£{vatAmount.toFixed(2)}</span></div>
                 {couponApplied && <div className="summary-row" style={{color:"#00c864"}}><span>{t("cart_discount", "Discount")} ({couponApplied.code})</span><span>-£{discountAmount.toFixed(2)}</span></div>}
                 <hr className="summary-divider" />
                 <div className="summary-row summary-total"><span>{t("cart_total", "Total")}</span><span>£{grandTotal.toFixed(2)}</span></div>
@@ -1391,7 +1414,7 @@ export default function CartPage() {
                   <div className="summary-body" style={{background:"rgba(139,0,255,0.05)", borderRadius:"12px", marginBottom:"16px"}}>
                     <div className="summary-row"><span>{t("cart_subtotal", "Subtotal")}</span><span>£{subtotal.toFixed(2)}</span></div>
                     <div className="summary-row"><span>{t("cart_shipping", "Shipping")}</span><span>{shipping === 0 ? t("cart_shipping_free", "Free") : `£${shipping.toFixed(2)}`}</span></div>
-                    <div className="summary-row"><span>{t("cart_vat_label", "VAT (20%)")}</span><span>£{vatAmount.toFixed(2)}</span></div>
+                    <div className="summary-row"><span>{vatLineLabel}</span><span>£{vatAmount.toFixed(2)}</span></div>
                     {couponApplied && <div className="summary-row" style={{color:"#00c864"}}><span>{t("cart_discount", "Discount")} ({couponApplied.code})</span><span>-£{discountAmount.toFixed(2)}</span></div>}
                     <hr className="summary-divider" />
                     <div className="summary-row summary-total"><span>{t("cart_total", "Total")}</span><span>£{grandTotal.toFixed(2)}</span></div>

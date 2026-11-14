@@ -27,6 +27,7 @@ import {
 } from "@/lib/productSeasonBoundaryClient";
 import { isDigitalProduct } from "@/lib/productFulfilment";
 import { stockBadgeLabel } from "@/lib/stockBadgeLabel";
+import PriceDisplay from "@/components/PriceDisplay";
 
 const xssOptions = {
   whiteList: {
@@ -490,7 +491,7 @@ export default function ProductDetail({
                   />
                 )}
                 <div className="product-price">
-                  £{Number(product.price).toFixed(2)}
+                  <PriceDisplay price={product.price} />
                   {(phase === "ended" || phase === "paused") && (
                     <span
                       data-testid="historical-price-label"
@@ -660,7 +661,7 @@ export default function ProductDetail({
           role="region"
           aria-label="Add to cart"
         >
-          <div className="pdp-sticky-atc__price">£{Number(product.price).toFixed(2)}</div>
+          <div className="pdp-sticky-atc__price"><PriceDisplay price={product.price} /></div>
           {canPurchase ? (
             <button
               type="button"

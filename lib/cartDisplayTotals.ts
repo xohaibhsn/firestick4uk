@@ -1,11 +1,16 @@
 /**
  * Client/server-safe cart display totals — same math as /cart summary
- * (pre-coupon): subtotal + shipping + VAT(20%).
+ * (pre-coupon): subtotal + shipping + VAT(20%) when prices are ex-VAT;
+ * or subtotal + shipping when prices_include_vat is ON.
  *
  * Coupons are NOT applied here — /cart remains the source of truth for discounts.
  */
 import { cartShippingPounds } from "./productFulfilment";
-import { calculateGrandTotal, roundMoney } from "./orderPricing";
+import {
+  calculateGrandTotal,
+  extractVatFromInclusiveGrandTotal,
+  roundMoney,
+} from "./orderPricing";
 
 export type CartDisplayTotalsInput = {
   /** Sum of price * qty (useCart().total). */
@@ -21,6 +26,8 @@ export type CartDisplayTotalsInput = {
    */
   hasPhysicalItems?: boolean | null;
   discountAmount?: number;
+  /** CMS prices_include_vat — default false (additive VAT). */
+  pricesIncludeVat?: boolean;
 };
 
 export type CartDisplayTotals = {
@@ -29,6 +36,7 @@ export type CartDisplayTotals = {
   vatAmount: number;
   discountAmount: number;
   grandTotal: number;
+  pricesIncludeVat: boolean;
 };
 
 /** Same presentation totals used on /cart when classification is known (pre-coupon). */
@@ -38,6 +46,7 @@ export function computeCartDisplayTotals(
   const subtotal = roundMoney(Number(opts.subtotal) || 0);
   const cartLength = Math.max(0, Number(opts.cartLength) || 0);
   const discountAmount = roundMoney(Number(opts.discountAmount) || 0);
+  const pricesIncludeVat = opts.pricesIncludeVat === true;
 
   let shipping = 0;
   if (cartLength > 0) {
@@ -52,15 +61,31 @@ export function computeCartDisplayTotals(
     // null/undefined → shipping 0 (no assumed physical shipping for display)
   }
 
-  const vatAmount = roundMoney(subtotal * 0.2);
+  let vatAmount = 0;
+  if (!pricesIncludeVat) {
+    vatAmount = roundMoney(subtotal * 0.2);
+  }
+
   const grandTotal = calculateGrandTotal({
     subtotal,
     shipping,
     vatAmount,
     discountAmount,
+    pricesIncludeVat,
   });
 
-  return { subtotal, shipping, vatAmount, discountAmount, grandTotal };
+  if (pricesIncludeVat) {
+    vatAmount = extractVatFromInclusiveGrandTotal(grandTotal);
+  }
+
+  return {
+    subtotal,
+    shipping,
+    vatAmount,
+    discountAmount,
+    grandTotal,
+    pricesIncludeVat,
+  };
 }
 
 export function formatGbp(amount: number): string {
@@ -70,21 +95,25 @@ export function formatGbp(amount: number): string {
 /**
  * Mini-bar amount text.
  * Ready + classified → £grandTotal (shipping included exactly as /cart).
- * Pending / error / unknown → "£subtotal + VAT" (label only; no shipping guess).
+ * Pending / error / unknown → "£subtotal + VAT" when ex-VAT; plain £subtotal when inclusive.
  */
 export function formatMiniCartAmountText(opts: {
   subtotal: number;
   cartLength: number;
   classificationReady: boolean;
   hasPhysicalItems: boolean;
+  pricesIncludeVat?: boolean;
 }): string {
+  const pricesIncludeVat = opts.pricesIncludeVat === true;
   if (opts.classificationReady) {
     const t = computeCartDisplayTotals({
       subtotal: opts.subtotal,
       cartLength: opts.cartLength,
       hasPhysicalItems: opts.hasPhysicalItems,
+      pricesIncludeVat,
     });
     return formatGbp(t.grandTotal);
   }
-  return `${formatGbp(roundMoney(Number(opts.subtotal) || 0))} + VAT`;
+  const base = formatGbp(roundMoney(Number(opts.subtotal) || 0));
+  return pricesIncludeVat ? base : `${base} + VAT`;
 }

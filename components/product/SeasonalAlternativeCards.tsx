@@ -1,5 +1,7 @@
 "use client";
 
+import PriceDisplay from "@/components/PriceDisplay";
+
 export type SeasonalAltCard = {
   id: number;
   name: string;
@@ -57,7 +59,7 @@ export default function SeasonalAlternativeCards({
                   >
                     {p.name}
                   </a>
-                  <div style={{ fontSize: 14, marginTop: 4 }}>£{Number(p.price).toFixed(2)}</div>
+                  <div style={{ fontSize: 14, marginTop: 4 }}><PriceDisplay price={p.price} /></div>
                 </div>
               </li>
             ))}
@@ -101,7 +103,7 @@ export default function SeasonalAlternativeCards({
                   >
                     {p.name}
                   </a>
-                  <div style={{ fontSize: 14, marginTop: 4 }}>£{Number(p.price).toFixed(2)}</div>
+                  <div style={{ fontSize: 14, marginTop: 4 }}><PriceDisplay price={p.price} /></div>
                   <div style={{ fontSize: 12, color: "#92400E", marginTop: 4 }}>Upcoming</div>
                 </div>
               </li>

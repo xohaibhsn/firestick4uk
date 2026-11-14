@@ -13,6 +13,7 @@ import {
   calculateAuthoritativePricing,
   calculateGrandTotal,
   evaluateLockedCoupon,
+  extractVatFromInclusiveGrandTotal,
   isFiniteNonNegativeMoney,
   normalizeCouponCode,
   parseOrderQuantity,
@@ -33,6 +34,7 @@ import {
 } from '../../lib/paymentMethod';
 import { isPaymentMethodEffectivelyEnabled } from '../../lib/paymentMethodSettings';
 import { getPaymentMethodSettings } from '../../lib/paymentMethodSettingsServer';
+import { getPricesIncludeVat } from '../../lib/pricesIncludeVatServer';
 import { lockAndAuthorizeOrderProducts } from '../../lib/orderProductEligibility';
 
 /** ORD- + Date.now() + 3 random digits (fits orders.order_id VARCHAR(20)). */
@@ -149,6 +151,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Payment method unavailable.' });
     }
 
+    // VAT mode — fail-safe OFF (additive VAT). Same value used for pricing math below.
+    const pricesIncludeVat = await getPricesIncludeVat();
+
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Order items are required.' });
     }
@@ -187,6 +192,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let shipping = 0;
     let vatAmount = 0;
     let hasDigital = false;
+    let orderPricesIncludeVat = pricesIncludeVat;
 
     const conn = await pool.getConnection();
     try {
@@ -206,6 +212,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!isPaymentMethodEffectivelyEnabled(publicPaymentMethod, paymentTogglesTx)) {
         throw new OrderValidationError('Payment method unavailable.');
       }
+
+      // Re-read VAT mode inside TX (authoritative for this order).
+      orderPricesIncludeVat = await getPricesIncludeVat({ db: conn, ttlMs: 0 });
 
       authoritativeItems = [];
       for (const id of uniqueIds) {
@@ -235,7 +244,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
       }
 
-      const pricing = calculateAuthoritativePricing(authoritativeItems);
+      const pricing = calculateAuthoritativePricing(authoritativeItems, {
+        pricesIncludeVat: orderPricesIncludeVat,
+      });
       subtotal = pricing.subtotal;
       shipping = pricing.shipping;
       vatAmount = pricing.vatAmount;
@@ -273,7 +284,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         shipping,
         vatAmount,
         discountAmount,
+        pricesIncludeVat: orderPricesIncludeVat,
       });
+      if (orderPricesIncludeVat) {
+        vatAmount = extractVatFromInclusiveGrandTotal(grandTotal);
+      }
 
       await conn.query(
         'INSERT INTO orders (order_id,customer_name,customer_email,customer_phone,delivery_address,city,postcode,notes,payment_method,receipt_path,total,coupon_code,discount_amount,vat_amount,payment_reference,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
@@ -415,7 +430,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       <tbody>${itemRows}</tbody>
     </table>
     <div style="background:#fafafa;border:1px solid #e5e5e5;border-radius:10px;padding:16px 20px">
-      ${vatAmount ? `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px"><span style="color:#888">VAT (20%)</span><span style="color:#111">£${vatAmount.toFixed(2)}</span></div>` : ''}
+      ${vatAmount ? `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px"><span style="color:#888">${orderPricesIncludeVat ? 'Includes VAT (20%)' : 'VAT (20%)'}</span><span style="color:#111">£${vatAmount.toFixed(2)}</span></div>` : ''}
       ${discountAmount ? `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#16A34A"><span>Discount${validatedCouponCode ? ` (${safeAdminCouponCode})` : ''}</span><span>−£${discountAmount.toFixed(2)}</span></div>` : ''}
       <div style="display:flex;justify-content:space-between;padding:10px 0 4px;font-size:18px;font-weight:700;border-top:1px solid #e5e5e5;margin-top:6px"><span style="color:#111">Grand Total</span><span style="color:#5B21B6">£${grandTotal.toFixed(2)}</span></div>
     </div>
@@ -528,6 +543,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         discount_amount: discountAmount,
         total: grandTotal,
         coupon_code: validatedCouponCode,
+        prices_include_vat: orderPricesIncludeVat,
       },
       items: responseItems,
     });

@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useCart } from "@/app/lib/cartContext";
 import { useCartClassification } from "@/lib/useCartClassification";
 import { formatMiniCartAmountText } from "@/lib/cartDisplayTotals";
+import { useSiteContent } from "@/hooks/useSiteContent";
+import { parsePricesIncludeVat } from "@/lib/pricesIncludeVat";
 
 /** Routes where the mini-cart bar must stay hidden. */
 export function shouldHideMiniCartBar(pathname: string | null): boolean {
@@ -22,6 +24,10 @@ const PDP_STICKY_ATC_ATTR = "data-pdp-sticky-atc";
 export default function MiniCartBar() {
   const pathname = usePathname();
   const { cart, total, itemCount, lastAddedAt } = useCart();
+  const { sc, loaded: cmsLoaded } = useSiteContent();
+  const pricesIncludeVat = parsePricesIncludeVat(
+    cmsLoaded ? sc.prices_include_vat : undefined
+  );
   const [mounted, setMounted] = useState(false);
   const [announce, setAnnounce] = useState("");
   const [pdpStickyAtc, setPdpStickyAtc] = useState(false);
@@ -68,8 +74,15 @@ export default function MiniCartBar() {
         cartLength: cart.length,
         classificationReady,
         hasPhysicalItems: classification?.hasPhysicalItems === true,
+        pricesIncludeVat,
       }),
-    [total, cart.length, classificationReady, classification?.hasPhysicalItems]
+    [
+      total,
+      cart.length,
+      classificationReady,
+      classification?.hasPhysicalItems,
+      pricesIncludeVat,
+    ]
   );
 
   useEffect(() => {

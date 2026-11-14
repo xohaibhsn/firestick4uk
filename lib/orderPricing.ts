@@ -61,12 +61,21 @@ export type AuthoritativeLineItem = {
   stock: string | null;
 };
 
-export function calculateAuthoritativePricing(items: AuthoritativeLineItem[]): {
+export type AuthoritativePricingOpts = {
+  /** When true, product prices are VAT-inclusive; VAT is extracted after grand total. */
+  pricesIncludeVat?: boolean;
+};
+
+export function calculateAuthoritativePricing(
+  items: AuthoritativeLineItem[],
+  opts?: AuthoritativePricingOpts
+): {
   subtotal: number;
   shipping: number;
   vatAmount: number;
   hasPhysicalItems: boolean;
   hasDigitalItems: boolean;
+  pricesIncludeVat: boolean;
 } {
   let subtotalRaw = 0;
   let hasPhysicalItems = false;
@@ -89,9 +98,28 @@ export function calculateAuthoritativePricing(items: AuthoritativeLineItem[]): {
       hasPhysicalItems,
     })
   );
-  const vatAmount = roundMoney(subtotal * 0.2);
+  const pricesIncludeVat = opts?.pricesIncludeVat === true;
+  // Inclusive mode: VAT is finalized from grand total after discount (see extractVatFromInclusiveGrandTotal).
+  const vatAmount = pricesIncludeVat ? 0 : roundMoney(subtotal * 0.2);
 
-  return { subtotal, shipping, vatAmount, hasPhysicalItems, hasDigitalItems };
+  return {
+    subtotal,
+    shipping,
+    vatAmount,
+    hasPhysicalItems,
+    hasDigitalItems,
+    pricesIncludeVat,
+  };
+}
+
+/**
+ * Extract VAT portion from a VAT-inclusive grand total (20% rate):
+ * vat = round(grand − grand / 1.2, 2).
+ */
+export function extractVatFromInclusiveGrandTotal(grandTotal: number): number {
+  const g = Number(grandTotal);
+  if (!Number.isFinite(g) || g <= 0) return 0;
+  return roundMoney(g - g / 1.2);
 }
 
 export function calculateGrandTotal(opts: {
@@ -99,10 +127,14 @@ export function calculateGrandTotal(opts: {
   shipping: number;
   vatAmount: number;
   discountAmount: number;
+  /** When true: grand = subtotal + shipping − discount (VAT not added). */
+  pricesIncludeVat?: boolean;
 }): number {
-  const total = roundMoney(
-    opts.subtotal + opts.shipping + opts.vatAmount - opts.discountAmount
-  );
+  const total = opts.pricesIncludeVat
+    ? roundMoney(opts.subtotal + opts.shipping - opts.discountAmount)
+    : roundMoney(
+        opts.subtotal + opts.shipping + opts.vatAmount - opts.discountAmount
+      );
   return total < 0 ? 0 : total;
 }
 

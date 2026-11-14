@@ -156,6 +156,8 @@ export const SUPER_ADMIN_SITE_SETTINGS_KEYS = new Set<string>([
   "ads_conv_label_whatsapp",
   /** Seasonal offers hub publication (default unpublished). */
   "seasonal_hub_published",
+  /** When ON, stored product prices are VAT-inclusive (default OFF). */
+  "prices_include_vat",
 ]);
 
 export function isSuperAdminSettingsKey(key: string): boolean {

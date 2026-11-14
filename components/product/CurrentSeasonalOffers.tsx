@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useCart } from "@/app/lib/cartContext";
 import SeasonalCardCountdown from "@/components/product/SeasonalCardCountdown";
+import PriceDisplay from "@/components/PriceDisplay";
 
 export type CurrentSeasonalOfferCard = {
   id: number;
@@ -115,7 +116,7 @@ export default function CurrentSeasonalOffers({
                   {p.name}
                 </a>
                 <div style={{ fontSize: 15, fontWeight: 800, marginTop: 4 }}>
-                  £{Number(p.price).toFixed(2)}
+                  <PriceDisplay price={p.price} />
                 </div>
                 <SeasonalCardCountdown
                   endsAt={p.season_ends_at}
