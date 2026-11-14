@@ -113,13 +113,14 @@ ok("admin_no_window_location", !/window\.location/.test(adminPage));
 ok(
   "admin_uses_next_server_redirect",
   /from\s+["']next\/navigation["']/.test(adminPage) &&
-    /redirect\s*\(\s*["']\/["']\s*\)/.test(adminPage)
+    /permanentRedirect\s*\(\s*["']\/["']\s*\)/.test(adminPage)
 );
 ok(
-  "admin_not_permanentRedirect",
-  !/permanentRedirect/.test(adminPage)
+  "admin_uses_permanentRedirect",
+  /permanentRedirect\s*\(\s*["']\/["']\s*\)/.test(adminPage) &&
+    !/\bredirect\s*\(/.test(adminPage)
 );
-ok("admin_destination_home_not_sidhu", /redirect\s*\(\s*["']\/["']\s*\)/.test(adminPage) && !/sidhu/.test(adminPage));
+ok("admin_destination_home_not_sidhu", /permanentRedirect\s*\(\s*["']\/["']\s*\)/.test(adminPage) && !/sidhu/.test(adminPage));
 
 // --- SIDHU ---
 ok("sidhu_layout_exists", exists("app/sidhu/layout.tsx"));
