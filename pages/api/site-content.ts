@@ -25,6 +25,7 @@ import {
   getCachedPublicSiteContentAll,
   invalidatePublicCmsCache,
 } from '../../lib/publicCmsDataServer';
+import { filterPublicSiteContentMap } from '../../lib/publicSiteContentFilter';
 import {
   SEASONAL_HUB_PUBLISHED_KEY,
   validateSeasonalHubPublicationWrite,
@@ -85,11 +86,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'GET') {
-      const { page } = req.query;
+      const { page, scope } = req.query;
+      const scopeAdmin = String(scope || '') === 'admin';
+
       if (page === 'all') {
+        if (scopeAdmin) {
+          const admin = await requireAdmin(req, res, { mutate: false });
+          if (!admin) return;
+          res.setHeader('Cache-Control', 'no-store');
+          const result = await getCachedPublicSiteContentAll();
+          return res.status(200).json(result);
+        }
         const result = await getCachedPublicSiteContentAll();
-        return res.status(200).json(result);
+        // Filter AFTER cache read — cache shape stays the full map.
+        return res.status(200).json(filterPublicSiteContentMap(result));
       }
+
+      // Any page value other than "all" is admin-only (locked public branch).
+      // Public → 401 with constant body { error: "Unauthorized" } via requireAdmin
+      // (same as SITE_CONTENT_PAGE_LOCKED_BODY in lib/publicSiteContentFilter).
+      const admin = await requireAdmin(req, res, { mutate: false });
+      if (!admin) return;
+      res.setHeader('Cache-Control', 'no-store');
       let query = 'SELECT content_key, content_value, content_type, page_name, label FROM site_content';
       const params: any[] = [];
       if (page && page !== 'all') { query += ' WHERE page_name=?'; params.push(page); }

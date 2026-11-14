@@ -19,6 +19,54 @@ const DEFAULT_BASE = "https://firestick4uk.com";
 const BASELINE_PATH = path.join(ROOT, "scripts", "baselines", "seo-baseline.json");
 const MIN_GAP_MS = 340; // ≤ 3 req/s
 
+/** Shared with lib/publicSiteContentFilter.ts (JSON source of truth). */
+const PUBLIC_SITE_CONTENT_DENYLIST = require(path.join(
+  ROOT,
+  "lib",
+  "publicSiteContentDenylist.json"
+));
+
+/**
+ * Critical public keys — presence only, never log values.
+ * Includes B5 list. Keys that may be defaults-only (not yet seeded in DB) are
+ * asserted when present in the live map's expected set below.
+ */
+const CRITICAL_PUBLIC_KEYS = [
+  "prices_include_vat",
+  "price_incl_vat_suffix",
+  "ads_conv_label_purchase",
+  "ads_conv_label_whatsapp",
+  "bank_account_name",
+  "bank_account_no",
+  "bank_sort_code",
+  "bank_heading",
+  "payment_bank_enabled",
+  "payment_cod_enabled",
+  "contact_email",
+  "contact_phone",
+  "contact_whatsapp",
+  "hero_slide_1",
+  "hero_slide_2",
+  "hero_slide_3",
+  "hero_slide_4",
+  "seasonal_promo_text",
+  "seasonal_promo_cta",
+  "track_email_label",
+  "track_email_placeholder",
+  "track_email_help",
+];
+
+/** Must be present on live production (seeded). */
+const CRITICAL_PUBLIC_KEYS_REQUIRED_LIVE = CRITICAL_PUBLIC_KEYS.filter(
+  (k) =>
+    ![
+      "price_incl_vat_suffix",
+      "track_email_label",
+      "track_email_placeholder",
+      "track_email_help",
+    ].includes(k)
+);
+
 const STATIC_PATHS = [
   "/",
   "/products",
@@ -234,6 +282,59 @@ async function main() {
   );
   await neg("admin_redirect", "GET", "/admin", undefined, 308);
 
+  // MULTI-95 key guard (names / booleans / counts only — never values)
+  const keyGuard = {
+    denylistAbsent: false,
+    denylistHits: 0,
+    criticalPresent: false,
+    criticalMissingCount: 0,
+    pageHome401: false,
+    publicKeyCount: 0,
+  };
+  {
+    const res = await politeFetch(`${base}/api/site-content?page=all`);
+    let map = null;
+    try {
+      map = JSON.parse(await res.text());
+    } catch {
+      map = null;
+    }
+    if (res.status !== 200 || !map || typeof map !== "object" || Array.isArray(map)) {
+      failures.push("keyGuard: page=all not a JSON object map");
+    } else {
+      const keys = Object.keys(map);
+      keyGuard.publicKeyCount = keys.length;
+      const hits = PUBLIC_SITE_CONTENT_DENYLIST.filter((k) =>
+        Object.prototype.hasOwnProperty.call(map, k)
+      );
+      keyGuard.denylistHits = hits.length;
+      keyGuard.denylistAbsent = hits.length === 0;
+      if (hits.length) {
+        failures.push(`keyGuard: denylist keys present (${hits.length})`);
+      }
+      const missing = CRITICAL_PUBLIC_KEYS_REQUIRED_LIVE.filter(
+        (k) => !Object.prototype.hasOwnProperty.call(map, k)
+      );
+      keyGuard.criticalMissingCount = missing.length;
+      keyGuard.criticalPresent = missing.length === 0;
+      if (missing.length) {
+        failures.push(`keyGuard: critical keys missing (${missing.length})`);
+      }
+    }
+  }
+  {
+    const res = await politeFetch(`${base}/api/site-content?page=home`);
+    try {
+      await res.text();
+    } catch {
+      /* ignore */
+    }
+    keyGuard.pageHome401 = res.status === 401;
+    if (res.status !== 401) {
+      failures.push(`keyGuard: page=home expected 401 got ${res.status}`);
+    }
+  }
+
   const summary = {
     ok: failures.length === 0,
     base,
@@ -251,6 +352,7 @@ async function main() {
     seoDiffCount: seoDiffs.length,
     seoDiffs,
     negative,
+    keyGuard,
     failures,
     notes,
   };
@@ -270,6 +372,14 @@ async function main() {
     ``,
     `## Negative API`,
     ...negative.map((n) => `- ${n.name}: ${n.status} (expect ${n.expect}) ${n.ok ? "OK" : "FAIL"}`),
+    ``,
+    `## Key guard (MULTI-95)`,
+    `- denylistAbsent: ${keyGuard.denylistAbsent}`,
+    `- denylistHits: ${keyGuard.denylistHits}`,
+    `- criticalPresent: ${keyGuard.criticalPresent}`,
+    `- criticalMissingCount: ${keyGuard.criticalMissingCount}`,
+    `- pageHome401: ${keyGuard.pageHome401}`,
+    `- publicKeyCount: ${keyGuard.publicKeyCount}`,
     ``,
     `## Security (/)`,
     `- CSP app policy: ${summary.securityHeaders.hasCspAppPolicy}`,

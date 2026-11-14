@@ -37,7 +37,13 @@ const provider = read("components/SiteContentProvider.tsx");
 const homeClient = read("app/HomeClient.tsx");
 const db = read("lib/db.ts");
 
-ok("A_page_all_uses_cached_loader", /page === 'all'[\s\S]{0,180}getCachedPublicSiteContentAll\(/.test(siteContent));
+// MULTI-95: page=all has public (filtered) + scope=admin (full) paths; both use the cached loader.
+ok(
+  "A_page_all_uses_cached_loader",
+  /page === 'all'/.test(siteContent) &&
+    (siteContent.match(/getCachedPublicSiteContentAll\(/g) || []).length >= 2 &&
+    /filterPublicSiteContentMap/.test(siteContent)
+);
 ok(
   "B_non_all_get_still_queries",
   /if \(page === 'all'\)/.test(siteContent) &&
@@ -46,7 +52,8 @@ ok(
 );
 ok(
   "C_mutations_do_not_read_public_cache",
-  (siteContent.match(/getCachedPublicSiteContentAll\(/g) || []).length === 1 &&
+  // MULTI-95: two GET page=all reads (public + admin); mutations must not call the cache loader.
+  (siteContent.match(/getCachedPublicSiteContentAll\(/g) || []).length === 2 &&
     !/req\.method === 'POST'[\s\S]*getCachedPublicSiteContentAll/.test(siteContent) &&
     !/req\.method === 'PUT'[\s\S]*getCachedPublicSiteContentAll/.test(siteContent) &&
     !/req\.method === 'DELETE'[\s\S]*getCachedPublicSiteContentAll/.test(siteContent)
@@ -101,8 +108,10 @@ ok(
 );
 ok(
   "L_no_http_cache_broadening",
+  // MULTI-95: admin scope / locked ?page= sets Cache-Control no-store only (not public s-maxage).
   /Cache-Control", value: "no-store, no-cache, must-revalidate"/.test(nextConfig) &&
-    !/s-maxage|Cache-Control/.test(siteContent) &&
+    !/s-maxage/.test(siteContent) &&
+    /Cache-Control['"],\s*['"]no-store['"]/.test(siteContent) &&
     !/s-maxage|Cache-Control/.test(sections) &&
     !/s-maxage|Cache-Control/.test(helper)
 );

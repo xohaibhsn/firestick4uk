@@ -1237,7 +1237,7 @@ export default function AdminPage() {
     if (!loggedIn) return;
     if (tab !== "settings" && tab !== "pages") return;
     if (!can("content.manage") && !can("settings.manage")) return;
-    fetch("/api/site-content?page=all")
+    fetch("/api/site-content?page=all&scope=admin", { credentials: "include" })
       .then((r) => r.json())
       .then((d) => {
         if (d && typeof d === "object") setSiteContent(d);
@@ -1287,7 +1287,7 @@ export default function AdminPage() {
       for (const u of updates) savedValues[u.key] = String(u.value ?? "");
       setSiteContent((s) => ({ ...s, ...savedValues }));
       // Background reconcile — only touch the keys we just saved so other unsaved edits survive.
-      fetch("/api/site-content?page=all", { cache: "no-store" })
+      fetch("/api/site-content?page=all&scope=admin", { cache: "no-store", credentials: "include" })
         .then((r) => r.json())
         .then((d) => {
           if (!d || typeof d !== "object") return;
