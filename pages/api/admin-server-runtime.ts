@@ -1,13 +1,14 @@
 /**
  * Super-admin read-only hosting process/thread snapshot (HOST-PROC-2).
  * GET only. Never reads process environment files. Never returns full argv.
- * MULTI-93: also returns a read-only request IP-chain diagnostic for the CURRENT
- * request only (never logged/stored). Client-IP selection for rate limits is unchanged.
+ * MULTI-93/94: also returns a read-only request IP-chain diagnostic for the CURRENT
+ * request only (never logged/stored), including selectedClientIp from getClientIp.
  */
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdminRole } from "../../lib/adminAuth";
 import { setAdminNoStore } from "../../lib/adminNoStore";
 import { getCachedServerRuntime } from "../../lib/serverRuntime";
+import { getClientIp } from "../../lib/rateLimit";
 
 /** CDN / proxy client-IP header names inspected when present (names + values). */
 const CDN_CLIENT_IP_HEADER_NAMES = [
@@ -42,6 +43,7 @@ export function buildRequestIpChain(req: {
   xRealIp: string | null;
   cdnClientIpHeaders: { name: string; value: string }[];
   remoteAddress: string | null;
+  selectedClientIp: string;
 } {
   const cdnClientIpHeaders: { name: string; value: string }[] = [];
   for (const name of CDN_CLIENT_IP_HEADER_NAMES) {
@@ -53,6 +55,7 @@ export function buildRequestIpChain(req: {
     xRealIp: headerValue(req.headers["x-real-ip"]),
     cdnClientIpHeaders,
     remoteAddress: req.socket?.remoteAddress ? String(req.socket.remoteAddress) : null,
+    selectedClientIp: getClientIp(req),
   };
 }
 

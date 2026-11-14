@@ -14,6 +14,7 @@ import {
   type SeoIssueReconcileScope,
 } from "@/lib/seoIssueMemory";
 import { reconcileSeoIssueMemory } from "@/lib/seoIssueMemoryServer";
+import { getClientIp } from "@/lib/rateLimit";
 
 function parseScope(body: any): SeoIssueReconcileScope | { error: string } {
   const scope = String(body?.scope || "").trim().toLowerCase();
@@ -96,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         resolved: result.resolved,
         resolutionReasons: result.resolutionReasons,
       },
-      ip: String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || ""),
+      ip: getClientIp(req).slice(0, 64),
     });
     return res.status(200).json(result);
   } catch (err: any) {

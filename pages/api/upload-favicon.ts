@@ -13,13 +13,13 @@ import {
 } from "../../lib/imageUploadValidation";
 import { invalidateFaviconCache } from "../../lib/hostingerResourceInvalidation";
 import { invalidatePublicCmsCache } from "../../lib/publicCmsDataServer";
+import { getClientIp } from "../../lib/rateLimit";
 
 export const config = { api: { bodyParser: { sizeLimit: "2mb" } } };
 
 function clientIp(req: NextApiRequest): string | null {
-  const xf = req.headers["x-forwarded-for"];
-  if (typeof xf === "string" && xf.trim()) return xf.split(",")[0].trim().slice(0, 64);
-  return req.socket?.remoteAddress?.slice(0, 64) || null;
+  const ip = getClientIp(req).slice(0, 64);
+  return ip === "unknown" ? null : ip;
 }
 
 function hasCloudinary(): boolean {

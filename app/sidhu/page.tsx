@@ -6465,6 +6465,10 @@ export default function AdminPage() {
                       </div>
                       <div style={{ fontSize: 12, color: "#111", lineHeight: 1.55, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }}>
                         <div>
+                          <span style={{ color: "#888" }}>Selected client IP (rate-limit key):</span>{" "}
+                          {serverRuntime.requestIpChain.selectedClientIp || "—"}
+                        </div>
+                        <div>
                           <span style={{ color: "#888" }}>X-Forwarded-For:</span>{" "}
                           {serverRuntime.requestIpChain.xForwardedFor || "—"}
                         </div>

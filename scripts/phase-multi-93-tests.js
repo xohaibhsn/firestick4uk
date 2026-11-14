@@ -109,10 +109,13 @@ async function main() {
     "runtime_api_includes_requestIpChain",
     /requestIpChain:\s*buildRequestIpChain\(req\)/.test(read("pages/api/admin-server-runtime.ts"))
   );
+  // STALE (MULTI-93): asserted first-XFF getClientIp + no getClientIp in runtime API.
+  // MULTI-94: selectedClientIp = getClientIp(req) (right-most public hop).
   ok(
-    "runtime_api_does_not_change_getClientIp",
-    !/getClientIp/.test(read("pages/api/admin-server-runtime.ts")) &&
-      /x-forwarded-for.*split\(","\)\[0\]/.test(read("lib/rateLimit.ts"))
+    "runtime_api_includes_selectedClientIp_via_getClientIp",
+    /getClientIp/.test(read("pages/api/admin-server-runtime.ts")) &&
+      /selectedClientIp:\s*getClientIp\(req\)/.test(read("pages/api/admin-server-runtime.ts")) &&
+      !/x-forwarded-for.*split\(","\)\[0\]/.test(read("lib/rateLimit.ts"))
   );
   ok(
     "sidhu_ip_chain_block",
@@ -224,6 +227,7 @@ async function main() {
         chain.xForwardedFor === "198.51.100.22" &&
         chain.xRealIp === "198.51.100.22" &&
         chain.remoteAddress === "127.0.0.1" &&
+        chain.selectedClientIp === "198.51.100.22" &&
         Array.isArray(chain.cdnClientIpHeaders) &&
         chain.cdnClientIpHeaders.some((h) => h.name === "cf-connecting-ip")
     );

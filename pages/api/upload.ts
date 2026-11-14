@@ -12,6 +12,7 @@ import {
   parseDataUrlImage,
   sanitizeUploadFilename,
 } from "../../lib/imageUploadValidation";
+import { getClientIp } from "../../lib/rateLimit";
 
 /** Cap libvips worker threads for this Hostinger account (HOST-PROC-2). */
 sharp.concurrency(1);
@@ -22,9 +23,8 @@ export const config = {
 };
 
 function clientIp(req: NextApiRequest): string | null {
-  const xf = req.headers["x-forwarded-for"];
-  if (typeof xf === "string" && xf.trim()) return xf.split(",")[0].trim().slice(0, 64);
-  return req.socket?.remoteAddress?.slice(0, 64) || null;
+  const ip = getClientIp(req).slice(0, 64);
+  return ip === "unknown" ? null : ip;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

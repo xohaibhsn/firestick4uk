@@ -3,6 +3,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
 import { hasAdminPermission, type AdminPermission } from "@/lib/adminPermissions";
+import { getClientIp } from "@/lib/rateLimit";
 
 export type AdminRole = "super_admin" | "manager" | "writer";
 export type PrincipalType = "master" | "staff";
@@ -207,14 +208,9 @@ export function clearAdminSessionCookie(res: NextApiResponse, req: NextApiReques
 }
 
 export function getRequestMeta(req: NextApiRequest): { ip: string; userAgent: string } {
-  const xf = req.headers["x-forwarded-for"];
-  const ip =
-    (typeof xf === "string" ? xf.split(",")[0].trim() : "") ||
-    String(req.headers["x-real-ip"] || "") ||
-    req.socket?.remoteAddress ||
-    "";
+  const ip = getClientIp(req).slice(0, 64);
   const ua = String(req.headers["user-agent"] || "").slice(0, 512);
-  return { ip: ip.slice(0, 64), userAgent: ua };
+  return { ip, userAgent: ua };
 }
 
 /**
