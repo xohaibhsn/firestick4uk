@@ -88,6 +88,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...(result.productVersion != null ? { product_version: result.productVersion } : {}),
     });
   } catch (error: any) {
-    return res.status(500).json({ error: error?.message || "Migration failed" });
+    const errCode = typeof error?.code === "string" ? error.code : undefined;
+    const errName = typeof error?.name === "string" ? error.name : "Error";
+    console.error("[admin-product-url-migration] failed", errCode || errName);
+    return res.status(500).json({ error: "Request failed" });
   }
 }

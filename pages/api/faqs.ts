@@ -3,6 +3,10 @@ import pool from '../../lib/db';
 import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
 import { setAdminNoStore } from '../../lib/adminNoStore';
+import { getClientIp, RL_PUBLIC_GET } from '../../lib/rateLimit';
+
+/** Columns used by public FAQ UI (FAQClient, contact preview, PublicFaq). */
+const PUBLIC_FAQ_COLUMNS = 'id, question, answer, category, sort_order';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -18,11 +22,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         setAdminNoStore(res);
         const identity = await requireAdminPermission(req, res, 'faqs.manage', { mutate: false });
         if (!identity) return;
+        let query = 'SELECT * FROM faqs';
+        query += ' ORDER BY category, sort_order ASC';
+        const [rows] = await pool.query(query);
+        return res.status(200).json(Array.isArray(rows)?rows:[]);
       }
-      let query = 'SELECT * FROM faqs';
-      if (!admin) query += ' WHERE is_visible=1';
-      query += ' ORDER BY category, sort_order ASC';
-      const [rows] = await pool.query(query);
+
+      const ip = getClientIp(req);
+      const { allowed, retryAfterSec } = RL_PUBLIC_GET(ip, 'faqs');
+      if (!allowed) {
+        res.setHeader('Retry-After', String(retryAfterSec));
+        return res.status(429).json({ error: 'Too many requests' });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT ${PUBLIC_FAQ_COLUMNS} FROM faqs WHERE is_visible=1 ORDER BY category, sort_order ASC`
+      );
       return res.status(200).json(Array.isArray(rows)?rows:[]);
     }
 
@@ -88,6 +103,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+    const errCode = typeof error?.code === 'string' ? error.code : undefined;
+    const errName = typeof error?.name === 'string' ? error.name : 'Error';
+    console.error('[faqs] failed', errCode || errName);
+    return res.status(500).json({ error: 'Request failed' });
   }
 }

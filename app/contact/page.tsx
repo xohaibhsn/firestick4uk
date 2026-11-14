@@ -66,6 +66,7 @@ const styles = `
   .form-title { font-family:var(--font-display); font-size:19px; font-weight:700; color:#111111;
     margin-bottom:22px; padding-bottom:14px; border-bottom:1px solid #F0F0F0; }
   .form-group { margin-bottom:16px; }
+  .hp-field { position:absolute; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden; }
   .form-group label { display:block; font-size:11px; letter-spacing:2px; text-transform:uppercase;
     color:#666666; margin-bottom:7px; font-weight:600; }
   .form-group input, .form-group select, .form-group textarea {
@@ -148,7 +149,7 @@ const styles = `
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "", website: "" });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [faqs, setFaqs] = useState<{ id: number; question: string; answer: string }[]>([]);
@@ -279,6 +280,18 @@ export default function ContactPage() {
                 <div className="form-group">
                   <label>{t("contact_lbl_message", "Message *")}</label>
                   <textarea placeholder="How can we help you?" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} />
+                </div>
+                <div className="hp-field" aria-hidden="true">
+                  <label htmlFor="contact-website">Website</label>
+                  <input
+                    id="contact-website"
+                    type="text"
+                    name="website"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={form.website}
+                    onChange={e => setForm({ ...form, website: e.target.value })}
+                  />
                 </div>
                 {formError && <p style={{ color: "#DC2626", fontSize: 13, marginBottom: 10 }}>{formError}</p>}
                 <button className="submit-btn" onClick={handleSubmit}

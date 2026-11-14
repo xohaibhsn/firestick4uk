@@ -8,6 +8,7 @@ import {
   getCachedPublicVisibleSections,
   invalidatePublicCmsCache,
 } from '../../lib/publicCmsDataServer';
+import { getClientIp, RL_PUBLIC_GET } from '../../lib/rateLimit';
 
 async function loadSection(key: string) {
   const [rows]: any = await pool.query(
@@ -54,6 +55,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       const pageArg = page || 'home';
       if (!all && typeof pageArg === 'string') {
+        const ip = getClientIp(req);
+        const { allowed, retryAfterSec } = RL_PUBLIC_GET(ip, 'sections');
+        if (!allowed) {
+          res.setHeader('Retry-After', String(retryAfterSec));
+          return res.status(429).json({ error: 'Too many requests' });
+        }
         const result = await getCachedPublicVisibleSections(pageArg);
         return res.status(200).json(result);
       }
@@ -223,6 +230,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+    const errCode = typeof error?.code === 'string' ? error.code : undefined;
+    const errName = typeof error?.name === 'string' ? error.name : 'Error';
+    console.error('[sections] failed', errCode || errName);
+    return res.status(500).json({ error: 'Request failed' });
   }
 }

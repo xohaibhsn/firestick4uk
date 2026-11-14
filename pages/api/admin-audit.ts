@@ -107,6 +107,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       pagination: { page, limit, total, totalPages },
     });
   } catch (error: any) {
-    return res.status(500).json({ error: error?.message || "Audit fetch failed" });
+    const errCode = typeof error?.code === "string" ? error.code : undefined;
+    const errName = typeof error?.name === "string" ? error.name : "Error";
+    console.error("[admin-audit] failed", errCode || errName);
+    return res.status(500).json({ error: "Request failed" });
   }
 }

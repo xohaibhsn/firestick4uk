@@ -48,6 +48,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }));
     return res.status(200).json(filtered);
   } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+    const errCode = typeof error?.code === 'string' ? error.code : undefined;
+    const errName = typeof error?.name === 'string' ? error.name : 'Error';
+    console.error('[search] failed', errCode || errName);
+    return res.status(500).json({ error: 'Request failed' });
   }
 }

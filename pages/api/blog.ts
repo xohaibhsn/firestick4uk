@@ -13,6 +13,7 @@ import {
   requireSuppliedBlogStatus,
   updateBlogPost,
 } from '../../lib/blogPersistenceServer';
+import { getClientIp, RL_PUBLIC_GET } from '../../lib/rateLimit';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -27,6 +28,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Public: published + active slug lookup only (no admin session).
       if (slug) {
+        const ip = getClientIp(req);
+        const { allowed, retryAfterSec } = RL_PUBLIC_GET(ip, 'blog');
+        if (!allowed) {
+          res.setHeader('Retry-After', String(retryAfterSec));
+          return res.status(429).json({ error: 'Too many requests' });
+        }
         const [rows]: any = await pool.query(
           'SELECT * FROM blog_posts WHERE slug = ? AND status = "published" AND active = 1 LIMIT 1',
           [slug]
@@ -171,6 +178,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+    const errCode = typeof error?.code === 'string' ? error.code : undefined;
+    const errName = typeof error?.name === 'string' ? error.name : 'Error';
+    console.error('[blog] failed', errCode || errName);
+    return res.status(500).json({ error: 'Request failed' });
   }
 }

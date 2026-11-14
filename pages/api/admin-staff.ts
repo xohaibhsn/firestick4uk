@@ -223,6 +223,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(405).json({ error: "Method not allowed" });
   } catch (error: any) {
-    return res.status(500).json({ error: error?.message || "Staff request failed" });
+    const errCode = typeof error?.code === "string" ? error.code : undefined;
+    const errName = typeof error?.name === "string" ? error.name : "Error";
+    console.error("[admin-staff] failed", errCode || errName);
+    return res.status(500).json({ error: "Request failed" });
   }
 }

@@ -60,6 +60,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ success: true, sessionsRevoked: true });
   } catch (error: any) {
-    return res.status(500).json({ error: error?.message || "Password reset failed" });
+    const errCode = typeof error?.code === "string" ? error.code : undefined;
+    const errName = typeof error?.name === "string" ? error.name : "Error";
+    console.error("[admin-staff-password] failed", errCode || errName);
+    return res.status(500).json({ error: "Request failed" });
   }
 }
