@@ -8,6 +8,30 @@
  *
  * Uses only __rm_runtime_* sources and always deletes them.
  */
+// ENV triage: this suite needs a running production server (BASE_URL) AND mutates url_redirects in the DB that
+// .env.local points at. Default `run all phase-*-tests.js` must not touch it; skip (exit 0) unless explicitly enabled.
+if (
+  process.env.ALLOW_DB_MUTATION_TESTS !== "YES_I_UNDERSTAND" ||
+  process.env.RM_B3_HTTP_E2E !== "1"
+) {
+  console.log(
+    "[phase-rm-b3-http-runtime-tests] SKIPPED — set RM_B3_HTTP_E2E=1 and ALLOW_DB_MUTATION_TESTS=YES_I_UNDERSTAND " +
+      "with a local production server on BASE_URL (see header)."
+  );
+  process.exit(0);
+}
+// ENV triage: this suite needs a running production server (BASE_URL) AND mutates url_redirects in the DB that
+// .env.local points at. Default `run all phase-*-tests.js` must not touch it; skip (exit 0) unless explicitly enabled.
+if (
+  process.env.ALLOW_DB_MUTATION_TESTS !== "YES_I_UNDERSTAND" ||
+  process.env.RM_B3_HTTP_E2E !== "1"
+) {
+  console.log(
+    "[phase-rm-b3-http-runtime-tests] SKIPPED — set RM_B3_HTTP_E2E=1 and ALLOW_DB_MUTATION_TESTS=YES_I_UNDERSTAND " +
+      "with a local production server on BASE_URL (see header)."
+  );
+  process.exit(0);
+}
 require("dotenv").config({ path: ".env.local" });
 const http = require("http");
 const mysql = require("mysql2/promise");

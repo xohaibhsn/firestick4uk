@@ -33,12 +33,31 @@ const saveSnippet =
 
 ok("saveProduct_found", saveSnippet.includes('const isNew = productModal === "new"'));
 
+// 16a0887 added a local-state-only `{ id: res.id, active: 1, ...localFields }` in the isNew branch
+// (page.tsx:2404; matches INSERT ... active=1 at pages/api/admin-products.ts:172). Scope the guard to the
+// actual request body (payload object + JSON.stringify(...) argument), not the post-success UI update.
+const payloadStart = saveSnippet.indexOf("const payload = {");
+const payloadObj =
+  payloadStart >= 0
+    ? saveSnippet.slice(payloadStart, saveSnippet.indexOf("};", payloadStart))
+    : "";
+const bodyStart = saveSnippet.indexOf("body: JSON.stringify(");
+const requestBody =
+  bodyStart >= 0
+    ? saveSnippet.slice(bodyStart, saveSnippet.indexOf("if (r.status === 401)", bodyStart))
+    : "";
 ok(
   "existing_put_omits_active_1",
-  /isNew\s*\?/.test(saveSnippet) &&
-    /payload/.test(saveSnippet) &&
-    !/active:\s*1/.test(saveSnippet) &&
-    !/, active:/.test(saveSnippet)
+  /isNew\s*\?/.test(requestBody) &&
+    payloadObj.length > 0 &&
+    requestBody.length > 0 &&
+    !/\bactive\b/.test(payloadObj) &&
+    !/\bactive\b/.test(requestBody)
+);
+ok(
+  "new_product_local_active_1_only_in_isNew_branch",
+  /if \(isNew\) \{[\s\S]*?active: 1[\s\S]*?\} else if \(savedModal/.test(saveSnippet) &&
+    (saveSnippet.match(/active:\s*1/g) || []).length === 1
 );
 
 ok(

@@ -215,16 +215,27 @@ const saveIdx = sidhu.indexOf("const saveProduct = async () => {");
 const saveEnd = sidhu.indexOf("const resetProductAiState", saveIdx);
 const saveSnippet =
   saveIdx >= 0 && saveEnd > saveIdx ? sidhu.slice(saveIdx, saveEnd) : "";
+// 16a0887: post-success local state for NEW products is `{ id: res.id, active: 1, ...localFields }` (page.tsx:2404).
+// The PUT body is only `...payload` + id + expected_version; assert on the request body, not the whole function.
+const payloadStart = saveSnippet.indexOf("const payload = {");
+const payloadObj =
+  payloadStart >= 0
+    ? saveSnippet.slice(payloadStart, saveSnippet.indexOf("};", payloadStart))
+    : "";
+const bodyStart = saveSnippet.indexOf("body: JSON.stringify(");
+const requestBody =
+  bodyStart >= 0
+    ? saveSnippet.slice(bodyStart, saveSnippet.indexOf("if (r.status === 401)", bodyStart))
+    : "";
 ok(
   "ordinary_edit_omits_active",
-  /isNew\s*\?\s*payload\s*:/.test(saveSnippet) &&
-    /\.\.\.payload/.test(saveSnippet) &&
-    /id:\s*\(productModal/.test(saveSnippet) &&
-    /expected_version/.test(saveSnippet) &&
-    !/, active:/.test(saveSnippet) &&
-    !/active:\s*0/.test(saveSnippet) &&
-    !/active:\s*1/.test(saveSnippet) &&
-    !/\bactive\b\s*:/.test(saveSnippet)
+  /isNew\s*\?\s*payload\s*:/.test(requestBody) &&
+    /\.\.\.payload/.test(requestBody) &&
+    /id:\s*\(productModal/.test(requestBody) &&
+    /expected_version/.test(requestBody) &&
+    payloadObj.length > 0 &&
+    !/\bactive\b/.test(payloadObj) &&
+    !/\bactive\b/.test(requestBody)
 );
 ok("preservation_script_still_present", /PS-ACTIVE/.test(preserveScript));
 

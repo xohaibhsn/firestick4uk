@@ -59,7 +59,9 @@ ok(
 );
 ok(
   "security_x_frame",
-  /X-Frame-Options/.test(securityBlock) && /DENY/.test(securityBlock)
+  // 5c46c58: intentional same-origin framing (CSP frame-ancestors 'self' too); DENY retired.
+  /key:\s*["']X-Frame-Options["'],\s*value:\s*["']SAMEORIGIN["']/.test(securityBlock) &&
+    !/X-Frame-Options["'],\s*value:\s*["']DENY["']/.test(securityBlock)
 );
 ok(
   "security_xss",

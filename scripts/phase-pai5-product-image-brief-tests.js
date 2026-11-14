@@ -615,9 +615,12 @@ console.log("\nPAI-5 Product Image Brief\n");
   );
   ok(
     "P_one_call_no_polling",
-    !/setInterval|poll.*image_brief|while\s*\(.*image/.test(
-      sidhuSrc + clientSrc + seoAiServerSrc
-    )
+    !/poll.*image_brief|while\s*\(.*image/.test(sidhuSrc + clientSrc + seoAiServerSrc) &&
+      // Brief client/server never poll. Sidhu has two unrelated, documented timers:
+      // 97ac729 (1s server-runtime cooldown tick) and 16a0887 (60s orders auto-refresh).
+      !/setInterval/.test(clientSrc + seoAiServerSrc) &&
+      !/setInterval[\s\S]{0,400}(image_?brief|ImageBrief)/i.test(sidhuSrc) &&
+      !/(image_?brief|ImageBrief)[\s\S]{0,400}setInterval/i.test(sidhuSrc)
   );
 }
 

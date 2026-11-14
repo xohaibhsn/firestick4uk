@@ -152,7 +152,9 @@ ok(
 );
 ok(
   "sitemap_h5_architecture_retained",
-  /getCachedSitemapDynamicData/.test(sitemap) &&
+  // f904ddb: route calls getSitemapDynamicDataSafe(); getCachedSitemapDynamicData (unstable_cache) lives in the data module.
+  /getSitemapDynamicDataSafe/.test(sitemap) &&
+    /getCachedSitemapDynamicData/.test(sitemapData) &&
     /export const dynamic = ["']force-dynamic["']/.test(sitemap) &&
     /export const revalidate = 0/.test(sitemap) &&
     /SITEMAP_CACHE_TTL_SECONDS\s*=\s*300/.test(sitemapData) &&

@@ -434,8 +434,10 @@ console.log("\nPAI-6 Product SEO Review Queue\n");
   );
   ok(
     "NW_no_issue_memory_on_products_load",
-    !/loadProducts[\s\S]{0,500}admin-seo-issues|loadProducts[\s\S]{0,500}reconcile/.test(
-      sidhuSrc
+    // 16a0887 added the comment "Remove locally right away, then reconcile" after loadProducts() in
+    // deleteProduct; match code only (strip // comments) so prose cannot trip the guard.
+    !/loadProducts[\s\S]{0,500}(admin-seo-issues|reconcile)/.test(
+      sidhuSrc.replace(/^\s*\/\/.*$/gm, "").replace(/\s\/\/ .*$/gm, "")
     )
   );
   ok(

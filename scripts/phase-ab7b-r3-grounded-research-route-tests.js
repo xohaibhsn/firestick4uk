@@ -1393,6 +1393,10 @@ async function main() {
       // Existing JSEO regression suites that assert route presence/isolation
       "scripts/phase-jseo-w1-daily-work-queue-tests.js",
       "scripts/phase-jseo-w2b-planning-readiness-tests.js",
+      // 0e16bcd (W1-59 S2): JSEO-B2 asserts SeoOverviewPanel POSTs /api/admin-blog-research (da6afbe)
+      "scripts/phase-jseo-b2-controls-tests.js",
+      // 16a0887: SEAS-72 no-store allowlist names POST-only admin-blog-research.ts
+      "scripts/phase-seasonal-ux-72-tests.js",
     ]);
     const unexpected = repoRefs.filter((r) => !allowed.has(r));
     ok(

@@ -96,7 +96,9 @@ ok(
 ok("sitemap_order_tracking_retained", /\/order-tracking/.test(sitemap));
 ok(
   "sitemap_h5_architecture_unchanged",
-  /getCachedSitemapDynamicData/.test(sitemap) &&
+  // f904ddb: route calls getSitemapDynamicDataSafe(); getCachedSitemapDynamicData (unstable_cache) lives in the data module.
+  /getSitemapDynamicDataSafe/.test(sitemap) &&
+    /getCachedSitemapDynamicData/.test(sitemapData) &&
     /export const dynamic = ["']force-dynamic["']/.test(sitemap) &&
     /SITEMAP_CACHE_TTL_SECONDS\s*=\s*300/.test(sitemapData) &&
     /unstable_cache/.test(sitemapData) &&

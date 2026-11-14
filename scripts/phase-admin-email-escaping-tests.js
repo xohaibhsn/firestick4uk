@@ -106,7 +106,11 @@ ok(
 );
 ok(
   "admin_notes_escape_before_br",
-  /escapeHtmlWithLineBreaks\(notesToStore\)/.test(orders) ||
+  // 545ff45: notes are first mapped by formatAdminEmailNotesDisplay (plain text only, pages/api/orders.ts:82-96),
+  // then escaped + <br/> by escapeHtmlWithLineBreaks (lib/contentHtml.ts:25-27: escapeHtml THEN \n -> <br />).
+  /safeAdminNotes\s*=\s*escapeHtmlWithLineBreaks\(\s*(?:formatAdminEmailNotesDisplay\(notesToStore\)|notesToStore)\s*\)/.test(
+    orders
+  ) ||
     /escapeHtml\(String\(notesToStore[\s\S]{0,40}\)\.replace/.test(orders)
 );
 ok(

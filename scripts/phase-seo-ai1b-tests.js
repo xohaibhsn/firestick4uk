@@ -872,9 +872,18 @@ const blogDraftRow = {
       /setBlogMetaAi\(\{ status: "idle" \}\);\s*setBlogModal\(null\)/.test(sidhuSrc)
   );
 
-  ok(
+  {
+    // 98f024a: page.tsx:2539 `setEditProduct(p => ({...p, slug: res.new_slug}))` is the authenticated Product URL
+    // Migration handler, not AI Apply. Scope the product-slug guard to the AI Apply block (as AN/AO do).
+    const aqProductAiOk = sidhuSrc.indexOf('productMetaAi.status === "ok"');
+    const aqProductApplyBlock = sidhuSrc.slice(
+      aqProductAiOk,
+      sidhuSrc.indexOf("SEO Title", aqProductAiOk)
+    );
+    ok(
     "AQ_apply_does_not_alter_slug_canonical_status",
-    !/setEditProduct\(\(p\) => \(\{ \.\.\.p, slug:/.test(sidhuSrc) &&
+    aqProductApplyBlock.length > 0 &&
+      !/setEditProduct\(\(p\) => \(\{ \.\.\.p, slug:/.test(aqProductApplyBlock) &&
       !/setEditBlog\(\(p\) => \(\{ \.\.\.p, slug:/.test(sidhuSrc) &&
       !/setEditBlog\(\(p\) => \(\{ \.\.\.p, canonical_url:/.test(
         sidhuSrc.slice(sidhuSrc.indexOf("blogMetaAi.result.titles.map"))
@@ -883,6 +892,7 @@ const blogDraftRow = {
         sidhuSrc.slice(sidhuSrc.indexOf("blogMetaAi.result.titles.map"))
       )
   );
+  }
 
   ok(
     "AR_ai_state_reset_between_entities",

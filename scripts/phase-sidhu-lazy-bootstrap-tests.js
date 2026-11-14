@@ -124,7 +124,11 @@ ok(
 
 ok(
   "N_dashboard_recent_orders",
-  /\/api\/admin-orders\?page=1&limit=10/.test(tabRegion)
+  // 16a0887: the fetch moved into refreshRecentOrders() (page.tsx:585-598); the dashboard branch of the
+  // tab-scoped effect still triggers it (page.tsx:955), so recent orders stay dashboard-lazy.
+  /const refreshRecentOrders = async/.test(sidhu) &&
+    /\/api\/admin-orders\?page=1&limit=10/.test(sidhu) &&
+    /tab === ["']dashboard["'][\s\S]{0,900}void refreshRecentOrders\(\)/.test(tabRegion)
 );
 
 ok(
@@ -133,9 +137,27 @@ ok(
     !/\/api\/admin-seo-overview/.test(tabRegion)
 );
 
+// The tab-scoped bootstrap effect itself must never poll. Bound it by the next top-level effect instead of a
+// fixed 6500/8000-char window (97ac729 added a 1s runtime-cooldown timer, 16a0887 a 60s auto-refresh; both
+// live in their own effects).
+const tabEffectStart = sidhu.indexOf("useEffect(", tabEffectIdx);
+const tabEffectEnd = sidhu.indexOf("\n  useEffect(", tabEffectStart + 10);
+const tabEffectOnly =
+  tabEffectStart >= 0 && tabEffectEnd > tabEffectStart
+    ? sidhu.slice(tabEffectStart, tabEffectEnd)
+    : "";
 ok(
   "P_no_polling",
-  !/setInterval\s*\(/.test(tabRegion) && !/setInterval\s*\(/.test(sidhu.match(/Tab-scoped[\s\S]{0,8000}/)?.[0] || "")
+  tabEffectOnly.length > 0 && !/setInterval\s*\(/.test(tabEffectOnly)
+);
+ok(
+  "P2_auto_refresh_is_guarded_60s",
+  // 16a0887 (instant updates): single 60s tick, visible-tab only, skipped while modals are open, no overlap, orders.view only.
+  /window\.setInterval\(\(\) => \{ void tick\(\); \}, 60000\)/.test(sidhu) &&
+    /document\.hidden/.test(sidhu) &&
+    /autoRefreshBlockedRef\.current/.test(sidhu) &&
+    /autoRefreshLockRef\.current/.test(sidhu) &&
+    /autoRefreshTickRef\.current = async \(\) => \{\s*if \(!can\("orders\.view"\)\) return;/.test(sidhu)
 );
 
 ok(

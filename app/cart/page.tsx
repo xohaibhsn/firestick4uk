@@ -1027,7 +1027,7 @@ export default function CartPage() {
               <div style={{padding:"0 20px 16px"}}>
                 <div style={{display:"flex",gap:8,marginBottom:6}} className="coupon-row">
                   <input style={{flex:1,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"8px 12px",color:"white",fontSize:13,outline:"none"}} placeholder={t("cart_coupon_ph", "Coupon code")} value={couponCode} onChange={e=>setCouponCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&applyCoupon()} />
-                  <button type="button" style={{background:"rgba(139,0,255,0.2)",border:"1px solid rgba(139,0,255,0.4)",color:"#5B21B6",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,whiteSpace:"nowrap",minHeight:44,minWidth:44}} onClick={applyCoupon} disabled={couponChecking}>{couponChecking?"...":t("cart_apply", "Apply")}</button>
+                  <button type="button" style={{background:"#5B21B6",border:"1px solid #5B21B6",color:"#FFFFFF",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,whiteSpace:"nowrap",minHeight:44,minWidth:44}} onClick={applyCoupon} disabled={couponChecking}>{couponChecking?"...":t("cart_apply", "Apply")}</button>
                 </div>
                 {couponApplied && <div style={{fontSize:12,color:"#00c864"}}>✅ {couponApplied.message} — Save £{discountAmount.toFixed(2)}</div>}
                 {couponError && <div style={{fontSize:12,color:"#ff6666"}}>❌ {couponError}</div>}

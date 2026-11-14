@@ -324,6 +324,18 @@ ok("session_cache_ttl", /SESSION_KEY/.test(classSrc) && /CATALOG_TTL_MS/.test(cl
 ok("abort_on_unmount", /ac\.abort\(\)/.test(hookSrc) && /AbortController/.test(hookSrc));
 ok("coupon_not_in_bar_comment", /Coupons are not applied/.test(mini));
 
+// F4UK-TEST-TRIAGE-90 B: coupon Apply uses white-on-primary-purple (≥4.5:1), matching Add to Cart / checkout-btn.
+const cartPageSrc = read("app/cart/page.tsx");
+const couponApplyBtn = (cartPageSrc.match(
+  /className="coupon-row"[\s\S]{0,600}?<button\b[^>]*onClick=\{applyCoupon\}[^>]*>/
+) || [])[0] || "";
+ok(
+  "coupon_apply_btn_white_on_purple",
+  /color:\s*["']#FFFFFF["']/.test(couponApplyBtn) &&
+    /background:\s*["']#5B21B6["']/.test(couponApplyBtn) &&
+    !/color:\s*["']#5B21B6["']/.test(couponApplyBtn)
+);
+
 function miniVisible({ mounted, pathname, itemCount }) {
   return mounted && !shouldHideMiniCartBar(pathname) && itemCount > 0;
 }

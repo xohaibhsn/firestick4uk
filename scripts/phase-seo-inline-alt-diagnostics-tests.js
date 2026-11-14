@@ -326,10 +326,17 @@ ok(
     !/openai|anthropic|gemini|generateAlt/i.test(api) &&
     !/generateAlt|chatgpt/i.test(panel) &&
     // AI-1A explain controls are click-only on the dedicated endpoint.
+    // 1ba04b4 added an earlier useEffect (researchUiRef sync) so the old first-useEffect..const-can slice now
+    // spans explainIssue(); anchor on the mount effect (the one that fetches the overview) instead.
     /admin-seo-ai/.test(panel) &&
     !/admin-seo-ai/.test(
-      panel.slice(panel.indexOf("useEffect(()"), panel.indexOf("const can ="))
-    )
+      panel.slice(
+        panel.lastIndexOf("useEffect(()", panel.indexOf("let cancelled = false")),
+        panel.indexOf("const can =", panel.indexOf("let cancelled = false"))
+      )
+    ) &&
+    !/useEffect\([\s\S]{0,300}explainIssue/.test(panel) &&
+    /void explainIssue\(/.test(panel)
 );
 
 ok(
