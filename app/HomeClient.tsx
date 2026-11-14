@@ -592,9 +592,9 @@ export default function HomeClient({
         .product-short-desc p { margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:14px; color:#374151; font-family:var(--font-body); }
         .product-short-desc strong,.product-desc strong { font-weight:700; color:#333333; }
         .product-short-desc a,.product-desc a { color:#5B21B6; text-decoration:none; }
-        .product-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; min-width:0; }
-        .product-price { font-size:1.3rem; font-weight:800; letter-spacing:-0.02em; color:#111111; font-family:var(--font-display); white-space:nowrap; min-width:0; flex:1 1 auto; }
-        .add-btn { font-family:var(--font-body); background:#5B21B6; color:#FFFFFF; border:none; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; letter-spacing:0.01em; cursor:pointer; transition:all 0.2s; white-space:nowrap; flex:0 1 auto; min-width:0; min-height:40px; box-sizing:border-box; }
+        .product-footer { display:flex; flex-wrap:nowrap; align-items:center; justify-content:space-between; gap:8px; min-width:0; }
+        .product-price { font-size:1.3rem; font-weight:800; letter-spacing:-0.02em; color:#111111; font-family:var(--font-display); white-space:nowrap; min-width:0; flex:0 1 auto; }
+        .add-btn { font-family:var(--font-body); background:#5B21B6; color:#FFFFFF; border:none; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; letter-spacing:0.01em; cursor:pointer; transition:all 0.2s; white-space:nowrap; flex:0 0 auto; min-width:0; min-height:40px; box-sizing:border-box; }
         .add-btn:hover { background:#1A1A1A; transform:translateY(-1px); }
         .add-btn.added { background:#16A34A; }
         .loading { text-align:center; padding:60px; color:#666666; font-size:18px; }
@@ -678,9 +678,9 @@ export default function HomeClient({
           .product-name{font-size:12px;}
           .product-desc,.product-short-desc{font-size:11px;margin-bottom:8px;}
           .product-short-desc p{font-size:11px;}
-          .product-footer{flex-direction:column;align-items:stretch;}
-          .product-price{font-size:14px;white-space:normal;width:100%;}
-          .add-btn{padding:7px 10px;font-size:11px;width:100%;min-height:40px;}
+          .product-footer{flex-wrap:wrap;flex-direction:column;align-items:stretch;}
+          .product-price{font-size:14px;white-space:normal;width:100%;flex:1 1 100%;}
+          .add-btn{padding:7px 8px;font-size:11px;width:100%;min-height:40px;white-space:normal;}
           .badge{font-size:9px;padding:3px 7px;top:6px;right:6px;}
           .view-all-wrap{padding:14px 16px 36px;}
           .hero{padding:36px 16px 44px;}

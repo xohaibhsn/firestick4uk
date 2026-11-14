@@ -39,8 +39,14 @@ ok(
 ok(
   "A_price_display_mobile_stack_css",
   /@media\s*\(\s*max-width:\s*520px\s*\)/.test(priceDisplay) &&
+    /@media\s*\(\s*max-width:\s*768px\s*\)/.test(priceDisplay) &&
     /flex-direction:\s*column/.test(priceDisplay) &&
     /price-incl-vat-suffix/.test(priceDisplay)
+);
+ok(
+  "A_desktop_footer_nowrap_row",
+  /flex-wrap:\s*nowrap/.test(priceDisplay) &&
+    /flex:\s*0\s+0\s+auto/.test(priceDisplay)
 );
 ok(
   "A_incl_vat_fallback_unchanged",
@@ -50,19 +56,25 @@ ok(
 );
 ok(
   "A_home_product_footer_mobile_stack",
-  /\.product-footer\{flex-direction:column;align-items:stretch;\}/.test(home) &&
-    /\.add-btn\{[^}]*width:100%/.test(home)
+  /\.product-footer\{flex-wrap:wrap;flex-direction:column;align-items:stretch;\}/.test(
+    home
+  ) && /\.add-btn\{[^}]*width:100%/.test(home)
 );
 ok(
   "A_products_product_footer_mobile_stack",
-  /\.product-footer\{flex-direction:column;align-items:stretch;\}/.test(
+  /\.product-footer\{flex-wrap:wrap;flex-direction:column;align-items:stretch;\}/.test(
     products
   ) && /\.add-btn\{[^}]*width:100%/.test(products)
 );
 ok(
-  "A_product_footer_flex_wrap",
-  /product-footer[^;{]*\{[^}]*flex-wrap:\s*wrap/.test(home) &&
-    /product-footer[^;{]*\{[^}]*flex-wrap:\s*wrap/.test(products)
+  "A_product_footer_desktop_nowrap",
+  /product-footer[^;{]*\{[^}]*flex-wrap:\s*nowrap/.test(home) &&
+    /product-footer[^;{]*\{[^}]*flex-wrap:\s*nowrap/.test(products)
+);
+ok(
+  "A_product_footer_mobile_wrap",
+  /\.product-footer\{flex-wrap:wrap;flex-direction:column/.test(home) &&
+    /\.product-footer\{flex-wrap:wrap;flex-direction:column/.test(products)
 );
 
 // B) Home hero secondary CTA fallback matches CMS

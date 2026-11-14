@@ -81,10 +81,10 @@ export default function PriceDisplay({
             line-height: 1.2;
           }
         }
-        /* Shared card price+CTA row: wrap / stack on narrow cards */
+        /* Shared card price+CTA row: desktop stays one row; stack only on narrow */
         .product-footer {
           display: flex;
-          flex-wrap: wrap;
+          flex-wrap: nowrap;
           align-items: center;
           justify-content: space-between;
           gap: 8px;
@@ -93,27 +93,30 @@ export default function PriceDisplay({
         .product-footer .product-price,
         .product-footer [data-price-display] {
           min-width: 0;
-          flex: 1 1 auto;
+          flex: 0 1 auto;
         }
         .product-footer .add-btn {
-          flex: 0 1 auto;
+          flex: 0 0 auto;
           min-width: 0;
           min-height: 40px;
           box-sizing: border-box;
         }
-        @media (max-width: 520px) {
+        @media (max-width: 768px) {
           .product-footer {
+            flex-wrap: wrap;
             flex-direction: column;
             align-items: stretch;
           }
           .product-footer .product-price {
             white-space: normal;
             width: 100%;
+            flex: 1 1 100%;
           }
           .product-footer .add-btn {
             width: 100%;
             flex: 1 1 100%;
             min-height: 40px;
+            white-space: normal;
           }
         }
       `}</style>
