@@ -93,23 +93,39 @@ export function isWhatsAppHref(href: string, baseHref?: string): boolean {
   }
 }
 
-function purchaseGuardKey(orderId: string): string {
+/**
+ * Per-channel purchase guards (sessionStorage).
+ *
+ * - Ads: `ads_purchase_fired_<orderId>` — set only when the Ads conversion fires.
+ * - GA4: `ga4_purchase_fired_<orderId>` — set only when the GA4 purchase fires.
+ *
+ * Backward compatibility: the legacy key name `ads_purchase_fired_*` is kept as
+ * the Ads-channel guard. Pre-MULTI-89 code set that same key when *either*
+ * channel fired; we still treat a present legacy key as "Ads already fired"
+ * (conservative: may skip one late Ads conversion in a stale same-tab session).
+ * New code never sets `ads_purchase_fired_*` unless the Ads branch actually fires.
+ */
+function adsPurchaseGuardKey(orderId: string): string {
   return `ads_purchase_fired_${orderId}`;
 }
 
-function hasPurchaseGuard(orderId: string): boolean {
+function ga4PurchaseGuardKey(orderId: string): string {
+  return `ga4_purchase_fired_${orderId}`;
+}
+
+function hasSessionGuard(key: string): boolean {
   if (typeof window === "undefined") return true;
   try {
-    return !!window.sessionStorage.getItem(purchaseGuardKey(orderId));
+    return !!window.sessionStorage.getItem(key);
   } catch {
     return true;
   }
 }
 
-function setPurchaseGuard(orderId: string): void {
+function setSessionGuard(key: string): void {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(purchaseGuardKey(orderId), "1");
+    window.sessionStorage.setItem(key, "1");
   } catch {
     /* ignore */
   }
@@ -149,8 +165,10 @@ function sanitizePurchaseItems(
 }
 
 /**
- * Fire Google Ads conversion + GA4 purchase once per orderId.
- * No-ops on /sidhu, missing gtag/consent/label, or when already fired.
+ * Fire Google Ads conversion and/or GA4 purchase per channel, at most once each
+ * per orderId. Channels are independent: GA4 firing must not block a later Ads
+ * conversion when the purchase label arrives in the same page view.
+ * No-ops on /sidhu, missing gtag/consent/label (Ads), or when that channel already fired.
  */
 export function firePurchase(opts: {
   orderId: string;
@@ -164,7 +182,6 @@ export function firePurchase(opts: {
 
   const orderId = String(opts.orderId || "").trim();
   if (!orderId) return;
-  if (hasPurchaseGuard(orderId)) return;
 
   const value = Number(opts.value);
   if (!Number.isFinite(value)) return;
@@ -173,19 +190,25 @@ export function firePurchase(opts: {
   const pref = readTrackingConsent();
   const labels = getAdsLabels(opts.contentMap);
   const gtagOk = typeof window.gtag === "function";
-  let fired = false;
 
-  if (pref?.advertising && gtagOk && labels.purchase) {
+  const adsKey = adsPurchaseGuardKey(orderId);
+  const ga4Key = ga4PurchaseGuardKey(orderId);
+  const adsAlready = hasSessionGuard(adsKey);
+  const ga4Already = hasSessionGuard(ga4Key);
+
+  if (adsAlready && ga4Already) return;
+
+  if (!adsAlready && pref?.advertising && gtagOk && labels.purchase) {
     window.gtag!("event", "conversion", {
       send_to: `${GOOGLE_ADS_ID}/${labels.purchase}`,
       value,
       currency,
       transaction_id: orderId,
     });
-    fired = true;
+    setSessionGuard(adsKey);
   }
 
-  if (pref?.analytics && gtagOk) {
+  if (!ga4Already && pref?.analytics && gtagOk) {
     const payload: Record<string, unknown> = {
       transaction_id: orderId,
       value,
@@ -194,10 +217,8 @@ export function firePurchase(opts: {
     const items = sanitizePurchaseItems(opts.items);
     if (items) payload.items = items;
     window.gtag!("event", "purchase", payload);
-    fired = true;
+    setSessionGuard(ga4Key);
   }
-
-  if (fired) setPurchaseGuard(orderId);
 }
 
 /**

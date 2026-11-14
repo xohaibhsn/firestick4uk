@@ -338,7 +338,61 @@ ok(
     "once_per_order_guard",
     first > 0 &&
       gtagCalls.length === first &&
-      sessionStorage.getItem("ads_purchase_fired_ORD-ONCE") === "1"
+      sessionStorage.getItem("ads_purchase_fired_ORD-ONCE") === "1" &&
+      sessionStorage.getItem("ga4_purchase_fired_ORD-ONCE") === "1"
+  );
+}
+
+// Per-channel: GA4 first (no label) must not block later Ads when label arrives
+{
+  const { gtagCalls, sessionStorage } = installWindow({ pathname: "/" });
+  setConsent({ analytics: true, advertising: true });
+  ads.firePurchase({
+    orderId: "ORD-LATE-ADS",
+    value: 7,
+    currency: "GBP",
+    contentMap: { ads_conv_label_purchase: "" },
+  });
+  const afterGa4 = gtagCalls.slice();
+  const ga4Only =
+    afterGa4.some((c) => c[0] === "event" && c[1] === "purchase") &&
+    !afterGa4.some((c) => c[0] === "event" && c[1] === "conversion");
+  ok(
+    "ga4_first_without_label_sets_ga4_guard_only",
+    ga4Only &&
+      sessionStorage.getItem("ga4_purchase_fired_ORD-LATE-ADS") === "1" &&
+      sessionStorage.getItem("ads_purchase_fired_ORD-LATE-ADS") == null
+  );
+  ads.firePurchase({
+    orderId: "ORD-LATE-ADS",
+    value: 7,
+    currency: "GBP",
+    contentMap: { ads_conv_label_purchase: LABEL_OK },
+  });
+  const convLate = gtagCalls.filter(
+    (c) => c[0] === "event" && c[1] === "conversion"
+  );
+  const purchaseAll = gtagCalls.filter(
+    (c) => c[0] === "event" && c[1] === "purchase"
+  );
+  ok(
+    "ads_fires_once_when_label_arrives_later",
+    convLate.length === 1 &&
+      purchaseAll.length === 1 &&
+      sessionStorage.getItem("ads_purchase_fired_ORD-LATE-ADS") === "1"
+  );
+  ads.firePurchase({
+    orderId: "ORD-LATE-ADS",
+    value: 7,
+    currency: "GBP",
+    contentMap: { ads_conv_label_purchase: LABEL_OK },
+  });
+  ok(
+    "no_double_fire_after_both_channels",
+    gtagCalls.filter((c) => c[0] === "event" && c[1] === "conversion")
+      .length === 1 &&
+      gtagCalls.filter((c) => c[0] === "event" && c[1] === "purchase")
+        .length === 1
   );
 }
 

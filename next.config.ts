@@ -6,6 +6,8 @@ const securityHeaders = [
   { key: "X-XSS-Protection", value: "1; mode=block" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  // 180 days; omit subdomain + browser-preload directives (ftp.staging may lack HTTPS).
+  { key: "Strict-Transport-Security", value: "max-age=15552000" },
   { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.googleadservices.com https://www.google.com https://googleads.g.doubleclick.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src 'self' https://www.googletagmanager.com https://td.doubleclick.net https://bid.g.doubleclick.net; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; media-src 'self'; manifest-src 'self';" },
 ];
 

@@ -33,11 +33,12 @@ const home = read("app/HomeClient.tsx");
 ok(
   "provider_accepts_initialContent",
   /initialContent\??:\s*SiteContentMap/.test(provider) &&
-    /useState<SiteContentMap>\(\(\)\s*=>\s*seeded/.test(provider)
+    /useState<SiteContentMap>\(\(\)\s*=>\s*seedMap/.test(provider)
 );
 ok(
-  "provider_loaded_true_when_seeded",
-  /useState\(\(\)\s*=>\s*Boolean\(seeded\)\)/.test(provider)
+  "provider_loaded_false_until_fetch_even_when_seeded",
+  /useState\(false\)/.test(provider) &&
+    /seeded:\s*isSeeded|seeded:\s*Boolean/.test(provider)
 );
 ok(
   "provider_still_fetches_page_all",
@@ -55,8 +56,8 @@ ok(
   /hasOwnProperty\.call\(vatSeed,\s*["']prices_include_vat["']\)/.test(layout)
 );
 ok(
-  "priceDisplay_still_gates_on_loaded",
-  /loaded\s*&&\s*parsePricesIncludeVat\(sc\.prices_include_vat\)/.test(
+  "priceDisplay_gates_on_loaded_or_seeded",
+  /\(loaded\s*\|\|\s*seeded\)\s*&&\s*parsePricesIncludeVat\(sc\.prices_include_vat\)/.test(
     priceDisplay
   ) && /t\(\s*["']price_incl_vat_suffix["']\s*,\s*["']incl\. VAT["']\s*\)/.test(priceDisplay)
 );

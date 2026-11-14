@@ -23,11 +23,12 @@ export default function PriceDisplay({
   style,
   suffixOnly = false,
 }: PriceDisplayProps) {
-  const { sc, loaded, t } = useSiteContent();
+  const { sc, loaded, seeded, t } = useSiteContent();
   const amount = Number(price);
   const formatted = `£${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
+  // `seeded` allows SSR/first-paint "incl. VAT" from the VAT seed; `loaded` is full CMS.
   const incl =
-    loaded && parsePricesIncludeVat(sc.prices_include_vat);
+    (loaded || seeded) && parsePricesIncludeVat(sc.prices_include_vat);
   const suffix = incl
     ? t("price_incl_vat_suffix", "incl. VAT")
     : "";
