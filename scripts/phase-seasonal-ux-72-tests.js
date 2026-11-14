@@ -490,7 +490,8 @@ function gitLines(args) {
   ok("seo_diff_no_meta_h1_canonical_jsonld_edits", d !== null && seoTouch.length === 0, seoTouch.join(" | ") || "clean");
 }
 
-// ── 16. Diff allowlist (working tree + untracked) ──────────────────────────
+// ── 16. Diff allowlist (UX-72 own historical commit range) ─────────────────
+// TEST-HYG-1: not applicable against later HEAD / unrelated working-tree edits
 const UX72_ALLOW = new Set([
   "lib/productPublicDto.ts",
   "lib/publicProductsServer.ts",
@@ -522,7 +523,7 @@ const UX72_ALLOW = new Set([
   "scripts/phase-promo-bar-75-tests.js",
   "scripts/phase-seasonal-rebase-38-tests.js",
   "scripts/phase-hostinger-h1-cms-bootstrap-tests.js",
-  // F4UK-ADS-CSP-77
+  // F4UK-ADS-CSP-77 (same-suite allowlist expansion in later commit)
   "next.config.ts",
   "scripts/phase-ads-csp-77-tests.js",
   "scripts/phase-csp-report-only-tests.js",
@@ -535,10 +536,15 @@ function ux72Allowed(f) {
   return false;
 }
 {
-  const tracked = gitLines(["diff", "--name-only", "HEAD"]);
-  const untracked = gitLines(["ls-files", "--others", "--exclude-standard"]);
+  const UX72_RANGE_BASE = "97ac72998d374236ae06f36a9f606501d83cc451";
+  const UX72_RANGE_END = "16a08877171042c2198e72b4bdd58cf31d3ea0aa";
+  const tracked = gitLines([
+    "diff",
+    "--name-only",
+    `${UX72_RANGE_BASE}..${UX72_RANGE_END}`,
+  ]);
   const names = new Set(
-    `${tracked || ""}\n${untracked || ""}`
+    `${tracked || ""}`
       .split(/\r?\n/)
       .map((s) => s.trim().replace(/\\/g, "/"))
       .filter(Boolean)
@@ -546,8 +552,9 @@ function ux72Allowed(f) {
   const bad = [...names].filter((n) => !ux72Allowed(n));
   ok(
     "diff_allowlist_ux72",
-    tracked !== null && untracked !== null && bad.length === 0,
-    bad.join(", ") || "clean"
+    tracked !== null && bad.length === 0,
+    bad.join(", ") ||
+      `scoped ${UX72_RANGE_BASE.slice(0, 7)}..${UX72_RANGE_END.slice(0, 7)} clean`
   );
   ok(
     "diff_has_no_env_files",

@@ -159,6 +159,9 @@ export default function CurrentSeasonalOffers({
                   fontSize: 13,
                   cursor: ended ? "not-allowed" : "pointer",
                   whiteSpace: "nowrap",
+                  minHeight: 40,
+                  flex: "1 1 140px",
+                  boxSizing: "border-box",
                 }}
               >
                 {ended

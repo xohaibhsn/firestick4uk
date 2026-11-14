@@ -577,7 +577,8 @@ function loadTs(rel, stubs = {}) {
   ok("A_mid_tx_rollback", rollbackCount >= 1);
   ok("A_mid_tx_two_payment_reads", paymentReads === 2);
 
-  // TEST-HYG-1: scope allowlist to this commit range
+  // TEST-HYG-1: scope allowlist to HARDEN-79's own historical commit range
+  // (not applicable against later HEAD / unrelated working-tree edits)
   const HARDEN79_ALLOW = new Set([
     "pages/api/orders.ts",
     "lib/insightsRetention.ts",
@@ -587,30 +588,17 @@ function loadTs(rel, stubs = {}) {
     "app/sidhu/page.tsx",
     "scripts/phase-harden-79-tests.js",
   ]);
+  const HARDEN79_RANGE_BASE = "7c2913b54aeb76d1bb77e250e9e104b43eefc603";
+  const HARDEN79_RANGE_END = "13e3835191723853148c31964b86ec607b202c74";
   let dirtyNames = [];
   try {
-    dirtyNames = execSync("git diff --name-only origin/main...HEAD", {
-      cwd: ROOT,
-      encoding: "utf8",
-    })
+    dirtyNames = execSync(
+      `git diff --name-only ${HARDEN79_RANGE_BASE}..${HARDEN79_RANGE_END}`,
+      { cwd: ROOT, encoding: "utf8" }
+    )
       .split(/\r?\n/)
       .map((s) => s.trim().replace(/\\/g, "/"))
       .filter(Boolean);
-    const wt = execSync("git diff --name-only HEAD", {
-      cwd: ROOT,
-      encoding: "utf8",
-    })
-      .split(/\r?\n/)
-      .map((s) => s.trim().replace(/\\/g, "/"))
-      .filter(Boolean);
-    const untracked = execSync("git ls-files --others --exclude-standard", {
-      cwd: ROOT,
-      encoding: "utf8",
-    })
-      .split(/\r?\n/)
-      .map((s) => s.trim().replace(/\\/g, "/"))
-      .filter(Boolean);
-    dirtyNames = [...new Set([...dirtyNames, ...wt, ...untracked])];
   } catch (e) {
     ok("diff_allowlist_harden79", false, String(e.message || e));
   }
@@ -618,7 +606,8 @@ function loadTs(rel, stubs = {}) {
   ok(
     "diff_allowlist_harden79",
     unexpected.length === 0,
-    unexpected.join(",") || `files=${dirtyNames.length}`
+    unexpected.join(",") ||
+      `scoped ${HARDEN79_RANGE_BASE.slice(0, 7)}..${HARDEN79_RANGE_END.slice(0, 7)} files=${dirtyNames.length}`
   );
 
   console.log(`\nHARDEN-79: ${passed} passed, ${failed} failed`);

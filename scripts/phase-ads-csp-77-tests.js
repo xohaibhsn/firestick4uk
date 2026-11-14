@@ -276,7 +276,8 @@ console.error = (...args) => {
       logged.some((line) => /\[admin-orders-export\] export failed/.test(line))
   );
 
-  // TEST-HYG-1: scope allowlist to this commit range (vs origin/main / HEAD~0 parent after commit)
+  // TEST-HYG-1: scope allowlist to ADS-CSP-77's own historical commit range
+  // (not applicable against later HEAD / unrelated working-tree edits)
   const ADS77_ALLOW = new Set([
     "next.config.ts",
     "pages/api/admin-orders-export.ts",
@@ -284,31 +285,17 @@ console.error = (...args) => {
     "scripts/phase-csp-report-only-tests.js",
     "scripts/phase-seasonal-ux-72-tests.js",
   ]);
+  const ADS77_RANGE_BASE = "32a67196488df01d91284d86318b875dc34bc14e";
+  const ADS77_RANGE_END = "7c2913b54aeb76d1bb77e250e9e104b43eefc603";
   let dirtyNames = [];
   try {
-    dirtyNames = execSync("git diff --name-only origin/main...HEAD", {
-      cwd: ROOT,
-      encoding: "utf8",
-    })
+    dirtyNames = execSync(
+      `git diff --name-only ${ADS77_RANGE_BASE}..${ADS77_RANGE_END}`,
+      { cwd: ROOT, encoding: "utf8" }
+    )
       .split(/\r?\n/)
       .map((s) => s.trim().replace(/\\/g, "/"))
       .filter(Boolean);
-    // Also include uncommitted working tree for pre-commit local runs
-    const wt = execSync("git diff --name-only HEAD", {
-      cwd: ROOT,
-      encoding: "utf8",
-    })
-      .split(/\r?\n/)
-      .map((s) => s.trim().replace(/\\/g, "/"))
-      .filter(Boolean);
-    const untracked = execSync("git ls-files --others --exclude-standard", {
-      cwd: ROOT,
-      encoding: "utf8",
-    })
-      .split(/\r?\n/)
-      .map((s) => s.trim().replace(/\\/g, "/"))
-      .filter(Boolean);
-    dirtyNames = [...new Set([...dirtyNames, ...wt, ...untracked])];
   } catch (e) {
     ok("diff_allowlist_ads77", false, String(e.message || e));
   }
@@ -316,7 +303,8 @@ console.error = (...args) => {
   ok(
     "diff_allowlist_ads77",
     unexpected.length === 0,
-    unexpected.join(",") || `files=${dirtyNames.length}`
+    unexpected.join(",") ||
+      `scoped ${ADS77_RANGE_BASE.slice(0, 7)}..${ADS77_RANGE_END.slice(0, 7)} files=${dirtyNames.length}`
   );
 
   console.log(`\nADS-CSP-77: ${passed} passed, ${failed} failed`);

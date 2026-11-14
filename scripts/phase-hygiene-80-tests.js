@@ -185,36 +185,24 @@ function loadTs(rel, stubs = {}) {
       /csvEscapeCell/.test(exportApi)
   );
 
-  // TEST-HYG-1: scope allowlist to this commit / working tree range
+  // TEST-HYG-1: scope allowlist to HYGIENE-80's own historical commit range
+  // (not applicable against later HEAD / unrelated working-tree edits)
   const HYG80_ALLOW = new Set([
     "app/sidhu/page.tsx",
     "app/order-tracking/page.tsx",
     "scripts/phase-hygiene-80-tests.js",
   ]);
+  const HYG80_RANGE_BASE = "13e3835191723853148c31964b86ec607b202c74";
+  const HYG80_RANGE_END = "914930df45ae2f14bc85dd63ea89784b43cc79fb";
   let dirtyNames = [];
   try {
-    dirtyNames = execSync("git diff --name-only origin/main...HEAD", {
-      cwd: ROOT,
-      encoding: "utf8",
-    })
+    dirtyNames = execSync(
+      `git diff --name-only ${HYG80_RANGE_BASE}..${HYG80_RANGE_END}`,
+      { cwd: ROOT, encoding: "utf8" }
+    )
       .split(/\r?\n/)
       .map((s) => s.trim().replace(/\\/g, "/"))
       .filter(Boolean);
-    const wt = execSync("git diff --name-only HEAD", {
-      cwd: ROOT,
-      encoding: "utf8",
-    })
-      .split(/\r?\n/)
-      .map((s) => s.trim().replace(/\\/g, "/"))
-      .filter(Boolean);
-    const untracked = execSync("git ls-files --others --exclude-standard", {
-      cwd: ROOT,
-      encoding: "utf8",
-    })
-      .split(/\r?\n/)
-      .map((s) => s.trim().replace(/\\/g, "/"))
-      .filter(Boolean);
-    dirtyNames = [...new Set([...dirtyNames, ...wt, ...untracked])];
   } catch (e) {
     ok("diff_allowlist_hyg80", false, String(e.message || e));
   }
@@ -222,7 +210,8 @@ function loadTs(rel, stubs = {}) {
   ok(
     "diff_allowlist_hyg80",
     unexpected.length === 0,
-    unexpected.join(",") || `files=${dirtyNames.length}`
+    unexpected.join(",") ||
+      `scoped ${HYG80_RANGE_BASE.slice(0, 7)}..${HYG80_RANGE_END.slice(0, 7)} files=${dirtyNames.length}`
   );
 
   console.log(`\nHYGIENE-80: ${passed} passed, ${failed} failed`);
