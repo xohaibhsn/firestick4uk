@@ -106,6 +106,11 @@ export function insightsSummaryDeleteSql(table: string): string {
   return `DELETE FROM ${table} WHERE summary_date < DATE_SUB(?, INTERVAL ? DAY) LIMIT ?`;
 }
 
+/** MULTI-93: purge ALL legacy city/geo aggregate rows (collection already disabled). */
+export function insightsGeoDailyPurgeAllSql(): string {
+  return `DELETE FROM insights_geo_daily LIMIT ?`;
+}
+
 let lastLocalAttemptAt = 0;
 
 export function __resetInsightsRetentionThrottle(): void {
@@ -245,9 +250,9 @@ export async function runInsightsRetention(deps: RetentionDeps): Promise<Retenti
       deletedSessions = Number((r as { affectedRows?: number })?.affectedRows || 0);
     }
 
+    // Date-based summary retention (geo table purged separately — all rows).
     for (const table of [
       "insights_daily_summary",
-      "insights_geo_daily",
       "insights_source_daily",
       "insights_page_daily",
     ]) {
@@ -258,6 +263,14 @@ export async function runInsightsRetention(deps: RetentionDeps): Promise<Retenti
         batch,
       ]);
       deletedSummaries += Number((r as { affectedRows?: number })?.affectedRows || 0);
+    }
+
+    // MULTI-93: delete ALL insights_geo_daily rows in batches within budget.
+    while (withinBudget()) {
+      const [r] = await conn.query(insightsGeoDailyPurgeAllSql(), [batch]);
+      const n = Number((r as { affectedRows?: number })?.affectedRows || 0);
+      deletedSummaries += n;
+      if (n < batch) break;
     }
 
     await conn.query(

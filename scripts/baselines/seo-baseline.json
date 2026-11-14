@@ -1,0 +1,914 @@
+{
+  "generatedAt": "2026-11-14T20:17:57.470Z",
+  "base": "https://firestick4uk.com",
+  "sitemapUrlCount": 23,
+  "productsCount": 9,
+  "pages": {
+    "/": {
+      "path": "/",
+      "title": "Premium Firestick Subscription & 4K Streaming Services",
+      "description": "Get a premium UK streaming service with Firestick4UK. Buy a preloaded Firestick with a reliable subscription, Android box support, and 4K streaming. Order today!",
+      "canonical": "https://firestick4uk.com",
+      "robots": "index, follow",
+      "h1": [
+        "UK Streaming Service Subscription for Firestick & Android Boxes"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "ba593f1d60eff420d5968d8c34ad0bd61eb8ab4efa5d3d928fc549947ff7740c"
+    },
+    "/products": {
+      "path": "/products",
+      "title": "Products — Firestick4UK | Streaming Devices UK",
+      "description": "Browse our full range of Firestick devices, Firestick Subscription plans, and Android boxes. Best prices in the UK.",
+      "canonical": "https://firestick4uk.com/products",
+      "robots": "index, follow",
+      "h1": [
+        "All Products"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "aa7271737ea3c00bf009c1ae416a58f0eae7e8ab331477f1048c5971f22e2b2f"
+    },
+    "/iptv-subscriptions-uk": {
+      "path": "/iptv-subscriptions-uk",
+      "title": "IPTV Subscription UK | Plans Start from £17.99 | Firestick4UK",
+      "description": "Compare Firestick4UK IPTV subscriptions and UK streaming plans for Firestick, Smart TV and Android devices. Order online with UK support.",
+      "canonical": "https://firestick4uk.com/iptv-subscriptions-uk",
+      "robots": "index, follow",
+      "h1": [
+        "IPTV Subscription UK for Firestick & Smart TV"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "3087bcb1ada34f1abe7cf738943fb85a819a284f6e4689ea8ec47046ec2390ff"
+    },
+    "/seasonal-offers": {
+      "path": "/seasonal-offers",
+      "title": "Seasonal Offers | Firestick4UK",
+      "description": "Live, upcoming and past seasonal offers from Firestick4UK.",
+      "canonical": "https://firestick4uk.com/seasonal-offers",
+      "robots": "index, follow",
+      "h1": [
+        "Seasonal Offers"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "dba4dc88bc931eb99dca76e80abd3f3261fa6fcfaf99f2d1de8387e0961ebc66"
+    },
+    "/blog": {
+      "path": "/blog",
+      "title": "Blog — Firestick4UK | Streaming Tips & Guides",
+      "description": "Read our latest guides, tips and news about Firestick, streaming services, Android boxes and live TV in the UK.",
+      "canonical": "https://firestick4uk.com/blog",
+      "robots": "index, follow",
+      "h1": [
+        "Tips, Guides & Updates"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Shop Now",
+          "href": "/"
+        }
+      ],
+      "jsonLdSha256": "e4ea9b85340199ea55cd2a1e2964d7aeaa0b9e93cbb82ae96b5defd46e32cffb"
+    },
+    "/contact": {
+      "path": "/contact",
+      "title": "Contact Us — Firestick4UK | UK Support",
+      "description": "Get in touch with Firestick4UK. WhatsApp support, email, and contact form available. We reply within 24 hours.",
+      "canonical": "https://firestick4uk.com/contact",
+      "robots": "index, follow",
+      "h1": [
+        "Contact Us"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Shop Now",
+          "href": "/"
+        }
+      ],
+      "jsonLdSha256": "c4b019f0de457ec941b1cdc003ebbe9d95e250b74ccff13267e5dffb510832a5"
+    },
+    "/faq": {
+      "path": "/faq",
+      "title": "FAQ — Firestick4UK | Frequently Asked Questions",
+      "description": "Find answers to common questions about ordering, delivery, Firestick setup, Firestick Subscriptions and more.",
+      "canonical": "https://firestick4uk.com/faq",
+      "robots": "index, follow",
+      "h1": [
+        "Frequently Asked Questions"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Shop Now",
+          "href": "/"
+        }
+      ],
+      "jsonLdSha256": "042a3999c5a4b5cd70fe7eec2898a32e1468082296d8eb6d32b50bdf3b1b9072"
+    },
+    "/order-tracking": {
+      "path": "/order-tracking",
+      "title": "Track Your Order — Firestick4UK",
+      "description": "Enter your Order ID to track your Firestick4UK order in real time. Check payment, dispatch and delivery status.",
+      "canonical": "https://firestick4uk.com/order-tracking",
+      "robots": "index, follow",
+      "h1": [
+        "Track Your Order"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Shop Now",
+          "href": "/"
+        }
+      ],
+      "jsonLdSha256": "dba4dc88bc931eb99dca76e80abd3f3261fa6fcfaf99f2d1de8387e0961ebc66"
+    },
+    "/about": {
+      "path": "/about",
+      "title": "About Us — Firestick4UK | UK Streaming Specialists",
+      "description": "Learn about Firestick4UK — a UK-based team dedicated to providing premium streaming devices and Firestick Subscriptions at fair prices.",
+      "canonical": "https://firestick4uk.com/about",
+      "robots": "index, follow",
+      "h1": [
+        "About Firestick4UK"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Shop Now",
+          "href": "/"
+        }
+      ],
+      "jsonLdSha256": "a1dcd197680a0a5db4c3cd1ecb6ad3148a0010d6af58553a2d3908e4da8694d0"
+    },
+    "/cart": {
+      "path": "/cart",
+      "title": "Cart & Checkout — Firestick4UK",
+      "description": "Complete your order for Firestick devices, Streaming Plans and Android boxes. Secure checkout with bank transfer or cash on delivery.",
+      "canonical": "https://firestick4uk.com/cart",
+      "robots": "noindex, nofollow",
+      "h1": [
+        "My Cart"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        }
+      ],
+      "jsonLdSha256": "dba4dc88bc931eb99dca76e80abd3f3261fa6fcfaf99f2d1de8387e0961ebc66"
+    },
+    "/sidhu": {
+      "path": "/sidhu",
+      "title": "Admin — Firestick4UK",
+      "description": "Buy Firestick, streaming subscriptions and Android boxes in the UK. Fast delivery, easy setup, real support.",
+      "canonical": "https://firestick4uk.com/sidhu",
+      "robots": "noindex, nofollow",
+      "h1": [],
+      "nav": [],
+      "jsonLdSha256": "dba4dc88bc931eb99dca76e80abd3f3261fa6fcfaf99f2d1de8387e0961ebc66"
+    },
+    "/products/halloween-3-year-iptv-deal": {
+      "path": "/products/halloween-3-year-iptv-deal",
+      "title": "Halloween 2026 IPTV Deal | 3 Years £78 | Firestick4UK",
+      "description": "Get the Halloween Special 2026 Deal for IPTV Subscription: 3 years for £78. For UK customers, with Firestick compatibility and setup support.",
+      "canonical": "https://firestick4uk.com/products/halloween-3-year-iptv-deal",
+      "robots": "index, follow",
+      "h1": [
+        "Halloween Special 2026 Deal for IPTV Subscription"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "585f0fb8a534c62410d20f8c52ff578520652cebcd663f82d9c8c4b3b497db36"
+    },
+    "/products/b1g-1-month-plan": {
+      "path": "/products/b1g-1-month-plan",
+      "title": "B1G 1 Month Plan | Flexible UK Streaming Subscription | Firestick4UK",
+      "description": "Get the B1G 1 Month Plan for £17.99 with 20,000+ Live Channels, 80,000+ Movies and 400,000+ Seasons, plus fast activation and setup support.",
+      "canonical": "https://firestick4uk.com/products/b1g-1-month-plan",
+      "robots": "index, follow",
+      "h1": [
+        "B1G 1 Month Plan"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "0859cb5107c7a832a167ffd81b61172f95c9cc8394c62814a2a2ff5263fd962b"
+    },
+    "/products/b1g-1-year-plan": {
+      "path": "/products/b1g-1-year-plan",
+      "title": "B1G 1 Year Subscription | Buy Annual Plan Online | Firestick4UK",
+      "description": "Get the B1G 1 Year Subscription for uninterrupted access to premium features. Buy your annual plan online with fast activation and reliable service in UK.",
+      "canonical": "https://firestick4uk.com/products/b1g-1-year-plan",
+      "robots": "index, follow",
+      "h1": [
+        "B1G 1 Year Plan"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "f059ed86401c36dd8d745bc8505690137add19e62ffa0cce247a853d6c5fa128"
+    },
+    "/products/firestick-4k": {
+      "path": "/products/firestick-4k",
+      "title": "Firestick 4K | 4K Fire TV Streaming Device UK | Firestick4UK",
+      "description": "Buy Firestick 4K for 4K Ultra HD, HDR support, Alexa voice search and compatible Fire TV apps, with setup support from Firestick4UK.",
+      "canonical": "https://firestick4uk.com/products/firestick-4k",
+      "robots": "index, follow",
+      "h1": [
+        "Firestick 4K"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "c94f8f99783885552150694cd3b62011ae5765b9cbfb2f72d8b4d2d256cc100d"
+    },
+    "/products/firestick-4k-max": {
+      "path": "/products/firestick-4k-max",
+      "title": "Firestick 4K Max | Premium 4K Streaming Device UK | Firestick4UK",
+      "description": "Buy Firestick 4K Max for premium 4K streaming, HDR, Alexa voice features and compatible Fire TV apps, with Firestick4UK setup support.",
+      "canonical": "https://firestick4uk.com/products/firestick-4k-max",
+      "robots": "index, follow",
+      "h1": [
+        "Firestick 4K Max"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "d5e0c100daa0eee83e836fc7b3115c75f6cb905d71059c0fd0be8da8f85a3286"
+    },
+    "/products/android-box-pro": {
+      "path": "/products/android-box-pro",
+      "title": "Android Box Pro | Android Streaming Box UK | Firestick4UK",
+      "description": "Buy Android Box Pro for a flexible Android-based TV streaming setup with compatible app support and setup help from Firestick4UK.",
+      "canonical": "https://firestick4uk.com/products/android-box-pro",
+      "robots": "index, follow",
+      "h1": [
+        "Android Box Pro"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "33e2d0d9cfe0061e233c336e979b60c35e263ff76eeadabdd411e926b9821838"
+    },
+    "/products/android-box-ultra": {
+      "path": "/products/android-box-ultra",
+      "title": "Android Box Ultra | Premium Android Streaming Box UK | Firestick4UK",
+      "description": "Buy Android Box Ultra for a premium Android-based TV streaming setup with flexible app support and guidance from Firestick4UK.",
+      "canonical": "https://firestick4uk.com/products/android-box-ultra",
+      "robots": "index, follow",
+      "h1": [
+        "Android Box Ultra"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "a48b0208ffd86e2c61983a690d183f39811c4d895ad56b592843c574c0232fe0"
+    },
+    "/products/3-years-subscription": {
+      "path": "/products/3-years-subscription",
+      "title": "3 Years Subscription UK | Firestick4UK",
+      "description": "Get a 3 Years Subscription for Firestick and compatible devices with long-term access, straightforward setup support and reliable UK-based help.",
+      "canonical": "https://firestick4uk.com/products/3-years-subscription",
+      "robots": "index, follow",
+      "h1": [
+        "3 Years Subscription"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "2b77652f0bc881053925e0c46e76d7e67859638ce2f1daec98dda588a4211a7f"
+    },
+    "/products/b1g-2-years-plan": {
+      "path": "/products/b1g-2-years-plan",
+      "title": "B1G 2 Years Plan | 24-Month Subscription for Firestick | Firestick4UK",
+      "description": "Buy the B1G 2 Years Plan for Firestick and compatible devices. Enjoy 24 months of streaming, fast activation, and reliable support.",
+      "canonical": "https://firestick4uk.com/products/b1g-2-years-plan",
+      "robots": "index, follow",
+      "h1": [
+        "B1G 2 Years Plan"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "bd9af416c6c2dec18cfc13dbaf46979f1fa46a36c92aef8151826f1a9055ee1f"
+    },
+    "/products/black-friday-3-year-iptv-deal": {
+      "path": "/products/black-friday-3-year-iptv-deal",
+      "title": "Black Friday 2026 IPTV Deal | 3 Years £78 | Firestick4UK",
+      "description": "Explore the Black Friday 2026 subscription deal from Firestick4UK. Get 36 months of streaming access for £78, with support for compatible devices.",
+      "canonical": "https://firestick4uk.com/products/black-friday-3-year-iptv-deal",
+      "robots": "index, follow",
+      "h1": [
+        "Black Friday 2026 IPTV Subscription Deal for 3 Years"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "bf267616f6531e4c8e3f052e382433df32ffee6435db02dd18b092cbb1d26947"
+    }
+  }
+}

@@ -6446,6 +6446,56 @@ export default function AdminPage() {
                       </div>
                     </>
                   )}
+                  {serverRuntime?.requestIpChain && (
+                    <div
+                      data-testid="request-ip-chain"
+                      style={{
+                        marginTop: 16,
+                        padding: 14,
+                        borderRadius: 8,
+                        border: "1px solid #EEE",
+                        background: "#fff",
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: 13, color: "#111", marginBottom: 6 }}>
+                        Request IP chain (your request)
+                      </div>
+                      <div style={{ fontSize: 12, color: "#666", marginBottom: 10, lineHeight: 1.45 }}>
+                        Read-only diagnostic for this page load only. Not logged or stored. Shows your own request headers.
+                      </div>
+                      <div style={{ fontSize: 12, color: "#111", lineHeight: 1.55, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }}>
+                        <div>
+                          <span style={{ color: "#888" }}>X-Forwarded-For:</span>{" "}
+                          {serverRuntime.requestIpChain.xForwardedFor || "—"}
+                        </div>
+                        <div>
+                          <span style={{ color: "#888" }}>X-Real-IP:</span>{" "}
+                          {serverRuntime.requestIpChain.xRealIp || "—"}
+                        </div>
+                        <div>
+                          <span style={{ color: "#888" }}>socket.remoteAddress:</span>{" "}
+                          {serverRuntime.requestIpChain.remoteAddress || "—"}
+                        </div>
+                        <div style={{ marginTop: 6 }}>
+                          <span style={{ color: "#888" }}>CDN client-IP headers:</span>
+                          {Array.isArray(serverRuntime.requestIpChain.cdnClientIpHeaders) &&
+                          serverRuntime.requestIpChain.cdnClientIpHeaders.length > 0 ? (
+                            <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                              {serverRuntime.requestIpChain.cdnClientIpHeaders.map(
+                                (h: { name: string; value: string }) => (
+                                  <li key={h.name}>
+                                    {h.name}: {h.value}
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          ) : (
+                            <span> none present</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

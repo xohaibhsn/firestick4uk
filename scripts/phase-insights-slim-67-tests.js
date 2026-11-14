@@ -717,7 +717,20 @@ async function main() {
     return res;
   }
 
-  for (const name of ["geo", "sources", "returning", "pages"]) {
+  // MULTI-93: geo returns empty 200 (no DB); other retired screens stay 410.
+  {
+    const g = await invoke("pages/api/admin-insights/geo.ts", { role: "super_admin" });
+    const p = await invoke("pages/api/admin-insights/geo.ts", { method: "POST", role: "super_admin" });
+    ok(
+      "api_geo_empty_200",
+      g.statusCode === 200 &&
+        Array.isArray(g.body?.rows) &&
+        g.body.rows.length === 0 &&
+        p.statusCode === 405 &&
+        sqlLog.length === 0
+    );
+  }
+  for (const name of ["sources", "returning", "pages"]) {
     const rel = `pages/api/admin-insights/${name}.ts`;
     const g = await invoke(rel, { role: "super_admin" });
     const p = await invoke(rel, { method: "POST", role: "super_admin" });

@@ -1,11 +1,14 @@
 /**
- * Retired (F4UK-INSIGHTS-SLIM-67): the geo screen was removed.
- * Always 410 Gone; no data access.
+ * Retired (F4UK-INSIGHTS-SLIM-67): geo collection/UI removed.
+ * MULTI-93: return an empty result gracefully (no DB access, no 500).
  */
 import type { NextApiRequest, NextApiResponse } from "next";
 import { setAdminNoStore } from "@/lib/adminNoStore";
 
-export default function handler(_req: NextApiRequest, res: NextApiResponse) {
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
   setAdminNoStore(res);
-  res.status(410).json({ error: "gone" });
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+  return res.status(200).json({ rows: [], items: [], data: [] });
 }
