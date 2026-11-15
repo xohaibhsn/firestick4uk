@@ -9,6 +9,8 @@ import CmsEaseToolbar, {
   confirmLeaveIfDirty,
   countDirtyKeys,
 } from "@/components/admin/CmsEaseToolbar";
+import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
+import type { AdminSearchTarget } from "@/components/admin/AdminGlobalSearch";
 import CmsPreviewPane from "@/components/admin/CmsPreviewPane";
 import CmsUpdatesAfterSaveChip from "@/components/admin/CmsUpdatesAfterSaveChip";
 import SeasonalOfferWizard from "@/components/admin/SeasonalOfferWizard";
@@ -534,6 +536,8 @@ function AdminPageInner() {
   const [blogModal, setBlogModal] = useState<BlogPost|"new"|null>(null);
   const [featImgUploading, setFeatImgUploading] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
+  const statusPatchInFlight = useRef<Set<string>>(new Set());
+  const productMsgLongRef = useRef(false);
   const defaultBlog = { title:"", slug:"", excerpt:"", content:"", category:"Guides", emoji:"📝", badge:"guide", badgeText:"Guide", featured_image:"", meta_title:"", meta_description:"", focus_keyword:"", status:"published" as "published"|"draft", featured:false, canonical_url:"", faqs:[] as Array<{question:string;answer:string}> };
   const [editBlog, setEditBlog] = useState<typeof defaultBlog>(defaultBlog);
   /** When true, this edit session opened a published post — slug stays protected even if status toggled to draft. */
@@ -1338,7 +1342,16 @@ function AdminPageInner() {
   // Cookie session carries auth — headers are only for Content-Type / optional metadata
   const getRoleHeaders = () => ({});
 
+  /** Content Editor page saves: only keys that differ from the saved baseline. */
+  const dirtyKeysAmong = (keys: string[]) =>
+    keys.filter((k) => String(siteContent[k] ?? "") !== String(siteContentSaved[k] ?? ""));
+
   const saveContent = async (keys: string[], overrides?: Record<string, string>) => {
+    if (!keys.length) {
+      setContentMsg("Nothing to save");
+      setTimeout(() => setContentMsg(""), 2500);
+      return false;
+    }
     setContentSaving(true); setContentMsg("");
     const updates = keys.map(k => ({ key: k, value: overrides?.[k] ?? siteContent[k] ?? "" }));
     const res = await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
@@ -1350,12 +1363,12 @@ function AdminPageInner() {
     setContentSaving(false);
     if (res.status === 401) {
       handleSessionExpired();
-      return;
+      return false;
     }
     if (res.status === 403) {
       setContentMsg(`❌ ${res.message || res.error || "You do not have permission for this action."}`);
       setTimeout(() => setContentMsg(""), 4000);
-      return;
+      return false;
     }
     if (res.success && res.subscription_slug) {
       setSiteContent((s) => ({
@@ -1392,6 +1405,31 @@ function AdminPageInner() {
           }
         })
         .catch(() => {});
+      return true;
+    }
+    return false;
+  };
+
+  /** PUT /api/sections?action=... — returns true only when the server confirms success. */
+  const sectionsPut = async (action: "reorder" | "visibility", body: unknown): Promise<boolean> => {
+    try {
+      const r = await fetch(`/api/sections?action=${action}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (r.status === 401) { handleSessionExpired(); return false; }
+      if (r.status === 403) { showPermError(); return false; }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || (data && (data as any).error)) {
+        adminAlert((data as any)?.error || `Could not update section ${action}.`);
+        return false;
+      }
+      return true;
+    } catch {
+      adminAlert(`Could not update section ${action}. Check your connection.`);
+      return false;
     }
   };
 
@@ -1870,6 +1908,8 @@ function AdminPageInner() {
       }
       body.cancel_reason = cancelReason;
     }
+    if (statusPatchInFlight.current.has(id)) return;
+    statusPatchInFlight.current.add(id);
     fetch("/api/admin-orders", {
       method: "PATCH",
       credentials: "include", headers: { "Content-Type": "application/json" },
@@ -1898,7 +1938,10 @@ function AdminPageInner() {
         // Background reconcile with server truth (summary, lists, customers if loaded).
         void refreshAfterOrderMutation();
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        statusPatchInFlight.current.delete(id);
+      });
     setCancelReasonModal(null);
     setCancelReasonDraft("");
     setOrderModal(null);
@@ -2006,7 +2049,8 @@ function AdminPageInner() {
       body: JSON.stringify(isNew ? payload : { ...payload, id: (blogModal as BlogPost).id }),
     }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
-      const base = isNew ? "✅ Post published!" : "✅ Post updated!";
+      const isDraft = String((payload as any).status || "").toLowerCase() === "draft";
+      const base = isDraft ? "✅ Draft saved" : isNew ? "✅ Post published!" : "✅ Post updated!";
       setBlogMsg(`${base}${formatSeoGuardBannerClient(res.seo_guard)}`);
       setBlogMetaAi({ status: "idle" });
       setBlogModal(null);
@@ -2386,8 +2430,16 @@ function AdminPageInner() {
   const saveProduct = async () => {
     const parsedPrice = parseStrictPriceGbp(editProduct.price);
     const slug = (editProduct.slug || toSlug(editProduct.name)).trim();
-    if (!editProduct.name.trim()) return;
-    if (!slug) return;
+    if (!editProduct.name.trim()) {
+      setProductMsg("❌ Product name is required.");
+      setTimeout(() => setProductMsg(""), 5000);
+      return;
+    }
+    if (!slug) {
+      setProductMsg("❌ Product slug is required (enter a name or slug).");
+      setTimeout(() => setProductMsg(""), 5000);
+      return;
+    }
     if (productSaving) return;
     if (parsedPrice === undefined) {
       setProductMsg("❌ Enter a valid price (non-negative number, max 2 decimal places).");
@@ -2435,8 +2487,14 @@ function AdminPageInner() {
       }
       const res = await r.json().catch(() => ({}));
       if (!r.ok || res.error) {
-        setProductMsg(`❌ ${res.error || "Failed to save product"}`);
+        const conflictCode = String(res.code || "");
+        setProductMsg(
+          r.status === 409 && (conflictCode === "concurrent_conflict" || conflictCode === "stale_version")
+            ? `❌ ${res.error || "This product changed elsewhere. Reload and re-apply your edits."}`
+            : `❌ ${res.error || "Failed to save product"}`
+        );
         if (r.status === 409) {
+          productMsgLongRef.current = true;
           await loadProducts();
           const serverRow =
             res.product && typeof res.product === "object"
@@ -2525,7 +2583,9 @@ function AdminPageInner() {
       setProductMsg("❌ Failed to save product");
     } finally {
       setProductSaving(false);
-      setTimeout(() => setProductMsg(""), 3000);
+      const clearMs = productMsgLongRef.current ? 12000 : 3000;
+      productMsgLongRef.current = false;
+      setTimeout(() => setProductMsg(""), clearMs);
     }
   };
 
@@ -2553,6 +2613,60 @@ function AdminPageInner() {
       for (const id of PRODUCT_EDITOR_SECTIONS) init[id] = id === "basic_info";
       return init;
     });
+  };
+
+  const openEditBlog = (p: any) => {
+    setBlogMetaAi({ status: "idle" });
+    const faqsParsed = p.faqs ? (typeof p.faqs === "string" ? JSON.parse(p.faqs) : p.faqs) : [];
+    setEditBlog({title:p.title,slug:p.slug||"",excerpt:p.excerpt||"",content:p.content||"",category:p.category||"Guides",emoji:p.emoji||"📝",badge:p.badge||"guide",badgeText:p.badgeText||"Guide",featured_image:p.featured_image||"",meta_title:p.meta_title||"",meta_description:p.meta_description||"",focus_keyword:p.focus_keyword||"",status:p.status||"published",featured:!!p.featured,canonical_url:p.canonical_url||"",faqs:faqsParsed});
+    setBlogSlugLocked(p.status === "published");
+    setBlogModal(p);
+    setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML=p.content||"";},80);
+  };
+
+  // Global search → open a product/blog editor once its list has loaded.
+  const [pendingSearchOpen, setPendingSearchOpen] = useState<{ kind: "product" | "blog"; id: string } | null>(null);
+  useEffect(() => {
+    if (!pendingSearchOpen) return;
+    if (pendingSearchOpen.kind === "product") {
+      const p = products.find((x: any) => String(x.id) === pendingSearchOpen.id);
+      if (p) { setPendingSearchOpen(null); openEditProduct(p); }
+    } else {
+      const b = blogPosts.find((x: any) => String(x.id) === pendingSearchOpen.id);
+      if (b) { setPendingSearchOpen(null); openEditBlog(b); }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingSearchOpen, products, blogPosts]);
+
+  const handleAdminSearchNavigate = (target: AdminSearchTarget) => {
+    requestTab(target.tab);
+    const id = target.id != null ? String(target.id) : "";
+    if (target.kind === "order" && id) {
+      void openOrderView(id);
+    } else if (target.kind === "product" && id) {
+      setPendingSearchOpen({ kind: "product", id });
+    } else if (target.kind === "blog" && id) {
+      setPendingSearchOpen({ kind: "blog", id });
+    } else if (target.kind === "customer") {
+      const q = String(target.query || target.email || "").trim();
+      if (q) {
+        setCustomersQ(q);
+        void loadCustomers(1, { q });
+      }
+    } else if (target.kind === "cms_find" && target.query) {
+      const q = target.query;
+      let tries = 0;
+      const apply = () => {
+        if (!document.querySelector("[data-cms-find-input]")) {
+          if (++tries < 20) setTimeout(apply, 150);
+          return;
+        }
+        window.dispatchEvent(
+          new CustomEvent("f4uk-cms-find-query", { detail: { query: q } })
+        );
+      };
+      setTimeout(apply, 150);
+    }
   };
 
   const openNewProduct = () => {
@@ -5136,6 +5250,7 @@ function AdminPageInner() {
               <button className="sidebar-hamburger" onClick={() => setSidebarOpen(o => !o)} aria-label="Menu">
                 <span/><span/><span/>
               </button>
+              <AdminGlobalSearch onNavigate={handleAdminSearchNavigate} />
               <h1 className="page-heading">
                 {tab==="dashboard" && <>Dashboard <span>Overview</span></>}
                 {tab==="orders" && <>Manage <span>Orders</span></>}
@@ -5773,7 +5888,7 @@ function AdminPageInner() {
                         <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{p.category}</span></td>
                         <td><span style={{fontSize:"11px",padding:"3px 10px",borderRadius:"10px",fontWeight:700,background:p.status==="published"?"rgba(0,200,100,0.12)":"rgba(255,180,0,0.12)",border:p.status==="published"?"1px solid rgba(0,200,100,0.3)":"1px solid rgba(255,180,0,0.3)",color:p.status==="published"?"#00c864":"#ffb400"}}>{p.status==="published"?"Published":"Draft"}</span></td>
                         <td style={{whiteSpace:"nowrap"}}>
-                          <button className="action-btn btn-edit" onClick={() => { setBlogMetaAi({ status: "idle" }); const faqsParsed = p.faqs ? (typeof p.faqs==="string" ? JSON.parse(p.faqs) : p.faqs) : []; setEditBlog({title:p.title,slug:p.slug||"",excerpt:p.excerpt||"",content:p.content||"",category:p.category||"Guides",emoji:p.emoji||"📝",badge:p.badge||"guide",badgeText:p.badgeText||"Guide",featured_image:p.featured_image||"",meta_title:p.meta_title||"",meta_description:p.meta_description||"",focus_keyword:p.focus_keyword||"",status:p.status||"published",featured:!!p.featured,canonical_url:p.canonical_url||"",faqs:faqsParsed}); setBlogSlugLocked(p.status === "published"); setBlogModal(p); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML=p.content||"";},80); }}>Edit</button>
+                          <button className="action-btn btn-edit" onClick={() => openEditBlog(p)}>Edit</button>
                           <button className="action-btn btn-delete" onClick={() => deleteBlog(p.id)}>Delete</button>
                         </td>
                       </tr>
@@ -6076,12 +6191,12 @@ function AdminPageInner() {
                     <div style={{display:"flex",flexDirection:"column",gap:2}}>
                       <button className="action-btn btn-view" style={{padding:"2px 6px",fontSize:10}} disabled={i===0} onClick={async()=>{
                         const prev=arr[i-1]; const newOrder=[{key:sec.key,section_order:prev.order},{key:prev.key,section_order:sec.order}];
-                        await fetch("/api/sections?action=reorder",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({order:newOrder})});
+                        if(!(await sectionsPut("reorder",{order:newOrder}))) return;
                         setSections(s=>s.map(x=>x.key===sec.key?{...x,order:prev.order}:x.key===prev.key?{...x,order:sec.order}:x));
                       }}>▲</button>
                       <button className="action-btn btn-view" style={{padding:"2px 6px",fontSize:10}} disabled={i===arr.length-1} onClick={async()=>{
                         const next=arr[i+1]; const newOrder=[{key:sec.key,section_order:next.order},{key:next.key,section_order:sec.order}];
-                        await fetch("/api/sections?action=reorder",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({order:newOrder})});
+                        if(!(await sectionsPut("reorder",{order:newOrder}))) return;
                         setSections(s=>s.map(x=>x.key===sec.key?{...x,order:next.order}:x.key===next.key?{...x,order:sec.order}:x));
                       }}>▼</button>
                     </div>
@@ -6092,7 +6207,7 @@ function AdminPageInner() {
                     <div style={{display:"flex",gap:8,alignItems:"center"}}>
                       {/* Visibility toggle */}
                       <span style={{fontSize:11,background:sec.visible?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${sec.visible?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,color:sec.visible?"#00c864":"#ff6666",padding:"3px 10px",borderRadius:20,cursor:"pointer"}} onClick={async()=>{
-                        await fetch("/api/sections?action=visibility",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:sec.key,is_visible:!sec.visible})});
+                        if(!(await sectionsPut("visibility",{key:sec.key,is_visible:!sec.visible}))) return;
                         setSections(s=>s.map(x=>x.key===sec.key?{...x,visible:!sec.visible}:x));
                       }}>{sec.visible?"👁 Visible":"🚫 Hidden"}</span>
                       {/* Edit button */}
@@ -7758,7 +7873,7 @@ function AdminPageInner() {
                   </div>
 
                   <div className="modal-field"><label>Tagline</label><input style={{width:"100%"}} value={siteContent.home_tagline||""} onChange={e=>setSiteContent(s=>({...s,home_tagline:e.target.value}))} placeholder="Fast. Reliable. Affordable." /></div>
-                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent([
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(dirtyKeysAmong([
                     "home_meta_title","home_meta_description",
                     "home_top_hero_title","home_top_hero_subtitle",
                     "home_hero_title","home_hero_subtitle",
@@ -7767,7 +7882,7 @@ function AdminPageInner() {
                     "home_stat1_num","home_stat1_label","home_stat2_num","home_stat2_label","home_stat3_num","home_stat3_label",
                     "home_tagline",
                     "home_product_ids",
-                  ])}>{contentSaving?"Saving...":"💾 Save Home"}</button>
+                  ]))}>{contentSaving?"Saving...":"💾 Save Home"}</button>
                   <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}} data-home-products-panel="1">
                     <div style={{marginBottom:6,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Home page products</div>
                     {(() => {
@@ -7878,7 +7993,7 @@ function AdminPageInner() {
                       placeholder="Mission text with headings, bold, links..."
                     />
                   </div>
-                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(["about_title","about_description","about_mission", ...keysForPage("about")])}>{contentSaving?"Saving...":"💾 Save About"}</button>
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(dirtyKeysAmong(["about_title","about_description","about_mission", ...keysForPage("about")]))}>{contentSaving?"Saving...":"💾 Save About"}</button>
                   <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
                     <div style={{marginBottom:16,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Additional about copy & JSON</div>
                     <AdminContentPanel
@@ -7916,11 +8031,11 @@ function AdminPageInner() {
                       <div className="modal-field"><label>Address</label><input style={{width:"100%"}} value={siteContent.contact_address||""} onChange={e=>setSiteContent(s=>({...s,contact_address:e.target.value}))} /></div>
                     </div>
                   )}
-                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(
+                  <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(dirtyKeysAmong(
                     can("settings.manage")
                       ? ["contact_phone","contact_email","contact_whatsapp","whatsapp_number","contact_telegram","contact_hours","contact_address"]
                       : ["contact_hours","contact_address"]
-                  )}>{contentSaving?"Saving...":"💾 Save Contact"}</button>
+                  ))}>{contentSaving?"Saving...":"💾 Save Contact"}</button>
                   <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
                     <div style={{marginBottom:16,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Contact page labels</div>
                     <AdminContentPanel

@@ -8,7 +8,10 @@ import {
   type CmsFindHit,
 } from "@/lib/cmsFindText";
 import { keysForPage } from "@/lib/adminContentFields";
-import { CMS_EXPAND_FIELD_EVENT } from "@/lib/adminSidebarGroups";
+import {
+  CMS_EXPAND_FIELD_EVENT,
+  CMS_FIND_QUERY_EVENT,
+} from "@/lib/adminSidebarGroups";
 
 type Props = {
   activePage: string;
@@ -19,7 +22,8 @@ type Props = {
   onMarkSaved: (next: Record<string, string>) => void;
   products: Array<{ id: number | string; name: string }>;
   contentSaving: boolean;
-  onSave: (keys: string[]) => void | Promise<void>;
+  /** Returns true when the server accepted the save. */
+  onSave: (keys: string[]) => boolean | void | Promise<boolean | void>;
   /** Called when user confirms leaving while dirty — returns true to proceed. */
   requestLeave?: (next: () => void) => void;
   /** Live preview pane toggle (admin Content Editor). */
@@ -90,6 +94,18 @@ export default function CmsEaseToolbar({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
+  // Global admin search → seed Find-text query
+  useEffect(() => {
+    const onFindQuery = (e: Event) => {
+      const q = String((e as CustomEvent)?.detail?.query || "").trim();
+      if (!q) return;
+      setQuery(q);
+    };
+    window.addEventListener(CMS_FIND_QUERY_EVENT, onFindQuery as EventListener);
+    return () =>
+      window.removeEventListener(CMS_FIND_QUERY_EVENT, onFindQuery as EventListener);
+  }, []);
+
   // Flash highlight on field
   useEffect(() => {
     if (!highlightKey) return;
@@ -149,7 +165,7 @@ export default function CmsEaseToolbar({
 
   const saveDirtyForPage = () => {
     const pageKeys = new Set(keysForPage(activePage));
-    // Include dirty keys that belong to this page prefix / keysForPage
+    // Include dirty keys that belong to this page prefix / keysForPage — never fall back to all page keys.
     const toSave = dirty.filter(
       (k) =>
         pageKeys.has(k) ||
@@ -162,8 +178,11 @@ export default function CmsEaseToolbar({
         (activePage === "contact" && k.startsWith("contact_")) ||
         (activePage === "subscription" && k.startsWith("subscription_"))
     );
-    const keys = toSave.length ? toSave : [...pageKeys];
-    void Promise.resolve(onSave(keys)).then(() => {
+    if (!toSave.length) return;
+    void Promise.resolve(onSave(toSave)).then((ok) => {
+      // false = failed; true = parent already updated saved baseline for those keys.
+      // undefined (void) = legacy callers — mark current snapshot saved.
+      if (ok === false || ok === true) return;
       onMarkSaved({ ...siteContent });
     });
   };

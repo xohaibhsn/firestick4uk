@@ -88,7 +88,7 @@ export function gateExpectedVersion(
     return {
       ok: false,
       status: 409,
-      error: "Stale product_version; refresh and retry",
+      error: "This product was updated elsewhere. Reload and try again.",
       code: "stale_version",
       current_version: version,
     };
@@ -141,7 +141,7 @@ export function gateExpectedVersionAllowMaxNoop(
     return {
       ok: false,
       status: 409,
-      error: "Stale product_version; refresh and retry",
+      error: "This product was updated elsewhere. Reload and try again.",
       code: "stale_version",
       current_version: version,
     };

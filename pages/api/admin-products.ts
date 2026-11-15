@@ -543,7 +543,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(409).json({ error: 'Slug already exists. Choose a different URL slug.' });
         }
         if (err?.code === 'concurrent_conflict') {
-          return res.status(409).json({ error: err.message, code: 'concurrent_conflict' });
+          return res.status(409).json({ error: 'This product changed elsewhere. Reload and re-apply your edits.', code: 'concurrent_conflict' });
         }
         throw err;
       } finally {
@@ -688,7 +688,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (txErr: any) {
         try { await conn.rollback(); } catch { /* ignore */ }
         if (txErr?.code === 'concurrent_conflict') {
-          return res.status(409).json({ error: txErr.message, code: 'concurrent_conflict' });
+          return res.status(409).json({ error: 'This product changed elsewhere. Reload and re-apply your edits.', code: 'concurrent_conflict' });
         }
         throw txErr;
       } finally {

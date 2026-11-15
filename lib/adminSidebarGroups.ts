@@ -315,3 +315,5 @@ export const PRODUCT_EDITOR_SECTION_TITLES: Record<ProductEditorSectionId, strin
 };
 
 export const CMS_EXPAND_FIELD_EVENT = "f4uk-cms-expand-for-field";
+/** Global admin search → Content Editor Find-text (detail.query string). */
+export const CMS_FIND_QUERY_EVENT = "f4uk-cms-find-query";

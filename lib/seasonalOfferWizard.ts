@@ -60,7 +60,8 @@ export type CreateStepName =
   | "create_product"
   | "set_lifecycle_settings"
   | "set_season_window"
-  | "set_archive_presentation";
+  | "set_archive_presentation"
+  | "set_shop_listed";
 
 export type CreateStepResult = {
   step: CreateStepName;
@@ -357,6 +358,7 @@ export async function runSeasonalOfferCreate(
     "set_lifecycle_settings",
     "set_season_window",
     "set_archive_presentation",
+    "set_shop_listed",
   ];
   const startIdx = opts.startFrom ? steps.indexOf(opts.startFrom) : 0;
   if (startIdx < 0) {
@@ -420,6 +422,15 @@ export async function runSeasonalOfferCreate(
         return { ok: false, results, productId, productVersion, slug };
       }
       body = w.body;
+    } else if (step === "set_shop_listed") {
+      // Product create defaults to shop_listed=1; only PATCH when the wizard wants it hidden.
+      if (state.shop_listed !== 0) continue;
+      body = {
+        action: "set_shop_listed",
+        id: productId,
+        expected_version: productVersion,
+        shop_listed: 0,
+      };
     } else {
       body = buildArchivePatch(productId, productVersion, state);
     }
