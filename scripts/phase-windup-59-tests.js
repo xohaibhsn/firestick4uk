@@ -410,7 +410,7 @@ function customerMail() {
     baseBody({
       payment_method: "bank",
       items: [{ id: 3, qty: 1 }],
-      receipt_path: "/uploads/receipts/x.jpg",
+      receipt_path: "/uploads/receipts/testrcpt01.jpg",
       notes: "Customer note <b>hi</b>",
     })
   );
@@ -481,7 +481,7 @@ function customerMail() {
       payment_method: "cod",
       items: [{ id: 3, qty: 1 }],
       notes: "COD dig <script>x</script>",
-      receipt_path: "should-ignore.jpg",
+      receipt_path: "",
     })
   );
   ok("scenario_cod_digital_ok", res.statusCode === 200 && res.body?.success);

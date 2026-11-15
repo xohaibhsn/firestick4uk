@@ -39,6 +39,7 @@ import {
   isPricesIncludeVatReadError,
 } from '../../lib/pricesIncludeVatServer';
 import { lockAndAuthorizeOrderProducts } from '../../lib/orderProductEligibility';
+import { isAllowedReceiptPath } from '../../lib/receiptPathPolicy';
 
 const PRICING_UNAVAILABLE_MSG =
   'Pricing temporarily unavailable. Please try again.';
@@ -150,6 +151,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     const publicPaymentMethod: PublicPaymentMethod = payment_method;
     const dbPaymentMethod = toDbPaymentMethod(publicPaymentMethod);
+
+    // Receipt path allowlist — before any DB / coupon / email work.
+    const receiptPathValue = receipt_path == null ? '' : String(receipt_path);
+    if (!isAllowedReceiptPath(receiptPathValue)) {
+      return res.status(400).json({
+        error: 'Receipt upload is invalid — please upload your receipt again.',
+      });
+    }
 
     // CMS on/off — fail-safe enabled. Reject before receipt, coupon, DB, or email.
     const paymentToggles = await getPaymentMethodSettings();

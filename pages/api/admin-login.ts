@@ -15,11 +15,13 @@ import {
   readRecoveryAuthConfigFromEnv,
   verifyRecoveryAdminPassword,
 } from "../../lib/recoveryAdminAuth";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 
 const PUBLIC_INVALID = "Invalid email or password";
 const PUBLIC_AUTH_UNAVAILABLE = "Authentication unavailable";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  setAdminNoStore(res);
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const limitResult = RL_AUTH(getClientIp(req));

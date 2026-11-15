@@ -125,7 +125,7 @@ const MOCK_ORDER = {
   // Sensitive columns that must NEVER appear in the response even if selected:
   notes: "leave at door",
   payment_reference: "SECRET-REF-999",
-  receipt_path: "/uploads/receipts/secret.pdf",
+  receipt_path: "/uploads/receipts/testrcpt01.pdf",
   delivery_address: "10 Downing Street",
   city: "London",
 };

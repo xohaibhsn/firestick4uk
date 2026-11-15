@@ -14,6 +14,11 @@ const PER_TYPE_LIMIT = 6;
 const Q_MIN = 2;
 const Q_MAX = 80;
 
+/** Escape LIKE wildcards so user input is matched literally. */
+function escapeLike(raw: string): string {
+  return raw.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
 type SearchGroup =
   | "orders"
   | "customers"
@@ -49,7 +54,7 @@ const GROUPS: GroupDef[] = [
       const [rows]: any = await pool.query(
         `SELECT order_id, status, created_at, customer_name
          FROM orders
-         WHERE order_id LIKE ?
+         WHERE order_id LIKE ? ESCAPE '\\\\'
          ORDER BY created_at DESC
          LIMIT ?`,
         [like, PER_TYPE_LIMIT]
@@ -70,7 +75,7 @@ const GROUPS: GroupDef[] = [
       const [rows]: any = await pool.query(
         `SELECT customer_name, customer_email, MAX(created_at) AS last_order
          FROM orders
-         WHERE customer_name LIKE ? OR customer_email LIKE ?
+         WHERE customer_name LIKE ? ESCAPE '\\\\' OR customer_email LIKE ? ESCAPE '\\\\'
          GROUP BY customer_email, customer_name
          ORDER BY last_order DESC
          LIMIT ?`,
@@ -90,7 +95,7 @@ const GROUPS: GroupDef[] = [
       const [rows]: any = await pool.query(
         `SELECT id, name, slug
          FROM products
-         WHERE name LIKE ? OR slug LIKE ? OR CAST(id AS CHAR) LIKE ?
+         WHERE name LIKE ? ESCAPE '\\\\' OR slug LIKE ? ESCAPE '\\\\' OR CAST(id AS CHAR) LIKE ? ESCAPE '\\\\'
          ORDER BY id DESC
          LIMIT ?`,
         [like, like, like, PER_TYPE_LIMIT]
@@ -110,7 +115,7 @@ const GROUPS: GroupDef[] = [
       const [rows]: any = await pool.query(
         `SELECT id, title, status
          FROM blog_posts
-         WHERE title LIKE ? OR slug LIKE ? OR CAST(id AS CHAR) LIKE ?
+         WHERE title LIKE ? ESCAPE '\\\\' OR slug LIKE ? ESCAPE '\\\\' OR CAST(id AS CHAR) LIKE ? ESCAPE '\\\\'
          ORDER BY id DESC
          LIMIT ?`,
         [like, like, like, PER_TYPE_LIMIT]
@@ -130,7 +135,7 @@ const GROUPS: GroupDef[] = [
       const [rows]: any = await pool.query(
         `SELECT id, question
          FROM faqs
-         WHERE question LIKE ? OR CAST(id AS CHAR) LIKE ?
+         WHERE question LIKE ? ESCAPE '\\\\' OR CAST(id AS CHAR) LIKE ? ESCAPE '\\\\'
          ORDER BY id DESC
          LIMIT ?`,
         [like, like, PER_TYPE_LIMIT]
@@ -149,7 +154,7 @@ const GROUPS: GroupDef[] = [
       const [rows]: any = await pool.query(
         `SELECT id, display_name, status
          FROM customer_reviews
-         WHERE display_name LIKE ? OR CAST(id AS CHAR) LIKE ?
+         WHERE display_name LIKE ? ESCAPE '\\\\' OR CAST(id AS CHAR) LIKE ? ESCAPE '\\\\'
          ORDER BY id DESC
          LIMIT ?`,
         [like, like, PER_TYPE_LIMIT]
@@ -187,7 +192,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const role = admin.role as AdminRoleName;
-  const like = `%${q}%`;
+  const like = `%${escapeLike(q)}%`;
 
   try {
     const groups: Record<string, unknown[]> = {};

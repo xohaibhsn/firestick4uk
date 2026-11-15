@@ -410,7 +410,7 @@ function extractVatFromInclusiveGrandTotal(grandTotal) {
       postcode: "E1 1AA",
       notes: "",
       payment_method: "bank",
-      receipt_path: "/uploads/receipts/x.jpg",
+      receipt_path: "/uploads/receipts/testrcpt01.jpg",
       items: [{ id: 3, qty: 1 }],
       coupon_code: "",
       payment_reference: "",

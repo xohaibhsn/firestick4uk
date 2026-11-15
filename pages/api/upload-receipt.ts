@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { getClientIp, rateLimit } from "../../lib/rateLimit";
@@ -11,11 +12,6 @@ export const config = {
 
 const RECEIPT_FOLDER = "firestick4uk/receipts";
 
-function sanitizeFilename(name: unknown): string {
-  const base = path.basename(String(name || "receipt")).replace(/[^a-zA-Z0-9._-]/g, "_");
-  return base.slice(0, 120) || "receipt";
-}
-
 /** Public checkout receipt upload — fixed folder only, no admin session. */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -24,14 +20,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!allowed) return res.status(429).json({ error: "Too many upload attempts. Please try again later." });
 
   try {
-    const { file, name } = req.body || {};
+    const { file } = req.body || {};
     if (!file) return res.status(400).json({ error: "No file provided" });
 
     const parsed = parseReceiptDataUrl(file);
     if (!parsed.ok) return res.status(400).json({ error: parsed.error });
 
     const { mime, buffer } = parsed;
-    const safeName = sanitizeFilename(name);
+    const randomId = crypto.randomBytes(16).toString("hex");
     const dataUri = `data:${mime};base64,${buffer.toString("base64")}`;
 
     if (
@@ -44,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const result = await cloudinary.uploader.upload(dataUri, {
         folder: RECEIPT_FOLDER,
         resource_type: "auto",
-        public_id: `${Date.now()}-${safeName.replace(/\.[^.]+$/, "")}`.slice(0, 180),
+        public_id: randomId,
         ...(isPdf
           ? {}
           : {
@@ -70,10 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           : mime === "image/webp"
             ? ".webp"
             : ".jpg";
-    const outName = `${Date.now()}-${safeName.replace(/\.[^.]+$/, "")}${ext}`.replace(
-      /[^a-zA-Z0-9._-]/g,
-      "_"
-    );
+    const outName = `${randomId}${ext}`;
     const outPath = path.resolve(resolvedDir, outName);
     if (!outPath.startsWith(resolvedDir + path.sep)) {
       return res.status(400).json({ error: "Invalid filename" });
