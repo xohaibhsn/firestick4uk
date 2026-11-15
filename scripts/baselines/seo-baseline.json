@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-11-14T20:17:57.470Z",
+  "generatedAt": "2026-11-15T04:08:09.326Z",
   "base": "https://firestick4uk.com",
-  "sitemapUrlCount": 23,
+  "sitemapUrlCount": 24,
   "productsCount": 9,
   "pages": {
     "/": {
@@ -460,51 +460,6 @@
       "nav": [],
       "jsonLdSha256": "dba4dc88bc931eb99dca76e80abd3f3261fa6fcfaf99f2d1de8387e0961ebc66"
     },
-    "/products/halloween-3-year-iptv-deal": {
-      "path": "/products/halloween-3-year-iptv-deal",
-      "title": "Halloween 2026 IPTV Deal | 3 Years £78 | Firestick4UK",
-      "description": "Get the Halloween Special 2026 Deal for IPTV Subscription: 3 years for £78. For UK customers, with Firestick compatibility and setup support.",
-      "canonical": "https://firestick4uk.com/products/halloween-3-year-iptv-deal",
-      "robots": "index, follow",
-      "h1": [
-        "Halloween Special 2026 Deal for IPTV Subscription"
-      ],
-      "nav": [
-        {
-          "text": "FIRESTICK4UK",
-          "href": "/"
-        },
-        {
-          "text": "Home",
-          "href": "/"
-        },
-        {
-          "text": "Products",
-          "href": "/products"
-        },
-        {
-          "text": "IPTV Subscription",
-          "href": "/iptv-subscriptions-uk"
-        },
-        {
-          "text": "Track Order",
-          "href": "/order-tracking"
-        },
-        {
-          "text": "Blog",
-          "href": "/blog"
-        },
-        {
-          "text": "Contact",
-          "href": "/contact"
-        },
-        {
-          "text": "Cart",
-          "href": "/cart"
-        }
-      ],
-      "jsonLdSha256": "585f0fb8a534c62410d20f8c52ff578520652cebcd663f82d9c8c4b3b497db36"
-    },
     "/products/b1g-1-month-plan": {
       "path": "/products/b1g-1-month-plan",
       "title": "B1G 1 Month Plan | Flexible UK Streaming Subscription | Firestick4UK",
@@ -865,6 +820,51 @@
       ],
       "jsonLdSha256": "bd9af416c6c2dec18cfc13dbaf46979f1fa46a36c92aef8151826f1a9055ee1f"
     },
+    "/products/halloween-3-year-iptv-deal": {
+      "path": "/products/halloween-3-year-iptv-deal",
+      "title": "Halloween 2026 IPTV Deal | 3 Years £78 | Firestick4UK",
+      "description": "Get the Halloween Special 2026 Deal for IPTV Subscription: 3 years for £78. For UK customers, with Firestick compatibility and setup support.",
+      "canonical": "https://firestick4uk.com/products/halloween-3-year-iptv-deal",
+      "robots": "index, follow",
+      "h1": [
+        "Halloween Special 2026 Deal for IPTV Subscription"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "25701f09da0300a8bf737bec292d4a7f90a7278b585e167106a8e4924304ee84"
+    },
     "/products/black-friday-3-year-iptv-deal": {
       "path": "/products/black-friday-3-year-iptv-deal",
       "title": "Black Friday 2026 IPTV Deal | 3 Years £78 | Firestick4UK",
@@ -909,6 +909,51 @@
         }
       ],
       "jsonLdSha256": "bf267616f6531e4c8e3f052e382433df32ffee6435db02dd18b092cbb1d26947"
+    },
+    "/products/christmas-new-year-offer-2026": {
+      "path": "/products/christmas-new-year-offer-2026",
+      "title": "Christmas & New Year IPTV Deal | 3 Years £78 | Firestick4UK",
+      "description": "Explore the Christmas &amp; New Year 2026 subscription deal from Firestick4UK. Get 36 months of streaming access for £78, with support for compatible devices.",
+      "canonical": "https://firestick4uk.com/products/christmas-new-year-offer-2026",
+      "robots": "index, follow",
+      "h1": [
+        "Christmas & New Year Offer 2026 — 3 Years IPTV"
+      ],
+      "nav": [
+        {
+          "text": "FIRESTICK4UK",
+          "href": "/"
+        },
+        {
+          "text": "Home",
+          "href": "/"
+        },
+        {
+          "text": "Products",
+          "href": "/products"
+        },
+        {
+          "text": "IPTV Subscription",
+          "href": "/iptv-subscriptions-uk"
+        },
+        {
+          "text": "Track Order",
+          "href": "/order-tracking"
+        },
+        {
+          "text": "Blog",
+          "href": "/blog"
+        },
+        {
+          "text": "Contact",
+          "href": "/contact"
+        },
+        {
+          "text": "Cart",
+          "href": "/cart"
+        }
+      ],
+      "jsonLdSha256": "bab73d55521b8244e71479d12ace7191590beefec83b5225d7b33012d2b2307f"
     }
   }
 }
