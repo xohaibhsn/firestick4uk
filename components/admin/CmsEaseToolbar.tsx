@@ -342,14 +342,18 @@ export default function CmsEaseToolbar({
 }
 
 /** Confirm helper for tab/page switches — used by sidhu page. */
-export function confirmLeaveIfDirty(dirtyCount: number, proceed: () => void): void {
+export async function confirmLeaveIfDirty(
+  dirtyCount: number,
+  proceed: () => void,
+  confirmFn?: (message: string) => boolean | Promise<boolean>
+): Promise<void> {
   if (dirtyCount <= 0) {
     proceed();
     return;
   }
-  const ok = window.confirm(
-    `You have ${dirtyCount} unsaved change${dirtyCount === 1 ? "" : "s"}. Leave without saving?`
-  );
+  const message = `You have ${dirtyCount} unsaved change${dirtyCount === 1 ? "" : "s"}. Leave without saving?`;
+  if (!confirmFn) return;
+  const ok = await confirmFn(message);
   if (ok) proceed();
 }
 

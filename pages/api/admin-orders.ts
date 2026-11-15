@@ -28,7 +28,10 @@ async function handleSummary(res: NextApiResponse, admin: AdminIdentity) {
       SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_orders,
       SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS delivered_orders,
       SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_orders,
-      COALESCE(SUM(CASE WHEN status IN ('confirmed','dispatched','delivered') THEN total ELSE 0 END), 0) AS confirmed_revenue
+      COALESCE(SUM(CASE WHEN status IN ('confirmed','dispatched','delivered') THEN total ELSE 0 END), 0) AS confirmed_revenue,
+      COALESCE(SUM(CASE WHEN status = 'delivered' THEN total ELSE 0 END), 0) AS delivered_revenue,
+      COALESCE(SUM(CASE WHEN status = 'pending' THEN total ELSE 0 END), 0) AS pending_value,
+      COALESCE(SUM(CASE WHEN status = 'cancelled' THEN total ELSE 0 END), 0) AS cancelled_value
     FROM orders
   `);
   const [[cust]]: any = await pool.query(`
@@ -73,6 +76,9 @@ async function handleSummary(res: NextApiResponse, admin: AdminIdentity) {
     delivered_orders: Number(totals?.delivered_orders || 0),
     cancelled_orders: Number(totals?.cancelled_orders || 0),
     confirmed_revenue: Number(totals?.confirmed_revenue || 0),
+    delivered_revenue: Number(totals?.delivered_revenue || 0),
+    pending_value: Number(totals?.pending_value || 0),
+    cancelled_value: Number(totals?.cancelled_value || 0),
     customer_count: Number(cust?.customer_count || 0),
     product_count,
     ...(leads_last_24 !== undefined ? { leads_last_24 } : {}),

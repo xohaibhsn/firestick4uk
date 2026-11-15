@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getRequestMeta, requireAdminPermission } from "../../lib/adminAuth";
 import { recordAdminAudit } from "../../lib/adminAudit";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 import { hasAdminPermission } from "../../lib/adminPermissions";
 import { migrateProductUrl } from "../../lib/productUrlMigrationServer";
 
@@ -10,6 +11,8 @@ import { migrateProductUrl } from "../../lib/productUrlMigrationServer";
  * Does not unlock ordinary product slug edits (HTTP 409 protection remains).
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  setAdminNoStore(res);
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }

@@ -8,9 +8,12 @@ import {
   validateStaffPassword,
 } from "../../lib/adminAuth";
 import { recordAdminAudit } from "../../lib/adminAudit";
+import { setAdminNoStore } from "../../lib/adminNoStore";
 
 /** Super Admin: reset another staff user's password (no old password required). */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  setAdminNoStore(res);
+
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const admin = await requireAdminPermission(req, res, "staff.manage");

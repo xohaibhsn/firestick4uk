@@ -190,7 +190,7 @@ ok("cms_default_filter_all", /useState<"all" \| "visible" \| "hidden">\("all"\)/
 ok("cms_pending_state", /productVisibilityPendingId/.test(sidhu) && /Privatising…/.test(sidhu) && /Publishing…/.test(sidhu));
 ok(
   "cms_confirm_dialog",
-  /window\.confirm/.test(sidhu) &&
+  (/askConfirm/.test(sidhu) || /window\.confirm/.test(sidhu)) &&
     /public product page becomes unavailable \(404\)/.test(sidhu)
 );
 ok("cms_patch_payload", /method: "PATCH"/.test(sidhu) && /expected_active:/.test(sidhu));

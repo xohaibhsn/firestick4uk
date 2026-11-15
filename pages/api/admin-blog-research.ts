@@ -7,6 +7,7 @@
  */
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireAdminPermission } from "@/lib/adminAuth";
+import { setAdminNoStore } from "@/lib/adminNoStore";
 import { mintBlogArticleEvidenceHandle } from "@/lib/blogArticleEvidenceBridge.server";
 import {
   BLOG_GROUNDED_RESEARCH_TASK,
@@ -33,6 +34,8 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  setAdminNoStore(res);
+
   if (req.method !== "POST") {
     return res.status(405).json({
       ok: false,

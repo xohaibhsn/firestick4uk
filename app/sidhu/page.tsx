@@ -26,6 +26,12 @@ import { buildProductEditorSavePayload } from "@/lib/productEditorSavePayload";
 import { buildDuplicateEditProduct } from "@/lib/seasonalOfferWizard";
 import SeoOverviewPanel from "@/components/admin/SeoOverviewPanel";
 import RedirectManagerPanel from "@/components/admin/RedirectManagerPanel";
+import { AdminDialogProvider, useAdminDialogs } from "@/components/admin/AdminDialogs";
+import {
+  applyOrderSummaryDelta as applyOrderSummaryDeltaPure,
+  parseMoney as parseMoneyPure,
+  REVENUE_ORDER_STATUSES as REVENUE_ORDER_STATUSES_LIB,
+} from "@/lib/orderSummaryDelta";
 import InsightsPanel from "@/components/sidhu/insights/InsightsPanel";
 import ReviewsPanel from "@/components/sidhu/ReviewsPanel";
 import { keysForPage } from "@/lib/adminContentFields";
@@ -321,6 +327,27 @@ function formatSeoGuardBannerClient(guard: any): string {
 }
 
 export default function AdminPage() {
+  return (
+    <AdminDialogProvider>
+      <AdminPageInner />
+    </AdminDialogProvider>
+  );
+}
+
+function AdminPageInner() {
+  const { showToast, confirm: askConfirm } = useAdminDialogs();
+  const adminAlert = (message: string, kind: "success" | "error" | "info" = "info") => {
+    const msg = String(message ?? "");
+    const k =
+      kind !== "info"
+        ? kind
+        : /failed|error|❌/i.test(msg)
+          ? "error"
+          : /changed|success|✅/i.test(msg)
+            ? "success"
+            : "info";
+    showToast(msg, k);
+  };
   const [loggedIn, setLoggedIn] = useState(false);
   const [adminRole, setAdminRole] = useState<AdminRole>("super_admin");
   const [adminName, setAdminName] = useState("Admin");
@@ -524,20 +551,20 @@ export default function AdminPage() {
   );
   const requestActivePage = useCallback(
     (next: string) => {
-      confirmLeaveIfDirty(cmsDirtyCount, () => setActivePage(next));
+      void confirmLeaveIfDirty(cmsDirtyCount, () => setActivePage(next), askConfirm);
     },
-    [cmsDirtyCount]
+    [cmsDirtyCount, askConfirm]
   );
   const requestTab = useCallback(
     (next: string) => {
       const leavingCms = (tab === "pages" || tab === "settings") && next !== tab;
       if (leavingCms) {
-        confirmLeaveIfDirty(cmsDirtyCount, () => setTab(next as Tab));
+        void confirmLeaveIfDirty(cmsDirtyCount, () => setTab(next as Tab), askConfirm);
       } else {
         setTab(next as Tab);
       }
     },
-    [cmsDirtyCount, tab]
+    [cmsDirtyCount, tab, askConfirm]
   );
   const [faviconUploading, setFaviconUploading] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -686,11 +713,8 @@ export default function AdminPage() {
     }
   };
 
-  const REVENUE_ORDER_STATUSES = ["confirmed", "dispatched", "delivered"];
-  const parseMoney = (v: unknown) => {
-    const n = parseFloat(String(v ?? "0").replace(/[£,\s]/g, ""));
-    return Number.isFinite(n) ? n : 0;
-  };
+  const REVENUE_ORDER_STATUSES = REVENUE_ORDER_STATUSES_LIB as unknown as string[];
+  const parseMoney = parseMoneyPure;
 
   /** Optimistically adjust dashboard summary counters for an order delete / status change. */
   const applyOrderSummaryDelta = (opts: {
@@ -698,39 +722,7 @@ export default function AdminPage() {
     statusChange?: { from: string; to: string; total: string };
     customerRemoved?: boolean;
   }) => {
-    setDashSummary((prev: any) => {
-      if (!prev) return prev;
-      const next = { ...prev };
-      const bump = (key: string, delta: number) => {
-        if (next[key] == null) return;
-        next[key] = Math.max(0, Number(next[key]) + delta);
-      };
-      if (opts.removed) {
-        const { status, total } = opts.removed;
-        bump("total_orders", -1);
-        if (status === "pending") bump("pending_orders", -1);
-        if (status === "delivered") bump("delivered_orders", -1);
-        if (status === "cancelled") bump("cancelled_orders", -1);
-        if (REVENUE_ORDER_STATUSES.includes(status)) bump("confirmed_revenue", -parseMoney(total));
-        if (opts.customerRemoved) bump("customer_count", -1);
-      }
-      if (opts.statusChange) {
-        const { from, to, total } = opts.statusChange;
-        if (from !== to) {
-          if (from === "pending") bump("pending_orders", -1);
-          if (to === "pending") bump("pending_orders", 1);
-          if (from === "delivered") bump("delivered_orders", -1);
-          if (to === "delivered") bump("delivered_orders", 1);
-          if (from === "cancelled") bump("cancelled_orders", -1);
-          if (to === "cancelled") bump("cancelled_orders", 1);
-          const wasRev = REVENUE_ORDER_STATUSES.includes(from);
-          const isRev = REVENUE_ORDER_STATUSES.includes(to);
-          if (wasRev && !isRev) bump("confirmed_revenue", -parseMoney(total));
-          if (!wasRev && isRev) bump("confirmed_revenue", parseMoney(total));
-        }
-      }
-      return next;
-    });
+    setDashSummary((prev: any) => applyOrderSummaryDeltaPure(prev, opts));
   };
 
   const loadOrders = async (page?: number, overrides?: OrderFilterOverrides, silent = false) => {
@@ -943,11 +935,11 @@ export default function AdminPage() {
       if (r.status === 403) { showPermError(); return; }
       if (r.status === 400) {
         const data = await r.json().catch(() => ({}));
-        alert(data?.error || "Export failed");
+        adminAlert(data?.error || "Export failed");
         return;
       }
       if (!r.ok) {
-        alert("Export failed");
+        adminAlert("Export failed");
         return;
       }
       const blob = await r.blob();
@@ -960,7 +952,7 @@ export default function AdminPage() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch {
-      alert("Export failed");
+      adminAlert("Export failed");
     }
   };
 
@@ -973,13 +965,13 @@ export default function AdminPage() {
       if (r.status === 403) { showPermError(); return; }
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !data?.order) {
-        alert(data?.error || "Order not found");
+        adminAlert(data?.error || "Order not found");
         return;
       }
       setOrderDetail({ order: data.order, items: Array.isArray(data.items) ? data.items : [] });
       setOrderModal(mapOrderRow(data.order));
     } catch {
-      alert("Failed to load order");
+      adminAlert("Failed to load order");
     }
   };
 
@@ -1846,7 +1838,7 @@ export default function AdminPage() {
       setLoginError("");
       setUsername("");
       setPassword("");
-      alert("Password changed. Please sign in again.");
+      adminAlert("Password changed. Please sign in again.");
     } else {
       setProfileMsg(`❌ ${res.error||"Password change failed"}`);
     }
@@ -1873,7 +1865,7 @@ export default function AdminPage() {
     const body: Record<string, unknown> = { order_id: id, status };
     if (status === "cancelled") {
       if (!cancelReason) {
-        alert("Please choose a cancel reason.");
+        adminAlert("Please choose a cancel reason.");
         return;
       }
       body.cancel_reason = cancelReason;
@@ -1888,7 +1880,7 @@ export default function AdminPage() {
         if (r.status === 403) { showPermError(); return; }
         if (!r.ok) {
           const data = await r.json().catch(() => ({}));
-          alert(data?.error || "Status update failed");
+          adminAlert(data?.error || "Status update failed");
           setOrderStatusSelectKey((k) => k + 1);
           return;
         }
@@ -1927,7 +1919,7 @@ export default function AdminPage() {
     const amountNum = parseFloat((total||"0").replace("£","").replace(",",""));
     const isRevenue = ["confirmed","dispatched","delivered"].includes(status);
     const msg = `⚠️ Delete order ${orderId}?\n\nAmount: ${total}\nStatus: ${status.toUpperCase()}${isRevenue ? `\n\n💰 This will reverse £${amountNum.toFixed(2)} from confirmed revenue.` : ""}\n\nThis cannot be undone.`;
-    if (!confirm(msg)) return;
+    if (!(await askConfirm(msg))) return;
     const res = await fetch("/api/admin-orders", {
       method: "DELETE",
       credentials: "include", headers: { "Content-Type": "application/json" },
@@ -1967,7 +1959,7 @@ export default function AdminPage() {
       // Background reconcile with server truth.
       void refreshAfterOrderMutation(reloadPage);
     } else {
-      alert(`❌ Delete failed: ${res.error || "Unknown error"}`);
+      adminAlert(`❌ Delete failed: ${res.error || "Unknown error"}`);
     }
   };
 
@@ -2033,7 +2025,7 @@ export default function AdminPage() {
   };
 
   const deleteBlog = async (id: number) => {
-    if (!confirm("Delete this blog post?")) return;
+    if (!(await askConfirm("Delete this blog post?"))) return;
     const res = await fetch(`/api/blog?id=${id}`, { method: "DELETE", credentials: "include" }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
       setBlogPosts((prev) => prev.filter(p => p.id !== id));
@@ -2047,9 +2039,9 @@ export default function AdminPage() {
 
   const deleteProduct = async (id: number) => {
     if (
-      !confirm(
+      !(await askConfirm(
         "Delete this product? A history snapshot will be kept, but deleted products cannot be restored automatically."
-      )
+      ))
     ) {
       return;
     }
@@ -2248,7 +2240,7 @@ export default function AdminPage() {
     const nextActive = expectedActive === 1 ? 0 : 1;
     const actionLabel = nextActive === 1 ? "Make Public" : "Make Private";
     const slugPath = p.slug ? `/products/${p.slug}` : "(no slug)";
-    const confirmed = window.confirm(
+    const confirmed = await askConfirm(
       `${actionLabel} product "${p.name || id}" (#${id})?\n\n` +
         `Stored URL: ${slugPath}\n\n` +
         (nextActive === 0
@@ -2330,7 +2322,7 @@ export default function AdminPage() {
   };
 
   const deleteLead = async (id: number) => {
-    if (!confirm("Delete this chat lead?")) return;
+    if (!(await askConfirm("Delete this chat lead?"))) return;
     const res = await fetch(`/api/admin/leads?id=${id}`, {
       method: "DELETE",
       credentials: "include",
@@ -2352,7 +2344,7 @@ export default function AdminPage() {
 
   const deleteSelectedLeads = async () => {
     if (selectedLeadIds.length === 0) return;
-    if (!confirm(`Delete ${selectedLeadIds.length} selected chat lead${selectedLeadIds.length === 1 ? "" : "s"}?`)) return;
+    if (!(await askConfirm(`Delete ${selectedLeadIds.length} selected chat lead${selectedLeadIds.length === 1 ? "" : "s"}?`))) return;
     const res = await fetch("/api/admin/leads", {
       method: "DELETE",
       credentials: "include", headers: { "Content-Type": "application/json" },
@@ -2363,7 +2355,7 @@ export default function AdminPage() {
       setSelectedLeadIds([]);
       setLeadModal(null);
     } else {
-      alert(`❌ Bulk delete failed: ${res.error || "Unknown error"}`);
+      adminAlert(`❌ Bulk delete failed: ${res.error || "Unknown error"}`);
     }
   };
 
@@ -2649,7 +2641,7 @@ export default function AdminPage() {
       return;
     }
 
-    const confirmed = window.confirm(
+    const confirmed = await askConfirm(
       `Migrate product #${productModal.id} URL?\n\n` +
         `FROM: /products/${expectedOldSlug}\n` +
         `TO:   /products/${newSlug}\n\n` +
@@ -5212,7 +5204,34 @@ export default function AdminPage() {
                   ? [
                       { icon:"🛒", label:"Total Orders", value:Number(dashSummary?.total_orders || 0), trend:"All time" },
                       { icon:"⏳", label:"Pending Orders", value:Number(dashSummary?.pending_orders || 0), trend:"Needs action" },
-                      { icon:"💰", label:"Total Revenue", value:`£${Number(dashSummary?.confirmed_revenue || 0).toFixed(2)}`, trend:"Confirmed only" },
+                      {
+                        icon:"💰",
+                        label:"Confirmed revenue",
+                        value:`£${Number(dashSummary?.confirmed_revenue || 0).toFixed(2)}`,
+                        trend:"Confirmed + Dispatched + Delivered",
+                        tip:"Confirmed + Dispatched + Delivered orders",
+                      },
+                      {
+                        icon:"📦",
+                        label:"Delivered revenue",
+                        value:`£${Number(dashSummary?.delivered_revenue || 0).toFixed(2)}`,
+                        trend:"Delivered only",
+                        tip:"Delivered orders only",
+                      },
+                      {
+                        icon:"⏳",
+                        label:"Pending value",
+                        value:`£${Number(dashSummary?.pending_value || 0).toFixed(2)}`,
+                        trend:"Not yet confirmed",
+                        tip:"Orders not yet confirmed",
+                      },
+                      {
+                        icon:"🚫",
+                        label:"Cancelled value",
+                        value:`£${Number(dashSummary?.cancelled_value || 0).toFixed(2)}`,
+                        trend:"Not counted as revenue",
+                        tip:"Cancelled orders — not counted as revenue",
+                      },
                       { icon:"👥", label:"Customers", value:Number(dashSummary?.customer_count || 0), trend:"Unique" },
                       { icon:"📦", label:"Products", value:Number(dashSummary?.product_count ?? products.length), trend:"Active" },
                       { icon:"✅", label:"Delivered", value:Number(dashSummary?.delivered_orders || 0), trend:"All time" },
@@ -5223,14 +5242,41 @@ export default function AdminPage() {
                       { icon:"✅", label:"Published", value:blogPosts.filter((p)=>p.status==="published").length, trend:"Live" },
                       { icon:"📄", label:"Drafts", value:blogPosts.filter((p)=>p.status==="draft").length, trend:"In progress" },
                     ]
-                ).map((s,i) => (
+                ).map((s: any,i) => (
                   <div className="stat-card" key={i}>
                     <div className="stat-card-top">
                       <span className="stat-icon">{s.icon}</span>
                       <span className="stat-trend">{s.trend}</span>
                     </div>
                     <div className="stat-value">{s.value}</div>
-                    <div className="stat-label">{s.label}</div>
+                    <div className="stat-label" style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span>{s.label}</span>
+                      {s.tip ? (
+                        <span
+                          className="stat-tip"
+                          tabIndex={0}
+                          role="img"
+                          aria-label={s.tip}
+                          title={s.tip}
+                          style={{
+                            display:"inline-flex",
+                            alignItems:"center",
+                            justifyContent:"center",
+                            width:16,
+                            height:16,
+                            borderRadius:999,
+                            border:"1px solid #CBD5E1",
+                            fontSize:11,
+                            fontWeight:700,
+                            color:"#64748B",
+                            cursor:"help",
+                            lineHeight:1,
+                          }}
+                        >
+                          ?
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -5990,7 +6036,7 @@ export default function AdminPage() {
                               {c.is_active?"Active":"Inactive"}
                             </span>
                           </td>
-                          <td><button className="action-btn btn-delete" onClick={async()=>{if(!confirm("Delete?"))return;const dr=await fetch(`/api/coupons?id=${c.id}`,{method:"DELETE",credentials:"include"}).then(x=>x.json()).catch(()=>({}));if(dr.success){setCoupons(prev=>prev.filter(x=>x.id!==c.id));}else{setCouponMsg(`❌ ${dr.error||"Delete failed"}`);setTimeout(()=>setCouponMsg(""),3000);}void loadCoupons();}}>Delete</button></td>
+                          <td><button className="action-btn btn-delete" onClick={async()=>{if (!(await askConfirm("Delete?"))) return;const dr=await fetch(`/api/coupons?id=${c.id}`,{method:"DELETE",credentials:"include"}).then(x=>x.json()).catch(()=>({}));if(dr.success){setCoupons(prev=>prev.filter(x=>x.id!==c.id));}else{setCouponMsg(`❌ ${dr.error||"Delete failed"}`);setTimeout(()=>setCouponMsg(""),3000);}void loadCoupons();}}>Delete</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -6264,7 +6310,7 @@ export default function AdminPage() {
                             <td><span style={{fontSize:11,background:f.is_visible?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${f.is_visible?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,color:f.is_visible?"#00c864":"#ff6666",padding:"3px 10px",borderRadius:20,cursor:"pointer"}} onClick={async()=>{const vr=await fetch("/api/faqs",{method:"PUT",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({...f,is_visible:f.is_visible?0:1})}).then(x=>x.json()).catch(()=>({}));if(vr.success){setFaqs(prev=>prev.map((x:FAQ)=>x.id===f.id?{...x,is_visible:f.is_visible?0:1}:x));}else{setFaqMsg(`❌ ${vr.error||"Update failed"}`);setTimeout(()=>setFaqMsg(""),3000);}void loadFaqs();}}>{f.is_visible?"Visible":"Hidden"}</span></td>
                             <td>
                               <button className="action-btn btn-edit" style={{marginRight:6}} onClick={()=>{setEditFaq({question:f.question,answer:f.answer,category:f.category});setFaqModal(f);}}>Edit</button>
-                              <button className="action-btn btn-delete" onClick={async()=>{if(!confirm("Delete this FAQ?"))return;const dr=await fetch(`/api/faqs?id=${f.id}`,{method:"DELETE",credentials:"include"}).then(x=>x.json()).catch(()=>({}));if(dr.success){setFaqs(prev=>prev.filter((x:FAQ)=>x.id!==f.id));}else{setFaqMsg(`❌ ${dr.error||"Delete failed"}`);setTimeout(()=>setFaqMsg(""),3000);}void loadFaqs();}}>Delete</button>
+                              <button className="action-btn btn-delete" onClick={async()=>{if (!(await askConfirm("Delete this FAQ?"))) return;const dr=await fetch(`/api/faqs?id=${f.id}`,{method:"DELETE",credentials:"include"}).then(x=>x.json()).catch(()=>({}));if(dr.success){setFaqs(prev=>prev.filter((x:FAQ)=>x.id!==f.id));}else{setFaqMsg(`❌ ${dr.error||"Delete failed"}`);setTimeout(()=>setFaqMsg(""),3000);}void loadFaqs();}}>Delete</button>
                             </td>
                           </tr>
                         ))}

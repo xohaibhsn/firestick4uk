@@ -1397,6 +1397,8 @@ async function main() {
       "scripts/phase-jseo-b2-controls-tests.js",
       // 16a0887: SEAS-72 no-store allowlist names POST-only admin-blog-research.ts
       "scripts/phase-seasonal-ux-72-tests.js",
+      // MULTI-103: asserts setAdminNoStore on admin-blog-research
+      "scripts/phase-multi-103-tests.js",
     ]);
     const unexpected = repoRefs.filter((r) => !allowed.has(r));
     ok(

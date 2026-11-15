@@ -6,6 +6,7 @@
  */
 import { useState } from "react";
 import { utcSqlToLondonWall } from "@/lib/productSeasonLondon";
+import { useAdminDialogs } from "@/components/admin/AdminDialogs";
 
 export type SeasonalityProduct = {
   id: number;
@@ -55,8 +56,8 @@ export type SeasonalityPanelProps = {
     product: Record<string, unknown>,
     meta: SeasonalityRequestContext
   ) => void;
-  confirmImpl?: (message: string) => boolean;
-  promptImpl?: (message: string, defaultValue?: string) => string | null;
+  confirmImpl?: (message: string) => boolean | Promise<boolean>;
+  promptImpl?: (message: string, defaultValue?: string) => string | null | Promise<string | null>;
 };
 
 function idsToText(raw: unknown): string {
@@ -141,8 +142,13 @@ export default function ProductSeasonalityPanel({
   promptImpl,
 }: SeasonalityPanelProps) {
   const doFetch = fetchImpl || fetch;
-  const confirm = confirmImpl || ((m: string) => window.confirm(m));
-  const prompt = promptImpl || ((m: string, d?: string) => window.prompt(m, d));
+  const dialogs = useAdminDialogs();
+  const confirm =
+    confirmImpl ||
+    ((m: string) => dialogs.confirm(m));
+  const prompt =
+    promptImpl ||
+    ((m: string, d?: string) => dialogs.prompt(m, d));
 
   const [localPending, setLocalPending] = useState(false);
   const busy = disabled || pending || localPending;
@@ -288,11 +294,13 @@ export default function ProductSeasonalityPanel({
             data-testid={`product-season-action-${qa.action}`}
             disabled={busy}
             onClick={() => {
-              if (qa.confirm && !confirm(qa.confirm)) return;
-              if (!qa.confirm && !confirm(`${qa.label} for "${product.name || product.id}"?`)) return;
-              const body: Record<string, unknown> = { action: qa.action };
-              if (qa.action === "set_shop_listed") body.shop_listed = qa.shop_listed;
-              void runPatch(body, qa.label);
+              void (async () => {
+                const msg = qa.confirm || `${qa.label} for "${product.name || product.id}"?`;
+                if (!(await confirm(msg))) return;
+                const body: Record<string, unknown> = { action: qa.action };
+                if (qa.action === "set_shop_listed") body.shop_listed = qa.shop_listed;
+                void runPatch(body, qa.label);
+              })();
             }}
           >
             {localPending ? "…" : qa.label}
@@ -305,23 +313,29 @@ export default function ProductSeasonalityPanel({
           data-testid="product-season-make-seasonal"
           disabled={busy}
           onClick={() => {
-            const name = prompt("Season name (required)", product.season_name || "");
-            if (name == null) return;
-            if (!String(name).trim()) {
-              onMessage?.("❌ Season name required");
-              return;
-            }
-            if (!confirm("Set lifecycle to Seasonal? Purchasing will require a valid UTC window.")) {
-              return;
-            }
-            void runPatch(
-              {
-                action: "set_lifecycle_settings",
-                lifecycle_mode: "seasonal",
-                season_name: String(name).trim(),
-              },
-              "Marked Seasonal"
-            );
+            void (async () => {
+              const name = await prompt("Season name (required)", product.season_name || "");
+              if (name == null) return;
+              if (!String(name).trim()) {
+                onMessage?.("❌ Season name required");
+                return;
+              }
+              if (
+                !(await confirm(
+                  "Set lifecycle to Seasonal? Purchasing will require a valid UTC window."
+                ))
+              ) {
+                return;
+              }
+              void runPatch(
+                {
+                  action: "set_lifecycle_settings",
+                  lifecycle_mode: "seasonal",
+                  season_name: String(name).trim(),
+                },
+                "Marked Seasonal"
+              );
+            })();
           }}
         >
           Set Seasonal…
@@ -333,17 +347,19 @@ export default function ProductSeasonalityPanel({
           data-testid="product-season-make-permanent"
           disabled={busy}
           onClick={() => {
-            if (
-              !confirm(
-                "Switch to Permanent (regular year-round offering)? This clears the season window/pause and may immediately re-enable purchasing for a Public product."
-              )
-            ) {
-              return;
-            }
-            void runPatch(
-              { action: "set_lifecycle_settings", lifecycle_mode: "permanent" },
-              "Marked Permanent"
-            );
+            void (async () => {
+              if (
+                !(await confirm(
+                  "Switch to Permanent (regular year-round offering)? This clears the season window/pause and may immediately re-enable purchasing for a Public product."
+                ))
+              ) {
+                return;
+              }
+              void runPatch(
+                { action: "set_lifecycle_settings", lifecycle_mode: "permanent" },
+                "Marked Permanent"
+              );
+            })();
           }}
         >
           Set Permanent
@@ -406,19 +422,21 @@ export default function ProductSeasonalityPanel({
           disabled={busy}
           style={{ marginTop: 8 }}
           onClick={() => {
-            if (!startsWall.trim() || !endsWall.trim()) {
-              onMessage?.("❌ Start and end London wall times are required");
-              return;
-            }
-            if (!confirm("Save season start/end window?")) return;
-            void runPatch(
-              {
-                action: "set_season_window",
-                starts_at_london: { wall: startsWall.trim(), offset: startsOffset },
-                ends_at_london: { wall: endsWall.trim(), offset: endsOffset },
-              },
-              "Season window saved"
-            );
+            void (async () => {
+              if (!startsWall.trim() || !endsWall.trim()) {
+                onMessage?.("❌ Start and end London wall times are required");
+                return;
+              }
+              if (!(await confirm("Save season start/end window?"))) return;
+              void runPatch(
+                {
+                  action: "set_season_window",
+                  starts_at_london: { wall: startsWall.trim(), offset: startsOffset },
+                  ends_at_london: { wall: endsWall.trim(), offset: endsOffset },
+                },
+                "Season window saved"
+              );
+            })();
           }}
         >
           Save window
@@ -481,28 +499,30 @@ export default function ProductSeasonalityPanel({
           data-testid="product-season-save-presentation"
           disabled={busy}
           onClick={() => {
-            const avail = parseIdsInput(availableIds);
-            if ("error" in avail) {
-              onMessage?.(`❌ Available IDs: ${avail.error}`);
-              return;
-            }
-            const up = parseIdsInput(upcomingIds);
-            if ("error" in up) {
-              onMessage?.(`❌ Upcoming IDs: ${up.error}`);
-              return;
-            }
-            if (!confirm("Save archive presentation / alternatives?")) return;
-            void runPatch(
-              {
-                action: "set_archive_presentation",
-                season_show_countdown: countdown,
-                season_ended_notice: notice,
-                available_offers_heading: heading.trim() || null,
-                season_available_ids: avail,
-                season_upcoming_ids: up,
-              },
-              "Presentation saved"
-            );
+            void (async () => {
+              const avail = parseIdsInput(availableIds);
+              if ("error" in avail) {
+                onMessage?.(`❌ Available IDs: ${avail.error}`);
+                return;
+              }
+              const up = parseIdsInput(upcomingIds);
+              if ("error" in up) {
+                onMessage?.(`❌ Upcoming IDs: ${up.error}`);
+                return;
+              }
+              if (!(await confirm("Save archive presentation / alternatives?"))) return;
+              void runPatch(
+                {
+                  action: "set_archive_presentation",
+                  season_show_countdown: countdown,
+                  season_ended_notice: notice,
+                  available_offers_heading: heading.trim() || null,
+                  season_available_ids: avail,
+                  season_upcoming_ids: up,
+                },
+                "Presentation saved"
+              );
+            })();
           }}
         >
           Save presentation

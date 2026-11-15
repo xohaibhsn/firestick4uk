@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AdminRoleName } from "@/lib/adminPermissions";
 import { hasAdminPermission } from "@/lib/adminPermissions";
 import { URL_REDIRECT_TYPE_V1 } from "@/lib/urlRedirects";
+import { useAdminDialogs } from "@/components/admin/AdminDialogs";
 
 export type RedirectRow = {
   id: number;
@@ -85,6 +86,7 @@ function safeError(data: any, fallback: string): string {
 
 export default function RedirectManagerPanel({ role, adminApi }: Props) {
   const canManage = hasAdminPermission(role, "redirects.manage");
+  const { confirm: askConfirm } = useAdminDialogs();
   const adminApiRef = useRef(adminApi);
   useEffect(() => {
     adminApiRef.current = adminApi;
@@ -210,7 +212,7 @@ export default function RedirectManagerPanel({ role, adminApi }: Props) {
   };
 
   const remove = async (row: RedirectRow) => {
-    const okConfirm = confirm(
+    const okConfirm = await askConfirm(
       `Delete redirect "${row.source_path}"?\nThis cannot be undone from Redirect Manager.`
     );
     if (!okConfirm) return;
