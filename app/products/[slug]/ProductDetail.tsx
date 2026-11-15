@@ -544,7 +544,7 @@ export default function ProductDetail({
                   )}
                 />
                 <div className="meta-row">
-                  <span className="meta-pill" data-stock-badge="1">{stockBadgeLabel(product.stock)}</span>
+                  <span className="meta-pill" data-stock-badge="1">{stockBadgeLabel(product.stock, t("pd_stock_fallback", "In stock"))}</span>
                   {canPurchase ? (
                     <>
                       <span className="meta-pill">🚚 {t("pd_pill_delivery", "Fast Delivery")}</span>

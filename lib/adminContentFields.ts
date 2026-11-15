@@ -3,6 +3,8 @@ export type AdminField = {
   label: string;
   wide?: boolean;
   type?: "text" | "textarea" | "json" | "html";
+  /** Short help under the label (editor UX only). */
+  help?: string;
 };
 
 export type AdminSection = {
@@ -29,6 +31,16 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
         { key: "home_tagline", label: "Tagline under stats" },
         { key: "seasonal_promo_text", label: "Seasonal promo strip text" },
         { key: "seasonal_promo_cta", label: "Seasonal promo strip CTA" },
+        {
+          key: "home_loading",
+          label: "Featured products loading",
+          help: "Shown while home featured products load.",
+        },
+        {
+          key: "home_empty",
+          label: "Featured products empty",
+          help: "Shown when no featured products are available.",
+        },
       ],
     },
   ],
@@ -239,7 +251,26 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
           wide: true,
           type: "textarea",
         },
-        { key: "products_search_placeholder", label: "Search placeholder" },
+        {
+          key: "products_search_placeholder",
+          label: "Search placeholder",
+          help: "Placeholder on the /products navbar search input.",
+        },
+        {
+          key: "products_search_aria",
+          label: "Search aria-label",
+          help: "Accessible name for the products search control.",
+        },
+        {
+          key: "products_search_empty",
+          label: "Live-search empty",
+          help: "Dropdown message when live search has no matches.",
+        },
+        {
+          key: "products_search_reset",
+          label: "Live-search reset",
+          help: "Button that clears the live search.",
+        },
         { key: "products_filter_all", label: "Filter: All" },
         { key: "products_min_ph", label: "Min price placeholder" },
         { key: "products_max_ph", label: "Max price placeholder" },
@@ -257,7 +288,21 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
           type: "textarea",
         },
         { key: "products_retry", label: "Retry button" },
-        { key: "products_empty", label: "Empty text" },
+        {
+          key: "products_empty",
+          label: "Empty text",
+          help: "Primary empty-state when filters match nothing (wins over Empty match).",
+        },
+        {
+          key: "products_empty_match",
+          label: "Empty match (fallback)",
+          help: "Used only when Empty text is blank.",
+        },
+        {
+          key: "products_empty_reset",
+          label: "Empty reset button",
+          help: "Resets filters on the products empty state.",
+        },
         { key: "products_add_cart", label: "Add to cart" },
         { key: "products_added", label: "Added label" },
         { key: "products_remove", label: "Remove label" },
@@ -268,7 +313,11 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
       fields: [
         { key: "pd_back", label: "Back link" },
         { key: "pd_not_found", label: "Not found message" },
-        { key: "pd_stock_fallback", label: "Stock fallback" },
+        {
+          key: "pd_stock_fallback",
+          label: "Stock fallback",
+          help: "Badge when stock is empty, digital, or not a low count.",
+        },
         { key: "pd_pill_delivery", label: "Trust pill: delivery" },
         { key: "pd_pill_active", label: "Trust pill: active" },
         { key: "pd_pill_uk", label: "Trust pill: UK" },
@@ -329,6 +378,36 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
         { key: "cart_pay_bank_sub", label: "Bank transfer sub" },
         { key: "cart_pay_cod", label: "COD label" },
         { key: "cart_pay_cod_sub", label: "COD sub" },
+        {
+          key: "cart_pay_cod_digital",
+          label: "COD label (digital-only cart)",
+          help: "Shown instead of COD label when the cart is digital-only.",
+        },
+        {
+          key: "cart_pay_cod_digital_sub",
+          label: "COD sub (digital-only cart)",
+          help: "Subtitle under digital-only COD option.",
+        },
+        {
+          key: "cart_phone_preview",
+          label: "Phone preview prefix",
+          help: "Text before the formatted phone preview at checkout.",
+        },
+        {
+          key: "cart_receipt_hint",
+          label: "Receipt upload hint",
+          help: "Hint under the bank receipt upload control.",
+        },
+        {
+          key: "cart_remove_aria",
+          label: "Remove item aria-label",
+          help: "Accessible name for the cart line remove button.",
+        },
+        {
+          key: "cart_totals_calculating",
+          label: "Totals calculating",
+          help: "Shown while cart/checkout totals are calculating.",
+        },
         { key: "bank_heading", label: "Bank details heading" },
         { key: "bank_account_name", label: "Bank account name" },
         { key: "bank_sort_code", label: "Sort code" },
@@ -457,6 +536,13 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
           label: "Success body",
           wide: true,
           type: "textarea",
+        },
+        {
+          key: "success_body_cod",
+          label: "Success body (COD)",
+          wide: true,
+          type: "textarea",
+          help: "Order-success message when payment method is COD / pay on delivery.",
         },
         { key: "success_order_label", label: "Order reference label" },
         { key: "success_items", label: "Order items heading" },

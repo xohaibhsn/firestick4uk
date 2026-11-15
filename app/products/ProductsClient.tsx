@@ -273,7 +273,7 @@ export default function ProductsClient({
         {/* Live Search */}
         <div ref={searchRef} style={{position:"relative",display:"flex",alignItems:"center",gap:8}}>
           {searchActive
-            ? <input autoFocus aria-label={t("products_search_aria", "Search products")} style={{background:"#F5F5F5",border:"1px solid #E5E5E5",borderRadius:20,padding:"7px 16px",color:"#111",fontSize:13,outline:"none",width:220,minHeight:44}} placeholder="Search products..." value={searchQ} onChange={e=>setSearchQ(e.target.value)} onKeyDown={e=>e.key==="Escape"&&(setSearchActive(false),setSearchQ(""),setSearchOpen(false))} />
+            ? <input autoFocus aria-label={t("products_search_aria", "Search products")} style={{background:"#F5F5F5",border:"1px solid #E5E5E5",borderRadius:20,padding:"7px 16px",color:"#111",fontSize:13,outline:"none",width:220,minHeight:44}} placeholder={t("products_search_placeholder", "Search products...")} value={searchQ} onChange={e=>setSearchQ(e.target.value)} onKeyDown={e=>e.key==="Escape"&&(setSearchActive(false),setSearchQ(""),setSearchOpen(false))} />
             : <button type="button" className="products-search-btn" onClick={()=>setSearchActive(true)} title="Search" aria-label={t("products_search_aria", "Search products")}>🔍</button>
           }
           {searchOpen && searchResults.length > 0 && (
@@ -370,7 +370,7 @@ export default function ProductsClient({
           ) : filtered.length === 0 ? (
             <div className="products-empty-state" data-products-empty="1">
               <div className="loading" style={{padding:0}}>
-                {t("products_empty_match", "No products match")}
+                {t("products_empty", t("products_empty_match", "No products match"))}
               </div>
               <button type="button" className="products-empty-reset" onClick={resetProductFilters}>
                 {t("products_empty_reset", "Reset filters")}

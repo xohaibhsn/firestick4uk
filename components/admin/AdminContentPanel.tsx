@@ -39,7 +39,7 @@ export default function AdminContentPanel({
   return (
     <div>
       {sections.map((section) => (
-        <div key={section.title} style={{ marginBottom: 24 }}>
+        <div key={section.title} style={{ marginBottom: 24 }} data-cms-section={section.title}>
           <div
             style={{
               margin: "0 0 14px",
@@ -61,9 +61,22 @@ export default function AdminContentPanel({
               <div
                 key={field.key}
                 className="modal-field"
+                data-cms-field={field.key}
                 style={field.wide ? { gridColumn: "1 / -1" } : undefined}
               >
                 <label>{field.label}</label>
+                {field.help ? (
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: "#666",
+                      margin: "0 0 6px",
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {field.help}
+                  </p>
+                ) : null}
                 {field.type === "html" ? (
                   <TipTapEditor
                     content={siteContent[field.key] || ""}

@@ -3,6 +3,10 @@ import { useState, useEffect, useRef, useCallback, useMemo, Fragment } from "rea
 import dynamic from "next/dynamic";
 import { toEditorHtml } from "@/lib/contentHtml";
 import AdminContentPanel from "@/components/admin/AdminContentPanel";
+import CmsEaseToolbar, {
+  confirmLeaveIfDirty,
+  countDirtyKeys,
+} from "@/components/admin/CmsEaseToolbar";
 import SubscriptionContentEditor from "@/components/admin/SubscriptionContentEditor";
 import MediaLibraryPanel from "@/components/admin/MediaLibraryPanel";
 import MediaLibraryPicker, { type MediaAsset } from "@/components/admin/MediaLibraryPicker";
@@ -462,9 +466,31 @@ export default function AdminPage() {
 
   // Site Content
   const [siteContent, setSiteContent] = useState<Record<string,string>>({});
+  const [siteContentSaved, setSiteContentSaved] = useState<Record<string,string>>({});
   const [contentSaving, setContentSaving] = useState(false);
   const [contentMsg, setContentMsg] = useState("");
   const [activePage, setActivePage] = useState("home");
+  const cmsDirtyCount = useMemo(
+    () => countDirtyKeys(siteContent, siteContentSaved),
+    [siteContent, siteContentSaved]
+  );
+  const requestActivePage = useCallback(
+    (next: string) => {
+      confirmLeaveIfDirty(cmsDirtyCount, () => setActivePage(next));
+    },
+    [cmsDirtyCount]
+  );
+  const requestTab = useCallback(
+    (next: string) => {
+      const leavingCms = (tab === "pages" || tab === "settings") && next !== tab;
+      if (leavingCms) {
+        confirmLeaveIfDirty(cmsDirtyCount, () => setTab(next as Tab));
+      } else {
+        setTab(next as Tab);
+      }
+    },
+    [cmsDirtyCount, tab]
+  );
   const [faviconUploading, setFaviconUploading] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const [waIconUploading, setWaIconUploading] = useState(false);
@@ -1240,7 +1266,10 @@ export default function AdminPage() {
     fetch("/api/site-content?page=all&scope=admin", { credentials: "include" })
       .then((r) => r.json())
       .then((d) => {
-        if (d && typeof d === "object") setSiteContent(d);
+        if (d && typeof d === "object") {
+          setSiteContent(d);
+          setSiteContentSaved(d);
+        }
       })
       .catch(() => {});
   }, [loggedIn, tab, adminRole]);
@@ -1286,6 +1315,7 @@ export default function AdminPage() {
       const savedValues: Record<string, string> = {};
       for (const u of updates) savedValues[u.key] = String(u.value ?? "");
       setSiteContent((s) => ({ ...s, ...savedValues }));
+      setSiteContentSaved((s) => ({ ...s, ...savedValues }));
       // Background reconcile — only touch the keys we just saved so other unsaved edits survive.
       fetch("/api/site-content?page=all&scope=admin", { cache: "no-store", credentials: "include" })
         .then((r) => r.json())
@@ -1295,7 +1325,10 @@ export default function AdminPage() {
           for (const k of keys) {
             if (typeof (d as any)[k] === "string") fresh[k] = (d as any)[k];
           }
-          if (Object.keys(fresh).length) setSiteContent((s) => ({ ...s, ...fresh }));
+          if (Object.keys(fresh).length) {
+            setSiteContent((s) => ({ ...s, ...fresh }));
+            setSiteContentSaved((s) => ({ ...s, ...fresh }));
+          }
         })
         .catch(() => {});
     }
@@ -4807,7 +4840,7 @@ export default function AdminPage() {
             ] as const).filter(item => item.id === "insights" ? hasAdminPermission(adminRole, "insights.view") : canAccessSidhuTab(adminRole, item.id as SidhuTab)).map(item => (
               <button key={item.id} className={`nav-item ${tab===item.id?"active":""}`} onClick={() => {
                 if (item.id === "history") setHistoryFilter(null);
-                setTab(item.id);
+                requestTab(item.id);
                 setSidebarOpen(false);
               }}>
                 <span className="nav-icon">{item.icon}</span>
@@ -7051,6 +7084,17 @@ export default function AdminPage() {
                 <br /><span style={{opacity:0.85}}>Page Builder alag hai — sirf “Why Choose Us” cards / Testimonials icons ke liye. Service info, features, buttons, stats yahan Content Editor mein likhein.</span>
               </div>
 
+              <CmsEaseToolbar
+                activePage={activePage}
+                setActivePage={requestActivePage}
+                siteContent={siteContent}
+                savedContent={siteContentSaved}
+                onMarkSaved={setSiteContentSaved}
+                products={products}
+                contentSaving={contentSaving}
+                onSave={saveContent}
+              />
+
               <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
                 {[
                   ["home","🏠 Home"],
@@ -7066,7 +7110,7 @@ export default function AdminPage() {
                   ["legal","⚖️ Legal"],
                   ["global","🌐 Global"],
                 ].map(([k,l])=>(
-                  <button key={k} className={`action-btn ${activePage===k?"btn-verify":"btn-view"}`} style={{padding:"10px 20px",fontSize:13}} onClick={()=>setActivePage(k)}>{l}</button>
+                  <button key={k} className={`action-btn ${activePage===k?"btn-verify":"btn-view"}`} style={{padding:"10px 20px",fontSize:13}} onClick={()=>requestActivePage(k)}>{l}</button>
                 ))}
               </div>
 
@@ -7094,11 +7138,11 @@ export default function AdminPage() {
                   </div>
 
                   <div style={{margin:"20px 0 12px",paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.08)",fontSize:13,fontWeight:700,color:"#5B21B6"}}>TOP HERO / SLIDER (title + subtitle above products)</div>
-                  <div className="modal-field"><label>Top Hero Title</label><input style={{width:"100%"}} value={siteContent.home_top_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_top_hero_title:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
+                  <div className="modal-field" data-cms-field="home_top_hero_title"><label>Top Hero Title</label><input style={{width:"100%"}} value={siteContent.home_top_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_top_hero_title:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
                   <div className="modal-field"><label>Top Hero Subtitle</label><textarea rows={2} style={{width:"100%",resize:"vertical"}} value={siteContent.home_top_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_top_hero_subtitle:e.target.value}))} placeholder="Premium Streaming Solutions for the UK" /></div>
 
                   <div style={{margin:"20px 0 12px",paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.08)",fontSize:13,fontWeight:700,color:"#5B21B6"}}>MAIN HERO (below products — title, buttons, features, stats)</div>
-                  <div className="modal-field"><label>Main Hero Title</label><input style={{width:"100%"}} value={siteContent.home_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_hero_title:e.target.value}))} placeholder="Premium UK Streaming Service" /></div>
+                  <div className="modal-field" data-cms-field="home_hero_title"><label>Main Hero Title</label><input style={{width:"100%"}} value={siteContent.home_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_hero_title:e.target.value}))} placeholder="Premium UK Streaming Service" /></div>
                   <div className="modal-field"><label>Main Hero Subtitle</label><textarea rows={3} style={{width:"100%",resize:"vertical"}} value={siteContent.home_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_hero_subtitle:e.target.value}))} placeholder="Firestick4UK provides premium UK streaming services for Firestick and Android Box users." /></div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
                     <div className="modal-field"><label>Primary Button Text</label><input style={{width:"100%"}} value={siteContent.home_hero_btn_text||""} onChange={e=>setSiteContent(s=>({...s,home_hero_btn_text:e.target.value}))} placeholder="Shop Now" /></div>
