@@ -19,17 +19,42 @@ const crypto = require("crypto");
 // Simplest: inline the same logic by requiring from a .js shim that re-exports after compiling with typescript transpileModule.
 
 const ts = require("typescript");
-const src = fs.readFileSync(path.join(__dirname, "../lib/adminOrdersQuery.ts"), "utf8");
-const { outputText } = ts.transpileModule(src, {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
-});
-const modulePath = path.join(__dirname, "../.tmp-adminOrdersQuery.cjs");
-fs.writeFileSync(modulePath, outputText);
+const Module = require("module");
+const ROOT = path.join(__dirname, "..");
+
+function loadTsRel(rel) {
+  const abs = path.join(ROOT, rel);
+  const src = fs.readFileSync(abs, "utf8");
+  const { outputText } = ts.transpileModule(src, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2019,
+      esModuleInterop: true,
+    },
+    fileName: abs,
+  });
+  const m = new Module(abs, module);
+  m.filename = abs;
+  m.paths = Module._nodeModulePaths(path.dirname(abs));
+  const orig = m.require.bind(m);
+  m.require = (id) => {
+    if (id.startsWith("./") || id.startsWith("../")) {
+      const resolved = path.normalize(path.join(path.dirname(abs), id));
+      for (const c of [resolved + ".ts", resolved + ".tsx", resolved + ".js"]) {
+        if (fs.existsSync(c)) return loadTsRel(path.relative(ROOT, c).replace(/\\/g, "/"));
+      }
+    }
+    return orig(id);
+  };
+  m._compile(outputText, abs);
+  return m.exports;
+}
+
 const {
   isValidCalendarDate,
   parseOrderFilters,
   csvEscapeCell,
-} = require(modulePath);
+} = loadTsRel("lib/adminOrdersQuery.ts");
 
 function loadEnvLocal() {
   const envPath = path.join(process.cwd(), ".env.local");

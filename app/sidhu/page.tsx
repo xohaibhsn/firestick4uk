@@ -300,7 +300,7 @@ const styles = `
 type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"reviews"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history"|"seo"|"redirects"|"insights";
 type AdminRole = "super_admin"|"manager"|"writer";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
-type ChatLead = { id:number; customer_name:string; customer_whatsapp:string; customer_email:string|null; interested_in:string; chat_history:string; ip_address:string; created_at:string; };
+type ChatLead = { id:number; customer_name:string; customer_whatsapp:string; customer_email:string|null; interested_in:string; chat_history:string; ip_address:string; created_at:string; handled?: number; handled_at?: string|null; };
 
 /** Additive SEO banner from post-save guard (client-safe; no server import). */
 function formatSeoGuardBannerClient(guard: any): string {
@@ -590,9 +590,14 @@ function AdminPageInner() {
   const [faqModal, setFaqModal] = useState<FAQ|"new"|null>(null);
   const [editFaq, setEditFaq] = useState({ question:"", answer:"", category:"General" });
   const [faqMsg, setFaqMsg] = useState("");
+  const [faqOrderDirty, setFaqOrderDirty] = useState(false);
   const [chatLeads, setChatLeads] = useState<ChatLead[]>([]);
   const [leadModal, setLeadModal] = useState<ChatLead|null>(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
+  const [leadsSearch, setLeadsSearch] = useState("");
+  const [leadsStatusFilter, setLeadsStatusFilter] = useState<"all"|"open"|"handled">("all");
+  const [leadsHandledAvailable, setLeadsHandledAvailable] = useState(false);
+  const [leadsTotal, setLeadsTotal] = useState(0);
   const [leadWindowStart] = useState(() => Date.now() - 24 * 60 * 60 * 1000);
   const [authChecking, setAuthChecking] = useState(true);
   const [permMsg, setPermMsg] = useState("");
@@ -911,6 +916,49 @@ function AdminPageInner() {
     }
   };
 
+  const applyLeadsPayload = (d: any) => {
+    if (Array.isArray(d)) {
+      setChatLeads(d);
+      setLeadsTotal(d.length);
+      setLeadsHandledAvailable(false);
+      setSelectedLeadIds([]);
+      return;
+    }
+    if (d && Array.isArray(d.leads)) {
+      setChatLeads(d.leads);
+      setLeadsTotal(Number(d.total) || d.leads.length);
+      setLeadsHandledAvailable(Boolean(d.handled_available));
+      setSelectedLeadIds([]);
+    }
+  };
+
+  const loadLeads = async (overrides?: { q?: string; status?: "all" | "open" | "handled" }) => {
+    if (!can("leads.view")) {
+      setChatLeads([]);
+      setLeadsHandledAvailable(false);
+      return;
+    }
+    const q = overrides?.q !== undefined ? overrides.q : leadsSearch;
+    const status = overrides?.status !== undefined ? overrides.status : leadsStatusFilter;
+    const params = new URLSearchParams();
+    const qTrim = String(q || "").trim();
+    if (qTrim.length >= 2) params.set("q", qTrim.slice(0, 80));
+    if (status && status !== "all") params.set("status", status);
+    const qs = params.toString();
+    try {
+      const r = await fetch(`/api/admin/leads${qs ? `?${qs}` : ""}`, { credentials: "include" });
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const d = await r.json().catch(() => null);
+      if (!r.ok) return;
+      applyLeadsPayload(d);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const clearOrderFilters = () => {
     setOrderQ("");
     setStatusFilter("all");
@@ -1092,7 +1140,10 @@ function AdminPageInner() {
         fetch("/api/faqs?admin=true", { credentials: "include" })
           .then((r) => r.json())
           .then((d) => {
-            if (Array.isArray(d)) setFaqs(d);
+            if (Array.isArray(d)) {
+              setFaqs(d);
+              setFaqOrderDirty(false);
+            }
           })
           .catch(() => {});
       } else {
@@ -1102,17 +1153,11 @@ function AdminPageInner() {
 
     if (tab === "leads") {
       if (can("leads.view")) {
-        fetch("/api/admin/leads", { credentials: "include" })
-          .then((r) => r.json())
-          .then((d) => {
-            if (Array.isArray(d)) {
-              setChatLeads(d);
-              setSelectedLeadIds([]);
-            }
-          })
-          .catch(() => {});
+        // Tab-scoped full list: GET /api/admin/leads (q/status via loadLeads).
+        void loadLeads();
       } else {
         setChatLeads([]);
+        setLeadsHandledAvailable(false);
       }
     }
 
@@ -2374,6 +2419,7 @@ function AdminPageInner() {
     if (res.success) {
       setChatLeads(prev => prev.filter(lead => lead.id !== id));
       setSelectedLeadIds(prev => prev.filter(leadId => leadId !== id));
+      setLeadsTotal((t) => Math.max(0, t - 1));
       setLeadModal(null);
     }
   };
@@ -2395,12 +2441,78 @@ function AdminPageInner() {
       body: JSON.stringify({ ids:selectedLeadIds }),
     }).then(r=>r.json()).catch(()=>({}));
     if (res.success) {
+      const n = selectedLeadIds.length;
       setChatLeads(prev => prev.filter(lead => !selectedLeadIds.includes(lead.id)));
       setSelectedLeadIds([]);
+      setLeadsTotal((t) => Math.max(0, t - n));
       setLeadModal(null);
     } else {
       adminAlert(`❌ Bulk delete failed: ${res.error || "Unknown error"}`);
     }
+  };
+
+  const toggleLeadHandled = async (lead: ChatLead) => {
+    if (!leadsHandledAvailable || !can("leads.manage")) return;
+    const next = Number(lead.handled) === 1 ? 0 : 1;
+    const res = await fetch("/api/admin/leads", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: lead.id, handled: next }),
+    }).then((r) => r.json()).catch(() => ({}));
+    if (res.success) {
+      setChatLeads((prev) =>
+        prev.map((l) =>
+          l.id === lead.id
+            ? { ...l, handled: next, handled_at: next ? new Date().toISOString() : null }
+            : l
+        )
+      );
+      if (leadsStatusFilter !== "all") void loadLeads();
+    } else {
+      adminAlert(`❌ ${res.error || "Status update failed"}`);
+    }
+  };
+
+  const moveFaqInCategory = (cat: string, id: number, dir: -1 | 1) => {
+    setFaqs((prev) => {
+      const cats = Array.from(new Set(prev.map((f) => f.category)));
+      const inCat = prev.filter((f) => f.category === cat);
+      const idx = inCat.findIndex((f) => f.id === id);
+      const j = idx + dir;
+      if (idx < 0 || j < 0 || j >= inCat.length) return prev;
+      const nextCat = [...inCat];
+      const tmp = nextCat[idx];
+      nextCat[idx] = nextCat[j];
+      nextCat[j] = tmp;
+      const rebuilt: FAQ[] = [];
+      for (const c of cats) {
+        if (c === cat) rebuilt.push(...nextCat);
+        else rebuilt.push(...prev.filter((f) => f.category === c));
+      }
+      return rebuilt;
+    });
+    setFaqOrderDirty(true);
+  };
+
+  const saveFaqOrder = async () => {
+    if (!faqOrderDirty) return;
+    if (!(await askConfirm("Save the new FAQ order?"))) return;
+    const ids = faqs.map((f) => f.id);
+    const res = await fetch("/api/faqs", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reorder", ids }),
+    }).then((r) => r.json()).catch(() => ({}));
+    if (res.success) {
+      setFaqMsg("✅ FAQ order saved");
+      setFaqOrderDirty(false);
+      void loadFaqs();
+    } else {
+      setFaqMsg(`❌ ${res.error || "Reorder failed"}`);
+    }
+    setTimeout(() => setFaqMsg(""), 3000);
   };
 
   const handleProductImage = async (file: File) => {
@@ -6038,39 +6150,91 @@ function AdminPageInner() {
                     <span className="stat-icon">📈</span>
                     <span className="stat-trend">All time</span>
                   </div>
-                  <div className="stat-value">{chatLeads.length}</div>
+                  <div className="stat-value">{leadsTotal || chatLeads.length}</div>
                   <div className="stat-label">Total leads count</div>
                 </div>
               </div>
 
               <div className="section-card">
-                <div className="section-header">
+                <div className="section-header" style={{flexWrap:"wrap",gap:12}}>
                   <div className="section-title">Chat Leads ({chatLeads.length})</div>
-                  {selectedLeadIds.length > 0 && (
-                    <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <span style={{fontSize:12,color:"#666666"}}>{selectedLeadIds.length} selected</span>
-                      <button className="action-btn btn-delete" onClick={deleteSelectedLeads}>🗑️ Delete Selected</button>
-                    </div>
-                  )}
+                  <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginLeft:"auto"}}>
+                    <label style={{fontSize:12,color:"#666"}}>
+                      Search
+                      <input
+                        type="search"
+                        value={leadsSearch}
+                        onChange={(e) => setLeadsSearch(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void loadLeads();
+                        }}
+                        placeholder="Name, email, phone…"
+                        aria-label="Search leads"
+                        style={{marginLeft:8,padding:"6px 10px",borderRadius:8,border:"1px solid #ddd",minWidth:180}}
+                      />
+                    </label>
+                    <button type="button" className="action-btn btn-view" onClick={() => void loadLeads()}>Search</button>
+                    {leadsHandledAvailable && (
+                      <label style={{fontSize:12,color:"#666"}}>
+                        Status
+                        <select
+                          aria-label="Filter leads by status"
+                          value={leadsStatusFilter}
+                          onChange={(e) => {
+                            const v = e.target.value as "all"|"open"|"handled";
+                            setLeadsStatusFilter(v);
+                            void loadLeads({ status: v });
+                          }}
+                          style={{marginLeft:8,padding:"6px 10px",borderRadius:8,border:"1px solid #ddd"}}
+                        >
+                          <option value="all">All</option>
+                          <option value="open">Open</option>
+                          <option value="handled">Handled</option>
+                        </select>
+                      </label>
+                    )}
+                    {selectedLeadIds.length > 0 && (
+                      <>
+                        <span style={{fontSize:12,color:"#666666"}}>{selectedLeadIds.length} selected</span>
+                        <button className="action-btn btn-delete" onClick={deleteSelectedLeads}>🗑️ Delete Selected</button>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th><input type="checkbox" checked={chatLeads.length > 0 && selectedLeadIds.length === chatLeads.length} onChange={toggleAllLeads} aria-label="Select all leads" /></th><th>Name</th><th>WhatsApp</th><th>Interested In</th><th>Date</th><th>Actions</th></tr></thead>
+                    <thead><tr><th><input type="checkbox" checked={chatLeads.length > 0 && selectedLeadIds.length === chatLeads.length} onChange={toggleAllLeads} aria-label="Select all leads" /></th><th>Name</th><th>WhatsApp</th><th>Interested In</th><th>Date</th>{leadsHandledAvailable && <th>Status</th>}<th>Actions</th></tr></thead>
                     <tbody>
                       {chatLeads.length === 0 && (
-                        <tr><td colSpan={6} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No chat leads yet.</td></tr>
+                        <tr><td colSpan={leadsHandledAvailable ? 7 : 6} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No chat leads yet.</td></tr>
                       )}
                       {chatLeads.map(lead => {
                         const waNumber = (lead.customer_whatsapp || "").replace(/\D/g,"");
+                        const isHandled = Number(lead.handled) === 1;
                         return (
                           <tr key={lead.id}>
-                            <td><input type="checkbox" checked={selectedLeadIds.includes(lead.id)} onChange={() => toggleLeadSelection(lead.id)} aria-label={`Select lead ${lead.customer_name || lead.id}`} /></td>
+                            <td><input type="checkbox" checked={selectedLeadIds.includes(lead.id)} onChange={() => toggleLeadSelection(lead.id)} aria-label={`Select lead ${lead.id}`} /></td>
                             <td style={{fontWeight:600}}>{lead.customer_name || "—"}</td>
                             <td style={{fontSize:13}}>{lead.customer_whatsapp || "—"}</td>
                             <td><span style={{background:"rgba(139,0,255,0.1)",border:"1px solid rgba(139,0,255,0.2)",padding:"3px 10px",borderRadius:"10px",fontSize:"12px"}}>{lead.interested_in || "—"}</span></td>
                             <td style={{color:"rgba(255,255,255,0.4)",fontSize:"12px",whiteSpace:"nowrap"}}>{lead.created_at ? new Date(lead.created_at).toLocaleString("en-GB") : "—"}</td>
+                            {leadsHandledAvailable && (
+                              <td>
+                                <span style={{fontSize:11,color:isHandled?"#00c864":"#888"}}>{isHandled ? "Handled" : "Open"}</span>
+                              </td>
+                            )}
                             <td style={{whiteSpace:"nowrap"}}>
                               <button className="action-btn btn-view" onClick={() => setLeadModal(lead)}>👁️ View</button>
+                              {leadsHandledAvailable && can("leads.manage") && (
+                                <button
+                                  type="button"
+                                  className="action-btn btn-verify"
+                                  onClick={() => void toggleLeadHandled(lead)}
+                                  aria-label={isHandled ? "Mark open" : "Mark handled"}
+                                >
+                                  {isHandled ? "Mark open" : "Mark handled"}
+                                </button>
+                              )}
                               {waNumber ? (
                                 <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer">
                                   <button className="action-btn btn-verify">💬 WhatsApp</button>
@@ -6408,19 +6572,49 @@ function AdminPageInner() {
           {tab==="faqadmin" && can("faqs.manage") && (
             <div>
               {faqMsg && <div style={{marginBottom:14,padding:"10px 14px",background:faqMsg.startsWith("✅")?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",borderRadius:10,fontSize:13,color:faqMsg.startsWith("✅")?"#00c864":"#ff6666"}}>{faqMsg}</div>}
-              <div style={{marginBottom:16,display:"flex",justifyContent:"flex-end"}}>
+              <div style={{marginBottom:16,display:"flex",justifyContent:"flex-end",gap:10,flexWrap:"wrap"}}>
+                <button
+                  type="button"
+                  className="add-btn"
+                  disabled={!faqOrderDirty}
+                  aria-disabled={!faqOrderDirty}
+                  onClick={() => void saveFaqOrder()}
+                  style={!faqOrderDirty ? {opacity:0.5,cursor:"not-allowed"} : undefined}
+                >
+                  Save order
+                </button>
                 <button className="add-btn" onClick={()=>{setEditFaq({question:"",answer:"",category:"General"});setFaqModal("new");}}>+ Add FAQ</button>
               </div>
               {/* Group by category */}
-              {Array.from(new Set(faqs.map((f:FAQ)=>f.category))).map(cat=>(
+              {Array.from(new Set(faqs.map((f:FAQ)=>f.category))).map(cat=>{
+                const catFaqs = faqs.filter((f:FAQ)=>f.category===cat);
+                return (
                 <div key={cat} className="section-card" style={{marginBottom:16,overflow:"hidden"}}>
                   <div className="section-header"><div className="section-title">{cat}</div></div>
                   <div className="table-wrap">
                     <table>
-                      <thead><tr><th>Question</th><th>Visible</th><th>Actions</th></tr></thead>
+                      <thead><tr><th>Order</th><th>Question</th><th>Visible</th><th>Actions</th></tr></thead>
                       <tbody>
-                        {faqs.filter((f:FAQ)=>f.category===cat).map((f:FAQ)=>(
+                        {catFaqs.map((f:FAQ, idx:number)=>(
                           <tr key={f.id}>
+                            <td style={{whiteSpace:"nowrap"}}>
+                              <button
+                                type="button"
+                                className="action-btn btn-view"
+                                aria-label={`Move FAQ ${f.id} up`}
+                                disabled={idx === 0}
+                                onClick={() => moveFaqInCategory(cat, f.id, -1)}
+                                style={idx === 0 ? {opacity:0.4,cursor:"not-allowed"} : undefined}
+                              >↑</button>
+                              <button
+                                type="button"
+                                className="action-btn btn-view"
+                                aria-label={`Move FAQ ${f.id} down`}
+                                disabled={idx === catFaqs.length - 1}
+                                onClick={() => moveFaqInCategory(cat, f.id, 1)}
+                                style={idx === catFaqs.length - 1 ? {opacity:0.4,cursor:"not-allowed"} : undefined}
+                              >↓</button>
+                            </td>
                             <td style={{maxWidth:320,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.question}</td>
                             <td><span style={{fontSize:11,background:f.is_visible?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${f.is_visible?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,color:f.is_visible?"#00c864":"#ff6666",padding:"3px 10px",borderRadius:20,cursor:"pointer"}} onClick={async()=>{const vr=await fetch("/api/faqs",{method:"PUT",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({...f,is_visible:f.is_visible?0:1})}).then(x=>x.json()).catch(()=>({}));if(vr.success){setFaqs(prev=>prev.map((x:FAQ)=>x.id===f.id?{...x,is_visible:f.is_visible?0:1}:x));}else{setFaqMsg(`❌ ${vr.error||"Update failed"}`);setTimeout(()=>setFaqMsg(""),3000);}void loadFaqs();}}>{f.is_visible?"Visible":"Hidden"}</span></td>
                             <td>
@@ -6433,7 +6627,7 @@ function AdminPageInner() {
                     </table>
                   </div>
                 </div>
-              ))}
+              );})}
             </div>
           )}
 

@@ -73,17 +73,92 @@ function isLeapYear(y: number): boolean {
   return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
 }
 
-function parseDateBound(raw: unknown, endOfDay: boolean): string | null {
-  const s = String(raw || "").trim();
-  if (!isValidCalendarDate(s)) return null;
-  return endOfDay ? `${s} 23:59:59` : `${s} 00:00:00`;
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Add calendar days to a validated YYYY-MM-DD (Gregorian, UTC-date arithmetic). */
+export function addCalendarDaysYmd(ymd: string, days: number): string | null {
+  if (!isValidCalendarDate(ymd)) return null;
+  if (!Number.isInteger(days)) return null;
+  const y = Number(ymd.slice(0, 4));
+  const m = Number(ymd.slice(5, 7));
+  const d = Number(ymd.slice(8, 10));
+  const ms = Date.UTC(y, m - 1, d + days);
+  if (!Number.isFinite(ms)) return null;
+  const dt = new Date(ms);
+  return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`;
+}
+
+/**
+ * Europe/London midnight (00:00:00) for a calendar day → UTC SQL.
+ * Tries GMT (+00:00) and BST (+01:00); keeps the offset that round-trips via Intl.
+ */
+export function londonDayStartUtcSql(ymd: string): string | null {
+  if (!isValidCalendarDate(ymd)) return null;
+  const y = Number(ymd.slice(0, 4));
+  const mo = Number(ymd.slice(5, 7));
+  const da = Number(ymd.slice(8, 10));
+  for (const offsetMinutes of [0, 60]) {
+    const asUtc = Date.UTC(y, mo - 1, da, 0, 0, 0);
+    const candidateMs = asUtc - offsetMinutes * 60_000;
+    const dtf = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/London",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+      timeZoneName: "longOffset",
+    });
+    const parts = dtf.formatToParts(new Date(candidateMs));
+    const get = (type: string) => parts.find((p) => p.type === type)?.value;
+    const wall = `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`;
+    const tzn = get("timeZoneName") || "";
+    let resolvedOffset = 0;
+    const m = tzn.match(/(?:GMT|UTC)([+-])(\d{1,2})(?::?(\d{2}))?/i);
+    if (m) {
+      const sign = m[1] === "-" ? -1 : 1;
+      resolvedOffset = sign * (Number(m[2]) * 60 + Number(m[3] || 0));
+    } else if (!/GMT|UTC/i.test(tzn)) {
+      continue;
+    }
+    if (wall === `${ymd}T00:00:00` && resolvedOffset === offsetMinutes) {
+      const d = new Date(candidateMs);
+      return (
+        `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())} ` +
+        `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`
+      );
+    }
+  }
+  return null;
+}
+
+/** UTC SQL "YYYY-MM-DD HH:mm:ss" → UTC epoch seconds. */
+export function utcSqlToEpochSeconds(utcSql: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/.exec(String(utcSql).trim());
+  if (!m) return null;
+  const ms = Date.UTC(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    Number(m[4]),
+    Number(m[5]),
+    Number(m[6])
+  );
+  if (!Number.isFinite(ms)) return null;
+  return Math.floor(ms / 1000);
 }
 
 export type OrderFilters = {
   q: string;
   status: string | null;
   paymentMethod: PublicPaymentMethod | null;
+  /** Inclusive London calendar day start as UTC SQL (created_at lower bound). */
   dateFrom: string | null;
+  /** Exclusive London calendar day end as UTC SQL (day after date_to at 00:00 London). */
   dateTo: string | null;
 };
 
@@ -116,14 +191,25 @@ export function parseOrderFilters(query: Record<string, unknown> | any): {
   const dateToRaw = String(query.date_to || "").trim();
   let dateFrom: string | null = null;
   let dateTo: string | null = null;
+
   if (dateFromRaw) {
-    dateFrom = parseDateBound(dateFromRaw, false);
+    if (!isValidCalendarDate(dateFromRaw)) {
+      return { filters: empty, error: "Invalid date_from" };
+    }
+    dateFrom = londonDayStartUtcSql(dateFromRaw);
     if (!dateFrom) {
       return { filters: empty, error: "Invalid date_from" };
     }
   }
   if (dateToRaw) {
-    dateTo = parseDateBound(dateToRaw, true);
+    if (!isValidCalendarDate(dateToRaw)) {
+      return { filters: empty, error: "Invalid date_to" };
+    }
+    const nextDay = addCalendarDaysYmd(dateToRaw, 1);
+    if (!nextDay) {
+      return { filters: empty, error: "Invalid date_to" };
+    }
+    dateTo = londonDayStartUtcSql(nextDay);
     if (!dateTo) {
       return { filters: empty, error: "Invalid date_to" };
     }
@@ -194,13 +280,21 @@ export function buildOrderWhere(
       params.push(...storageValues);
     }
   }
+  // London calendar days → UTC bounds. Use UNIX_TIMESTAMP so session time_zone
+  // cannot mis-interpret bound strings against TIMESTAMP created_at.
   if (filters.dateFrom) {
-    where.push(`${col("created_at")} >= ?`);
-    params.push(filters.dateFrom);
+    const epoch = utcSqlToEpochSeconds(filters.dateFrom);
+    if (epoch != null) {
+      where.push(`UNIX_TIMESTAMP(${col("created_at")}) >= ?`);
+      params.push(epoch);
+    }
   }
   if (filters.dateTo) {
-    where.push(`${col("created_at")} <= ?`);
-    params.push(filters.dateTo);
+    const epoch = utcSqlToEpochSeconds(filters.dateTo);
+    if (epoch != null) {
+      where.push(`UNIX_TIMESTAMP(${col("created_at")}) < ?`);
+      params.push(epoch);
+    }
   }
 
   return {

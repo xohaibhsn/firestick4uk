@@ -8,6 +8,20 @@ import { getClientIp, RL_PUBLIC_GET } from '../../lib/rateLimit';
 /** Columns used by public FAQ UI (FAQClient, contact preview, PublicFaq). */
 const PUBLIC_FAQ_COLUMNS = 'id, question, answer, category, sort_order';
 
+function parseIdList(raw: unknown): number[] | null {
+  if (!Array.isArray(raw)) return null;
+  const ids: number[] = [];
+  const seen = new Set<number>();
+  for (const v of raw) {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n <= 0) return null;
+    if (seen.has(n)) return null;
+    seen.add(n);
+    ids.push(n);
+  }
+  return ids;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     let admin: Awaited<ReturnType<typeof requireAdminPermission>> | null = null;
@@ -42,6 +56,64 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
+      // Reorder action: { action: "reorder", ids: number[] }
+      if (req.body?.action === 'reorder') {
+        setAdminNoStore(res);
+        const ids = parseIdList(req.body?.ids);
+        if (!ids) {
+          return res.status(400).json({ error: 'Invalid id list' });
+        }
+
+        const conn = await pool.getConnection();
+        try {
+          await conn.beginTransaction();
+          const [existingRows]: any = await conn.query('SELECT id FROM faqs FOR UPDATE');
+          const existing = new Set(
+            (Array.isArray(existingRows) ? existingRows : []).map((r: any) => Number(r.id))
+          );
+          if (ids.length !== existing.size) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Invalid id list' });
+          }
+          for (const id of ids) {
+            if (!existing.has(id)) {
+              await conn.rollback();
+              return res.status(400).json({ error: 'Invalid id list' });
+            }
+          }
+
+          for (let i = 0; i < ids.length; i++) {
+            const sortOrder = (i + 1) * 10;
+            await conn.query('UPDATE faqs SET sort_order = ? WHERE id = ?', [sortOrder, ids[i]]);
+          }
+
+          await conn.commit();
+        } catch (txErr) {
+          try {
+            await conn.rollback();
+          } catch {
+            /* ignore */
+          }
+          throw txErr;
+        } finally {
+          conn.release();
+        }
+
+        if (admin) {
+          const { ip } = getRequestMeta(req);
+          await recordAdminAudit({
+            actor: admin,
+            action: 'faq.reordered',
+            entityType: 'faq',
+            entityId: null,
+            summary: `Reordered ${ids.length} FAQ(s)`,
+            metadata: { count: ids.length },
+            ip,
+          });
+        }
+        return res.status(200).json({ success: true, count: ids.length });
+      }
+
       const { question, answer, category, sort_order } = req.body;
       if (!question || !answer) return res.status(400).json({ error: 'Question and answer required' });
       const [r]: any = await pool.query(
