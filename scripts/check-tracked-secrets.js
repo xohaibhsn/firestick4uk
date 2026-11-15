@@ -110,7 +110,20 @@ function redact(line) {
     .slice(0, 160);
 }
 
-function isLikelyFalsePositive(ruleId, line) {
+/**
+ * Narrow allowlist: phase-*-tests.js may assign obvious dummy SMTP stubs.
+ * Real-looking values in the same files still FAIL. Non-test paths never match.
+ */
+const PHASE_TEST_PATH_RE = /(^|[\\/])scripts[\\/]phase-[^\\/]+-tests\.js$/i;
+const DUMMY_SMTP_VALUE_RE = /SMTP_PASS(?:WORD)?\s*[:=]\s*['"](x|test|dummy)['"]/i;
+
+function isPhaseTestDummySmtp(rel, ruleId, line) {
+  if (ruleId !== "smtp-secret-literal") return false;
+  if (!PHASE_TEST_PATH_RE.test(rel.replace(/\\/g, "/"))) return false;
+  return DUMMY_SMTP_VALUE_RE.test(line);
+}
+
+function isLikelyFalsePositive(ruleId, line, rel) {
   const t = line.trim();
   // UI empty password state
   if (/\bpassword\s*[:=]\s*['"]{2}/.test(line)) return true;
@@ -130,8 +143,64 @@ function isLikelyFalsePositive(ruleId, line) {
   if (ruleId === "password-prop-literal" && /password\s*[:=]\s*[a-zA-Z_][\w.]*/.test(line) && !/['"]/.test(line.match(/password\s*[:=]\s*(.+)/i)?.[1] || "")) {
     return true;
   }
+  // Documented: phase suite SMTP stubs only when value is an obvious dummy
+  if (rel && isPhaseTestDummySmtp(rel, ruleId, line)) return true;
   return false;
 }
+
+/** Self-test: realistic SMTP stub in a non-test path must still be detected.
+ *  Lines are built at runtime so this file itself is not flagged by the scan. */
+function runSelfTest() {
+  const key = ["SMTP", "PASS"].join("_");
+  const mk = (val) => `process.env.${key} = "${val}";`;
+  const cases = [
+    {
+      name: "phase-test-dummy-allowed",
+      rel: "scripts/phase-multi-97-tests.js",
+      line: mk("x"),
+      ruleId: "smtp-secret-literal",
+      expectFp: true,
+    },
+    {
+      name: "phase-test-real-still-fails",
+      rel: "scripts/phase-multi-97-tests.js",
+      line: mk("SuperSecret99!"),
+      ruleId: "smtp-secret-literal",
+      expectFp: false,
+    },
+    {
+      name: "non-test-realistic-fails",
+      rel: "lib/mailer.ts",
+      line: mk("SuperSecret99!"),
+      ruleId: "smtp-secret-literal",
+      expectFp: false,
+    },
+    {
+      name: "non-test-dummy-still-fails",
+      rel: "lib/mailer.ts",
+      line: `${key} = "x";`,
+      ruleId: "smtp-secret-literal",
+      expectFp: false,
+    },
+  ];
+  for (const c of cases) {
+    const rule = RULES.find((r) => r.id === c.ruleId);
+    if (!rule || !rule.re.test(c.line)) {
+      console.error(`SELF-TEST FAIL: ${c.name} — rule did not match line`);
+      process.exit(1);
+    }
+    const fp = isLikelyFalsePositive(c.ruleId, c.line, c.rel);
+    if (fp !== c.expectFp) {
+      console.error(
+        `SELF-TEST FAIL: ${c.name} — expected falsePositive=${c.expectFp}, got ${fp}`
+      );
+      process.exit(1);
+    }
+  }
+  console.log("SELF-TEST PASS: smtp-secret-literal allowlist scoped to phase-*-tests.js dummies only");
+}
+
+runSelfTest();
 
 const findings = [];
 for (const rel of listTrackedFiles()) {
@@ -151,7 +220,7 @@ for (const rel of listTrackedFiles()) {
   lines.forEach((line, idx) => {
     for (const rule of RULES) {
       if (!rule.re.test(line)) continue;
-      if (isLikelyFalsePositive(rule.id, line)) continue;
+      if (isLikelyFalsePositive(rule.id, line, rel)) continue;
       findings.push({
         file: rel.replace(/\\/g, "/"),
         line: idx + 1,
