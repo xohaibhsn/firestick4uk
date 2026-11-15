@@ -9,6 +9,13 @@ import {
   type ReactNode,
 } from "react";
 import { cms, cmsJson, type SiteContentMap } from "@/lib/cms";
+import CmsPreviewBadge from "@/components/CmsPreviewBadge";
+import {
+  isTrustedCmsPreviewEvent,
+  parentIsSidhuAdmin,
+  sanitizePreviewOverrides,
+  shouldAttachCmsPreviewListener,
+} from "@/lib/cmsPreview";
 
 type SiteContentContextValue = {
   sc: SiteContentMap;
@@ -20,6 +27,8 @@ type SiteContentContextValue = {
    * Does not mean the full CMS map is ready — use `loaded` for that.
    */
   seeded: boolean;
+  /** True when unsaved CMS preview overrides are applied (iframe + /sidhu only). */
+  previewActive: boolean;
 };
 
 const SiteContentContext = createContext<SiteContentContextValue | null>(null);
@@ -38,6 +47,7 @@ type SiteContentProviderProps = {
 /**
  * Single public storefront CMS bootstrap.
  * Performs ONE GET /api/site-content?page=all for the whole tree.
+ * Optional admin-only live preview via postMessage (never persisted).
  */
 export function SiteContentProvider({
   children,
@@ -53,6 +63,9 @@ export function SiteContentProvider({
   const [sc, setSc] = useState<SiteContentMap>(() => seedMap || {});
   // loaded = full CMS fetch settled — never true from SSR seed alone (pre-MULTI-88 semantics).
   const [loaded, setLoaded] = useState(false);
+  const [previewOverrides, setPreviewOverrides] = useState<SiteContentMap | null>(
+    null
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -76,13 +89,67 @@ export function SiteContentProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Live preview listener — attached ONLY when all four conditions hold.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isIframe = window.self !== window.top;
+    const parentOk = parentIsSidhuAdmin({
+      tryParentPathname: () => {
+        try {
+          return window.parent.location.pathname;
+        } catch {
+          return null;
+        }
+      },
+      referrer: document.referrer || "",
+    });
+    if (
+      !shouldAttachCmsPreviewListener({
+        search: window.location.search,
+        isIframe,
+        parentIsSidhu: parentOk,
+      })
+    ) {
+      return;
+    }
+
+    const onMessage = (event: MessageEvent) => {
+      if (
+        !isTrustedCmsPreviewEvent(event, window.location.origin, window.parent)
+      ) {
+        return;
+      }
+      const overrides = sanitizePreviewOverrides(
+        (event.data as { overrides: Record<string, unknown> }).overrides
+      );
+      // In-memory merge for rendering only — never written to storage / API.
+      setPreviewOverrides(overrides);
+    };
+    window.addEventListener("message", onMessage);
+    return () => {
+      window.removeEventListener("message", onMessage);
+    };
+  }, []);
+
+  const previewActive = previewOverrides != null;
+  const mergedSc = useMemo(() => {
+    if (!previewOverrides) return sc;
+    return { ...sc, ...previewOverrides };
+  }, [sc, previewOverrides]);
+
   const value = useMemo(
-    () => ({ sc, loaded, seeded: isSeeded }),
-    [sc, loaded, isSeeded]
+    () => ({
+      sc: mergedSc,
+      loaded,
+      seeded: isSeeded,
+      previewActive,
+    }),
+    [mergedSc, loaded, isSeeded, previewActive]
   );
 
   return (
     <SiteContentContext.Provider value={value}>
+      {previewActive ? <CmsPreviewBadge /> : null}
       {children}
     </SiteContentContext.Provider>
   );
@@ -92,14 +159,15 @@ export function useSiteContentContext(): SiteContentContextValue {
   const ctx = useContext(SiteContentContext);
   if (!ctx) {
     // Safe fallback if a consumer mounts outside provider (should not happen in root layout).
-    return { sc: {}, loaded: false, seeded: false };
+    return { sc: {}, loaded: false, seeded: false, previewActive: false };
   }
   return ctx;
 }
 
 export function useSharedCmsHelpers() {
-  const { sc, loaded, seeded } = useSiteContentContext();
+  const { sc, loaded, seeded, previewActive } = useSiteContentContext();
   const t = (key: string, fallback = "") => cms(sc, key, fallback);
   const j = <T,>(key: string, fallback: T) => cmsJson<T>(sc, key, fallback);
-  return { sc, loaded, seeded, t, j };
+  // Keep `seeded, t, j` adjacent for MULTI-89 source assert; previewActive is additive.
+  return { sc, loaded, seeded, t, j, previewActive };
 }

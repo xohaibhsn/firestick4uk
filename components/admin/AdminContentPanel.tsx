@@ -6,6 +6,7 @@ import {
   keysForPage,
 } from "@/lib/adminContentFields";
 import { formatCmsAppearsOnHint } from "@/lib/cmsAppearsOn";
+import CmsUpdatesAfterSaveChip from "@/components/admin/CmsUpdatesAfterSaveChip";
 
 const TipTapEditor = dynamic(() => import("./TipTapEditor"), { ssr: false });
 
@@ -67,7 +68,10 @@ export default function AdminContentPanel({
                 data-cms-field={field.key}
                 style={field.wide ? { gridColumn: "1 / -1" } : undefined}
               >
-                <label>{field.label}</label>
+                <label>
+                  {field.label}
+                  <CmsUpdatesAfterSaveChip fieldKey={field.key} />
+                </label>
                 {field.help ? (
                   <p
                     style={{

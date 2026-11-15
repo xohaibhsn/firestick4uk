@@ -7,11 +7,15 @@ import CmsEaseToolbar, {
   confirmLeaveIfDirty,
   countDirtyKeys,
 } from "@/components/admin/CmsEaseToolbar";
+import CmsPreviewPane from "@/components/admin/CmsPreviewPane";
+import CmsUpdatesAfterSaveChip from "@/components/admin/CmsUpdatesAfterSaveChip";
+import SeasonalOfferWizard from "@/components/admin/SeasonalOfferWizard";
 import SubscriptionContentEditor from "@/components/admin/SubscriptionContentEditor";
 import MediaLibraryPanel from "@/components/admin/MediaLibraryPanel";
 import MediaLibraryPicker, { type MediaAsset } from "@/components/admin/MediaLibraryPicker";
 import ContentHistoryPanel from "@/components/admin/ContentHistoryPanel";
 import ProductSeasonalityPanel from "@/components/admin/ProductSeasonalityPanel";
+import { buildDuplicateEditProduct } from "@/lib/seasonalOfferWizard";
 import SeoOverviewPanel from "@/components/admin/SeoOverviewPanel";
 import RedirectManagerPanel from "@/components/admin/RedirectManagerPanel";
 import InsightsPanel from "@/components/sidhu/insights/InsightsPanel";
@@ -388,6 +392,8 @@ export default function AdminPage() {
   const [reviewsPendingCount, setReviewsPendingCount] = useState(0);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [productModal, setProductModal] = useState<any|null|"new">(null);
+  const [cmsPreviewOpen, setCmsPreviewOpen] = useState(false);
+  const [seasonalWizardOpen, setSeasonalWizardOpen] = useState(false);
   const [editProduct, setEditProduct] = useState({ name:"", slug:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
   /** Base product_version for the open content draft — not advanced by arbitrary list refresh/409. */
   const [contentDraftBaseVersion, setContentDraftBaseVersion] = useState<number | null>(null);
@@ -2554,6 +2560,39 @@ export default function AdminPage() {
     setContentConflict(null);
     setContentDraftBaseVersion(null);
     setEditProduct({ name:"", slug:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
+    setProductModal("new");
+  };
+
+  /** Duplicate → normal new-product editor with copied fields; unsaved until Save. */
+  const openDuplicateProduct = (p: any) => {
+    if (!can("products.manage")) {
+      showPermError();
+      return;
+    }
+    const next = newEditorSessionId();
+    editorSessionIdRef.current = next;
+    setEditorSessionId(next);
+    setProductMetaAi({ status: "idle" });
+    resetProductAiState(p.category || "Subscription");
+    setProductUrlMigration({ newSlug: "", status: "idle", message: "" });
+    setContentConflict(null);
+    setContentDraftBaseVersion(null);
+    const copy = buildDuplicateEditProduct(p);
+    setEditProduct({
+      name: String(copy.name || ""),
+      slug: String(copy.slug || ""),
+      category: String(copy.category || "Subscription"),
+      price: String(copy.price || ""),
+      stock: String(copy.stock || "Digital"),
+      image: String(copy.image || ""),
+      short_description: String(copy.short_description || ""),
+      full_description: String(copy.full_description || ""),
+      features: String(copy.features || ""),
+      seo_title: String(copy.seo_title || ""),
+      meta_description: String(copy.meta_description || ""),
+      focus_keyword: String(copy.focus_keyword || ""),
+      og_image: String(copy.og_image || ""),
+    });
     setProductModal("new");
   };
 
@@ -4951,6 +4990,25 @@ export default function AdminPage() {
         }}
       />
 
+      {can("products.manage") ? (
+        <SeasonalOfferWizard
+          open={seasonalWizardOpen}
+          onClose={() => setSeasonalWizardOpen(false)}
+          products={products}
+          onCreated={async () => {
+            await loadProducts();
+            setProductMsg("✅ Seasonal offer created");
+          }}
+          onPickImage={(onSelected) => {
+            setMediaPicker({
+              purposes: ["products"],
+              title: "Choose Product Image",
+              onSelect: (asset) => onSelected(asset.url),
+            });
+          }}
+        />
+      ) : null}
+
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       {adminDropOpen && <div style={{position:"fixed",inset:0,zIndex:199}} onClick={() => setAdminDropOpen(false)} />}
 
@@ -5254,7 +5312,19 @@ export default function AdminPage() {
               <div className="section-header">
                 <div className="section-title">Products ({productsLoading ? "…" : products.length})</div>
                 {can("products.manage") && (
-                  <button className="add-btn" onClick={openNewProduct} disabled={productSaving || productVisibilityPendingId != null}>+ Add Product</button>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button className="add-btn" onClick={openNewProduct} disabled={productSaving || productVisibilityPendingId != null}>+ Add Product</button>
+                    <button
+                      type="button"
+                      className="add-btn"
+                      data-testid="new-seasonal-offer"
+                      onClick={() => setSeasonalWizardOpen(true)}
+                      disabled={productSaving || productVisibilityPendingId != null}
+                      style={{ background: "rgba(91,33,182,0.85)" }}
+                    >
+                      New seasonal offer
+                    </button>
+                  </div>
                 )}
               </div>
               <p
@@ -5480,6 +5550,15 @@ export default function AdminPage() {
                                 disabled={productSaving || productDeletingId != null || productVisibilityPendingId != null}
                               >
                                 Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="action-btn btn-view"
+                                data-testid={`product-duplicate-${p.id}`}
+                                onClick={() => openDuplicateProduct(p)}
+                                disabled={productSaving || productDeletingId != null || productVisibilityPendingId != null}
+                              >
+                                Duplicate
                               </button>
                               <button
                                 type="button"
@@ -7319,6 +7398,15 @@ export default function AdminPage() {
                 products={products}
                 contentSaving={contentSaving}
                 onSave={saveContent}
+                previewOpen={cmsPreviewOpen}
+                onTogglePreview={() => setCmsPreviewOpen((v) => !v)}
+              />
+              <CmsPreviewPane
+                open={cmsPreviewOpen}
+                onClose={() => setCmsPreviewOpen(false)}
+                activePage={activePage}
+                siteContent={siteContent}
+                savedContent={siteContentSaved}
               />
 
               <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
@@ -7411,21 +7499,21 @@ export default function AdminPage() {
                 <div className="section-card" style={{padding:24}}>
                   <div className="section-header" style={{marginBottom:20}}><div className="section-title">🏠 Home Page Content</div></div>
                   <div className="modal-field">
-                    <label>Meta Title <span style={{fontSize:11,color:(siteContent.home_meta_title||"").length>55?"#ff6666":(siteContent.home_meta_title||"").length>40?"#00c864":"rgba(255,255,255,0.3)"}}>{(siteContent.home_meta_title||"").length}/60</span></label>
+                    <label>Meta Title <CmsUpdatesAfterSaveChip fieldKey="home_meta_title" /> <span style={{fontSize:11,color:(siteContent.home_meta_title||"").length>55?"#ff6666":(siteContent.home_meta_title||"").length>40?"#00c864":"rgba(255,255,255,0.3)"}}>{(siteContent.home_meta_title||"").length}/60</span></label>
                     <input style={{width:"100%"}} maxLength={60} value={siteContent.home_meta_title||""} onChange={e=>setSiteContent(s=>({...s,home_meta_title:e.target.value}))} placeholder="Firestick4UK — Best Streaming Service UK" />
                   </div>
                   <div className="modal-field">
-                    <label>Meta Description <span style={{fontSize:11,color:(siteContent.home_meta_description||"").length>160?"#ff6666":(siteContent.home_meta_description||"").length>120?"#00c864":"rgba(255,255,255,0.3)"}}>{(siteContent.home_meta_description||"").length}/180</span></label>
+                    <label>Meta Description <CmsUpdatesAfterSaveChip fieldKey="home_meta_description" /> <span style={{fontSize:11,color:(siteContent.home_meta_description||"").length>160?"#ff6666":(siteContent.home_meta_description||"").length>120?"#00c864":"rgba(255,255,255,0.3)"}}>{(siteContent.home_meta_description||"").length}/180</span></label>
                     <textarea rows={3} style={{width:"100%",resize:"vertical"}} maxLength={180} value={siteContent.home_meta_description||""} onChange={e=>setSiteContent(s=>({...s,home_meta_description:e.target.value}))} placeholder="Premium Firestick subscriptions and streaming services in the UK..." />
                   </div>
 
                   <div style={{margin:"20px 0 12px",paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.08)",fontSize:13,fontWeight:700,color:"#5B21B6"}}>TOP HERO / SLIDER (title + subtitle above products)</div>
-                  <div className="modal-field" data-cms-field="home_top_hero_title"><label>Top Hero Title</label><input style={{width:"100%"}} value={siteContent.home_top_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_top_hero_title:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
-                  <div className="modal-field"><label>Top Hero Subtitle</label><textarea rows={2} style={{width:"100%",resize:"vertical"}} value={siteContent.home_top_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_top_hero_subtitle:e.target.value}))} placeholder="Premium Streaming Solutions for the UK" /></div>
+                  <div className="modal-field" data-cms-field="home_top_hero_title"><label>Top Hero Title <CmsUpdatesAfterSaveChip fieldKey="home_top_hero_title" /></label><input style={{width:"100%"}} value={siteContent.home_top_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_top_hero_title:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
+                  <div className="modal-field"><label>Top Hero Subtitle <CmsUpdatesAfterSaveChip fieldKey="home_top_hero_subtitle" /></label><textarea rows={2} style={{width:"100%",resize:"vertical"}} value={siteContent.home_top_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_top_hero_subtitle:e.target.value}))} placeholder="Premium Streaming Solutions for the UK" /></div>
 
                   <div style={{margin:"20px 0 12px",paddingTop:16,borderTop:"1px solid rgba(255,255,255,0.08)",fontSize:13,fontWeight:700,color:"#5B21B6"}}>MAIN HERO (below products — title, buttons, features, stats)</div>
-                  <div className="modal-field" data-cms-field="home_hero_title"><label>Main Hero Title</label><input style={{width:"100%"}} value={siteContent.home_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_hero_title:e.target.value}))} placeholder="Premium UK Streaming Service" /></div>
-                  <div className="modal-field"><label>Main Hero Subtitle</label><textarea rows={3} style={{width:"100%",resize:"vertical"}} value={siteContent.home_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_hero_subtitle:e.target.value}))} placeholder="Firestick4UK provides premium UK streaming services for Firestick and Android Box users." /></div>
+                  <div className="modal-field" data-cms-field="home_hero_title"><label>Main Hero Title <CmsUpdatesAfterSaveChip fieldKey="home_hero_title" /></label><input style={{width:"100%"}} value={siteContent.home_hero_title||""} onChange={e=>setSiteContent(s=>({...s,home_hero_title:e.target.value}))} placeholder="Premium UK Streaming Service" /></div>
+                  <div className="modal-field"><label>Main Hero Subtitle <CmsUpdatesAfterSaveChip fieldKey="home_hero_subtitle" /></label><textarea rows={3} style={{width:"100%",resize:"vertical"}} value={siteContent.home_hero_subtitle||""} onChange={e=>setSiteContent(s=>({...s,home_hero_subtitle:e.target.value}))} placeholder="Firestick4UK provides premium UK streaming services for Firestick and Android Box users." /></div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
                     <div className="modal-field"><label>Primary Button Text</label><input style={{width:"100%"}} value={siteContent.home_hero_btn_text||""} onChange={e=>setSiteContent(s=>({...s,home_hero_btn_text:e.target.value}))} placeholder="Shop Now" /></div>
                     <div className="modal-field"><label>Primary Button Link</label><input style={{width:"100%"}} value={siteContent.home_hero_btn_link||""} onChange={e=>setSiteContent(s=>({...s,home_hero_btn_link:e.target.value}))} placeholder="/products" /></div>

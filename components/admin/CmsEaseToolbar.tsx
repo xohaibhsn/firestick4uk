@@ -21,6 +21,9 @@ type Props = {
   onSave: (keys: string[]) => void | Promise<void>;
   /** Called when user confirms leaving while dirty — returns true to proceed. */
   requestLeave?: (next: () => void) => void;
+  /** Live preview pane toggle (admin Content Editor). */
+  previewOpen?: boolean;
+  onTogglePreview?: () => void;
 };
 
 function dirtyKeys(
@@ -44,6 +47,8 @@ export default function CmsEaseToolbar({
   products,
   contentSaving,
   onSave,
+  previewOpen = false,
+  onTogglePreview,
 }: Props) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -201,6 +206,22 @@ export default function CmsEaseToolbar({
           >
             View product detail ↗
           </a>
+        ) : null}
+        {onTogglePreview ? (
+          <button
+            type="button"
+            data-cms-preview-toggle="1"
+            className="action-btn btn-verify"
+            aria-pressed={previewOpen}
+            onClick={onTogglePreview}
+            style={{
+              padding: "8px 14px",
+              fontSize: 12,
+              background: previewOpen ? "rgba(91,33,182,0.15)" : undefined,
+            }}
+          >
+            {previewOpen ? "Preview on" : "Preview"}
+          </button>
         ) : null}
       </div>
 

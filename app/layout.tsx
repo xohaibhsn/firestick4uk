@@ -9,6 +9,7 @@ import AdsConversionTracking from "@/components/AdsConversionTracking";
 import SidhuInsightsBeacon from "@/components/SidhuInsightsBeacon";
 import JsonLd from "@/components/JsonLd";
 import { SiteContentProvider } from "@/components/SiteContentProvider";
+import CmsPreviewSeo from "@/components/CmsPreviewSeo";
 import { getContactConfig } from "@/lib/contact-config";
 import { getPublicSiteContent } from "@/lib/publicSiteContentServer";
 import {
@@ -194,6 +195,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <JsonLd data={organizationLd} />
         <SiteContentProvider initialContent={initialSiteContent}>
+          <CmsPreviewSeo />
           <CartProvider>
             {children}
             <MiniCartBar />
