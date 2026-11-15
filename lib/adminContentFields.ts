@@ -676,6 +676,13 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
         { key: "track_status_confirmed", label: "Status: confirmed" },
         { key: "track_status_dispatched", label: "Status: dispatched" },
         { key: "track_status_delivered", label: "Status: delivered" },
+        { key: "track_status_cancelled", label: "Status: cancelled" },
+        {
+          key: "track_cancelled_msg",
+          label: "Cancelled message",
+          wide: true,
+          type: "textarea",
+        },
         { key: "track_step1_title", label: "Step 1 title" },
         {
           key: "track_step1_desc",

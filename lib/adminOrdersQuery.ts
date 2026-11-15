@@ -7,7 +7,47 @@ import {
   type PublicPaymentMethod,
 } from "./paymentMethod";
 
-export const ORDER_STATUSES = ["pending", "confirmed", "dispatched", "delivered"] as const;
+export const ORDER_STATUSES = [
+  "pending",
+  "confirmed",
+  "dispatched",
+  "delivered",
+  "cancelled",
+] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+/** Cancel reason codes stored in orders.cancel_reason (VARCHAR(50)). */
+export const CANCEL_REASONS = [
+  "customer_cancelled",
+  "cod_refused",
+  "no_response",
+  "duplicate_test",
+  "payment_not_received",
+  "other",
+] as const;
+export type CancelReason = (typeof CANCEL_REASONS)[number];
+
+export const CANCEL_REASON_LABELS: Record<CancelReason, string> = {
+  customer_cancelled: "Customer cancelled",
+  cod_refused: "COD refused / not collected",
+  no_response: "No response from customer",
+  duplicate_test: "Duplicate / test order",
+  payment_not_received: "Payment not received",
+  other: "Other",
+};
+
+export function isCancelReason(value: unknown): value is CancelReason {
+  return (
+    typeof value === "string" &&
+    (CANCEL_REASONS as readonly string[]).includes(value)
+  );
+}
+
+export function cancelReasonLabel(code: unknown): string {
+  if (!isCancelReason(code)) return "";
+  return CANCEL_REASON_LABELS[code];
+}
+
 /** Admin filter vocabulary (public contract). Bank filter dual-matches storage. */
 export const PAYMENT_METHODS = ["bank", "cod"] as const;
 export const EXPORT_MAX = 5000;

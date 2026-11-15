@@ -15,8 +15,10 @@ import {
   ORDER_STATUSES,
   buildOrderWhere,
   clampInt,
+  isCancelReason,
   itemsListForOrderIds,
   parseOrderFilters,
+  type CancelReason,
 } from "../../lib/adminOrdersQuery";
 
 async function handleSummary(res: NextApiResponse, admin: AdminIdentity) {
@@ -25,6 +27,7 @@ async function handleSummary(res: NextApiResponse, admin: AdminIdentity) {
       COUNT(*) AS total_orders,
       SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_orders,
       SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS delivered_orders,
+      SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_orders,
       COALESCE(SUM(CASE WHEN status IN ('confirmed','dispatched','delivered') THEN total ELSE 0 END), 0) AS confirmed_revenue
     FROM orders
   `);
@@ -68,6 +71,7 @@ async function handleSummary(res: NextApiResponse, admin: AdminIdentity) {
     total_orders: Number(totals?.total_orders || 0),
     pending_orders: Number(totals?.pending_orders || 0),
     delivered_orders: Number(totals?.delivered_orders || 0),
+    cancelled_orders: Number(totals?.cancelled_orders || 0),
     confirmed_revenue: Number(totals?.confirmed_revenue || 0),
     customer_count: Number(cust?.customer_count || 0),
     product_count,
@@ -218,22 +222,122 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const admin = await requireAdminPermission(req, res, "orders.manage");
       if (!admin) return;
 
-      const { order_id, status } = req.body || {};
+      const { order_id, status, cancel_reason: rawCancelReason } = req.body || {};
       if (!order_id) return res.status(400).json({ error: "order_id required" });
       const newStatus = String(status || "").toLowerCase();
       if (!(ORDER_STATUSES as readonly string[]).includes(newStatus)) {
         return res.status(400).json({ error: "Invalid status" });
       }
 
-      const [prevRows]: any = await pool.query(
-        "SELECT order_id, status FROM orders WHERE order_id = ? LIMIT 1",
-        [order_id]
-      );
-      const prev = Array.isArray(prevRows) && prevRows[0] ? prevRows[0] : null;
+      let nextReason: CancelReason | null = null;
+      if (newStatus === "cancelled") {
+        const reasonCode = String(rawCancelReason || "").trim();
+        if (!isCancelReason(reasonCode)) {
+          return res.status(400).json({ error: "cancel_reason required" });
+        }
+        nextReason = reasonCode;
+      }
+
+      let prev: { order_id: string; status: unknown; cancel_reason: unknown } | null = null;
+      try {
+        const [prevRows]: any = await pool.query(
+          "SELECT order_id, status, cancel_reason FROM orders WHERE order_id = ? LIMIT 1",
+          [order_id]
+        );
+        prev = Array.isArray(prevRows) && prevRows[0] ? prevRows[0] : null;
+      } catch (error: any) {
+        if (error?.code === "ER_BAD_FIELD_ERROR") {
+          console.error("[admin-orders] status change blocked", error?.code || error?.name || "Error");
+          return res.status(500).json({
+            error: "Status could not be saved. Please contact the site admin.",
+          });
+        }
+        throw error;
+      }
       if (!prev) return res.status(404).json({ error: "Order not found" });
 
       const oldStatus = String(prev.status || "");
-      await pool.query("UPDATE orders SET status = ? WHERE order_id = ?", [newStatus, order_id]);
+      const oldReason =
+        prev.cancel_reason == null || prev.cancel_reason === ""
+          ? null
+          : String(prev.cancel_reason);
+
+      try {
+        await pool.query(
+          "UPDATE orders SET status = ?, cancel_reason = ? WHERE order_id = ?",
+          [newStatus, nextReason, order_id]
+        );
+      } catch (error: any) {
+        if (error?.code === "ER_BAD_FIELD_ERROR") {
+          console.error("[admin-orders] status change blocked", error?.code || error?.name || "Error");
+          return res.status(500).json({
+            error: "Status could not be saved. Please contact the site admin.",
+          });
+        }
+        throw error;
+      }
+
+      // Non-strict ENUM guard: MySQL may silently store '' when ENUM rejects the value.
+      let storedStatus = "";
+      let storedReason: string | null = null;
+      try {
+        const [checkRows]: any = await pool.query(
+          "SELECT status, cancel_reason FROM orders WHERE order_id = ? LIMIT 1",
+          [order_id]
+        );
+        const row = Array.isArray(checkRows) && checkRows[0] ? checkRows[0] : null;
+        storedStatus = row ? String(row.status ?? "") : "";
+        storedReason =
+          row?.cancel_reason == null || row.cancel_reason === ""
+            ? null
+            : String(row.cancel_reason);
+      } catch (error: any) {
+        if (error?.code === "ER_BAD_FIELD_ERROR") {
+          console.error("[admin-orders] status change blocked", error?.code || error?.name || "Error");
+          return res.status(500).json({
+            error: "Status could not be saved. Please contact the site admin.",
+          });
+        }
+        throw error;
+      }
+
+      const reasonOk =
+        newStatus === "cancelled"
+          ? storedReason === nextReason
+          : storedReason == null;
+      if (storedStatus !== newStatus || !reasonOk) {
+        try {
+          await pool.query(
+            "UPDATE orders SET status = ?, cancel_reason = ? WHERE order_id = ?",
+            [oldStatus || null, oldReason, order_id]
+          );
+        } catch (error: any) {
+          console.error(
+            "[admin-orders] status restore failed",
+            error?.code || error?.name || "Error"
+          );
+        }
+        const { ip } = getRequestMeta(req);
+        await recordAdminAudit({
+          actor: admin,
+          action: "order.status_change_failed",
+          entityType: "order",
+          entityId: order_id,
+          summary: `Order status change failed ${oldStatus} → ${newStatus}`,
+          metadata: {
+            old_status: oldStatus,
+            requested_status: newStatus,
+            stored_status: storedStatus,
+            requested_cancel_reason: nextReason,
+            stored_cancel_reason: storedReason,
+          },
+          ip,
+        });
+        console.error("[admin-orders] status mismatch after update", "ER_ENUM_GUARD");
+        return res.status(500).json({
+          error: "Status could not be saved. Please contact the site admin.",
+        });
+      }
 
       const { ip } = getRequestMeta(req);
       await recordAdminAudit({
@@ -241,8 +345,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         action: "order.status_changed",
         entityType: "order",
         entityId: order_id,
-        summary: `Order status ${oldStatus} → ${newStatus}`,
-        metadata: { old_status: oldStatus, new_status: newStatus },
+        summary:
+          newStatus === "cancelled"
+            ? `Order status ${oldStatus} → ${newStatus} (${nextReason})`
+            : `Order status ${oldStatus} → ${newStatus}`,
+        metadata: {
+          old_status: oldStatus,
+          new_status: newStatus,
+          ...(nextReason ? { cancel_reason: nextReason } : { cancel_reason: null }),
+        },
         ip,
       });
 

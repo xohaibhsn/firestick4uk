@@ -54,6 +54,8 @@ const styles = `
   .status-confirmed { background:#EDE9FE; border:1px solid rgba(91,33,182,0.3); color:#5B21B6; }
   .status-dispatched { background:#DBEAFE; border:1px solid rgba(37,99,235,0.3); color:#1E3A8A; }
   .status-delivered { background:#DCFCE7; border:1px solid rgba(22,163,74,0.3); color:#166534; }
+  .status-cancelled { background:#FEE2E2; border:1px solid rgba(185,28,28,0.45); color:#991B1B; }
+  .cancelled-msg { margin-top:8px; padding:14px 16px; border-radius:12px; background:#FEF2F2; border:1px solid rgba(185,28,28,0.25); color:#991B1B; font-size:14px; line-height:1.55; }
   .order-card-body { padding:24px 28px; }
   .order-items { margin-bottom:24px; }
   .order-items h4 { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#666666; margin-bottom:14px; font-weight:600; }
@@ -113,7 +115,7 @@ const styles = `
 
 type OrderResult = {
   id: string;
-  status: "pending" | "confirmed" | "dispatched" | "delivered";
+  status: "pending" | "confirmed" | "dispatched" | "delivered" | "cancelled";
   items: { name: string; price: number; qty: number }[];
   total: number;
   currency: string;
@@ -125,7 +127,7 @@ type OrderResult = {
   date: string;
 };
 
-const statusOrder = ["pending", "confirmed", "dispatched", "delivered"];
+const statusOrder = ["pending", "confirmed", "dispatched", "delivered"] as const;
 
 export default function OrderTrackingPage() {
   const [query, setQuery] = useState("");
@@ -198,12 +200,16 @@ export default function OrderTrackingPage() {
     setSearching(false);
   };
 
-  const currentStatusIndex = result ? statusOrder.indexOf(result.status) : -1;
+  const currentStatusIndex =
+    result && result.status !== "cancelled"
+      ? (statusOrder as readonly string[]).indexOf(result.status)
+      : -1;
 
   const statusBadgeClass = (status: string) => {
     if (status === "pending") return "order-status-badge status-pending";
     if (status === "confirmed") return "order-status-badge status-confirmed";
     if (status === "dispatched") return "order-status-badge status-dispatched";
+    if (status === "cancelled") return "order-status-badge status-cancelled";
     return "order-status-badge status-delivered";
   };
 
@@ -211,6 +217,7 @@ export default function OrderTrackingPage() {
     if (status === "pending") return t("track_status_pending", "Pending Verification");
     if (status === "confirmed") return t("track_status_confirmed", "Confirmed");
     if (status === "dispatched") return t("track_status_dispatched", "Dispatched");
+    if (status === "cancelled") return t("track_status_cancelled", "Cancelled");
     return t("track_status_delivered", "Delivered");
   };
 
@@ -297,6 +304,14 @@ export default function OrderTrackingPage() {
                   </div>
                 </div>
 
+                {result.status === "cancelled" ? (
+                  <div className="cancelled-msg" data-testid="track-cancelled-msg">
+                    {t(
+                      "track_cancelled_msg",
+                      "This order has been cancelled. Please contact us if you have any questions."
+                    )}
+                  </div>
+                ) : (
                 <div className="progress-section">
                   <h4>Order Progress</h4>
                   <div className="steps">
@@ -325,6 +340,7 @@ export default function OrderTrackingPage() {
                     })}
                   </div>
                 </div>
+                )}
 
                 <div className="customer-info">
                   <h4>Order Details</h4>

@@ -35,6 +35,13 @@ import {
   formatPaymentMethodLabel,
 } from "@/lib/paymentMethod";
 import {
+  CANCEL_REASONS,
+  CANCEL_REASON_LABELS,
+  cancelReasonLabel,
+  type CancelReason,
+  type OrderStatus,
+} from "@/lib/adminOrdersQuery";
+import {
   bankDetailsComplete,
   parsePaymentMethodToggle,
   paymentToggleToStoredValue,
@@ -178,6 +185,7 @@ const styles = `
   .status-confirmed { background:rgba(91,33,182,0.1); border:1px solid rgba(91,33,182,0.3); color:#5B21B6; }
   .status-dispatched { background:rgba(37,99,235,0.1); border:1px solid rgba(37,99,235,0.25); color:#2563EB; }
   .status-delivered { background:rgba(22,163,74,0.1); border:1px solid rgba(22,163,74,0.3); color:#16A34A; }
+  .status-cancelled { background:#FEE2E2; border:1px solid rgba(185,28,28,0.45); color:#991B1B; }
 
   .action-btn { padding:5px 11px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; border:none; transition:all 0.15s; margin-right:4px; }
   .btn-view { background:#F5F5F5; color:#5B21B6; border:1px solid #E5E5E5; }
@@ -271,7 +279,6 @@ const styles = `
 
 type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"reviews"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history"|"seo"|"redirects"|"insights";
 type AdminRole = "super_admin"|"manager"|"writer";
-type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
 type ChatLead = { id:number; customer_name:string; customer_whatsapp:string; customer_email:string|null; interested_in:string; chat_history:string; ip_address:string; created_at:string; };
 
@@ -370,6 +377,13 @@ export default function AdminPage() {
   const [receiptModal, setReceiptModal] = useState<string|null>(null);
   const [orderModal, setOrderModal] = useState<any|null>(null);
   const [orderDetail, setOrderDetail] = useState<{ order: any; items: any[] }|null>(null);
+  const [cancelReasonModal, setCancelReasonModal] = useState<{
+    orderId: string;
+    fromStatus: string;
+    total: string;
+  } | null>(null);
+  const [cancelReasonDraft, setCancelReasonDraft] = useState<CancelReason | "">("");
+  const [orderStatusSelectKey, setOrderStatusSelectKey] = useState(0);
   const [dashSummary, setDashSummary] = useState<any>(null);
   const [reviewsPendingCount, setReviewsPendingCount] = useState(0);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
@@ -570,6 +584,7 @@ export default function AdminPage() {
     items: o.items_list || o.payment_method || "—",
     total: `£${parseFloat(o.total || 0).toFixed(2)}`,
     status: o.status,
+    cancel_reason: o.cancel_reason || null,
     date: o.created_at
       ? new Date(o.created_at).toLocaleDateString("en-GB", {
           day: "numeric",
@@ -665,6 +680,7 @@ export default function AdminPage() {
         bump("total_orders", -1);
         if (status === "pending") bump("pending_orders", -1);
         if (status === "delivered") bump("delivered_orders", -1);
+        if (status === "cancelled") bump("cancelled_orders", -1);
         if (REVENUE_ORDER_STATUSES.includes(status)) bump("confirmed_revenue", -parseMoney(total));
         if (opts.customerRemoved) bump("customer_count", -1);
       }
@@ -675,6 +691,8 @@ export default function AdminPage() {
           if (to === "pending") bump("pending_orders", 1);
           if (from === "delivered") bump("delivered_orders", -1);
           if (to === "delivered") bump("delivered_orders", 1);
+          if (from === "cancelled") bump("cancelled_orders", -1);
+          if (to === "cancelled") bump("cancelled_orders", 1);
           const wasRev = REVENUE_ORDER_STATUSES.includes(from);
           const isRev = REVENUE_ORDER_STATUSES.includes(to);
           if (wasRev && !isRev) bump("confirmed_revenue", -parseMoney(total));
@@ -1817,11 +1835,23 @@ export default function AdminPage() {
     await Promise.allSettled(tasks);
   };
 
-  const updateStatus = (id: string, status: OrderStatus) => {
+  const updateStatus = (
+    id: string,
+    status: OrderStatus,
+    cancelReason?: CancelReason | null
+  ) => {
+    const body: Record<string, unknown> = { order_id: id, status };
+    if (status === "cancelled") {
+      if (!cancelReason) {
+        alert("Please choose a cancel reason.");
+        return;
+      }
+      body.cancel_reason = cancelReason;
+    }
     fetch("/api/admin-orders", {
       method: "PATCH",
       credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ order_id: id, status }),
+      body: JSON.stringify(body),
     })
       .then(async (r) => {
         if (r.status === 401) { handleSessionExpired(); return; }
@@ -1829,20 +1859,38 @@ export default function AdminPage() {
         if (!r.ok) {
           const data = await r.json().catch(() => ({}));
           alert(data?.error || "Status update failed");
+          setOrderStatusSelectKey((k) => k + 1);
           return;
         }
         const known = orders.find((o) => o.id === id) || recentOrders.find((o) => o.id === id);
         if (known && known.status !== status) {
           applyOrderSummaryDelta({ statusChange: { from: String(known.status), to: String(status), total: known.total } });
         }
-        setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
-        setRecentOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+        const nextReason = status === "cancelled" ? cancelReason || null : null;
+        setOrders((prev) =>
+          prev.map((o) => (o.id === id ? { ...o, status, cancel_reason: nextReason } : o))
+        );
+        setRecentOrders((prev) =>
+          prev.map((o) => (o.id === id ? { ...o, status, cancel_reason: nextReason } : o))
+        );
         // Background reconcile with server truth (summary, lists, customers if loaded).
         void refreshAfterOrderMutation();
       })
       .catch(() => {});
+    setCancelReasonModal(null);
+    setCancelReasonDraft("");
     setOrderModal(null);
     setOrderDetail(null);
+  };
+
+  const requestStatusChange = (id: string, status: OrderStatus, fromStatus: string, total: string) => {
+    if (status === "cancelled") {
+      setCancelReasonDraft("");
+      setCancelReasonModal({ orderId: id, fromStatus, total });
+      setOrderStatusSelectKey((k) => k + 1);
+      return;
+    }
+    updateStatus(id, status);
   };
 
   const deleteOrder = async (orderId: string, total: string, status: string) => {
@@ -3387,13 +3435,34 @@ export default function AdminPage() {
               </div>
             )}
 
+            {(orderModal.cancel_reason || orderDetail?.order?.cancel_reason) && (
+              <div className="modal-field" style={{marginTop:8}}>
+                <label>Cancel reason</label>
+                <input
+                  readOnly
+                  value={cancelReasonLabel(orderModal.cancel_reason || orderDetail?.order?.cancel_reason) || "—"}
+                />
+              </div>
+            )}
             <div className="modal-field">
               <label>Update Status</label>
-              <select defaultValue={orderModal.status} onChange={e => updateStatus(orderModal.id, e.target.value as OrderStatus)}>
+              <select
+                key={`order-status-${orderModal.id}-${orderStatusSelectKey}`}
+                defaultValue={orderModal.status}
+                onChange={(e) =>
+                  requestStatusChange(
+                    orderModal.id,
+                    e.target.value as OrderStatus,
+                    String(orderModal.status || ""),
+                    String(orderModal.total || "")
+                  )
+                }
+              >
                 <option value="pending">⏳ Pending</option>
                 <option value="confirmed">✅ Confirmed</option>
                 <option value="dispatched">🚚 Dispatched</option>
                 <option value="delivered">📦 Delivered</option>
+                <option value="cancelled">❌ Cancelled</option>
               </select>
             </div>
             <div className="modal-actions" style={{justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
@@ -3408,6 +3477,60 @@ export default function AdminPage() {
                 <button className="modal-cancel" onClick={() => { setOrderModal(null); setOrderDetail(null); }}>Close</button>
                 {orderModal.receipt && <button className="modal-save" onClick={() => { setOrderModal(null); setOrderDetail(null); setReceiptModal(orderModal.id); }}>View Receipt</button>}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CANCEL REASON MODAL */}
+      {cancelReasonModal && (
+        <div className="modal-overlay" data-testid="cancel-reason-modal">
+          <div className="modal" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()} style={{maxWidth:440}}>
+            <div className="modal-title">Cancel order</div>
+            <p style={{fontSize:13,color:"#555",marginBottom:14,lineHeight:1.5}}>
+              Choose a reason before marking this order as cancelled. No customer details are shown here.
+            </p>
+            <div className="modal-field">
+              <label htmlFor="cancel-reason-select">Cancel reason</label>
+              <select
+                id="cancel-reason-select"
+                data-testid="cancel-reason-select"
+                value={cancelReasonDraft}
+                onChange={(e) => setCancelReasonDraft(e.target.value as CancelReason | "")}
+              >
+                <option value="">Select a reason…</option>
+                {CANCEL_REASONS.map((code) => (
+                  <option key={code} value={code}>
+                    {CANCEL_REASON_LABELS[code]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="modal-actions" style={{justifyContent:"flex-end",gap:8}}>
+              <button
+                type="button"
+                className="modal-cancel"
+                data-testid="cancel-reason-dismiss"
+                onClick={() => {
+                  setCancelReasonModal(null);
+                  setCancelReasonDraft("");
+                  setOrderStatusSelectKey((k) => k + 1);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="modal-save"
+                data-testid="cancel-reason-confirm"
+                disabled={!cancelReasonDraft}
+                onClick={() => {
+                  if (!cancelReasonDraft) return;
+                  updateStatus(cancelReasonModal.orderId, "cancelled", cancelReasonDraft);
+                }}
+              >
+                Confirm cancel
+              </button>
             </div>
           </div>
         </div>
@@ -4955,6 +5078,7 @@ export default function AdminPage() {
                       { icon:"👥", label:"Customers", value:Number(dashSummary?.customer_count || 0), trend:"Unique" },
                       { icon:"📦", label:"Products", value:Number(dashSummary?.product_count ?? products.length), trend:"Active" },
                       { icon:"✅", label:"Delivered", value:Number(dashSummary?.delivered_orders || 0), trend:"All time" },
+                      { icon:"❌", label:"Cancelled", value:Number(dashSummary?.cancelled_orders || 0), trend:"All time" },
                     ]
                   : [
                       { icon:"📝", label:"Blog Posts", value:blogPosts.length, trend:"All posts" },
@@ -5039,6 +5163,7 @@ export default function AdminPage() {
                     <option value="confirmed">Confirmed</option>
                     <option value="dispatched">Dispatched</option>
                     <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                   <select className="filter-select" value={orderPaymentFilter} onChange={e => setOrderPaymentFilter(e.target.value as "all"|"bank"|"cod")}>
                     <option value="all">All Payment</option>
