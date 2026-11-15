@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AdminRoleName } from "@/lib/adminPermissions";
-import { revisionEntityTypesForRole } from "@/lib/contentRevisionsClient";
+import {
+  canOfferRestoreRevision,
+  revisionEntityTypesForRole,
+} from "@/lib/contentRevisionsClient";
+import { RevisionCompareLoader } from "@/components/admin/RevisionCompareView";
 
 type RevisionItem = {
   id: number;
@@ -72,19 +76,13 @@ function formatRestoreSeoBanner(guard: any): string {
   return ` — SEO: ${countLabel}`;
 }
 
+/**
+ * UI gate only (server canRestoreRevisionEntity stays authoritative).
+ * Delegates to the shared client mirror in lib/contentRevisionsClient.ts so the History tab,
+ * per-field drawers and the server use the same permission mapping.
+ */
 function canOfferRestore(item: RevisionItem, role: AdminRoleName): boolean {
-  if (item.revision_action === "delete") {
-    return item.entity_type === "site_content" || item.entity_type === "site_settings";
-  }
-  if (item.entity_type === "site_settings" && role !== "super_admin") return false;
-  if (item.entity_type === "section" && role !== "super_admin") return false;
-  if (item.entity_type === "product" || item.entity_type === "blog") {
-    return role === "super_admin" || role === "manager" || (item.entity_type === "blog" && role === "writer");
-  }
-  if (item.entity_type === "site_content" || item.entity_type === "site_content_batch") {
-    return role === "super_admin" || role === "manager";
-  }
-  return role === "super_admin";
+  return canOfferRestoreRevision(item, role);
 }
 
 export default function ContentHistoryPanel({
@@ -113,6 +111,8 @@ export default function ContentHistoryPanel({
   const [restoreVersionLoading, setRestoreVersionLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const restoreReqSeq = useRef(0);
+  /** MULTI-106: snapshot of the revision being confirmed, so the confirm modal can show the diff again. */
+  const [confirmDetail, setConfirmDetail] = useState<any>(null);
 
   const load = useCallback(
     async (pageNum = 1) => {
@@ -256,6 +256,18 @@ export default function ContentHistoryPanel({
     setConfirmRestore(item);
     setMsg("");
     void loadCurrentProductVersionForRestore(item);
+    // Load the revision snapshot (read-only) so the confirm modal can show the diff again.
+    if (viewItem && viewItem.id === item.id && viewItem.snapshot !== undefined) {
+      setConfirmDetail(viewItem);
+    } else {
+      setConfirmDetail(null);
+      void fetch(`/api/admin-revisions?id=${item.id}`, { credentials: "include" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d && d.id === item.id) setConfirmDetail(d);
+        })
+        .catch(() => {});
+    }
   };
 
   const doRestore = async () => {
@@ -466,7 +478,7 @@ export default function ContentHistoryPanel({
                   </td>
                   <td>
                     <button type="button" className="action-btn btn-view" onClick={() => openView(item.id)} disabled={busy}>
-                      View
+                      View / compare
                     </button>
                     {canOfferRestore(item, role) && (
                       <button
@@ -509,7 +521,7 @@ export default function ContentHistoryPanel({
         <div className="modal-overlay" style={{ zIndex: 1300 }} onClick={() => setViewItem(null)}>
           <div
             className="modal"
-            style={{ maxWidth: 720, width: "95%", maxHeight: "90vh", overflow: "auto" }}
+            style={{ maxWidth: 1000, width: "96%", maxHeight: "90vh", overflow: "auto" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-title">Revision #{viewItem.id}</div>
@@ -521,24 +533,46 @@ export default function ContentHistoryPanel({
               <div><strong>When:</strong> {viewItem.created_at ? new Date(viewItem.created_at).toLocaleString() : "—"}</div>
               <div><strong>Changed:</strong> {(viewItem.changed_fields || []).join(", ") || "—"}</div>
             </div>
-            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Snapshot (escaped text)</div>
-            <pre
-              style={{
-                background: "#F8F8F8",
-                border: "1px solid #E5E5E5",
-                borderRadius: 8,
-                padding: 12,
-                fontSize: 11,
-                maxHeight: 360,
-                overflow: "auto",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-              }}
-            >
-              {typeof viewItem.snapshot === "string"
-                ? viewItem.snapshot
-                : JSON.stringify(viewItem.snapshot, null, 2)}
-            </pre>
+            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Compare with current</div>
+            {viewItem.snapshot != null && viewItem.entity_type !== "section" ? (
+              <RevisionCompareLoader
+                key={viewItem.id}
+                revision={{
+                  id: viewItem.id,
+                  entity_type: viewItem.entity_type,
+                  entity_id: String(viewItem.entity_id),
+                  snapshot: viewItem.snapshot,
+                  created_at: viewItem.created_at,
+                  actor_name: viewItem.actor_name,
+                  actor_role: viewItem.actor_role,
+                }}
+              />
+            ) : (
+              <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
+                Side-by-side compare is not available for this entity type.
+              </div>
+            )}
+            <details style={{ marginTop: 12 }}>
+              <summary style={{ fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Raw snapshot (escaped text)</summary>
+              <pre
+                style={{
+                  background: "#F8F8F8",
+                  border: "1px solid #E5E5E5",
+                  borderRadius: 8,
+                  padding: 12,
+                  fontSize: 11,
+                  maxHeight: 360,
+                  overflow: "auto",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  marginTop: 6,
+                }}
+              >
+                {typeof viewItem.snapshot === "string"
+                  ? viewItem.snapshot
+                  : JSON.stringify(viewItem.snapshot, null, 2)}
+              </pre>
+            </details>
             <div className="modal-actions">
               <button type="button" className="modal-cancel" onClick={() => setViewItem(null)}>Close</button>
               {canOfferRestore(
@@ -589,7 +623,7 @@ export default function ContentHistoryPanel({
             setBoundRestoreVersion(null);
           }}
         >
-          <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 960, width: "96%", maxHeight: "92vh", overflow: "auto" }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-title">Confirm restore</div>
             <p style={{ fontSize: 14, color: "#333", lineHeight: 1.55, marginBottom: 16 }}>
               You are about to restore an older version of{" "}
@@ -621,6 +655,34 @@ export default function ContentHistoryPanel({
                 </>
               ) : null}
             </p>
+            <div style={{ marginBottom: 14 }} data-testid="confirm-restore-diff">
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                What changes (revision on the left replaces current on the right)
+              </div>
+              {confirmDetail &&
+              confirmDetail.id === confirmRestore.id &&
+              confirmDetail.snapshot != null &&
+              confirmDetail.entity_type !== "section" ? (
+                <RevisionCompareLoader
+                  key={`confirm-${confirmRestore.id}`}
+                  revision={{
+                    id: confirmDetail.id,
+                    entity_type: confirmDetail.entity_type,
+                    entity_id: String(confirmDetail.entity_id),
+                    snapshot: confirmDetail.snapshot,
+                    created_at: confirmDetail.created_at,
+                    actor_name: confirmDetail.actor_name,
+                    actor_role: confirmDetail.actor_role,
+                  }}
+                />
+              ) : (
+                <div style={{ fontSize: 12, color: "#888" }}>
+                  {confirmRestore.entity_type === "section"
+                    ? "Diff not available for this entity type."
+                    : "Loading revision diff…"}
+                </div>
+              )}
+            </div>
             <div className="modal-actions">
               <button
                 type="button"

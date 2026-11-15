@@ -24,6 +24,12 @@ type Props = {
   activePage: string;
   siteContent: Record<string, string>;
   savedContent: Record<string, string>;
+  /**
+   * F4UK-MULTI-106 — optional temporary overrides (e.g. "Preview restore" of an old revision).
+   * Merged over the dirty overrides in the postMessage payload only; never touches editor state
+   * or storage, so clearing it (null/undefined) returns the preview to the editor's own dirty state.
+   */
+  forceOverrides?: Record<string, string> | null;
 };
 
 function previewPathForPage(page: string): string {
@@ -39,6 +45,7 @@ export default function CmsPreviewPane({
   activePage,
   siteContent,
   savedContent,
+  forceOverrides = null,
 }: Props) {
   const [widthMode, setWidthMode] = useState<"desktop" | "mobile">("desktop");
   const [paneWidth, setPaneWidth] = useState(440);
@@ -52,18 +59,21 @@ export default function CmsPreviewPane({
   const postOverrides = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe?.contentWindow) return;
-    const overrides = buildDirtyOverrides(siteContent, savedContent);
+    const overrides = {
+      ...buildDirtyOverrides(siteContent, savedContent),
+      ...(forceOverrides || {}),
+    };
     iframe.contentWindow.postMessage(
       { type: CMS_PREVIEW_MSG_TYPE, overrides },
       window.location.origin
     );
-  }, [siteContent, savedContent]);
+  }, [siteContent, savedContent, forceOverrides]);
 
   useEffect(() => {
     if (!open || !iframeReady) return;
     const t = window.setTimeout(postOverrides, DEBOUNCE_MS);
     return () => window.clearTimeout(t);
-  }, [open, iframeReady, postOverrides, siteContent, savedContent]);
+  }, [open, iframeReady, postOverrides, siteContent, savedContent, forceOverrides]);
 
   useEffect(() => {
     setIframeReady(false);

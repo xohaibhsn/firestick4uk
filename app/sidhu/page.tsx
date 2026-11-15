@@ -18,6 +18,10 @@ import SubscriptionContentEditor from "@/components/admin/SubscriptionContentEdi
 import MediaLibraryPanel from "@/components/admin/MediaLibraryPanel";
 import MediaLibraryPicker, { type MediaAsset } from "@/components/admin/MediaLibraryPicker";
 import ContentHistoryPanel from "@/components/admin/ContentHistoryPanel";
+import FieldHistoryDrawer, {
+  FieldHistoryButton,
+  type FieldHistoryTarget,
+} from "@/components/admin/FieldHistoryDrawer";
 import ProductSeasonalityPanel from "@/components/admin/ProductSeasonalityPanel";
 import {
   PRODUCT_EDITOR_SECTION_TITLES,
@@ -446,6 +450,10 @@ function AdminPageInner() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [productModal, setProductModal] = useState<any|null|"new">(null);
   const [cmsPreviewOpen, setCmsPreviewOpen] = useState(false);
+  /** MULTI-106 — temporary "Preview restore" overrides pushed to Live Preview only (never editor state). */
+  const [cmsPreviewForce, setCmsPreviewForce] = useState<Record<string, string> | null>(null);
+  /** MULTI-106 — per-field History drawer for Site Settings + product editor fields. */
+  const [fieldHistoryTarget, setFieldHistoryTarget] = useState<FieldHistoryTarget | null>(null);
   const [seasonalWizardOpen, setSeasonalWizardOpen] = useState(false);
   const [editProduct, setEditProduct] = useState({ name:"", slug:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
   /** Base product_version for the open content draft — not advanced by arbitrary list refresh/409. */
@@ -604,6 +612,8 @@ function AdminPageInner() {
 
   const can = (permission: Parameters<typeof hasAdminPermission>[1]) =>
     hasAdminPermission(adminRole, permission);
+  /** MULTI-106 — per-field History buttons only render with revisions.view (server re-checks). */
+  const canViewRevisions = can("revisions.view");
 
   const showPermError = (msg?: string) => {
     setPermMsg(msg || "You do not have permission for this action.");
@@ -1455,6 +1465,70 @@ function AdminPageInner() {
     return false;
   };
 
+  /** MULTI-106 — after a History restore, re-read the restored keys into editor + saved baseline. */
+  const refreshRestoredContentKeys = async (keys: string[]) => {
+    try {
+      const r = await fetch(
+        "/api/site-content?page=" + "all&scope=admin",
+        { cache: "no-store", credentials: "include" }
+      );
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      if (!r.ok) return;
+      const d = await r.json();
+      if (!d || typeof d !== "object") return;
+      const fresh: Record<string, string> = {};
+      for (const k of keys) {
+        if (typeof (d as any)[k] === "string") fresh[k] = (d as any)[k];
+      }
+      if (Object.keys(fresh).length) {
+        setSiteContent((s) => ({ ...s, ...fresh }));
+        setSiteContentSaved((s) => ({ ...s, ...fresh }));
+      }
+    } catch {
+      /* best-effort refresh — server state is already restored */
+    }
+  };
+
+  /** Shared per-field History wiring for Content Editor panels (MULTI-106). */
+  const cmsHistoryProps = {
+    canViewRevisions,
+    role: adminRole,
+    onFieldsRestored: (keys: string[]) => {
+      void refreshRestoredContentKeys(keys);
+    },
+    onPreviewRestore: (overrides: Record<string, string> | null) => {
+      setCmsPreviewForce(overrides);
+      if (overrides) setCmsPreviewOpen(true);
+    },
+    onToast: (message: string, kind?: "success" | "error" | "info") => showToast(message, kind),
+  };
+
+  /** 🕘 History button for a Site Settings key (renders only with revisions.view). */
+  const settingsHistoryBtn = (key: string, label: string) => (
+    <FieldHistoryButton
+      canViewRevisions={canViewRevisions}
+      label={label}
+      testId={key}
+      onOpen={() => setFieldHistoryTarget({ kind: "content", fieldKey: key, label })}
+    />
+  );
+
+  /** 🕘 History button for a product editor field (existing products only; renders only with revisions.view). */
+  const productHistoryBtn = (field: string, label: string) =>
+    productModal && productModal !== "new" && productModal.id ? (
+      <FieldHistoryButton
+        canViewRevisions={canViewRevisions}
+        label={label}
+        testId={`product-${field}`}
+        onOpen={() =>
+          setFieldHistoryTarget({ kind: "product", productId: productModal.id, fieldKey: field, label })
+        }
+      />
+    ) : null;
+
   /** PUT /api/sections?action=... — returns true only when the server confirms success. */
   const sectionsPut = async (action: "reorder" | "visibility", body: unknown): Promise<boolean> => {
     try {
@@ -2250,6 +2324,27 @@ function AdminPageInner() {
         "⚠️ Server state changed (409). Your draft was kept. Review current vs draft and choose Reload or keep editing — Save stays blocked on the old draft base until you resolve."
       );
     }
+  };
+
+  /** MULTI-106 — after a per-field History restore, pull the authoritative product into the open editor. */
+  const refreshProductAfterHistoryRestore = async (productId: string) => {
+    try {
+      const r = await fetch("/api/admin-products", { credentials: "include", cache: "no-store" });
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      if (r.ok) {
+        const list = await r.json().catch(() => null);
+        const row = Array.isArray(list)
+          ? list.find((p: any) => String(p.id) === String(productId))
+          : null;
+        if (row) applyAuthoritativeProductRow(row, { replaceContent: true, reason: "history-restore" });
+      }
+    } catch {
+      /* best-effort — restore already succeeded on the server */
+    }
+    void loadProducts();
   };
 
   /**
@@ -3951,7 +4046,7 @@ function AdminPageInner() {
             >
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div className="modal-field">
-                <label>Product Name *</label>
+                <label>Product Name *{productHistoryBtn("name","Product Name")}</label>
                 <input
                   placeholder="e.g. B1G 1 Year Plan"
                   value={editProduct.name}
@@ -3988,7 +4083,7 @@ function AdminPageInner() {
               </div>
             </div>
             <div className="modal-field">
-              <label>URL Slug</label>
+              <label>URL Slug{productHistoryBtn("slug","URL Slug")}</label>
               <input
                 type="text"
                 value={editProduct.slug || ""}
@@ -4151,7 +4246,7 @@ function AdminPageInner() {
               testId="product-section-price_stock"
             >
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-              <div className="modal-field"><label>Price</label><input placeholder="e.g. £9.99" value={editProduct.price} onChange={e => setEditProduct({...editProduct,price:e.target.value})} /></div>
+              <div className="modal-field"><label>Price{productHistoryBtn("price","Price")}</label><input placeholder="e.g. £9.99" value={editProduct.price} onChange={e => setEditProduct({...editProduct,price:e.target.value})} /></div>
               <div className="modal-field"><label>Stock / Type</label><input placeholder="e.g. 10 or Digital" value={editProduct.stock} onChange={e => setEditProduct({...editProduct,stock:e.target.value})} /></div>
             </div>
 
@@ -4200,7 +4295,7 @@ function AdminPageInner() {
               testId="product-section-description_features"
             >
             <div className="modal-field">
-              <label>Short Description</label>
+              <label>Short Description{productHistoryBtn("short_description","Short Description")}</label>
               <TipTapEditor
                 content={editProduct.short_description || ""}
                 onChange={(html) => setEditProduct({ ...editProduct, short_description: html })}
@@ -4215,7 +4310,7 @@ function AdminPageInner() {
               />
             </div>
             <div className="modal-field">
-              <label>Full Description</label>
+              <label>Full Description{productHistoryBtn("full_description","Full Description")}</label>
               <TipTapEditor
                 content={editProduct.full_description || ""}
                 onChange={(html) => setEditProduct({ ...editProduct, full_description: html })}
@@ -4230,7 +4325,7 @@ function AdminPageInner() {
               />
             </div>
             <div className="modal-field">
-              <label>Features (one per line)</label>
+              <label>Features (one per line){productHistoryBtn("features","Features")}</label>
               <textarea rows={3} placeholder={"✅ 1 Year Streaming Access\n✅ 10,000+ Channels\n✅ Free Setup Support"} value={editProduct.features} onChange={e => setEditProduct({...editProduct,features:e.target.value})} style={{resize:"vertical"}} />
             </div>
 
@@ -4823,21 +4918,21 @@ function AdminPageInner() {
               ) : null}
               <div className="modal-field">
                 <label style={{display:"flex",justifyContent:"space-between"}}>
-                  SEO Title <span style={{fontSize:11,color:editProduct.seo_title.length>55?"#ff6666":editProduct.seo_title.length>40?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.seo_title.length}/60</span>
+                  <span>SEO Title{productHistoryBtn("seo_title","SEO Title")}</span> <span style={{fontSize:11,color:editProduct.seo_title.length>55?"#ff6666":editProduct.seo_title.length>40?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.seo_title.length}/60</span>
                 </label>
                 <input placeholder={`Auto: "${editProduct.name || 'Product Name'} | Firestick4UK"`} maxLength={60} value={editProduct.seo_title} onChange={e => setEditProduct({...editProduct,seo_title:e.target.value})} />
                 <div className="char-bar" style={{background:"rgba(255,255,255,0.08)",width:"100%"}}><div className="char-bar" style={{width:`${Math.min(100,(editProduct.seo_title.length/60)*100)}%`,background:editProduct.seo_title.length>55?"#ff6666":editProduct.seo_title.length>40?"#00c864":"rgba(139,0,255,0.5)"}} /></div>
               </div>
               <div className="modal-field">
                 <label style={{display:"flex",justifyContent:"space-between"}}>
-                  Meta Description <span style={{fontSize:11,color:editProduct.meta_description.length>=175?"#ff6666":editProduct.meta_description.length>=140?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.meta_description.length}/180</span>
+                  <span>Meta Description{productHistoryBtn("meta_description","Meta Description")}</span> <span style={{fontSize:11,color:editProduct.meta_description.length>=175?"#ff6666":editProduct.meta_description.length>=140?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.meta_description.length}/180</span>
                 </label>
                 <textarea rows={2} placeholder={`Auto: Short description will be used if empty (max 180 chars)`} maxLength={180} value={editProduct.meta_description} onChange={e => setEditProduct({...editProduct,meta_description:e.target.value})} style={{resize:"none"}} />
                 <div className="char-bar" style={{background:"rgba(255,255,255,0.08)",width:"100%"}}><div className="char-bar" style={{width:`${Math.min(100,(editProduct.meta_description.length/180)*100)}%`,background:editProduct.meta_description.length>=175?"#ff6666":editProduct.meta_description.length>=140?"#00c864":"rgba(139,0,255,0.5)"}} /></div>
               </div>
-              <div className="modal-field"><label>Focus Keyword</label><input placeholder="e.g. firestick 4k uk" value={editProduct.focus_keyword} onChange={e => setEditProduct({...editProduct,focus_keyword:e.target.value})} /></div>
+              <div className="modal-field"><label>Focus Keyword{productHistoryBtn("focus_keyword","Focus Keyword")}</label><input placeholder="e.g. firestick 4k uk" value={editProduct.focus_keyword} onChange={e => setEditProduct({...editProduct,focus_keyword:e.target.value})} /></div>
               <div className="modal-field" style={{marginBottom:0}}>
-                <label>Social / OG Image</label>
+                <label>Social / OG Image{productHistoryBtn("og_image","Social / OG Image")}</label>
                 <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",marginBottom:8}}>
                   Used for social sharing previews. If empty, the normal product image/global fallback is used.
                 </div>
@@ -4879,6 +4974,24 @@ function AdminPageInner() {
               variant="dark"
               testId="product-section-seasonal"
             >
+              {canViewRevisions && productModal !== "new" && productModal?.id ? (
+                <div
+                  data-testid="product-seasonal-history"
+                  style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 12, marginBottom: 10 }}
+                >
+                  {([
+                    ["season_name", "Season name"],
+                    ["season_starts_at", "Season starts"],
+                    ["season_ends_at", "Season ends"],
+                    ["lifecycle_mode", "Lifecycle"],
+                  ] as const).map(([f, l]) => (
+                    <span key={f}>
+                      {l}
+                      {productHistoryBtn(f, l)}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               {productModal !== "new" && productModal?.id && can("products.manage") ? (
                 <ProductSeasonalityPanel
                   product={productModal as any}
@@ -7064,11 +7177,11 @@ function AdminPageInner() {
                 fieldCount={6}
                 testId="settings-section-branding"
               >
-                <div className="modal-field"><label>Website Title</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_title||""} onChange={e=>setSiteContent(s=>({...s,site_title:e.target.value}))} placeholder="Firestick4UK" /></div>
-                <div className="modal-field"><label>Website Tagline</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_tagline||""} onChange={e=>setSiteContent(s=>({...s,site_tagline:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
+                <div className="modal-field"><label>Website Title{settingsHistoryBtn("site_title","Website Title")}</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_title||""} onChange={e=>setSiteContent(s=>({...s,site_title:e.target.value}))} placeholder="Firestick4UK" /></div>
+                <div className="modal-field"><label>Website Tagline{settingsHistoryBtn("site_tagline","Website Tagline")}</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_tagline||""} onChange={e=>setSiteContent(s=>({...s,site_tagline:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
                 <div className="modal-field">
                   <label style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:12}}>
-                    <span>Site Meta Description</span>
+                    <span>Site Meta Description{settingsHistoryBtn("site_meta_description","Site Meta Description")}</span>
                     <span style={{fontSize:11,color:(siteContent.site_meta_description||"").length>160?"#ff6666":(siteContent.site_meta_description||"").length>120?"#00c864":"#888"}}>
                       {(siteContent.site_meta_description||"").length}/160–180
                     </span>
@@ -7086,7 +7199,7 @@ function AdminPageInner() {
                 </div>
 
                 <div className="modal-field">
-                  <label>Site Logo</label>
+                  <label>Site Logo{settingsHistoryBtn("site_logo_url","Site Logo")}</label>
                   <p data-cms-appears-on="site_logo_url" style={{fontSize:11,color:"#9CA3AF",margin:"0 0 6px"}}>{formatCmsAppearsOnHint("site_logo_url")}</p>
                   <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
                     Recommended: <strong>360×80px</strong>, PNG transparent
@@ -7127,7 +7240,7 @@ function AdminPageInner() {
                 </div>
 
                 <div className="modal-field">
-                  <label>Favicon</label>
+                  <label>Favicon{settingsHistoryBtn("favicon_url","Favicon")}</label>
                   <p data-cms-appears-on="favicon_url" style={{fontSize:11,color:"#9CA3AF",margin:"0 0 6px"}}>{formatCmsAppearsOnHint("favicon_url")}</p>
                   <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
                     Recommended: <strong>180×180 or 512×512 PNG</strong> (works on mobile + desktop)
@@ -7187,7 +7300,7 @@ function AdminPageInner() {
                 </div>
 
                 <div className="modal-field" style={{marginTop:8}}>
-                  <label>Default Share Image (OG Image)</label>
+                  <label>Default Share Image (OG Image){settingsHistoryBtn("og_default_image","Default Share Image")}</label>
                   <p data-cms-appears-on="og_default_image" style={{fontSize:11,color:"#9CA3AF",margin:"0 0 6px"}}>{formatCmsAppearsOnHint("og_default_image")}</p>
                   <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
                     📐 Recommended: <strong>1200×630px</strong> — shown when sharing homepage on WhatsApp/Facebook
@@ -7268,7 +7381,7 @@ function AdminPageInner() {
                       const url = siteContent[key] || "";
                       return (
                         <div key={key} style={{border:"1px solid #E5E5E5",borderRadius:10,padding:14,background:"#FAFAFA"}}>
-                          <div style={{fontSize:13,fontWeight:600,color:"#111",marginBottom:10}}>Slide {n}</div>
+                          <div style={{fontSize:13,fontWeight:600,color:"#111",marginBottom:10}}>Slide {n}{settingsHistoryBtn(key, `Hero Slide ${n}`)}</div>
                           {url ? (
                             <img
                               src={url}
@@ -7343,7 +7456,7 @@ function AdminPageInner() {
                 testId="settings-section-contact_whatsapp"
               >
                 <div className="modal-field" style={{marginTop:8}}>
-                  <label>WhatsApp Button Icon (PNG)</label>
+                  <label>WhatsApp Button Icon (PNG){settingsHistoryBtn("whatsapp_icon_url","WhatsApp Button Icon")}</label>
                   <p data-cms-appears-on="whatsapp_icon_url" style={{fontSize:11,color:"#9CA3AF",margin:"0 0 6px"}}>{formatCmsAppearsOnHint("whatsapp_icon_url")}</p>
                   <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
                     Recommended: <strong>512×512px PNG</strong>
@@ -7408,7 +7521,7 @@ function AdminPageInner() {
                 <div style={{marginTop:28,paddingTop:24,borderTop:"1px solid #E5E5E5"}}>
                   <div style={{fontSize:15,fontWeight:700,color:"#111",marginBottom:16}}>📞 Contact Details</div>
                   <div className="modal-field">
-                    <label>WhatsApp Number</label>
+                    <label>WhatsApp Number{settingsHistoryBtn("contact_whatsapp","WhatsApp Number")}</label>
                     <input
                       className="modal-field"
                       style={{width:"100%"}}
@@ -7419,7 +7532,7 @@ function AdminPageInner() {
                     <div style={{fontSize:11,color:"#888",marginTop:4}}>(without + sign)</div>
                   </div>
                   <div className="modal-field">
-                    <label>Phone Number</label>
+                    <label>Phone Number{settingsHistoryBtn("contact_phone","Phone Number")}</label>
                     <input
                       className="modal-field"
                       style={{width:"100%"}}
@@ -7429,7 +7542,7 @@ function AdminPageInner() {
                     />
                   </div>
                   <div className="modal-field">
-                    <label>Email Address</label>
+                    <label>Email Address{settingsHistoryBtn("contact_email","Email Address")}</label>
                     <input
                       className="modal-field"
                       style={{width:"100%"}}
@@ -7439,7 +7552,7 @@ function AdminPageInner() {
                     />
                   </div>
                   <div className="modal-field">
-                    <label>Telegram Handle</label>
+                    <label>Telegram Handle{settingsHistoryBtn("contact_telegram","Telegram Handle")}</label>
                     <input
                       className="modal-field"
                       style={{width:"100%"}}
@@ -7506,7 +7619,7 @@ function AdminPageInner() {
                     background: "#F5F3FF",
                   }}
                 >
-                  <div style={{ fontWeight: 700, marginBottom: 6 }}>Seasonal Offers Hub</div>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>Seasonal Offers Hub{settingsHistoryBtn("seasonal_hub_published","Seasonal Offers Hub")}</div>
                   <p style={{ fontSize: 13, color: "#4C1D95", marginBottom: 10, lineHeight: 1.45 }}>
                     Default unpublished. Publishing requires at least one public seasonal product in Live /
                     Upcoming / Past. Empty publication is rejected server-side. Sitemap includes the hub only
@@ -7555,7 +7668,7 @@ function AdminPageInner() {
                     background: "#F5F3FF",
                   }}
                 >
-                  <div style={{ fontWeight: 700, marginBottom: 6 }}>VAT-inclusive prices</div>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>VAT-inclusive prices{settingsHistoryBtn("prices_include_vat","VAT-inclusive prices")}</div>
                   <p style={{ fontSize: 13, color: "#4C1D95", marginBottom: 10, lineHeight: 1.45 }}>
                     Default OFF. When ON, product prices are treated as final VAT-inclusive amounts:
                     cart total = subtotal − discount + shipping (VAT is shown as included, not added on top).
@@ -7605,7 +7718,7 @@ function AdminPageInner() {
                     background: "#F5F3FF",
                   }}
                 >
-                  <div style={{ fontWeight: 700, marginBottom: 6 }}>Customer reviews</div>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>Customer reviews{settingsHistoryBtn("reviews_submission_enabled","Review submissions")}{settingsHistoryBtn("reviews_notify_admin","Review notify admin")}</div>
                   <p style={{ fontSize: 13, color: "#4C1D95", marginBottom: 10, lineHeight: 1.45 }}>
                     Submission defaults ON when unset. Admin email notify defaults OFF — leave it off unless you want a mail for each new pending review.
                   </p>
@@ -7662,7 +7775,7 @@ function AdminPageInner() {
                     Google Ads conversion labels. Paste only the label part after AW-18404353244/. Empty or invalid labels disable that conversion. Fires only after the visitor accepts advertising cookies; never on /sidhu.
                   </div>
                   <div className="modal-field">
-                    <label>Ads conversion label — Website order (purchase)</label>
+                    <label>Ads conversion label — Website order (purchase){settingsHistoryBtn("ads_conv_label_purchase","Ads label (purchase)")}</label>
                     <input
                       className="modal-field"
                       style={{width:"100%"}}
@@ -7679,7 +7792,7 @@ function AdminPageInner() {
                     />
                   </div>
                   <div className="modal-field">
-                    <label>Ads conversion label — WhatsApp contact</label>
+                    <label>Ads conversion label — WhatsApp contact{settingsHistoryBtn("ads_conv_label_whatsapp","Ads label (WhatsApp)")}</label>
                     <input
                       className="modal-field"
                       style={{width:"100%"}}
@@ -7907,10 +8020,11 @@ function AdminPageInner() {
               />
               <CmsPreviewPane
                 open={cmsPreviewOpen}
-                onClose={() => setCmsPreviewOpen(false)}
+                onClose={() => { setCmsPreviewOpen(false); setCmsPreviewForce(null); }}
                 activePage={activePage}
                 siteContent={siteContent}
                 savedContent={siteContentSaved}
+                forceOverrides={cmsPreviewForce}
               />
 
               <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
@@ -8154,6 +8268,7 @@ function AdminPageInner() {
                   <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
                     <div style={{marginBottom:16,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Additional home labels</div>
                     <AdminContentPanel
+                      {...cmsHistoryProps}
                       page="home"
                       siteContent={siteContent}
                       setSiteContent={setSiteContent}
@@ -8191,6 +8306,7 @@ function AdminPageInner() {
                   <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
                     <div style={{marginBottom:16,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Additional about copy & JSON</div>
                     <AdminContentPanel
+                      {...cmsHistoryProps}
                       page="about"
                       siteContent={siteContent}
                       setSiteContent={setSiteContent}
@@ -8209,20 +8325,20 @@ function AdminPageInner() {
                   <div className="section-header" style={{marginBottom:20}}><div className="section-title">📞 Contact Page Content</div></div>
                   {can("settings.manage") ? (
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-                      <div className="modal-field"><label>Phone Number</label><input style={{width:"100%"}} value={siteContent.contact_phone||""} onChange={e=>setSiteContent(s=>({...s,contact_phone:e.target.value}))} /></div>
-                      <div className="modal-field"><label>Email Address</label><input style={{width:"100%"}} value={siteContent.contact_email||""} onChange={e=>setSiteContent(s=>({...s,contact_email:e.target.value}))} /></div>
-                      <div className="modal-field"><label>WhatsApp (numbers only)</label><input style={{width:"100%"}} value={siteContent.contact_whatsapp||""} onChange={e=>setSiteContent(s=>({...s,contact_whatsapp:e.target.value,whatsapp_number:e.target.value}))} placeholder="447518787653" /></div>
-                      <div className="modal-field"><label>Telegram Handle</label><input style={{width:"100%"}} value={siteContent.contact_telegram||""} onChange={e=>setSiteContent(s=>({...s,contact_telegram:e.target.value}))} placeholder="@firestick44" /></div>
-                      <div className="modal-field"><label>Business Hours</label><input style={{width:"100%"}} value={siteContent.contact_hours||""} onChange={e=>setSiteContent(s=>({...s,contact_hours:e.target.value}))} /></div>
-                      <div className="modal-field"><label>Address</label><input style={{width:"100%"}} value={siteContent.contact_address||""} onChange={e=>setSiteContent(s=>({...s,contact_address:e.target.value}))} /></div>
+                      <div className="modal-field"><label>Phone Number{settingsHistoryBtn("contact_phone","Phone Number")}</label><input style={{width:"100%"}} value={siteContent.contact_phone||""} onChange={e=>setSiteContent(s=>({...s,contact_phone:e.target.value}))} /></div>
+                      <div className="modal-field"><label>Email Address{settingsHistoryBtn("contact_email","Email Address")}</label><input style={{width:"100%"}} value={siteContent.contact_email||""} onChange={e=>setSiteContent(s=>({...s,contact_email:e.target.value}))} /></div>
+                      <div className="modal-field"><label>WhatsApp (numbers only){settingsHistoryBtn("contact_whatsapp","WhatsApp")}</label><input style={{width:"100%"}} value={siteContent.contact_whatsapp||""} onChange={e=>setSiteContent(s=>({...s,contact_whatsapp:e.target.value,whatsapp_number:e.target.value}))} placeholder="447518787653" /></div>
+                      <div className="modal-field"><label>Telegram Handle{settingsHistoryBtn("contact_telegram","Telegram Handle")}</label><input style={{width:"100%"}} value={siteContent.contact_telegram||""} onChange={e=>setSiteContent(s=>({...s,contact_telegram:e.target.value}))} placeholder="@firestick44" /></div>
+                      <div className="modal-field"><label>Business Hours{settingsHistoryBtn("contact_hours","Business Hours")}</label><input style={{width:"100%"}} value={siteContent.contact_hours||""} onChange={e=>setSiteContent(s=>({...s,contact_hours:e.target.value}))} /></div>
+                      <div className="modal-field"><label>Address{settingsHistoryBtn("contact_address","Address")}</label><input style={{width:"100%"}} value={siteContent.contact_address||""} onChange={e=>setSiteContent(s=>({...s,contact_address:e.target.value}))} /></div>
                     </div>
                   ) : (
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
                       <div className="modal-field" style={{gridColumn:"1 / -1",padding:"10px 12px",background:"#F8F5FF",borderRadius:8,fontSize:12,color:"#5B21B6"}}>
                         Phone, email, WhatsApp and Telegram coordinates are <strong>Super Admin only</strong> (Site Settings). You can still edit hours, address and page labels.
                       </div>
-                      <div className="modal-field"><label>Business Hours</label><input style={{width:"100%"}} value={siteContent.contact_hours||""} onChange={e=>setSiteContent(s=>({...s,contact_hours:e.target.value}))} /></div>
-                      <div className="modal-field"><label>Address</label><input style={{width:"100%"}} value={siteContent.contact_address||""} onChange={e=>setSiteContent(s=>({...s,contact_address:e.target.value}))} /></div>
+                      <div className="modal-field"><label>Business Hours{settingsHistoryBtn("contact_hours","Business Hours")}</label><input style={{width:"100%"}} value={siteContent.contact_hours||""} onChange={e=>setSiteContent(s=>({...s,contact_hours:e.target.value}))} /></div>
+                      <div className="modal-field"><label>Address{settingsHistoryBtn("contact_address","Address")}</label><input style={{width:"100%"}} value={siteContent.contact_address||""} onChange={e=>setSiteContent(s=>({...s,contact_address:e.target.value}))} /></div>
                     </div>
                   )}
                   <button className="btn-primary" disabled={contentSaving} onClick={()=>saveContent(dirtyKeysAmong(
@@ -8233,6 +8349,7 @@ function AdminPageInner() {
                   <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
                     <div style={{marginBottom:16,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Contact page labels</div>
                     <AdminContentPanel
+                      {...cmsHistoryProps}
                       page="contact"
                       siteContent={siteContent}
                       setSiteContent={setSiteContent}
@@ -8328,6 +8445,7 @@ function AdminPageInner() {
                   <div style={{marginTop:28,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
                     <div style={{marginBottom:16,fontSize:13,fontWeight:700,color:"#5B21B6"}}>Cart &amp; checkout labels</div>
                     <AdminContentPanel
+                      {...cmsHistoryProps}
                       page="cart"
                       siteContent={siteContent}
                       setSiteContent={setSiteContent}
@@ -8344,6 +8462,7 @@ function AdminPageInner() {
               {["footer","faq","products","tracking","blog","legal","global"].includes(activePage) && (
                 <div className="section-card" style={{padding:24}}>
                   <AdminContentPanel
+                    {...cmsHistoryProps}
                     page={activePage}
                     siteContent={siteContent}
                     setSiteContent={setSiteContent}
@@ -8357,6 +8476,27 @@ function AdminPageInner() {
           )}
         </main>
       </div>
+
+      {/* MULTI-106 — per-field History drawer (Site Settings + product editor) */}
+      <FieldHistoryDrawer
+        target={fieldHistoryTarget}
+        role={adminRole}
+        canViewRevisions={canViewRevisions}
+        onClose={() => setFieldHistoryTarget(null)}
+        onToast={(message, kind) => showToast(message, kind)}
+        restoreNote={
+          fieldHistoryTarget?.kind === "product"
+            ? "The product editor will reload the restored values — unsaved edits in the open editor are replaced."
+            : "Restoring replaces the saved value(s) on the server."
+        }
+        onRestored={(info) => {
+          if (info.entityType === "product") {
+            void refreshProductAfterHistoryRestore(info.entityId);
+          } else {
+            void refreshRestoredContentKeys(info.keys);
+          }
+        }}
+      />
     </>
   );
 }

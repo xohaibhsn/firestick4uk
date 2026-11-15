@@ -10,6 +10,10 @@ import {
   revisionEntityTypesForRole,
 } from "../../lib/contentRevisions";
 
+const CONTENT_KEY_ENTITY_TYPES = ["site_content", "site_settings", "site_content_batch"] as const;
+/** Field / content keys are simple identifiers — rejects anything else before it reaches SQL params. */
+const REVISION_FIELD_RE = /^[A-Za-z0-9_.-]{1,120}$/;
+
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
@@ -71,6 +75,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const action = String(req.query.action || "").trim().slice(0, 30);
     const q = String(req.query.q || "").trim().slice(0, 180);
 
+    // F4UK-MULTI-106 — READ-ONLY per-field history filter.
+    // ?field=<key> matches revisions whose entity_id equals the key (single site-content saves)
+    // OR whose changed_fields_json contains the key (batch saves / product edits).
+    let field = "";
+    if (Array.isArray(req.query.field)) {
+      return res.status(400).json({ error: "Invalid field" });
+    }
+    if (req.query.field != null && String(req.query.field).trim() !== "") {
+      field = String(req.query.field).trim();
+      if (!REVISION_FIELD_RE.test(field)) {
+        return res.status(400).json({ error: "Invalid field" });
+      }
+    }
+
     if (entityType) {
       if (!allowed.includes(entityType as any)) {
         return res.status(403).json({
@@ -80,7 +98,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    const types = entityType ? [entityType] : allowed;
+    // Content-key lookup (no entity_type): search only site_content / site_settings /
+    // site_content_batch, still limited to the types this role may view.
+    const types = entityType
+      ? [entityType]
+      : field
+        ? allowed.filter((t) => (CONTENT_KEY_ENTITY_TYPES as readonly string[]).includes(t))
+        : allowed;
     if (!types.length) {
       return res.status(200).json({
         items: [],
@@ -94,6 +118,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (entityId) {
       where.push("entity_id = ?");
       params.push(entityId);
+    }
+    if (field) {
+      // CASE short-circuits so a legacy row with non-JSON text can never raise a SQL error.
+      const jsonHas = `CASE WHEN JSON_VALID(changed_fields_json) THEN JSON_CONTAINS(changed_fields_json, ?) ELSE 0 END`;
+      const contentOnly = types.every((t) => (CONTENT_KEY_ENTITY_TYPES as readonly string[]).includes(t));
+      if (contentOnly) {
+        where.push(`(entity_id = ? OR ${jsonHas})`);
+        params.push(field, JSON.stringify(field));
+      } else {
+        where.push(`(${jsonHas})`);
+        params.push(JSON.stringify(field));
+      }
     }
     if (action) {
       where.push("revision_action = ?");

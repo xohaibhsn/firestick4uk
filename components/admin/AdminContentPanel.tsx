@@ -10,6 +10,11 @@ import { formatCmsAppearsOnHint } from "@/lib/cmsAppearsOn";
 import { CMS_EXPAND_FIELD_EVENT } from "@/lib/adminSidebarGroups";
 import CmsUpdatesAfterSaveChip from "@/components/admin/CmsUpdatesAfterSaveChip";
 import CollapsibleSection from "@/components/admin/CollapsibleSection";
+import FieldHistoryDrawer, {
+  FieldHistoryButton,
+  type FieldHistoryTarget,
+} from "@/components/admin/FieldHistoryDrawer";
+import type { AdminRoleName } from "@/lib/adminPermissions";
 
 const TipTapEditor = dynamic(() => import("./TipTapEditor"), { ssr: false });
 
@@ -24,6 +29,14 @@ type Props = {
   saveLabel?: string;
   /** Snapshot for dirty-dot per section. */
   savedContent?: Record<string, string>;
+  /** F4UK-MULTI-106 — per-field History (shown only when the host passes revisions.view). */
+  canViewRevisions?: boolean;
+  role?: AdminRoleName;
+  /** Refresh editor + saved baseline for keys restored from History. */
+  onFieldsRestored?: (keys: string[]) => void;
+  /** Push an old value into Live Preview as an unsaved override (null clears). */
+  onPreviewRestore?: (overrides: Record<string, string> | null) => void;
+  onToast?: (message: string, kind?: "success" | "error" | "info") => void;
 };
 
 function sectionDirty(
@@ -45,7 +58,13 @@ export default function AdminContentPanel({
   saving,
   saveLabel = "💾 Save",
   savedContent,
+  canViewRevisions = false,
+  role = "writer",
+  onFieldsRestored,
+  onPreviewRestore,
+  onToast,
 }: Props) {
+  const [historyTarget, setHistoryTarget] = useState<FieldHistoryTarget | null>(null);
   const sections = ADMIN_CONTENT_SECTIONS[page] || [];
 
   function defaultOpenMap(list: typeof sections): Record<string, boolean> {
@@ -196,6 +215,14 @@ export default function AdminContentPanel({
                     <label>
                       {field.label}
                       <CmsUpdatesAfterSaveChip fieldKey={field.key} />
+                      <FieldHistoryButton
+                        canViewRevisions={canViewRevisions}
+                        label={field.label}
+                        testId={field.key}
+                        onOpen={() =>
+                          setHistoryTarget({ kind: "content", fieldKey: field.key, label: field.label })
+                        }
+                      />
                     </label>
                     {field.help ? (
                       <p
@@ -271,6 +298,16 @@ export default function AdminContentPanel({
       >
         {saving ? "Saving..." : saveLabel}
       </button>
+      <FieldHistoryDrawer
+        target={historyTarget}
+        role={role}
+        canViewRevisions={canViewRevisions}
+        onClose={() => setHistoryTarget(null)}
+        onPreviewRestore={onPreviewRestore}
+        onToast={onToast}
+        onRestored={(info) => onFieldsRestored?.(info.keys)}
+        restoreNote="Restoring replaces the saved value(s) on the server. Unsaved edits to the restored keys in this editor are replaced too."
+      />
     </div>
   );
 }
