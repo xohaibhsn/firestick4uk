@@ -8,6 +8,7 @@ import {
   type CmsFindHit,
 } from "@/lib/cmsFindText";
 import { keysForPage } from "@/lib/adminContentFields";
+import { CMS_EXPAND_FIELD_EVENT } from "@/lib/adminSidebarGroups";
 
 type Props = {
   activePage: string;
@@ -115,12 +116,25 @@ export default function CmsEaseToolbar({
         setActivePage("products");
         return;
       }
+      const expandThenHighlight = () => {
+        try {
+          window.dispatchEvent(
+            new CustomEvent(CMS_EXPAND_FIELD_EVENT, {
+              detail: { key: hit.key },
+            })
+          );
+        } catch {
+          /* ignore */
+        }
+        // Allow accordion open + paint before scroll/highlight
+        window.setTimeout(() => setHighlightKey(hit.key), 60);
+      };
       if (hit.page && hit.page !== activePage) {
         setActivePage(hit.page);
-        // allow panel to mount then highlight
-        window.setTimeout(() => setHighlightKey(hit.key), 80);
+        // allow panel to mount then expand + highlight
+        window.setTimeout(expandThenHighlight, 80);
       } else {
-        setHighlightKey(hit.key);
+        expandThenHighlight();
       }
     },
     [activePage, setActivePage]

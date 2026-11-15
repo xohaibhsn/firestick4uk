@@ -36,10 +36,11 @@ ok("saveProduct_found", saveSnippet.includes('const isNew = productModal === "ne
 // 16a0887 added a local-state-only `{ id: res.id, active: 1, ...localFields }` in the isNew branch
 // (page.tsx:2404; matches INSERT ... active=1 at pages/api/admin-products.ts:172). Scope the guard to the
 // actual request body (payload object + JSON.stringify(...) argument), not the post-success UI update.
-const payloadStart = saveSnippet.indexOf("const payload = {");
+const payloadHelper = read("lib/productEditorSavePayload.ts");
+const payloadStart = saveSnippet.indexOf("const payload = ");
 const payloadObj =
   payloadStart >= 0
-    ? saveSnippet.slice(payloadStart, saveSnippet.indexOf("};", payloadStart))
+    ? saveSnippet.slice(payloadStart, saveSnippet.indexOf(";", payloadStart) + 1)
     : "";
 const bodyStart = saveSnippet.indexOf("body: JSON.stringify(");
 const requestBody =
@@ -52,7 +53,8 @@ ok(
     payloadObj.length > 0 &&
     requestBody.length > 0 &&
     !/\bactive\b/.test(payloadObj) &&
-    !/\bactive\b/.test(requestBody)
+    !/\bactive\b/.test(requestBody) &&
+    !/\bactive\b/.test(payloadHelper)
 );
 ok(
   "new_product_local_active_1_only_in_isNew_branch",
@@ -124,7 +126,8 @@ ok(
 ok(
   "b2_og_image_state_payload",
   /og_image:""/.test(sidhu) &&
-    /og_image:\s*editProduct\.og_image\s*\|\|\s*""/.test(sidhu) &&
+    (/og_image:\s*editProduct\.og_image\s*\|\|\s*""/.test(sidhu) ||
+      /og_image:\s*editProduct\.og_image\s*\|\|\s*""/.test(payloadHelper)) &&
     /Choose Product OG Image/.test(sidhu)
 );
 

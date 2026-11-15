@@ -74,13 +74,19 @@ ok("manager_cannot_access_redirects", perms.canAccessSidhuTab("manager", "redire
 ok("writer_cannot_access_redirects", perms.canAccessSidhuTab("writer", "redirects") === false);
 
 // 6 sidebar
+const sidebarGroups = read("lib/adminSidebarGroups.ts");
 ok(
   "sidebar_contains_redirects",
-  /id:"redirects"/.test(sidhu) && /label:"Redirects"/.test(sidhu)
+  (/id:"redirects"/.test(sidhu) && /label:"Redirects"/.test(sidhu)) ||
+    (/id:\s*"redirects"/.test(sidebarGroups) && /label:\s*"Redirects"/.test(sidebarGroups))
 );
 ok(
   "sidebar_order_seo_redirects_media_history",
-  /id:"seo"[\s\S]*?id:"redirects"[\s\S]*?id:"media"[\s\S]*?id:"history"/.test(sidhu)
+  // MULTI-102 regrouped: media→Content, history→Settings & Team; SEO+Redirects stay adjacent.
+  (/id:"seo"[\s\S]*?id:"redirects"[\s\S]*?id:"media"[\s\S]*?id:"history"/.test(sidhu) ||
+    (/id:\s*"seo"[\s\S]*?id:\s*"redirects"/.test(sidebarGroups) &&
+      /id:\s*"media"/.test(sidebarGroups) &&
+      /id:\s*"history"/.test(sidebarGroups)))
 );
 
 // 7 UI only for proper tab

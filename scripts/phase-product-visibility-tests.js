@@ -217,10 +217,11 @@ const saveSnippet =
   saveIdx >= 0 && saveEnd > saveIdx ? sidhu.slice(saveIdx, saveEnd) : "";
 // 16a0887: post-success local state for NEW products is `{ id: res.id, active: 1, ...localFields }` (page.tsx:2404).
 // The PUT body is only `...payload` + id + expected_version; assert on the request body, not the whole function.
-const payloadStart = saveSnippet.indexOf("const payload = {");
+const payloadHelperVis = read("lib/productEditorSavePayload.ts");
+const payloadStart = saveSnippet.indexOf("const payload = ");
 const payloadObj =
   payloadStart >= 0
-    ? saveSnippet.slice(payloadStart, saveSnippet.indexOf("};", payloadStart))
+    ? saveSnippet.slice(payloadStart, saveSnippet.indexOf(";", payloadStart) + 1)
     : "";
 const bodyStart = saveSnippet.indexOf("body: JSON.stringify(");
 const requestBody =
@@ -235,7 +236,8 @@ ok(
     /expected_version/.test(requestBody) &&
     payloadObj.length > 0 &&
     !/\bactive\b/.test(payloadObj) &&
-    !/\bactive\b/.test(requestBody)
+    !/\bactive\b/.test(requestBody) &&
+    !/\bactive\b/.test(payloadHelperVis)
 );
 ok("preservation_script_still_present", /PS-ACTIVE/.test(preserveScript));
 

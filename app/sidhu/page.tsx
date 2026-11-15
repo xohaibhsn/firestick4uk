@@ -3,6 +3,8 @@ import { useState, useEffect, useRef, useCallback, useMemo, Fragment } from "rea
 import dynamic from "next/dynamic";
 import { toEditorHtml } from "@/lib/contentHtml";
 import AdminContentPanel from "@/components/admin/AdminContentPanel";
+import AdminSidebarNav from "@/components/admin/AdminSidebarNav";
+import CollapsibleSection from "@/components/admin/CollapsibleSection";
 import CmsEaseToolbar, {
   confirmLeaveIfDirty,
   countDirtyKeys,
@@ -15,6 +17,12 @@ import MediaLibraryPanel from "@/components/admin/MediaLibraryPanel";
 import MediaLibraryPicker, { type MediaAsset } from "@/components/admin/MediaLibraryPicker";
 import ContentHistoryPanel from "@/components/admin/ContentHistoryPanel";
 import ProductSeasonalityPanel from "@/components/admin/ProductSeasonalityPanel";
+import {
+  PRODUCT_EDITOR_SECTION_TITLES,
+  PRODUCT_EDITOR_SECTIONS,
+  SITE_SETTINGS_SECTION_TITLES,
+} from "@/lib/adminSidebarGroups";
+import { buildProductEditorSavePayload } from "@/lib/productEditorSavePayload";
 import { buildDuplicateEditProduct } from "@/lib/seasonalOfferWizard";
 import SeoOverviewPanel from "@/components/admin/SeoOverviewPanel";
 import RedirectManagerPanel from "@/components/admin/RedirectManagerPanel";
@@ -350,6 +358,22 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState("");
   const [tab, setTab] = useState<Tab>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [settingsSectionOpen, setSettingsSectionOpen] = useState<Record<string, boolean>>({
+    branding: true,
+    hero_slides: false,
+    contact_whatsapp: false,
+    vat_pricing: false,
+    seasonal_offers: false,
+    reviews: false,
+    tracking_ads: false,
+    server: false,
+    other: false,
+  });
+  const [productSectionOpen, setProductSectionOpen] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    for (const id of PRODUCT_EDITOR_SECTIONS) init[id] = id === "basic_info";
+    return init;
+  });
   const [adminDropOpen, setAdminDropOpen] = useState(false);
   const [serverRuntime, setServerRuntime] = useState<any>(null);
   const [serverRuntimeLoading, setServerRuntimeLoading] = useState(false);
@@ -2377,23 +2401,7 @@ export default function AdminPage() {
       setProductMsg("❌ Enter a valid price (non-negative number, max 2 decimal places).");
       return;
     }
-    const payload = {
-      name: editProduct.name,
-      slug,
-      description: editProduct.short_description || "",
-      price: String(parsedPrice),
-      category: editProduct.category,
-      badge: null,
-      image: editProduct.image || null,
-      stock: editProduct.stock || "Digital",
-      short_description: editProduct.short_description || "",
-      full_description: editProduct.full_description || "",
-      features: editProduct.features || "",
-      seo_title: editProduct.seo_title || "",
-      meta_description: editProduct.meta_description || "",
-      focus_keyword: editProduct.focus_keyword || "",
-      og_image: editProduct.og_image || "",
-    };
+    const payload = buildProductEditorSavePayload(editProduct, { slug, parsedPrice });
     if (contentConflict) {
       setProductMsg("❌ Resolve the version conflict (Reload server content or review) before saving.");
       return;
@@ -2548,6 +2556,11 @@ export default function AdminPage() {
     setContentDraftBaseVersion(session.contentDraftBaseVersion);
     setEditProduct(session.editProduct);
     setProductModal(p);
+    setProductSectionOpen(() => {
+      const init: Record<string, boolean> = {};
+      for (const id of PRODUCT_EDITOR_SECTIONS) init[id] = id === "basic_info";
+      return init;
+    });
   };
 
   const openNewProduct = () => {
@@ -2561,6 +2574,11 @@ export default function AdminPage() {
     setContentDraftBaseVersion(null);
     setEditProduct({ name:"", slug:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
     setProductModal("new");
+    setProductSectionOpen(() => {
+      const init: Record<string, boolean> = {};
+      for (const id of PRODUCT_EDITOR_SECTIONS) init[id] = id === "basic_info";
+      return init;
+    });
   };
 
   /** Duplicate → normal new-product editor with copied fields; unsaved until Save. */
@@ -2594,6 +2612,11 @@ export default function AdminPage() {
       og_image: String(copy.og_image || ""),
     });
     setProductModal("new");
+    setProductSectionOpen(() => {
+      const init: Record<string, boolean> = {};
+      for (const id of PRODUCT_EDITOR_SECTIONS) init[id] = id === "basic_info";
+      return init;
+    });
   };
 
   const migrateProductUrl = async () => {
@@ -3696,7 +3719,18 @@ export default function AdminPage() {
               );
             })() : null}
 
-            {/* Basic Info */}
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}} data-testid="product-section-toolbar">
+              <button type="button" className="action-btn btn-view" data-testid="product-expand-all" style={{padding:"6px 12px",fontSize:12}} onClick={() => setProductSectionOpen(Object.fromEntries(PRODUCT_EDITOR_SECTIONS.map(id => [id, true])))}>Expand all</button>
+              <button type="button" className="action-btn btn-view" data-testid="product-collapse-all" style={{padding:"6px 12px",fontSize:12}} onClick={() => setProductSectionOpen(Object.fromEntries(PRODUCT_EDITOR_SECTIONS.map(id => [id, false])))}>Collapse all</button>
+            </div>
+            <CollapsibleSection
+              title={PRODUCT_EDITOR_SECTION_TITLES.basic_info}
+              open={!!productSectionOpen.basic_info}
+              onToggle={() => setProductSectionOpen(st => ({...st, basic_info: !st.basic_info}))}
+              fieldCount={3}
+              variant="dark"
+              testId="product-section-basic_info"
+            >
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div className="modal-field">
                 <label>Product Name *</label>
@@ -3763,113 +3797,6 @@ export default function AdminPage() {
                   Public URL is protected. Slug changes require a controlled SEO migration with a redirect.
                 </small>
               )}
-              {productModal !== "new" && Number(productModal?.active) !== 1 ? (
-                <small
-                  data-testid="product-editor-hidden-url-note"
-                  style={{display:"block",marginTop:6,fontSize:11,color:"#EA580C",lineHeight:1.45}}
-                >
-                  This product is Private (active=0). Stored slug is retained, but the public page is unavailable (404) until Make Public. Ordinary Save preserves Private status and does not change seasonal/shop controls.
-                </small>
-              ) : null}
-              {productModal !== "new" && productModal?.id && can("products.manage") ? (
-                <ProductSeasonalityPanel
-                  product={productModal as any}
-                  editorSessionId={editorSessionId}
-                  disabled={productSaving}
-                  pending={productVisibilityPendingId === productModal.id}
-                  onSessionExpired={handleSessionExpired}
-                  onForbidden={showPermError}
-                  onMessage={(msg) => {
-                    setProductMsg(msg);
-                    setTimeout(() => setProductMsg(""), 5000);
-                  }}
-                  onRefresh={async () => {
-                    await loadProducts();
-                  }}
-                  onProductUpdate={(row, meta) => {
-                    // Seasonal/ops action succeeded: reflect it in the products list immediately
-                    // (background loadProducts via onRefresh reconciles with the server).
-                    if (row && (row as any).id != null) {
-                      const rowId = Number((row as any).id);
-                      setProducts((prev) =>
-                        prev.map((x: any) => (Number(x.id) === rowId ? { ...x, ...(row as any) } : x))
-                      );
-                    }
-                    // Compare captured dispatch context against CURRENT active editor — never
-                    // re-label an old response with editorSessionIdRef.current.
-                    const activeProductId =
-                      productModal && productModal !== "new" ? Number(productModal.id) : null;
-                    if (
-                      !isActiveEditorRequest(
-                        editorSessionIdRef.current,
-                        activeProductId,
-                        meta
-                      )
-                    ) {
-                      return;
-                    }
-                    const snap = contentDraftSessionSnapshot();
-                    if (!snap) {
-                      applyAuthoritativeProductRow(row as any, {
-                        replaceContent: false,
-                        editorSessionId: meta.editorSessionId,
-                      });
-                      return;
-                    }
-                    const next = applyOwnContentPreservingActionResult(snap, {
-                      editorSessionId: meta.editorSessionId,
-                      productId: meta.productId,
-                      actionStartedAtVersion: meta.actionStartedAtVersion,
-                      nextVersion: meta.nextVersion,
-                      noop: meta.noop,
-                      // Successful Pause does not resolve an existing content conflict.
-                      clearConflict: false,
-                    });
-                    setContentDraftBaseVersion(next.contentDraftBaseVersion);
-                    // Keep outstanding conflict; only refresh ops fields + live version.
-                    applyAuthoritativeProductRow(
-                      {
-                        ...row,
-                        product_version: next.liveProductVersion ?? row.product_version,
-                      } as any,
-                      {
-                        replaceContent: false,
-                        editorSessionId: meta.editorSessionId,
-                      }
-                    );
-                  }}
-                  onVersionUpdate={(version, ctx) => {
-                    // Live ops version only — NEVER advance content draft base from unqualified callback.
-                    // Reject late responses that belong to a closed/switched editor session.
-                    const activeProductId =
-                      productModal && productModal !== "new" ? Number(productModal.id) : null;
-                    if (
-                      !isActiveEditorRequest(
-                        editorSessionIdRef.current,
-                        activeProductId,
-                        ctx
-                      )
-                    ) {
-                      return;
-                    }
-                    const snap = contentDraftSessionSnapshot();
-                    if (snap) {
-                      const next = applyLiveVersionOnly(snap, Number(version));
-                      setProductModal((prev: any) =>
-                        prev && prev !== "new" && Number(prev.id) === Number(ctx.productId)
-                          ? { ...prev, product_version: next.liveProductVersion }
-                          : prev
-                      );
-                    } else {
-                      setProductModal((prev: any) =>
-                        prev && prev !== "new" && Number(prev.id) === Number(ctx.productId)
-                          ? { ...prev, product_version: version }
-                          : prev
-                      );
-                    }
-                  }}
-                />
-              ) : null}
               {contentConflict ? (
                 <div
                   data-testid="product-content-conflict"
@@ -3996,12 +3923,29 @@ export default function AdminPage() {
                 </div>
               ) : null}
             </div>
+</CollapsibleSection>
+            <CollapsibleSection
+              title={PRODUCT_EDITOR_SECTION_TITLES.price_stock}
+              open={!!productSectionOpen.price_stock}
+              onToggle={() => setProductSectionOpen(st => ({...st, price_stock: !st.price_stock}))}
+              fieldCount={2}
+              variant="dark"
+              testId="product-section-price_stock"
+            >
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div className="modal-field"><label>Price</label><input placeholder="e.g. £9.99" value={editProduct.price} onChange={e => setEditProduct({...editProduct,price:e.target.value})} /></div>
               <div className="modal-field"><label>Stock / Type</label><input placeholder="e.g. 10 or Digital" value={editProduct.stock} onChange={e => setEditProduct({...editProduct,stock:e.target.value})} /></div>
             </div>
 
-            {/* Image */}
+</CollapsibleSection>
+            <CollapsibleSection
+              title={PRODUCT_EDITOR_SECTION_TITLES.images}
+              open={!!productSectionOpen.images}
+              onToggle={() => setProductSectionOpen(st => ({...st, images: !st.images}))}
+              fieldCount={1}
+              variant="dark"
+              testId="product-section-images"
+            >
             <div className="modal-field">
               <label>Product Image</label>
               <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
@@ -4028,7 +3972,15 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Descriptions — TipTap rich text */}
+</CollapsibleSection>
+            <CollapsibleSection
+              title={PRODUCT_EDITOR_SECTION_TITLES.description_features}
+              open={!!productSectionOpen.description_features}
+              onToggle={() => setProductSectionOpen(st => ({...st, description_features: !st.description_features}))}
+              fieldCount={3}
+              variant="dark"
+              testId="product-section-description_features"
+            >
             <div className="modal-field">
               <label>Short Description</label>
               <TipTapEditor
@@ -4064,7 +4016,9 @@ export default function AdminPage() {
               <textarea rows={3} placeholder={"✅ 1 Year Streaming Access\n✅ 10,000+ Channels\n✅ Free Setup Support"} value={editProduct.features} onChange={e => setEditProduct({...editProduct,features:e.target.value})} style={{resize:"vertical"}} />
             </div>
 
-            {/* PAI-3 — New Product AI Assistant (new modal only) */}
+</CollapsibleSection>
+
+                        {/* PAI-3 — New Product AI Assistant (new modal only) */}
             {productModal === "new" && can("products.manage") ? (
               <div
                 className="seo-box"
@@ -4569,7 +4523,14 @@ export default function AdminPage() {
               </div>
             ) : null}
 
-            {/* SEO Section */}
+<CollapsibleSection
+              title={PRODUCT_EDITOR_SECTION_TITLES.seo}
+              open={!!productSectionOpen.seo}
+              onToggle={() => setProductSectionOpen(st => ({...st, seo: !st.seo}))}
+              fieldCount={4}
+              variant="dark"
+              testId="product-section-seo"
+            >
             <div className="seo-box">
               <div className="seo-box-title">🔍 SEO Settings</div>
               {productModal !== "new" && productModal?.id ? (
@@ -4690,6 +4651,142 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
+
+</CollapsibleSection>
+            <CollapsibleSection
+              title={PRODUCT_EDITOR_SECTION_TITLES.seasonal}
+              open={!!productSectionOpen.seasonal}
+              onToggle={() => setProductSectionOpen(st => ({...st, seasonal: !st.seasonal}))}
+              fieldCount={1}
+              variant="dark"
+              testId="product-section-seasonal"
+            >
+              {productModal !== "new" && productModal?.id && can("products.manage") ? (
+                <ProductSeasonalityPanel
+                  product={productModal as any}
+                  editorSessionId={editorSessionId}
+                  disabled={productSaving}
+                  pending={productVisibilityPendingId === productModal.id}
+                  onSessionExpired={handleSessionExpired}
+                  onForbidden={showPermError}
+                  onMessage={(msg) => {
+                    setProductMsg(msg);
+                    setTimeout(() => setProductMsg(""), 5000);
+                  }}
+                  onRefresh={async () => {
+                    await loadProducts();
+                  }}
+                  onProductUpdate={(row, meta) => {
+                    // Seasonal/ops action succeeded: reflect it in the products list immediately
+                    // (background loadProducts via onRefresh reconciles with the server).
+                    if (row && (row as any).id != null) {
+                      const rowId = Number((row as any).id);
+                      setProducts((prev) =>
+                        prev.map((x: any) => (Number(x.id) === rowId ? { ...x, ...(row as any) } : x))
+                      );
+                    }
+                    // Compare captured dispatch context against CURRENT active editor — never
+                    // re-label an old response with editorSessionIdRef.current.
+                    const activeProductId =
+                      productModal && productModal !== "new" ? Number(productModal.id) : null;
+                    if (
+                      !isActiveEditorRequest(
+                        editorSessionIdRef.current,
+                        activeProductId,
+                        meta
+                      )
+                    ) {
+                      return;
+                    }
+                    const snap = contentDraftSessionSnapshot();
+                    if (!snap) {
+                      applyAuthoritativeProductRow(row as any, {
+                        replaceContent: false,
+                        editorSessionId: meta.editorSessionId,
+                      });
+                      return;
+                    }
+                    const next = applyOwnContentPreservingActionResult(snap, {
+                      editorSessionId: meta.editorSessionId,
+                      productId: meta.productId,
+                      actionStartedAtVersion: meta.actionStartedAtVersion,
+                      nextVersion: meta.nextVersion,
+                      noop: meta.noop,
+                      // Successful Pause does not resolve an existing content conflict.
+                      clearConflict: false,
+                    });
+                    setContentDraftBaseVersion(next.contentDraftBaseVersion);
+                    // Keep outstanding conflict; only refresh ops fields + live version.
+                    applyAuthoritativeProductRow(
+                      {
+                        ...row,
+                        product_version: next.liveProductVersion ?? row.product_version,
+                      } as any,
+                      {
+                        replaceContent: false,
+                        editorSessionId: meta.editorSessionId,
+                      }
+                    );
+                  }}
+                  onVersionUpdate={(version, ctx) => {
+                    // Live ops version only — NEVER advance content draft base from unqualified callback.
+                    // Reject late responses that belong to a closed/switched editor session.
+                    const activeProductId =
+                      productModal && productModal !== "new" ? Number(productModal.id) : null;
+                    if (
+                      !isActiveEditorRequest(
+                        editorSessionIdRef.current,
+                        activeProductId,
+                        ctx
+                      )
+                    ) {
+                      return;
+                    }
+                    const snap = contentDraftSessionSnapshot();
+                    if (snap) {
+                      const next = applyLiveVersionOnly(snap, Number(version));
+                      setProductModal((prev: any) =>
+                        prev && prev !== "new" && Number(prev.id) === Number(ctx.productId)
+                          ? { ...prev, product_version: next.liveProductVersion }
+                          : prev
+                      );
+                    } else {
+                      setProductModal((prev: any) =>
+                        prev && prev !== "new" && Number(prev.id) === Number(ctx.productId)
+                          ? { ...prev, product_version: version }
+                          : prev
+                      );
+                    }
+                  }}
+
+                />
+              ) : (
+                <div style={{fontSize:12,color:"rgba(255,255,255,0.45)"}}>Seasonal controls appear when editing an existing product.</div>
+              )}
+            </CollapsibleSection>
+            <CollapsibleSection
+              title={PRODUCT_EDITOR_SECTION_TITLES.visibility}
+              open={!!productSectionOpen.visibility}
+              onToggle={() => setProductSectionOpen(st => ({...st, visibility: !st.visibility}))}
+              fieldCount={2}
+              variant="dark"
+              testId="product-section-visibility"
+            >
+              {productModal !== "new" && Number(productModal?.active) !== 1 ? (
+                <small
+                  data-testid="product-editor-hidden-url-note"
+                  style={{display:"block",marginTop:6,fontSize:11,color:"#EA580C",lineHeight:1.45}}
+                >
+                  This product is Private (active=0). Stored slug is retained, but the public page is unavailable (404) until Make Public. Ordinary Save preserves Private status and does not change seasonal/shop controls.
+                </small>
+              ) : (
+                <div style={{fontSize:12,color:"rgba(255,255,255,0.55)",lineHeight:1.45}} data-testid="product-editor-visibility-status">
+                  {productModal === "new"
+                    ? "New products are created Public (active=1) unless you change visibility from the products list after save."
+                    : ("Visibility: active=" + String(Number(productModal?.active) === 1 ? 1 : 0) + ", shop_listed=" + String(Number(productModal?.shop_listed) === 0 ? 0 : 1) + ". Use list actions or Seasonal settings for Make Public/Private and shop listing.")}
+                </div>
+              )}
+            </CollapsibleSection>
 
             <div className="modal-actions">
               <button
@@ -5019,39 +5116,22 @@ export default function AdminPage() {
             <div className="sidebar-logo-text">FIRESTICK4UK</div>
             <div className="sidebar-label">Admin Panel</div>
           </div>
-          <nav className="sidebar-nav">
-            {([
-              { id:"dashboard", icon:"📊", label:"Dashboard", roles:["super_admin","manager","writer"] },
-              { id:"orders",    icon:"🛒", label:"Orders",       badge: pendingCount > 0 ? String(pendingCount) : null, badgeColor:"orange", roles:["super_admin","manager"] },
-              { id:"products",  icon:"📦", label:"Products",     roles:["super_admin","manager"] },
-              { id:"customers", icon:"👥", label:"Customers",    roles:["super_admin","manager"] },
-              { id:"leads",     icon:"💬", label:"Leads",        badge: leadsLast24 > 0 ? String(leadsLast24) : null, badgeColor:"orange", roles:["super_admin","manager"] },
-              { id:"reviews",   icon:"⭐", label:"Reviews",      badge: reviewsPendingCount > 0 ? String(reviewsPendingCount) : null, badgeColor:"orange", roles:["super_admin","manager"] },
-              { id:"blog",      icon:"📝", label:"Blog",         roles:["super_admin","manager","writer"] },
-              { id:"seo",       icon:"🔎", label:"SEO",          roles:["super_admin","manager","writer"] },
-              { id:"redirects", icon:"↪️", label:"Redirects",    roles:["super_admin"] },
-              { id:"insights",  icon:"📈", label:"Insights",     roles:["super_admin","manager"] },
-              { id:"media",     icon:"🖼️", label:"Media Library", roles:["super_admin","manager","writer"] },
-              { id:"history",   icon:"🕘", label:"History", roles:["super_admin","manager","writer"] },
-              { id:"coupons",   icon:"🎟️", label:"Coupons",      roles:["super_admin"] },
-              { id:"builder",   icon:"🎨", label:"Page Builder", roles:["super_admin","manager"] },
-              { id:"faqadmin",  icon:"❓", label:"FAQs",         roles:["super_admin","manager"] },
-              { id:"pages",     icon:"✏️", label:"Content Editor", roles:["super_admin","manager"] },
-              { id:"staff",     icon:"👤", label:"Staff Users",  roles:["super_admin"] },
-              { id:"audit",     icon:"📜", label:"Activity Log", roles:["super_admin"] },
-              { id:"settings",  icon:"⚙️", label:"Site Settings",roles:["super_admin"] },
-            ] as const).filter(item => item.id === "insights" ? hasAdminPermission(adminRole, "insights.view") : canAccessSidhuTab(adminRole, item.id as SidhuTab)).map(item => (
-              <button key={item.id} className={`nav-item ${tab===item.id?"active":""}`} onClick={() => {
-                if (item.id === "history") setHistoryFilter(null);
-                requestTab(item.id);
-                setSidebarOpen(false);
-              }}>
-                <span className="nav-icon">{item.icon}</span>
-                {item.label}
-                {"badge" in item && item.badge && <span className={`nav-badge ${item.badgeColor||""}`}>{item.badge}</span>}
-              </button>
-            ))}
-          </nav>
+          <AdminSidebarNav
+            tab={tab}
+            adminRole={adminRole}
+            badges={{
+              orders: pendingCount > 0 ? String(pendingCount) : null,
+              leads: leadsLast24 > 0 ? String(leadsLast24) : null,
+              reviews: reviewsPendingCount > 0 ? String(reviewsPendingCount) : null,
+            }}
+            requestTab={(id) => {
+              if (id === "history") setHistoryFilter(null);
+              requestTab(id);
+            }}
+            onCloseMobile={() => setSidebarOpen(false)}
+            onOpenSeasonalWizard={() => setSeasonalWizardOpen(true)}
+            canManageProducts={can("products.manage")}
+          />
           <div className="sidebar-footer" style={{padding:"12px 10px"}}>
             <div style={{fontSize:11,color:"rgba(255,255,255,0.3)",textAlign:"center",letterSpacing:"1px"}}>FIRESTICK4UK ADMIN</div>
           </div>
@@ -6600,176 +6680,10 @@ export default function AdminPage() {
               <div className="section-header" style={{marginBottom:24}}>
                 <div className="section-title">Site Settings</div>
               </div>
-
-              {adminRole === "super_admin" && (
-                <div
-                  data-testid="server-runtime-panel"
-                  style={{
-                    marginBottom: 28,
-                    padding: 18,
-                    borderRadius: 12,
-                    border: "1px solid #E5E5E5",
-                    background: "#FAFAFA",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "#111" }}>Server</div>
-                      <div style={{ fontSize: 12, color: "#666", marginTop: 4, lineHeight: 1.45 }}>
-                        Read-only process threads for this hosting account. Plan limit: 200 threads (static). Refresh at most every 30 seconds.
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      disabled={
-                        serverRuntimeLoading ||
-                        (serverRuntimeCooldownUntil > 0 && serverRuntimeNow < serverRuntimeCooldownUntil)
-                      }
-                      onClick={() => loadServerRuntime()}
-                      data-testid="server-runtime-refresh"
-                    >
-                      {serverRuntimeLoading ? "Refreshing…" : "Refresh"}
-                    </button>
-                  </div>
-                  {serverRuntimeError && (
-                    <div style={{ fontSize: 13, color: "#b91c1c", marginBottom: 10 }}>{serverRuntimeError}</div>
-                  )}
-                  {serverRuntime && serverRuntime.available === false && (
-                    <div style={{ fontSize: 13, color: "#666" }}>/proc is not available on this host.</div>
-                  )}
-                  {serverRuntime && serverRuntime.available !== false && serverRuntime.self && (
-                    <>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
-                          gap: 10,
-                          marginBottom: 14,
-                        }}
-                      >
-                        {[
-                          ["PID", serverRuntime.self.pid],
-                          ["Node", serverRuntime.self.node],
-                          ["Uptime (s)", serverRuntime.self.uptimeSec],
-                          ["Threads", serverRuntime.self.threads],
-                          ["RSS (MB)", serverRuntime.self.memory?.rssMb],
-                          ["Heap (MB)", serverRuntime.self.memory?.heapUsedMb],
-                          ["CPUs", serverRuntime.self.cpuCount],
-                          ["Load", Array.isArray(serverRuntime.self.loadavg) ? serverRuntime.self.loadavg.map((n: number) => Number(n).toFixed(2)).join(" / ") : "—"],
-                        ].map(([label, value]) => (
-                          <div key={String(label)} style={{ background: "#fff", border: "1px solid #EEE", borderRadius: 8, padding: "10px 12px" }}>
-                            <div style={{ fontSize: 11, color: "#888" }}>{label}</div>
-                            <div style={{ fontSize: 14, fontWeight: 650, color: "#111", marginTop: 2 }}>{String(value ?? "—")}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ fontSize: 13, marginBottom: 10, color: "#111" }}>
-                        Account threads: <strong>{serverRuntime.totalThreads ?? 0}</strong>
-                        {" / "}
-                        plan limit <strong>{serverRuntime.planThreadLimit ?? 200}</strong>
-                      </div>
-                      <div style={{ overflowX: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: "#fff" }} data-testid="server-runtime-table">
-                          <thead>
-                            <tr style={{ textAlign: "left", borderBottom: "1px solid #E5E5E5", color: "#666" }}>
-                              <th style={{ padding: "8px 6px" }}>PID</th>
-                              <th style={{ padding: "8px 6px" }}>Name</th>
-                              <th style={{ padding: "8px 6px" }}>Threads</th>
-                              <th style={{ padding: "8px 6px" }}>RSS (MB)</th>
-                              <th style={{ padding: "8px 6px" }}>Site</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(() => {
-                              const rows = Array.isArray(serverRuntime.processes) ? [...serverRuntime.processes] : [];
-                              const groups = new Map<string, any[]>();
-                              for (const row of rows) {
-                                const key = row.site || "(no site)";
-                                if (!groups.has(key)) groups.set(key, []);
-                                groups.get(key)!.push(row);
-                              }
-                              for (const list of groups.values()) {
-                                list.sort((a: any, b: any) => (b.threads || 0) - (a.threads || 0) || a.pid - b.pid);
-                              }
-                              return [...groups.entries()]
-                                .sort((a, b) => {
-                                  const maxA = Math.max(0, ...a[1].map((r: any) => r.threads || 0));
-                                  const maxB = Math.max(0, ...b[1].map((r: any) => r.threads || 0));
-                                  return maxB - maxA || a[0].localeCompare(b[0]);
-                                })
-                                .flatMap(([, list]) => list);
-                            })()
-                              .map((row: any) => (
-                                <tr key={row.pid} style={{ borderBottom: "1px solid #F0F0F0" }}>
-                                  <td style={{ padding: "7px 6px" }}>{row.pid}</td>
-                                  <td style={{ padding: "7px 6px" }}>{row.name}</td>
-                                  <td style={{ padding: "7px 6px" }}>{row.threads}</td>
-                                  <td style={{ padding: "7px 6px" }}>{row.vmRssMb}</td>
-                                  <td style={{ padding: "7px 6px" }}>{row.site || "—"}</td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </>
-                  )}
-                  {serverRuntime?.requestIpChain && (
-                    <div
-                      data-testid="request-ip-chain"
-                      style={{
-                        marginTop: 16,
-                        padding: 14,
-                        borderRadius: 8,
-                        border: "1px solid #EEE",
-                        background: "#fff",
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, fontSize: 13, color: "#111", marginBottom: 6 }}>
-                        Request IP chain (your request)
-                      </div>
-                      <div style={{ fontSize: 12, color: "#666", marginBottom: 10, lineHeight: 1.45 }}>
-                        Read-only diagnostic for this page load only. Not logged or stored. Shows your own request headers.
-                      </div>
-                      <div style={{ fontSize: 12, color: "#111", lineHeight: 1.55, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }}>
-                        <div>
-                          <span style={{ color: "#888" }}>Selected client IP (rate-limit key):</span>{" "}
-                          {serverRuntime.requestIpChain.selectedClientIp || "—"}
-                        </div>
-                        <div>
-                          <span style={{ color: "#888" }}>X-Forwarded-For:</span>{" "}
-                          {serverRuntime.requestIpChain.xForwardedFor || "—"}
-                        </div>
-                        <div>
-                          <span style={{ color: "#888" }}>X-Real-IP:</span>{" "}
-                          {serverRuntime.requestIpChain.xRealIp || "—"}
-                        </div>
-                        <div>
-                          <span style={{ color: "#888" }}>socket.remoteAddress:</span>{" "}
-                          {serverRuntime.requestIpChain.remoteAddress || "—"}
-                        </div>
-                        <div style={{ marginTop: 6 }}>
-                          <span style={{ color: "#888" }}>CDN client-IP headers:</span>
-                          {Array.isArray(serverRuntime.requestIpChain.cdnClientIpHeaders) &&
-                          serverRuntime.requestIpChain.cdnClientIpHeaders.length > 0 ? (
-                            <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
-                              {serverRuntime.requestIpChain.cdnClientIpHeaders.map(
-                                (h: { name: string; value: string }) => (
-                                  <li key={h.name}>
-                                    {h.name}: {h.value}
-                                  </li>
-                                )
-                              )}
-                            </ul>
-                          ) : (
-                            <span> none present</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}} data-testid="settings-section-toolbar">
+                <button type="button" className="action-btn btn-view" data-testid="settings-expand-all" style={{padding:"6px 12px",fontSize:12}} onClick={() => setSettingsSectionOpen({branding:true,hero_slides:true,contact_whatsapp:true,vat_pricing:true,seasonal_offers:true,reviews:true,tracking_ads:true,server:true,other:true})}>Expand all</button>
+                <button type="button" className="action-btn btn-view" data-testid="settings-collapse-all" style={{padding:"6px 12px",fontSize:12}} onClick={() => setSettingsSectionOpen({branding:false,hero_slides:false,contact_whatsapp:false,vat_pricing:false,seasonal_offers:false,reviews:false,tracking_ads:false,server:false,other:false})}>Collapse all</button>
+              </div>
 
               {contentMsg && (
                 <div
@@ -6788,6 +6702,13 @@ export default function AdminPage() {
               )}
 
               <div style={{maxWidth:600}}>
+                <CollapsibleSection
+                title={SITE_SETTINGS_SECTION_TITLES.branding}
+                open={!!settingsSectionOpen.branding}
+                onToggle={() => setSettingsSectionOpen(st => ({...st, branding: !st.branding}))}
+                fieldCount={6}
+                testId="settings-section-branding"
+              >
                 <div className="modal-field"><label>Website Title</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_title||""} onChange={e=>setSiteContent(s=>({...s,site_title:e.target.value}))} placeholder="Firestick4UK" /></div>
                 <div className="modal-field"><label>Website Tagline</label><input className="modal-field" style={{width:"100%"}} value={siteContent.site_tagline||""} onChange={e=>setSiteContent(s=>({...s,site_tagline:e.target.value}))} placeholder="Best Firestick Service in UK" /></div>
                 <div className="modal-field">
@@ -6972,68 +6893,14 @@ export default function AdminPage() {
                   )}
                 </div>
 
-                <div className="modal-field" style={{marginTop:8}}>
-                  <label>WhatsApp Button Icon (PNG)</label>
-                  <p data-cms-appears-on="whatsapp_icon_url" style={{fontSize:11,color:"#9CA3AF",margin:"0 0 6px"}}>{formatCmsAppearsOnHint("whatsapp_icon_url")}</p>
-                  <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
-                    Recommended: <strong>512×512px PNG</strong>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
-                    {siteContent.whatsapp_icon_url ? (
-                      <img
-                        key={siteContent.whatsapp_icon_url}
-                        src={siteContent.whatsapp_icon_url}
-                        alt="WhatsApp icon"
-                        style={{width:60,height:60,borderRadius:"50%",border:"1px solid #E5E5E5",objectFit:"cover",background:"#fff"}}
-                      />
-                    ) : (
-                      <div style={{width:60,height:60,borderRadius:"50%",border:"1px dashed #CCC",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#AAA",background:"#FAFAFA"}}>
-                        None
-                      </div>
-                    )}
-                    <label style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}>
-                      {waIconUploading ? "Uploading..." : "UPLOAD ICON"}
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        style={{display:"none"}}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) uploadWhatsAppIconAdmin(f);
-                          e.target.value = "";
-                        }}
-                        disabled={waIconUploading}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}
-                      onClick={() => setMediaPicker({
-                        purposes: ["whatsapp"],
-                        title: "Choose WhatsApp Icon",
-                        onSelect: (asset) => setSiteContent((s) => ({ ...s, whatsapp_icon_url: asset.url })),
-                      })}
-                    >
-                      Choose from Library
-                    </button>
-                    {siteContent.whatsapp_icon_url && (
-                      <button
-                        type="button"
-                        style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:12}}
-                        onClick={() => {
-                          setSiteContent((s) => ({ ...s, whatsapp_icon_url: "" }));
-                          saveContent(["whatsapp_icon_url"]);
-                        }}
-                      >
-                        ✕ Remove
-                      </button>
-                    )}
-                  </div>
-                  {siteContent.whatsapp_icon_url && (
-                    <div style={{fontSize:11,color:"#888",marginTop:8,wordBreak:"break-all"}}>{siteContent.whatsapp_icon_url}</div>
-                  )}
-                </div>
-
+</CollapsibleSection>
+                <CollapsibleSection
+                title={SITE_SETTINGS_SECTION_TITLES.hero_slides}
+                open={!!settingsSectionOpen.hero_slides}
+                onToggle={() => setSettingsSectionOpen(st => ({...st, hero_slides: !st.hero_slides}))}
+                fieldCount={4}
+                testId="settings-section-hero_slides"
+              >
                 <div className="modal-field" style={{marginTop:24,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
                   <label style={{fontSize:15,fontWeight:700,marginBottom:6,display:"block"}}>🖼️ Hero Slider Images</label>
                   <p data-cms-appears-on="hero_slide_1" style={{fontSize:11,color:"#9CA3AF",margin:"0 0 6px"}}>{formatCmsAppearsOnHint("hero_slide_1")}</p>
@@ -7111,6 +6978,77 @@ export default function AdminPage() {
                     {contentSaving ? "Saving..." : "💾 Save All Slides"}
                   </button>
                 </div>
+
+</CollapsibleSection>
+                <CollapsibleSection
+                title={SITE_SETTINGS_SECTION_TITLES.contact_whatsapp}
+                open={!!settingsSectionOpen.contact_whatsapp}
+                onToggle={() => setSettingsSectionOpen(st => ({...st, contact_whatsapp: !st.contact_whatsapp}))}
+                fieldCount={6}
+                testId="settings-section-contact_whatsapp"
+              >
+                <div className="modal-field" style={{marginTop:8}}>
+                  <label>WhatsApp Button Icon (PNG)</label>
+                  <p data-cms-appears-on="whatsapp_icon_url" style={{fontSize:11,color:"#9CA3AF",margin:"0 0 6px"}}>{formatCmsAppearsOnHint("whatsapp_icon_url")}</p>
+                  <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
+                    Recommended: <strong>512×512px PNG</strong>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+                    {siteContent.whatsapp_icon_url ? (
+                      <img
+                        key={siteContent.whatsapp_icon_url}
+                        src={siteContent.whatsapp_icon_url}
+                        alt="WhatsApp icon"
+                        style={{width:60,height:60,borderRadius:"50%",border:"1px solid #E5E5E5",objectFit:"cover",background:"#fff"}}
+                      />
+                    ) : (
+                      <div style={{width:60,height:60,borderRadius:"50%",border:"1px dashed #CCC",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#AAA",background:"#FAFAFA"}}>
+                        None
+                      </div>
+                    )}
+                    <label style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}>
+                      {waIconUploading ? "Uploading..." : "UPLOAD ICON"}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        style={{display:"none"}}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadWhatsAppIconAdmin(f);
+                          e.target.value = "";
+                        }}
+                        disabled={waIconUploading}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}
+                      onClick={() => setMediaPicker({
+                        purposes: ["whatsapp"],
+                        title: "Choose WhatsApp Icon",
+                        onSelect: (asset) => setSiteContent((s) => ({ ...s, whatsapp_icon_url: asset.url })),
+                      })}
+                    >
+                      Choose from Library
+                    </button>
+                    {siteContent.whatsapp_icon_url && (
+                      <button
+                        type="button"
+                        style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:12}}
+                        onClick={() => {
+                          setSiteContent((s) => ({ ...s, whatsapp_icon_url: "" }));
+                          saveContent(["whatsapp_icon_url"]);
+                        }}
+                      >
+                        ✕ Remove
+                      </button>
+                    )}
+                  </div>
+                  {siteContent.whatsapp_icon_url && (
+                    <div style={{fontSize:11,color:"#888",marginTop:8,wordBreak:"break-all"}}>{siteContent.whatsapp_icon_url}</div>
+                  )}
+                </div>
+
 
                 <div style={{marginTop:28,paddingTop:24,borderTop:"1px solid #E5E5E5"}}>
                   <div style={{fontSize:15,fontWeight:700,color:"#111",marginBottom:16}}>📞 Contact Details</div>
@@ -7195,47 +7133,14 @@ export default function AdminPage() {
                     {contentMsg}
                   </div>
                 )}
-                <div className="modal-field" style={{marginTop:24,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
-                  <label style={{fontWeight:700,fontSize:14,color:"#111"}}>Tracking</label>
-                  <div style={{fontSize:11,color:"#888888",marginBottom:12,lineHeight:1.5}}>
-                    Google Ads conversion labels. Paste only the label part after AW-18404353244/. Empty or invalid labels disable that conversion. Fires only after the visitor accepts advertising cookies; never on /sidhu.
-                  </div>
-                  <div className="modal-field">
-                    <label>Ads conversion label — Website order (purchase)</label>
-                    <input
-                      className="modal-field"
-                      style={{width:"100%"}}
-                      value={siteContent.ads_conv_label_purchase || ""}
-                      onChange={(e) =>
-                        setSiteContent((s) => ({
-                          ...s,
-                          ads_conv_label_purchase: e.target.value.trim(),
-                        }))
-                      }
-                      placeholder="Paste only the label part after AW-18404353244/"
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </div>
-                  <div className="modal-field">
-                    <label>Ads conversion label — WhatsApp contact</label>
-                    <input
-                      className="modal-field"
-                      style={{width:"100%"}}
-                      value={siteContent.ads_conv_label_whatsapp || ""}
-                      onChange={(e) =>
-                        setSiteContent((s) => ({
-                          ...s,
-                          ads_conv_label_whatsapp: e.target.value.trim(),
-                        }))
-                      }
-                      placeholder="Paste only the label part after AW-18404353244/"
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </div>
-                </div>
-
+</CollapsibleSection>
+                <CollapsibleSection
+                title={SITE_SETTINGS_SECTION_TITLES.seasonal_offers}
+                open={!!settingsSectionOpen.seasonal_offers}
+                onToggle={() => setSettingsSectionOpen(st => ({...st, seasonal_offers: !st.seasonal_offers}))}
+                fieldCount={1}
+                testId="settings-section-seasonal_offers"
+              >
                 <div
                   data-testid="seasonal-hub-publish-control"
                   style={{
@@ -7277,6 +7182,14 @@ export default function AdminPage() {
                   </button>
                 </div>
 
+</CollapsibleSection>
+                <CollapsibleSection
+                title={SITE_SETTINGS_SECTION_TITLES.vat_pricing}
+                open={!!settingsSectionOpen.vat_pricing}
+                onToggle={() => setSettingsSectionOpen(st => ({...st, vat_pricing: !st.vat_pricing}))}
+                fieldCount={1}
+                testId="settings-section-vat_pricing"
+              >
                 <div
                   data-testid="prices-include-vat-control"
                   style={{
@@ -7319,6 +7232,14 @@ export default function AdminPage() {
                   </button>
                 </div>
 
+</CollapsibleSection>
+                <CollapsibleSection
+                title={SITE_SETTINGS_SECTION_TITLES.reviews}
+                open={!!settingsSectionOpen.reviews}
+                onToggle={() => setSettingsSectionOpen(st => ({...st, reviews: !st.reviews}))}
+                fieldCount={2}
+                testId="settings-section-reviews"
+              >
                 <div
                   data-testid="reviews-settings-control"
                   style={{
@@ -7372,6 +7293,234 @@ export default function AdminPage() {
                     {contentSaving ? "Saving..." : "Save review settings"}
                   </button>
                 </div>
+</CollapsibleSection>
+                <CollapsibleSection
+                title={SITE_SETTINGS_SECTION_TITLES.tracking_ads}
+                open={!!settingsSectionOpen.tracking_ads}
+                onToggle={() => setSettingsSectionOpen(st => ({...st, tracking_ads: !st.tracking_ads}))}
+                fieldCount={2}
+                testId="settings-section-tracking_ads"
+              >
+                <div className="modal-field" style={{marginTop:24,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
+                  <label style={{fontWeight:700,fontSize:14,color:"#111"}}>Tracking</label>
+                  <div style={{fontSize:11,color:"#888888",marginBottom:12,lineHeight:1.5}}>
+                    Google Ads conversion labels. Paste only the label part after AW-18404353244/. Empty or invalid labels disable that conversion. Fires only after the visitor accepts advertising cookies; never on /sidhu.
+                  </div>
+                  <div className="modal-field">
+                    <label>Ads conversion label — Website order (purchase)</label>
+                    <input
+                      className="modal-field"
+                      style={{width:"100%"}}
+                      value={siteContent.ads_conv_label_purchase || ""}
+                      onChange={(e) =>
+                        setSiteContent((s) => ({
+                          ...s,
+                          ads_conv_label_purchase: e.target.value.trim(),
+                        }))
+                      }
+                      placeholder="Paste only the label part after AW-18404353244/"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </div>
+                  <div className="modal-field">
+                    <label>Ads conversion label — WhatsApp contact</label>
+                    <input
+                      className="modal-field"
+                      style={{width:"100%"}}
+                      value={siteContent.ads_conv_label_whatsapp || ""}
+                      onChange={(e) =>
+                        setSiteContent((s) => ({
+                          ...s,
+                          ads_conv_label_whatsapp: e.target.value.trim(),
+                        }))
+                      }
+                      placeholder="Paste only the label part after AW-18404353244/"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </div>
+                </div>
+
+</CollapsibleSection>
+
+                {adminRole === "super_admin" && (
+                <CollapsibleSection
+                title={SITE_SETTINGS_SECTION_TITLES.server}
+                open={!!settingsSectionOpen.server}
+                onToggle={() => setSettingsSectionOpen(st => ({...st, server: !st.server}))}
+                fieldCount={1}
+                testId="settings-section-server"
+              >
+                <div
+                  data-testid="server-runtime-panel"
+                  style={{
+                    marginBottom: 28,
+                    padding: 18,
+                    borderRadius: 12,
+                    border: "1px solid #E5E5E5",
+                    background: "#FAFAFA",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: "#111" }}>Server</div>
+                      <div style={{ fontSize: 12, color: "#666", marginTop: 4, lineHeight: 1.45 }}>
+                        Read-only process threads for this hosting account. Plan limit: 200 threads (static). Refresh at most every 30 seconds.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={
+                        serverRuntimeLoading ||
+                        (serverRuntimeCooldownUntil > 0 && serverRuntimeNow < serverRuntimeCooldownUntil)
+                      }
+                      onClick={() => loadServerRuntime()}
+                      data-testid="server-runtime-refresh"
+                    >
+                      {serverRuntimeLoading ? "Refreshing…" : "Refresh"}
+                    </button>
+                  </div>
+                  {serverRuntimeError && (
+                    <div style={{ fontSize: 13, color: "#b91c1c", marginBottom: 10 }}>{serverRuntimeError}</div>
+                  )}
+                  {serverRuntime && serverRuntime.available === false && (
+                    <div style={{ fontSize: 13, color: "#666" }}>/proc is not available on this host.</div>
+                  )}
+                  {serverRuntime && serverRuntime.available !== false && serverRuntime.self && (
+                    <>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
+                          gap: 10,
+                          marginBottom: 14,
+                        }}
+                      >
+                        {[
+                          ["PID", serverRuntime.self.pid],
+                          ["Node", serverRuntime.self.node],
+                          ["Uptime (s)", serverRuntime.self.uptimeSec],
+                          ["Threads", serverRuntime.self.threads],
+                          ["RSS (MB)", serverRuntime.self.memory?.rssMb],
+                          ["Heap (MB)", serverRuntime.self.memory?.heapUsedMb],
+                          ["CPUs", serverRuntime.self.cpuCount],
+                          ["Load", Array.isArray(serverRuntime.self.loadavg) ? serverRuntime.self.loadavg.map((n: number) => Number(n).toFixed(2)).join(" / ") : "—"],
+                        ].map(([label, value]) => (
+                          <div key={String(label)} style={{ background: "#fff", border: "1px solid #EEE", borderRadius: 8, padding: "10px 12px" }}>
+                            <div style={{ fontSize: 11, color: "#888" }}>{label}</div>
+                            <div style={{ fontSize: 14, fontWeight: 650, color: "#111", marginTop: 2 }}>{String(value ?? "—")}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 13, marginBottom: 10, color: "#111" }}>
+                        Account threads: <strong>{serverRuntime.totalThreads ?? 0}</strong>
+                        {" / "}
+                        plan limit <strong>{serverRuntime.planThreadLimit ?? 200}</strong>
+                      </div>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: "#fff" }} data-testid="server-runtime-table">
+                          <thead>
+                            <tr style={{ textAlign: "left", borderBottom: "1px solid #E5E5E5", color: "#666" }}>
+                              <th style={{ padding: "8px 6px" }}>PID</th>
+                              <th style={{ padding: "8px 6px" }}>Name</th>
+                              <th style={{ padding: "8px 6px" }}>Threads</th>
+                              <th style={{ padding: "8px 6px" }}>RSS (MB)</th>
+                              <th style={{ padding: "8px 6px" }}>Site</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              const rows = Array.isArray(serverRuntime.processes) ? [...serverRuntime.processes] : [];
+                              const groups = new Map<string, any[]>();
+                              for (const row of rows) {
+                                const key = row.site || "(no site)";
+                                if (!groups.has(key)) groups.set(key, []);
+                                groups.get(key)!.push(row);
+                              }
+                              for (const list of groups.values()) {
+                                list.sort((a: any, b: any) => (b.threads || 0) - (a.threads || 0) || a.pid - b.pid);
+                              }
+                              return [...groups.entries()]
+                                .sort((a, b) => {
+                                  const maxA = Math.max(0, ...a[1].map((r: any) => r.threads || 0));
+                                  const maxB = Math.max(0, ...b[1].map((r: any) => r.threads || 0));
+                                  return maxB - maxA || a[0].localeCompare(b[0]);
+                                })
+                                .flatMap(([, list]) => list);
+                            })()
+                              .map((row: any) => (
+                                <tr key={row.pid} style={{ borderBottom: "1px solid #F0F0F0" }}>
+                                  <td style={{ padding: "7px 6px" }}>{row.pid}</td>
+                                  <td style={{ padding: "7px 6px" }}>{row.name}</td>
+                                  <td style={{ padding: "7px 6px" }}>{row.threads}</td>
+                                  <td style={{ padding: "7px 6px" }}>{row.vmRssMb}</td>
+                                  <td style={{ padding: "7px 6px" }}>{row.site || "—"}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                  {serverRuntime?.requestIpChain && (
+                    <div
+                      data-testid="request-ip-chain"
+                      style={{
+                        marginTop: 16,
+                        padding: 14,
+                        borderRadius: 8,
+                        border: "1px solid #EEE",
+                        background: "#fff",
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: 13, color: "#111", marginBottom: 6 }}>
+                        Request IP chain (your request)
+                      </div>
+                      <div style={{ fontSize: 12, color: "#666", marginBottom: 10, lineHeight: 1.45 }}>
+                        Read-only diagnostic for this page load only. Not logged or stored. Shows your own request headers.
+                      </div>
+                      <div style={{ fontSize: 12, color: "#111", lineHeight: 1.55, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }}>
+                        <div>
+                          <span style={{ color: "#888" }}>Selected client IP (rate-limit key):</span>{" "}
+                          {serverRuntime.requestIpChain.selectedClientIp || "—"}
+                        </div>
+                        <div>
+                          <span style={{ color: "#888" }}>X-Forwarded-For:</span>{" "}
+                          {serverRuntime.requestIpChain.xForwardedFor || "—"}
+                        </div>
+                        <div>
+                          <span style={{ color: "#888" }}>X-Real-IP:</span>{" "}
+                          {serverRuntime.requestIpChain.xRealIp || "—"}
+                        </div>
+                        <div>
+                          <span style={{ color: "#888" }}>socket.remoteAddress:</span>{" "}
+                          {serverRuntime.requestIpChain.remoteAddress || "—"}
+                        </div>
+                        <div style={{ marginTop: 6 }}>
+                          <span style={{ color: "#888" }}>CDN client-IP headers:</span>
+                          {Array.isArray(serverRuntime.requestIpChain.cdnClientIpHeaders) &&
+                          serverRuntime.requestIpChain.cdnClientIpHeaders.length > 0 ? (
+                            <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                              {serverRuntime.requestIpChain.cdnClientIpHeaders.map(
+                                (h: { name: string; value: string }) => (
+                                  <li key={h.name}>
+                                    {h.name}: {h.value}
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          ) : (
+                            <span> none present</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                </CollapsibleSection>
+                )}
                 <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_meta_description","site_logo_url","og_default_image","whatsapp_icon_url","ads_conv_label_purchase","ads_conv_label_whatsapp"])}>                  {contentSaving?"Saving...":"💾 Save Settings"}
                 </button>
               </div>
@@ -7656,6 +7805,7 @@ export default function AdminPage() {
                       onSave={saveContent}
                       saving={contentSaving}
                       saveLabel="💾 Save Home Labels"
+                    savedContent={siteContentSaved}
                     />
                   </div>
                 </div>
@@ -7692,6 +7842,7 @@ export default function AdminPage() {
                       onSave={saveContent}
                       saving={contentSaving}
                       saveLabel="💾 Save About Labels"
+                    savedContent={siteContentSaved}
                     />
                   </div>
                 </div>
@@ -7733,6 +7884,7 @@ export default function AdminPage() {
                       onSave={saveContent}
                       saving={contentSaving}
                       saveLabel="💾 Save Contact Labels"
+                    savedContent={siteContentSaved}
                     />
                   </div>
                 </div>
@@ -7827,6 +7979,7 @@ export default function AdminPage() {
                       onSave={saveContent}
                       saving={contentSaving}
                       saveLabel="💾 Save Cart Labels"
+                    savedContent={siteContentSaved}
                     />
                   </div>
                 </div>
@@ -7841,7 +7994,8 @@ export default function AdminPage() {
                     setSiteContent={setSiteContent}
                     onSave={saveContent}
                     saving={contentSaving}
-                  />
+                    savedContent={siteContentSaved}
+                    />
                 </div>
               )}
             </div>

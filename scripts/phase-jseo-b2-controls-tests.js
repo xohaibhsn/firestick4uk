@@ -87,7 +87,11 @@ ok(
 );
 ok(
   "save_payload_includes_og_image",
-  /og_image:\s*editProduct\.og_image\s*\|\|\s*""/.test(sidhu)
+  /og_image:\s*editProduct\.og_image\s*\|\|\s*""/.test(sidhu) ||
+    (/buildProductEditorSavePayload/.test(sidhu) &&
+      /og_image:\s*editProduct\.og_image\s*\|\|\s*""/.test(
+        read("lib/productEditorSavePayload.ts")
+      ))
 );
 ok(
   "og_ui_label_present",

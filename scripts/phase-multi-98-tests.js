@@ -205,7 +205,15 @@ ok("manager_no_settings", !perms.hasAdminPermission("manager", "settings.manage"
 ok("manager_no_staff", !perms.hasAdminPermission("manager", "staff.manage"));
 ok("writer_no_settings", !perms.hasAdminPermission("writer", "settings.manage"));
 ok("sa_has_settings", perms.hasAdminPermission("super_admin", "settings.manage"));
-ok("builder_tab_manager", /id:"builder"[\s\S]{0,80}manager/.test(sidhu));
+// MULTI-102: builder lives in lib/adminSidebarGroups (Content group); access via canAccessSidhuTab.
+const sidebarGroupsSrc = read("lib/adminSidebarGroups.ts");
+ok(
+  "builder_tab_manager",
+  /id:\s*"builder"/.test(sidebarGroupsSrc) &&
+    /AdminSidebarNav/.test(sidhu) &&
+    perms.canAccessSidhuTab("manager", "builder") &&
+    !perms.canAccessSidhuTab("writer", "builder")
+);
 
 const sectionsSrc = read("pages/api/sections.ts");
 ok(
