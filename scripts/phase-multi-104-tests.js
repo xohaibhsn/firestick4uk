@@ -251,7 +251,7 @@ function sqlTable(sql) {
       { match: (sql) => sqlTable(sql) === "products", result: [[{ id: 3, name: "Fire Stick 4K", slug: "firestick-4k" }]] },
       { match: (sql) => sqlTable(sql) === "blog_posts", result: [[{ id: 7, title: "Guide", status: "draft" }]] },
       { match: (sql) => sqlTable(sql) === "faqs", result: [[{ id: 2, question: "How to install?" }]] },
-      { match: (sql) => sqlTable(sql) === "reviews", result: [[{ id: 9, display_name: "Sam", status: "approved" }]] },
+      { match: (sql) => sqlTable(sql) === "customer_reviews", result: [[{ id: 9, display_name: "Sam", status: "approved" }]] },
     ]);
     const { handler } = loadSearchHandler({ pool, role: "super_admin" });
     const res = makeRes();
@@ -268,6 +268,7 @@ function sqlTable(sql) {
     ok("A2_customer_display_name", g.customers && g.customers[0].display_name === "Jane Doe");
     ok("A2_product_shape", g.products && g.products[0].type === "product" && g.products[0].slug === "firestick-4k");
     ok("A2_faq_shape", g.faqs && g.faqs[0].type === "faq" && g.faqs[0].question === "How to install?");
+    ok("A2_reviews_table_customer_reviews", /FROM customer_reviews/.test(searchSrc));
     ok("A2_review_shape", g.reviews && g.reviews[0].type === "review" && g.reviews[0].name === "Sam");
     ok("A2_limit_param_is_6", pool.calls.every((c) => Array.isArray(c.params) && c.params[c.params.length - 1] === 6));
   }
@@ -341,7 +342,7 @@ function sqlTable(sql) {
     ok("A2_unauth_401_no_db_no_rl", res.statusCode === 401 && pool.calls.length === 0 && rlCalls.length === 0);
   }
 
-  // A2g generic 500, no leak
+  // A2g per-group DB failure → empty groups (200), no leak; outer catch still present in source
   {
     const secret = "ER_ACCESS_DENIED secret-host.internal";
     const pool = makePool([{ match: () => true, throw: Object.assign(new Error(secret), { code: "ER_X" }) }]);
@@ -354,8 +355,16 @@ function sqlTable(sql) {
     } finally {
       console.error = origErr;
     }
-    ok("A2_500_generic", res.statusCode === 500 && res.body.error === "Request failed");
+    ok(
+      "A2_group_fail_resilient_200",
+      res.statusCode === 200 &&
+        res.body.groups &&
+        ["orders", "customers", "products", "blog", "faqs", "reviews"].every(
+          (k) => Array.isArray(res.body.groups[k]) && res.body.groups[k].length === 0
+        )
+    );
     ok("A2_500_no_leak", !JSON.stringify(res.body).includes("secret-host") && !JSON.stringify(res.body).includes("ER_"));
+    ok("A2_outer_500_catch_present", /Request failed/.test(searchSrc) && /\[admin-search\] failed/.test(searchSrc));
   }
 
   // =========================================================================

@@ -148,7 +148,7 @@ const GROUPS: GroupDef[] = [
     run: async (like) => {
       const [rows]: any = await pool.query(
         `SELECT id, display_name, status
-         FROM reviews
+         FROM customer_reviews
          WHERE display_name LIKE ? OR CAST(id AS CHAR) LIKE ?
          ORDER BY id DESC
          LIMIT ?`,
@@ -194,7 +194,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await Promise.all(
       GROUPS.map(async (g) => {
         if (!hasAdminPermission(role, g.permission)) return;
-        groups[g.key] = await g.run(like, q);
+        try {
+          groups[g.key] = await g.run(like, q);
+        } catch (groupErr: any) {
+          const errCode = typeof groupErr?.code === "string" ? groupErr.code : undefined;
+          const errName = typeof groupErr?.name === "string" ? groupErr.name : "Error";
+          console.error("[admin-search] group failed", g.key, errCode || errName);
+          groups[g.key] = [];
+        }
       })
     );
 
