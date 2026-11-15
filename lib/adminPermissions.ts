@@ -29,7 +29,8 @@ export type AdminPermission =
   | "redirects.manage"
   | "insights.view"
   | "insights.export"
-  | "insights.settings";
+  | "insights.settings"
+  | "reviews.manage";
 
 export type SidhuTab =
   | "dashboard"
@@ -48,7 +49,8 @@ export type SidhuTab =
   | "media"
   | "history"
   | "seo"
-  | "redirects";
+  | "redirects"
+  | "reviews";
 
 const ALL_PERMISSIONS: readonly AdminPermission[] = [
   "dashboard.view",
@@ -75,6 +77,7 @@ const ALL_PERMISSIONS: readonly AdminPermission[] = [
   "insights.view",
   "insights.export",
   "insights.settings",
+  "reviews.manage",
 ] as const;
 
 const MANAGER_PERMISSIONS: readonly AdminPermission[] = [
@@ -95,6 +98,7 @@ const MANAGER_PERMISSIONS: readonly AdminPermission[] = [
   "revisions.view",
   "insights.view",
   "insights.export",
+  "reviews.manage",
 ] as const;
 
 const WRITER_PERMISSIONS: readonly AdminPermission[] = [
@@ -128,6 +132,7 @@ const TAB_PERMISSION: Record<Exclude<SidhuTab, "seo">, AdminPermission> = {
   media: "media.view",
   history: "revisions.view",
   redirects: "redirects.manage",
+  reviews: "reviews.manage",
 };
 
 /**
@@ -158,6 +163,10 @@ export const SUPER_ADMIN_SITE_SETTINGS_KEYS = new Set<string>([
   "seasonal_hub_published",
   /** When ON, stored product prices are VAT-inclusive (default OFF). */
   "prices_include_vat",
+  /** Public review form (default ON when missing). */
+  "reviews_submission_enabled",
+  /** Email admin on new pending review (default OFF). */
+  "reviews_notify_admin",
 ]);
 
 export function isSuperAdminSettingsKey(key: string): boolean {

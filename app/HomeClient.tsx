@@ -24,6 +24,17 @@ import {
   type HomeTestimonialsSection,
   type PublishableHomeTestimonial,
 } from "@/lib/homeTestimonials";
+import {
+  HOME_REVIEWS_HELPER_DEFAULT,
+  HOME_REVIEWS_HELPER_KEY,
+  HOME_REVIEWS_WRITE_BTN_DEFAULT,
+  HOME_REVIEWS_WRITE_BTN_KEY,
+  isReviewsSubmissionEnabled,
+  mergeHomeReviews,
+  REVIEWS_SUBMISSION_ENABLED_KEY,
+  type PublicCustomerReview,
+} from "@/lib/customerReviews";
+import WriteReviewModal from "@/components/home/WriteReviewModal";
 import { hydrateProductFactsCatalog } from "@/lib/cartClassification";
 import { productCardSrc } from "@/lib/cloudinaryDelivery";
 import PriceDisplay from "@/components/PriceDisplay";
@@ -226,6 +237,8 @@ export default function HomeClient({
     home_newsletter: { title:"Stay in the Loop", subtitle:"Get the latest guides, tips and offers", button_text:"Subscribe" },
   });
   const reviewsTrackRef = useRef<HTMLDivElement | null>(null);
+  const [customerReviews, setCustomerReviews] = useState<PublicCustomerReview[]>([]);
+  const [writeReviewOpen, setWriteReviewOpen] = useState(false);
 
   useEffect(() => {
     if (initialProducts.length > 0) {
@@ -310,14 +323,42 @@ export default function HomeClient({
     });
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/reviews", { credentials: "same-origin" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data)) {
+          setCustomerReviews(data as PublicCustomerReview[]);
+        }
+      } catch {
+        /* keep empty */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const testimonialsSection = (sec.home_testimonials || {}) as HomeTestimonialsSection;
-  const publishedReviews = getPublishableHomeTestimonials(testimonialsSection.items);
+  const manualReviews = getPublishableHomeTestimonials(testimonialsSection.items);
+  const publishedReviews = mergeHomeReviews(manualReviews, customerReviews);
   const reviewsTitle = getHomeTestimonialsTitle(testimonialsSection);
   const reviewsSubtitle = getHomeTestimonialsSubtitle(testimonialsSection);
   const reviewsSummary = computeHomeTestimonialsSummary(publishedReviews);
   const showReviewsSummary =
     shouldShowHomeTestimonialsSummary(testimonialsSection, publishedReviews) &&
     reviewsSummary !== null;
+  const reviewsSubmissionEnabled = isReviewsSubmissionEnabled(
+    cmsData?.[REVIEWS_SUBMISSION_ENABLED_KEY]
+  );
+  const writeReviewBtnLabel = t(
+    HOME_REVIEWS_WRITE_BTN_KEY,
+    HOME_REVIEWS_WRITE_BTN_DEFAULT
+  );
+  const writeReviewHelper = t(HOME_REVIEWS_HELPER_KEY, HOME_REVIEWS_HELPER_DEFAULT);
 
   const scrollReviewsBy = (dir: -1 | 1) => {
     const el = reviewsTrackRef.current;
@@ -617,6 +658,11 @@ export default function HomeClient({
         .reviews-cta { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:11px 22px; border-radius:8px; background:#5B21B6; color:#FFFFFF; text-decoration:none; font-family:var(--font-body); font-size:14px; font-weight:600; letter-spacing:0.01em; transition:background 0.2s, transform 0.2s; }
         .reviews-cta:hover { background:#1A1A1A; transform:translateY(-1px); }
         .reviews-cta:focus-visible { outline:2px solid #5B21B6; outline-offset:3px; }
+        .reviews-write-wrap { max-width:720px; margin:22px auto 0; text-align:center; }
+        .reviews-write-btn { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:11px 22px; border-radius:8px; border:1px solid #5B21B6; background:#FFFFFF; color:#5B21B6; font-family:var(--font-body); font-size:14px; font-weight:600; cursor:pointer; transition:background 0.2s, color 0.2s, transform 0.2s; }
+        .reviews-write-btn:hover { background:#5B21B6; color:#FFFFFF; transform:translateY(-1px); }
+        .reviews-write-btn:focus-visible { outline:2px solid #5B21B6; outline-offset:3px; }
+        .reviews-write-helper { margin:12px auto 0; max-width:560px; font-family:var(--font-body); font-size:13px; line-height:1.55; color:#64748b; }
         .reviews-carousel-wrap { position:relative; margin-top:8px; min-height:200px; }
         .reviews-nav { display:none; }
         .reviews-track { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
@@ -1048,6 +1094,23 @@ export default function HomeClient({
                 <a className="reviews-cta" href="/contact">Share Your Experience</a>
               </div>
             )}
+            {reviewsSubmissionEnabled ? (
+              <div className="reviews-write-wrap">
+                <button
+                  type="button"
+                  className="reviews-write-btn"
+                  onClick={() => setWriteReviewOpen(true)}
+                >
+                  {writeReviewBtnLabel}
+                </button>
+                <p className="reviews-write-helper">{writeReviewHelper}</p>
+              </div>
+            ) : null}
+            <WriteReviewModal
+              open={writeReviewOpen}
+              onClose={() => setWriteReviewOpen(false)}
+              title={writeReviewBtnLabel}
+            />
           </section>
           {sec.home_newsletter && (
             <div className="features-section" style={{paddingTop:0}}>

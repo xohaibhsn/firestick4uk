@@ -43,6 +43,10 @@ export const EXTRA_CONTENT_DEFAULTS: Array<[string, string, string, string, stri
   ['seasonal_promo_text','{season} deal is live','text','home','Seasonal Promo Strip Text'],
   ['seasonal_promo_cta','Shop now','text','home','Seasonal Promo Strip CTA'],
   ['home_product_ids','','text','home','Home Page Product IDs (ordered, comma-separated, max 8)'],
+  ['home_reviews_write_btn','Write a review','text','home','Write a review button'],
+  ['home_reviews_helper','Reviews are checked before publishing to remove spam or personal details. We publish genuine reviews, good or bad.','textarea','home','Reviews helper text'],
+  ['reviews_submission_enabled','1','text','settings','Reviews submission enabled (1/0; missing=ON)'],
+  ['reviews_notify_admin','0','text','settings','Notify admin on new review (1/0; default OFF)'],
   ['season_countdown_prefix','Offer ends in','text','settings','Seasonal Countdown Prefix (Live)'],
   ['season_countdown_upcoming_prefix','Offer starts in','text','settings','Seasonal Countdown Prefix (Upcoming)'],
 

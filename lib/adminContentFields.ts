@@ -43,6 +43,23 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
         },
       ],
     },
+    {
+      title: "Reviews",
+      fields: [
+        {
+          key: "home_reviews_write_btn",
+          label: "Write a review button",
+          help: "Opens the public review form. Hidden when submissions are closed in Site Settings.",
+        },
+        {
+          key: "home_reviews_helper",
+          label: "Reviews helper text",
+          wide: true,
+          type: "textarea",
+          help: "Shown under the Write a review button.",
+        },
+      ],
+    },
   ],
   about: [
     {

@@ -15,6 +15,7 @@ import ProductSeasonalityPanel from "@/components/admin/ProductSeasonalityPanel"
 import SeoOverviewPanel from "@/components/admin/SeoOverviewPanel";
 import RedirectManagerPanel from "@/components/admin/RedirectManagerPanel";
 import InsightsPanel from "@/components/sidhu/insights/InsightsPanel";
+import ReviewsPanel from "@/components/sidhu/ReviewsPanel";
 import { keysForPage } from "@/lib/adminContentFields";
 import {
   canAccessSidhuTab,
@@ -266,7 +267,7 @@ const styles = `
   }
 `;
 
-type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history"|"seo"|"redirects"|"insights";
+type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"reviews"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history"|"seo"|"redirects"|"insights";
 type AdminRole = "super_admin"|"manager"|"writer";
 type OrderStatus = "pending"|"confirmed"|"dispatched"|"delivered";
 type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
@@ -368,6 +369,7 @@ export default function AdminPage() {
   const [orderModal, setOrderModal] = useState<any|null>(null);
   const [orderDetail, setOrderDetail] = useState<{ order: any; items: any[] }|null>(null);
   const [dashSummary, setDashSummary] = useState<any>(null);
+  const [reviewsPendingCount, setReviewsPendingCount] = useState(0);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [productModal, setProductModal] = useState<any|null|"new">(null);
   const [editProduct, setEditProduct] = useState({ name:"", slug:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
@@ -1178,6 +1180,23 @@ export default function AdminPage() {
       setTab("dashboard");
     }
   }, [loggedIn, adminRole, tab]);
+
+  // Pending review badge (sidebar) — best-effort; Reviews tab refreshes on mount too.
+  useEffect(() => {
+    if (!loggedIn || !hasAdminPermission(adminRole, "reviews.manage")) return;
+    let cancelled = false;
+    fetch("/api/admin-reviews?status=pending&page=1", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d && typeof d.total === "number") {
+          setReviewsPendingCount(Number(d.total) || 0);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [loggedIn, adminRole]);
 
   const loadAuditLog = (page = 1) => {
     if (!can("audit.view")) return;
@@ -4824,6 +4843,7 @@ export default function AdminPage() {
               { id:"products",  icon:"📦", label:"Products",     roles:["super_admin","manager"] },
               { id:"customers", icon:"👥", label:"Customers",    roles:["super_admin","manager"] },
               { id:"leads",     icon:"💬", label:"Leads",        badge: leadsLast24 > 0 ? String(leadsLast24) : null, badgeColor:"orange", roles:["super_admin","manager"] },
+              { id:"reviews",   icon:"⭐", label:"Reviews",      badge: reviewsPendingCount > 0 ? String(reviewsPendingCount) : null, badgeColor:"orange", roles:["super_admin","manager"] },
               { id:"blog",      icon:"📝", label:"Blog",         roles:["super_admin","manager","writer"] },
               { id:"seo",       icon:"🔎", label:"SEO",          roles:["super_admin","manager","writer"] },
               { id:"redirects", icon:"↪️", label:"Redirects",    roles:["super_admin"] },
@@ -4867,6 +4887,7 @@ export default function AdminPage() {
                 {tab==="products" && <>Manage <span>Products</span></>}
                 {tab==="customers" && <>Customer <span>Data</span></>}
                 {tab==="leads" && <>Chat <span>Leads</span></>}
+                {tab==="reviews" && <>Customer <span>Reviews</span></>}
                 {tab==="blog" && <>Manage <span>Blog</span></>}
                 {tab==="seo" && <>SEO <span>Overview</span></>}
                 {tab==="redirects" && <>Manage <span>Redirects</span></>}
@@ -5389,6 +5410,14 @@ export default function AdminPage() {
           )}
           {tab==="insights" && hasAdminPermission(adminRole, "insights.view") && (
             <InsightsPanel role={adminRole} />
+          )}
+
+          {tab==="reviews" && canAccessSidhuTab(adminRole, "reviews") && (
+            <ReviewsPanel
+              onPendingCount={setReviewsPendingCount}
+              onSessionExpired={handleSessionExpired}
+              onPermError={() => showPermError()}
+            />
           )}
           {tab==="blog" && can("blog.manage") && (
             <div>
@@ -7065,6 +7094,60 @@ export default function AdminPage() {
                     onClick={() => saveContent(["prices_include_vat"])}
                   >
                     {contentSaving ? "Saving..." : "Save VAT price mode"}
+                  </button>
+                </div>
+
+                <div
+                  data-testid="reviews-settings-control"
+                  style={{
+                    marginTop: 18,
+                    padding: "14px 16px",
+                    borderRadius: 12,
+                    border: "1px solid #DDD6FE",
+                    background: "#F5F3FF",
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>Customer reviews</div>
+                  <p style={{ fontSize: 13, color: "#4C1D95", marginBottom: 10, lineHeight: 1.45 }}>
+                    Submission defaults ON when unset. Admin email notify defaults OFF — leave it off unless you want a mail for each new pending review.
+                  </p>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, marginBottom: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={String(siteContent.reviews_submission_enabled ?? "1") !== "0"}
+                      onChange={(e) =>
+                        setSiteContent((s: any) => ({
+                          ...s,
+                          reviews_submission_enabled: e.target.checked ? "1" : "0",
+                        }))
+                      }
+                    />
+                    Allow public review submissions
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                    <input
+                      type="checkbox"
+                      checked={String(siteContent.reviews_notify_admin || "") === "1"}
+                      onChange={(e) =>
+                        setSiteContent((s: any) => ({
+                          ...s,
+                          reviews_notify_admin: e.target.checked ? "1" : "0",
+                        }))
+                      }
+                    />
+                    Email admin when a new review is pending
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ marginTop: 10 }}
+                    disabled={contentSaving}
+                    data-testid="reviews-settings-save"
+                    onClick={() =>
+                      saveContent(["reviews_submission_enabled", "reviews_notify_admin"])
+                    }
+                  >
+                    {contentSaving ? "Saving..." : "Save review settings"}
                   </button>
                 </div>
                 <button className="btn-primary" style={{marginTop:12}} disabled={contentSaving} onClick={()=>saveContent(["site_title","site_tagline","site_meta_description","site_logo_url","og_default_image","whatsapp_icon_url","ads_conv_label_purchase","ads_conv_label_whatsapp"])}>                  {contentSaving?"Saving...":"💾 Save Settings"}

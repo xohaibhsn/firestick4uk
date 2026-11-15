@@ -282,6 +282,29 @@ async function main() {
   );
   await neg("admin_redirect", "GET", "/admin", undefined, 308);
 
+  // MULTI-97 customer reviews
+  {
+    const res = await politeFetch(`${base}/api/reviews`);
+    let body = null;
+    try {
+      body = JSON.parse(await res.text());
+    } catch {
+      body = null;
+    }
+    const okArr = res.status === 200 && Array.isArray(body);
+    const row = {
+      name: "reviews_get",
+      method: "GET",
+      path: "/api/reviews",
+      status: res.status,
+      expect: 200,
+      ok: okArr,
+    };
+    if (!row.ok) failures.push(`negative reviews_get: got ${res.status} expect 200 array`);
+    negative.push(row);
+  }
+  await neg("reviews_empty_post", "POST", "/api/reviews", {}, 400);
+
   // MULTI-95 key guard (names / booleans / counts only — never values)
   const keyGuard = {
     denylistAbsent: false,
