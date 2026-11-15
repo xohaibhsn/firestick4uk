@@ -47,16 +47,23 @@ export default function AdminContentPanel({
   savedContent,
 }: Props) {
   const sections = ADMIN_CONTENT_SECTIONS[page] || [];
-  const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
+
+  function defaultOpenMap(list: typeof sections): Record<string, boolean> {
+    const next: Record<string, boolean> = {};
+    list.forEach((s, i) => {
+      next[s.title] = i === 0;
+    });
+    return next;
+  }
+
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>(() =>
+    defaultOpenMap(ADMIN_CONTENT_SECTIONS[page] || [])
+  );
 
   // First section open by default when page changes
   useEffect(() => {
-    const next: Record<string, boolean> = {};
-    sections.forEach((s, i) => {
-      next[s.title] = i === 0;
-    });
-    setOpenMap(next);
-  }, [page]); // eslint-disable-line react-hooks/exhaustive-deps -- reset only on page switch
+    setOpenMap(defaultOpenMap(ADMIN_CONTENT_SECTIONS[page] || []));
+  }, [page]);
 
   const expandAll = useCallback(() => {
     const next: Record<string, boolean> = {};

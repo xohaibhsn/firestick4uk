@@ -144,7 +144,12 @@ function loadTs(rel, stubs = {}) {
   // Content sections: first open by default (useEffect sets i===0)
   ok(
     "first_section_default_open",
-    read("components/admin/AdminContentPanel.tsx").includes("next[s.title] = i === 0")
+    /next\[s\.title\]\s*=\s*i\s*===\s*0/.test(
+      read("components/admin/AdminContentPanel.tsx")
+    ) &&
+      /defaultOpenMap\(ADMIN_CONTENT_SECTIONS\[page\]/.test(
+        read("components/admin/AdminContentPanel.tsx")
+      )
   );
 
   // Settings: every SUPER_ADMIN_SITE_SETTINGS_KEYS present once in settings block
