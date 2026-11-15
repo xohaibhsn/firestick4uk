@@ -17,6 +17,8 @@ import RedirectManagerPanel from "@/components/admin/RedirectManagerPanel";
 import InsightsPanel from "@/components/sidhu/insights/InsightsPanel";
 import ReviewsPanel from "@/components/sidhu/ReviewsPanel";
 import { keysForPage } from "@/lib/adminContentFields";
+import { formatCmsAppearsOnHint } from "@/lib/cmsAppearsOn";
+import { CMS_PAGES_OVERVIEW } from "@/lib/cmsPagesOverview";
 import {
   canAccessSidhuTab,
   hasAdminPermission,
@@ -471,7 +473,7 @@ export default function AdminPage() {
   const [siteContentSaved, setSiteContentSaved] = useState<Record<string,string>>({});
   const [contentSaving, setContentSaving] = useState(false);
   const [contentMsg, setContentMsg] = useState("");
-  const [activePage, setActivePage] = useState("home");
+  const [activePage, setActivePage] = useState("overview");
   const cmsDirtyCount = useMemo(
     () => countDirtyKeys(siteContent, siteContentSaved),
     [siteContent, siteContentSaved]
@@ -4851,7 +4853,7 @@ export default function AdminPage() {
               { id:"media",     icon:"🖼️", label:"Media Library", roles:["super_admin","manager","writer"] },
               { id:"history",   icon:"🕘", label:"History", roles:["super_admin","manager","writer"] },
               { id:"coupons",   icon:"🎟️", label:"Coupons",      roles:["super_admin"] },
-              { id:"builder",   icon:"🎨", label:"Page Builder", roles:["super_admin"] },
+              { id:"builder",   icon:"🎨", label:"Page Builder", roles:["super_admin","manager"] },
               { id:"faqadmin",  icon:"❓", label:"FAQs",         roles:["super_admin","manager"] },
               { id:"pages",     icon:"✏️", label:"Content Editor", roles:["super_admin","manager"] },
               { id:"staff",     icon:"👤", label:"Staff Users",  roles:["super_admin"] },
@@ -6605,6 +6607,7 @@ export default function AdminPage() {
 
                 <div className="modal-field">
                   <label>Site Logo</label>
+                  <p data-cms-appears-on="site_logo_url" style={{fontSize:11,color:"#9CA3AF",margin:"0 0 6px"}}>{formatCmsAppearsOnHint("site_logo_url")}</p>
                   <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
                     Recommended: <strong>360×80px</strong>, PNG transparent
                   </div>
@@ -6645,6 +6648,7 @@ export default function AdminPage() {
 
                 <div className="modal-field">
                   <label>Favicon</label>
+                  <p data-cms-appears-on="favicon_url" style={{fontSize:11,color:"#9CA3AF",margin:"0 0 6px"}}>{formatCmsAppearsOnHint("favicon_url")}</p>
                   <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
                     Recommended: <strong>180×180 or 512×512 PNG</strong> (works on mobile + desktop)
                   </div>
@@ -6673,6 +6677,17 @@ export default function AdminPage() {
                         disabled={faviconUploading}
                       />
                     </label>
+                    <button
+                      type="button"
+                      style={{cursor:"pointer",background:"#F5F5F5",border:"1px solid #E5E5E5",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6",fontWeight:600}}
+                      onClick={() => setMediaPicker({
+                        purposes: ["favicon"],
+                        title: "Choose Favicon",
+                        onSelect: (asset) => setSiteContent((s) => ({ ...s, favicon_url: asset.url })),
+                      })}
+                    >
+                      Choose from Library
+                    </button>
                     {siteContent.favicon_url && (
                       <button
                         type="button"
@@ -6693,6 +6708,7 @@ export default function AdminPage() {
 
                 <div className="modal-field" style={{marginTop:8}}>
                   <label>Default Share Image (OG Image)</label>
+                  <p data-cms-appears-on="og_default_image" style={{fontSize:11,color:"#9CA3AF",margin:"0 0 6px"}}>{formatCmsAppearsOnHint("og_default_image")}</p>
                   <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
                     📐 Recommended: <strong>1200×630px</strong> — shown when sharing homepage on WhatsApp/Facebook
                   </div>
@@ -6754,6 +6770,7 @@ export default function AdminPage() {
 
                 <div className="modal-field" style={{marginTop:8}}>
                   <label>WhatsApp Button Icon (PNG)</label>
+                  <p data-cms-appears-on="whatsapp_icon_url" style={{fontSize:11,color:"#9CA3AF",margin:"0 0 6px"}}>{formatCmsAppearsOnHint("whatsapp_icon_url")}</p>
                   <div style={{fontSize:11,color:"#888888",marginBottom:8}}>
                     Recommended: <strong>512×512px PNG</strong>
                   </div>
@@ -6815,6 +6832,7 @@ export default function AdminPage() {
 
                 <div className="modal-field" style={{marginTop:24,paddingTop:20,borderTop:"1px solid #E5E5E5"}}>
                   <label style={{fontSize:15,fontWeight:700,marginBottom:6,display:"block"}}>🖼️ Hero Slider Images</label>
+                  <p data-cms-appears-on="hero_slide_1" style={{fontSize:11,color:"#9CA3AF",margin:"0 0 6px"}}>{formatCmsAppearsOnHint("hero_slide_1")}</p>
                   <div style={{fontSize:11,color:"#888888",marginBottom:16}}>
                     Recommended: <strong>1920×1080px</strong> — homepage background slides (auto-rotate every 3s)
                   </div>
@@ -6860,7 +6878,7 @@ export default function AdminPage() {
                                 onSelect: (asset) => setSiteContent((s) => ({ ...s, [key]: asset.url })),
                               })}
                             >
-                              Library
+                              Choose from Library
                             </button>
                             {url && (
                               <button
@@ -7180,6 +7198,7 @@ export default function AdminPage() {
 
               <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
                 {[
+                  ["overview","📋 Pages"],
                   ["home","🏠 Home"],
                   ["about","ℹ️ About"],
                   ["subscription","📺 Subscription"],
@@ -7197,6 +7216,54 @@ export default function AdminPage() {
                 ))}
               </div>
 
+              {/* PAGES OVERVIEW */}
+              {activePage==="overview" && (
+                <div className="section-card" style={{padding:24}} data-cms-pages-overview="1">
+                  <div className="section-header" style={{marginBottom:16}}>
+                    <div className="section-title">Pages overview</div>
+                  </div>
+                  <p style={{fontSize:13,color:"#666",margin:"0 0 18px",lineHeight:1.45}}>
+                    Pick a page to edit its text. Counts show how many sections and fields are available in the Content Editor.
+                  </p>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:14}}>
+                    {CMS_PAGES_OVERVIEW.map((card) => (
+                      <div
+                        key={card.id}
+                        data-cms-overview-card={card.id}
+                        style={{border:"1px solid #E5E5E5",borderRadius:12,padding:16,background:"#FAFAFA"}}
+                      >
+                        <div style={{fontSize:15,fontWeight:700,color:"#111",marginBottom:6}}>{card.title}</div>
+                        <div style={{fontSize:12,color:"#666",marginBottom:10}}>
+                          {card.sectionCount} section{card.sectionCount === 1 ? "" : "s"} · {card.fieldCount} field{card.fieldCount === 1 ? "" : "s"}
+                        </div>
+                        {card.note ? (
+                          <div style={{fontSize:11,color:"#9CA3AF",marginBottom:10,lineHeight:1.35}}>{card.note}</div>
+                        ) : null}
+                        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                          <button
+                            type="button"
+                            className="action-btn btn-verify"
+                            style={{padding:"8px 14px",fontSize:12}}
+                            onClick={() => requestActivePage(card.editPage)}
+                          >
+                            Edit
+                          </button>
+                          <a
+                            href={card.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="action-btn btn-view"
+                            style={{padding:"8px 14px",fontSize:12,textDecoration:"none",display:"inline-flex",alignItems:"center"}}
+                          >
+                            View on site
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* SUBSCRIPTION LANDING */}
               {activePage==="subscription" && (
                 <SubscriptionContentEditor
@@ -7204,6 +7271,13 @@ export default function AdminPage() {
                   setSiteContent={setSiteContent}
                   onSave={saveContent}
                   saving={contentSaving}
+                  onRequestMedia={({ purposes, title, onSelect }) =>
+                    setMediaPicker({
+                      purposes,
+                      title,
+                      onSelect: (asset) => onSelect(asset.url),
+                    })
+                  }
                 />
               )}
 

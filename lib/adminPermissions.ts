@@ -92,6 +92,7 @@ const MANAGER_PERMISSIONS: readonly AdminPermission[] = [
   "blog.manage",
   "faqs.manage",
   "content.manage",
+  "page_builder.manage",
   "media.view",
   "media.upload",
   "blog_media.upload",

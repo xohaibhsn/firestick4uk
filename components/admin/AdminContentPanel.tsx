@@ -5,6 +5,7 @@ import {
   ADMIN_CONTENT_SECTIONS,
   keysForPage,
 } from "@/lib/adminContentFields";
+import { formatCmsAppearsOnHint } from "@/lib/cmsAppearsOn";
 
 const TipTapEditor = dynamic(() => import("./TipTapEditor"), { ssr: false });
 
@@ -57,7 +58,9 @@ export default function AdminContentPanel({
               gap: 14,
             }}
           >
-            {section.fields.map((field) => (
+            {section.fields.map((field) => {
+              const appears = formatCmsAppearsOnHint(field.key);
+              return (
               <div
                 key={field.key}
                 className="modal-field"
@@ -75,6 +78,19 @@ export default function AdminContentPanel({
                     }}
                   >
                     {field.help}
+                  </p>
+                ) : null}
+                {appears ? (
+                  <p
+                    data-cms-appears-on={field.key}
+                    style={{
+                      fontSize: 11,
+                      color: "#9CA3AF",
+                      margin: "0 0 6px",
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    {appears}
                   </p>
                 ) : null}
                 {field.type === "html" ? (
@@ -113,7 +129,8 @@ export default function AdminContentPanel({
                   />
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}

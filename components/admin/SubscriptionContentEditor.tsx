@@ -17,6 +17,8 @@ type Props = {
   setSiteContent: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   onSave: (keys: string[], overrides?: Record<string, string>) => void;
   saving: boolean;
+  /** Opens Media Library picker; parent fills URL via setSiteContent. */
+  onRequestMedia?: (opts: { purposes: Array<"og" | "products" | "blog" | "hero">; title?: string; onSelect: (url: string) => void }) => void;
 };
 
 type CardItem = { icon?: string; title: string; desc: string; step?: string };
@@ -232,6 +234,7 @@ export default function SubscriptionContentEditor({
   setSiteContent,
   onSave,
   saving,
+  onRequestMedia,
 }: Props) {
   const [products, setProducts] = useState<ProductOpt[]>([]);
   const [faqs, setFaqs] = useState<FaqOpt[]>([]);
@@ -579,13 +582,49 @@ export default function SubscriptionContentEditor({
           onChange={(v) => set("subscription_canonical", v)}
           hint="Leave blank to auto-use https://firestick4uk.com/{active-slug}/. Only set a custom URL if you intentionally need a different canonical."
         />
-        <Field
-          label="OG image URL"
-          value={siteContent.subscription_og_image || ""}
-          onChange={(v) => set("subscription_og_image", v)}
-          wide
-          hint="Optional. Falls back to Site Settings default OG image."
-        />
+        <div className="modal-field" style={{ gridColumn: "1 / -1" }} data-cms-field="subscription_og_image">
+          <label>OG image URL</label>
+          <p style={{ fontSize: 12, color: "#666", margin: "0 0 6px" }}>
+            Optional. Falls back to Site Settings default OG image.
+          </p>
+          <p data-cms-appears-on="subscription_og_image" style={{ fontSize: 11, color: "#9CA3AF", margin: "0 0 6px" }}>
+            Appears on: Subscriptions → SEO
+          </p>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+            {siteContent.subscription_og_image ? (
+              <img
+                src={siteContent.subscription_og_image}
+                alt="Subscription OG preview"
+                style={{ width: 160, height: 84, objectFit: "cover", borderRadius: 8, border: "1px solid #E5E5E5" }}
+              />
+            ) : (
+              <div style={{ width: 160, height: 84, borderRadius: 8, border: "1px dashed #CCC", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#AAA" }}>
+                No image
+              </div>
+            )}
+            {onRequestMedia ? (
+              <button
+                type="button"
+                style={{ cursor: "pointer", background: "#F5F5F5", border: "1px solid #E5E5E5", padding: "8px 16px", borderRadius: 8, fontSize: 13, color: "#5B21B6", fontWeight: 600 }}
+                onClick={() =>
+                  onRequestMedia({
+                    purposes: ["og"],
+                    title: "Choose Subscription OG Image",
+                    onSelect: (url) => set("subscription_og_image", url),
+                  })
+                }
+              >
+                Choose from Library
+              </button>
+            ) : null}
+          </div>
+          <input
+            style={{ width: "100%" }}
+            value={siteContent.subscription_og_image || ""}
+            onChange={(e) => set("subscription_og_image", e.target.value)}
+            placeholder="https://…"
+          />
+        </div>
       </div>
 
       <button className="btn-primary" disabled={saving} onClick={handleSave}>
