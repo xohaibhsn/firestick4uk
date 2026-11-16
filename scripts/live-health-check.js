@@ -304,6 +304,14 @@ async function main() {
     negative.push(row);
   }
   await neg("reviews_empty_post", "POST", "/api/reviews", {}, 400);
+  // MULTI-109: unauthenticated admin scope must not leak the full map
+  await neg(
+    "site_content_scope_admin_unauth",
+    "GET",
+    "/api/site-content?page=all&scope=admin",
+    undefined,
+    401
+  );
 
   // MULTI-95 key guard (names / booleans / counts only — never values)
   const keyGuard = {

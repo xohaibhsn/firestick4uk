@@ -704,6 +704,7 @@ console.log("\n=== P2 completed boundary duplicates harmless (FUNCTIONAL) ===");
         },
         "../../lib/publicCmsDataServer": {
           getCachedPublicSiteContentAll: async () => ({}),
+          loadSiteContentAllUncached: async () => ({}),
           invalidatePublicCmsCache: () => {},
         },
         "../../lib/siteContentSeed": { SITE_CONTENT_DEFAULTS: [] },
@@ -816,6 +817,7 @@ console.log("\n=== P2 completed boundary duplicates harmless (FUNCTIONAL) ===");
         },
         "../../lib/publicCmsDataServer": {
           getCachedPublicSiteContentAll: async () => ({}),
+          loadSiteContentAllUncached: async () => ({}),
           invalidatePublicCmsCache: () => {},
         },
         "../../lib/siteContentSeed": { SITE_CONTENT_DEFAULTS: [] },
@@ -882,6 +884,7 @@ console.log("\n=== P2 completed boundary duplicates harmless (FUNCTIONAL) ===");
         },
         "../../lib/publicCmsDataServer": {
           getCachedPublicSiteContentAll: async () => ({}),
+          loadSiteContentAllUncached: async () => ({}),
           invalidatePublicCmsCache: () => {},
         },
         "../../lib/siteContentSeed": { SITE_CONTENT_DEFAULTS: [] },
@@ -933,6 +936,7 @@ console.log("\n=== P2 completed boundary duplicates harmless (FUNCTIONAL) ===");
         },
         "../../lib/publicCmsDataServer": {
           getCachedPublicSiteContentAll: async () => ({}),
+          loadSiteContentAllUncached: async () => ({}),
           invalidatePublicCmsCache: () => {},
         },
         "../../lib/siteContentSeed": { SITE_CONTENT_DEFAULTS: [] },

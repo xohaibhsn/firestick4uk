@@ -24,6 +24,7 @@ import {
 import {
   getCachedPublicSiteContentAll,
   invalidatePublicCmsCache,
+  loadSiteContentAllUncached,
 } from '../../lib/publicCmsDataServer';
 import { filterPublicSiteContentMap } from '../../lib/publicSiteContentFilter';
 import {
@@ -98,7 +99,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const admin = await requireAdmin(req, res, { mutate: false });
           if (!admin) return;
           res.setHeader('Cache-Control', 'no-store');
-          const result = await getCachedPublicSiteContentAll();
+          // Admin editors must see fresh DB values (bypass 60s public TTL cache).
+          const result = await loadSiteContentAllUncached();
           return res.status(200).json(result);
         }
         const result = await getCachedPublicSiteContentAll();

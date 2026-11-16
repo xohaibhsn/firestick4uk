@@ -22,8 +22,9 @@ export type PublicVisibleSection = {
 /**
  * Same SELECT and key mapping as GET /api/site-content?page=all.
  * Throws on query failure so a DB error is not stored as an empty map.
+ * Uncached — used by admin editors and as the body of the public TTL cache.
  */
-async function loadPublicSiteContentAll(): Promise<PublicSiteContentAllMap> {
+export async function loadSiteContentAllUncached(): Promise<PublicSiteContentAllMap> {
   const [rows]: any = await pool.query(
     "SELECT content_key, content_value, content_type, page_name, label FROM site_content ORDER BY id ASC"
   );
@@ -58,7 +59,7 @@ async function loadPublicVisibleSections(page: string): Promise<PublicVisibleSec
 }
 
 export const getCachedPublicSiteContentAll = unstable_cache(
-  loadPublicSiteContentAll,
+  loadSiteContentAllUncached,
   ["public-site-content-all-v1"],
   {
     revalidate: PUBLIC_CMS_CACHE_TTL_SECONDS,

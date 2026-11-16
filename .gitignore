@@ -47,3 +47,4 @@ tmp_*.json
 # APK downloads: 5GNext exceeds GitHub 100MB — keep on Hostinger only (manual upload).
 # A1IPTVPlayer-latest.apk stays in git (~12MB) so deploy does not remove it from server.
 public/downloads/5GNext-vpn.apk
+public/uploads/receipts/

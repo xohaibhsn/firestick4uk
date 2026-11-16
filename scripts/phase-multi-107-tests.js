@@ -540,6 +540,13 @@ function baseBody(overrides = {}) {
   ok("upload_local_path_shape", /^\/uploads\/receipts\/[a-f0-9]{32}\.png$/.test(lastLocalPath));
   ok("upload_local_id_32_hex", /^[a-f0-9]{32}$/.test(localId));
   ok("upload_local_no_user_name", !/user-supplied|user_supplied|name/i.test(localId));
+  // MULTI-109: local fallback writes into public/uploads/receipts — remove test artifact.
+  try {
+    const written = path.join(ROOT, "public", "uploads", "receipts", localBase);
+    if (fs.existsSync(written)) fs.unlinkSync(written);
+  } catch {
+    /* ignore cleanup errors */
+  }
 
   // Cloudinary branch: dynamic import bypasses loadTs stubs — assert source contract.
   ok(

@@ -232,6 +232,7 @@ async function main() {
     },
     "../../lib/publicCmsDataServer": {
       getCachedPublicSiteContentAll: async () => ({ ...cachedAll }),
+      loadSiteContentAllUncached: async () => ({ ...cachedAll }),
       invalidatePublicCmsCache: () => {},
     },
     "../../lib/seasonalHubPublic": {
@@ -360,6 +361,7 @@ async function main() {
       },
       "../../lib/publicCmsDataServer": {
         getCachedPublicSiteContentAll: async () => ({ ...cachedAll }),
+        loadSiteContentAllUncached: async () => ({ ...cachedAll }),
         invalidatePublicCmsCache: () => {},
       },
       "../../lib/seasonalHubPublic": {

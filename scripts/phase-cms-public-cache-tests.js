@@ -37,12 +37,14 @@ const provider = read("components/SiteContentProvider.tsx");
 const homeClient = read("app/HomeClient.tsx");
 const db = read("lib/db.ts");
 
-// MULTI-95: page=all has public (filtered) + scope=admin (full) paths; both use the cached loader.
+// MULTI-109: public page=all uses cached loader + denylist filter; scope=admin uses uncached loader.
 ok(
-  "A_page_all_uses_cached_loader",
+  "A_page_all_public_cached_admin_uncached",
   /page === 'all'/.test(siteContent) &&
-    (siteContent.match(/getCachedPublicSiteContentAll\(/g) || []).length >= 2 &&
-    /filterPublicSiteContentMap/.test(siteContent)
+    (siteContent.match(/getCachedPublicSiteContentAll\(/g) || []).length === 1 &&
+    /loadSiteContentAllUncached\(/.test(siteContent) &&
+    /filterPublicSiteContentMap/.test(siteContent) &&
+    /scopeAdmin[\s\S]*loadSiteContentAllUncached/.test(siteContent)
 );
 ok(
   "B_non_all_get_still_queries",
@@ -52,8 +54,8 @@ ok(
 );
 ok(
   "C_mutations_do_not_read_public_cache",
-  // MULTI-95: two GET page=all reads (public + admin); mutations must not call the cache loader.
-  (siteContent.match(/getCachedPublicSiteContentAll\(/g) || []).length === 2 &&
+  // MULTI-109: one public GET page=all cache read; mutations must not call the cache loader.
+  (siteContent.match(/getCachedPublicSiteContentAll\(/g) || []).length === 1 &&
     !/req\.method === 'POST'[\s\S]*getCachedPublicSiteContentAll/.test(siteContent) &&
     !/req\.method === 'PUT'[\s\S]*getCachedPublicSiteContentAll/.test(siteContent) &&
     !/req\.method === 'DELETE'[\s\S]*getCachedPublicSiteContentAll/.test(siteContent)
@@ -78,7 +80,7 @@ ok(
   (sections.match(/invalidatePublicCmsCache\(\)/g) || []).length >= 3
 );
 const allLoader = helper.slice(
-  helper.indexOf("async function loadPublicSiteContentAll"),
+  helper.indexOf("export async function loadSiteContentAllUncached"),
   helper.indexOf("async function loadPublicVisibleSections")
 );
 const sectionLoader = helper.slice(

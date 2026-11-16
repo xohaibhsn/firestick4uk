@@ -339,6 +339,7 @@ function makeSiteHarness(values) {
     },
     "../../lib/publicCmsDataServer": {
       getCachedPublicSiteContentAll: async () => ({}),
+      loadSiteContentAllUncached: async () => ({}),
       invalidatePublicCmsCache() {},
     },
     "../../lib/publicSiteContentFilter": {
