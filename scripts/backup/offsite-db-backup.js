@@ -48,6 +48,7 @@ function parseArgs(argv) {
   const out = {
     dryRun: false,
     expectDb: EXPECTED_DB_DEFAULT,
+    expectDbOverridden: false,
     keepLocal: null,
   };
   for (let i = 2; i < argv.length; i++) {
@@ -57,6 +58,7 @@ function parseArgs(argv) {
       const v = argv[++i];
       if (!v) throw Object.assign(new Error("missing --expect-db value"), { code: 2 });
       out.expectDb = v;
+      out.expectDbOverridden = true;
     } else if (a === "--keep-local") {
       const v = argv[++i];
       if (!v) throw Object.assign(new Error("missing --keep-local value"), { code: 2 });
@@ -66,6 +68,13 @@ function parseArgs(argv) {
     } else {
       throw Object.assign(new Error("unknown flag: " + a), { code: 2 });
     }
+  }
+  // P4 (MULTI-116): --expect-db is tests-only and must not run a real upload path.
+  if (out.expectDbOverridden && !out.dryRun) {
+    throw Object.assign(
+      new Error("--expect-db requires --dry-run"),
+      { code: 2 }
+    );
   }
   return out;
 }
@@ -554,11 +563,15 @@ async function main() {
     process.exit(0);
   } catch (err) {
     const code = err && err.code ? Number(err.code) : 1;
+    const msg = err && err.message ? String(err.message) : "";
+    if (
+      msg &&
+      !/missing\/invalid key|wrong database|missing env/.test(msg)
+    ) {
+      console.error(msg);
+    }
     if (code === 2 || code === 3 || code === 4) {
       process.exit(code);
-    }
-    if (err && err.message && !/missing\/invalid key|wrong database|missing env/.test(err.message)) {
-      console.error("error=" + (err.message || "unknown"));
     }
     process.exit(Number.isFinite(code) && code > 0 ? code : 1);
   }

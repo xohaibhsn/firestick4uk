@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
-    "postbuild": "node scripts/sync-hostinger-apks.js",
+    "postbuild": "node scripts/sync-hostinger-apks.js && node scripts/copy-backup-into-standalone.js",
     "start": "next start",
     "lint": "eslint"
   },

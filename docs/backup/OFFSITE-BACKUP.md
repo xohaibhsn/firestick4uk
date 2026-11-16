@@ -36,7 +36,7 @@ Key: `BACKUP_ENC_KEY` = 64 hex characters (32 bytes).
 | Flag | Purpose |
 | --- | --- |
 | `--dry-run` | Dump + encrypt in temp, print summary, delete temps, no upload |
-| `--expect-db <name>` | Tests only — override expected database name |
+| `--expect-db <name>` | Tests only — override expected database name; **requires `--dry-run`** |
 | `--keep-local <path>` | Tests only — copy ciphertext; refuses repo/`public/` paths |
 
 | Exit | Meaning |

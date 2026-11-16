@@ -16,6 +16,9 @@ const noStoreHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Hostinger runs the Next.js standalone server; keep this explicit so local
+  // builds match production and postbuild can ship scripts/backup into the tree.
+  output: "standalone",
   generateEtags: false,
   experimental: {
     globalNotFound: true,

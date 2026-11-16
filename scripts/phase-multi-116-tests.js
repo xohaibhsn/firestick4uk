@@ -580,6 +580,53 @@ async function main() {
   );
   ok("cli_missing_key_exit_2", cli.status === 2, "status=" + cli.status);
 
+  // P4: --expect-db without --dry-run must exit 2
+  let expectOnlyThrown = false;
+  try {
+    bk.parseArgs([
+      process.execPath,
+      "offsite-db-backup.js",
+      "--expect-db",
+      "testdb",
+    ]);
+  } catch (e) {
+    expectOnlyThrown = e && e.code === 2 && /requires --dry-run/.test(e.message);
+  }
+  ok("expect_db_requires_dry_run_parse", expectOnlyThrown);
+
+  const expectOk = bk.parseArgs([
+    process.execPath,
+    "offsite-db-backup.js",
+    "--dry-run",
+    "--expect-db",
+    "testdb",
+  ]);
+  ok(
+    "expect_db_with_dry_run_ok",
+    expectOk.dryRun === true &&
+      expectOk.expectDb === "testdb" &&
+      expectOk.expectDbOverridden === true
+  );
+
+  const cliExpect = spawnSync(
+    process.execPath,
+    [
+      path.join(ROOT, "scripts/backup/offsite-db-backup.js"),
+      "--expect-db",
+      "testdb",
+    ],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: { ...process.env, BACKUP_ENC_KEY: "a".repeat(64) },
+    }
+  );
+  ok(
+    "cli_expect_db_without_dry_run_exit_2",
+    cliExpect.status === 2,
+    "status=" + cliExpect.status
+  );
+
   origLog(`\nMULTI-116: ${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 }
