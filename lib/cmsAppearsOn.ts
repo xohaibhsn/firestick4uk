@@ -31,7 +31,7 @@ const PAGE_LABELS: Record<string, string> = {
 };
 
 /** Inline sidhu fields not listed in ADMIN_CONTENT_SECTIONS. */
-const INLINE_APPEARS_ON: Record<string, CmsAppearsOn> = {
+export const INLINE_APPEARS_ON: Record<string, CmsAppearsOn> = {
   home_meta_title: { pageLabel: "Home", sectionLabel: "SEO" },
   home_meta_description: { pageLabel: "Home", sectionLabel: "SEO" },
   home_top_hero_title: { pageLabel: "Home", sectionLabel: "Top hero" },

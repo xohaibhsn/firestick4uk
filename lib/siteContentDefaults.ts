@@ -13,7 +13,7 @@ export const EXTRA_CONTENT_DEFAULTS: Array<[string, string, string, string, stri
   ['social_instagram','','url','settings','Instagram URL'],
   ['social_youtube','','url','settings','YouTube URL'],
   ['social_tiktok','','url','settings','TikTok URL'],
-  ['trust_activation','Subscription services are active within 1 hour of payment confirmation.','textarea','settings','Activation Trust Text'],
+  ['trust_activation','Subscription services are active within 1 hour of payment confirmation.','textarea','settings','Test field (safe to edit — not shown on the website)'],
 
   // Footer
   ['footer_logo_text','FIRESTICK4UK','text','footer','Footer Logo Text'],

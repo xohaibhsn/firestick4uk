@@ -26,9 +26,20 @@ import ProductSeasonalityPanel from "@/components/admin/ProductSeasonalityPanel"
 import {
   PRODUCT_EDITOR_SECTION_TITLES,
   PRODUCT_EDITOR_SECTIONS,
+  CMS_EXPAND_FIELD_EVENT,
   SITE_SETTINGS_OTHER_KEYS,
   SITE_SETTINGS_SECTION_TITLES,
 } from "@/lib/adminSidebarGroups";
+import {
+  clearAdminHintCookie,
+  setAdminHintCookie,
+} from "@/lib/adminHintCookie";
+import {
+  isValidDeepLinkFieldKey,
+  isValidDeepLinkPath,
+  resolveOpenDeepLink,
+} from "@/lib/publicAdminDeepLinks";
+import { lookupCmsFieldByKey } from "@/lib/cmsFindText";
 import { buildProductEditorSavePayload } from "@/lib/productEditorSavePayload";
 import { buildDuplicateEditProduct } from "@/lib/seasonalOfferWizard";
 import SeoOverviewPanel from "@/components/admin/SeoOverviewPanel";
@@ -631,6 +642,7 @@ function AdminPageInner() {
   };
 
   const handleSessionExpired = () => {
+    clearAdminHintCookie();
     setLoggedIn(false);
     setAdminRole("super_admin");
     setAdminName("Admin");
@@ -1059,6 +1071,7 @@ function AdminPageInner() {
           setAdminName(res.name || "Admin");
           setAdminPrincipalType(res.principalType === "staff" ? "staff" : "master");
           setAdminEmail(res.email || null);
+          setAdminHintCookie();
           // F6: auto-exclude this admin browser from Insights (localStorage only).
           try {
             window.localStorage.setItem("firestick_insights_optout_v1", "1");
@@ -1066,6 +1079,7 @@ function AdminPageInner() {
             /* ignore */
           }
         } else {
+          clearAdminHintCookie();
           setLoggedIn(false);
         }
       } catch {
@@ -1849,6 +1863,7 @@ function AdminPageInner() {
         setAdminPrincipalType(res.principalType === "staff" ? "staff" : "master");
         setAdminEmail(null);
         setLoggedIn(true);
+        setAdminHintCookie();
         setLoginError("");
       } else if (res.status === 429) {
         setLoginError("❌ Too many login attempts. Try again in 15 minutes.");
@@ -1866,6 +1881,7 @@ function AdminPageInner() {
     } catch {
       /* ignore */
     }
+    clearAdminHintCookie();
     setLoggedIn(false);
     setAdminRole("super_admin");
     setAdminName("Admin");
@@ -2995,6 +3011,173 @@ function AdminPageInner() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingSearchOpen, products, blogPosts]);
+
+  // Public admin bar deep links: ?field=<key> | ?open=<path> (never auto-save).
+  const deepLinkHandledRef = useRef(false);
+  const [pendingDeepProductSlug, setPendingDeepProductSlug] = useState<string | null>(null);
+  const [pendingDeepBlogSlug, setPendingDeepBlogSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!loggedIn || authChecking || deepLinkHandledRef.current) return;
+    if (typeof window === "undefined") return;
+    let fieldParam = "";
+    let openParam = "";
+    try {
+      const sp = new URLSearchParams(window.location.search || "");
+      fieldParam = String(sp.get("field") || "").trim();
+      openParam = String(sp.get("open") || "").trim();
+    } catch {
+      return;
+    }
+    if (!fieldParam && !openParam) {
+      deepLinkHandledRef.current = true;
+      return;
+    }
+    deepLinkHandledRef.current = true;
+
+    const stripDeepParams = () => {
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.delete("field");
+        u.searchParams.delete("open");
+        const next = u.pathname + (u.search || "") + (u.hash || "");
+        window.history.replaceState({}, "", next);
+      } catch {
+        /* ignore */
+      }
+    };
+
+    const highlightField = (key: string) => {
+      try {
+        window.dispatchEvent(
+          new CustomEvent(CMS_EXPAND_FIELD_EVENT, { detail: { key } })
+        );
+      } catch {
+        /* ignore */
+      }
+      window.setTimeout(() => {
+        const el = document.querySelector(
+          `[data-cms-field="${CSS.escape(key)}"]`
+        ) as HTMLElement | null;
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        const prev = el.style.outline;
+        const prevBg = el.style.background;
+        el.style.outline = "2px solid #7C3AED";
+        el.style.background = "#F5F3FF";
+        window.setTimeout(() => {
+          el.style.outline = prev;
+          el.style.background = prevBg;
+        }, 2000);
+      }, 80);
+    };
+
+    if (fieldParam) {
+      stripDeepParams();
+      if (!isValidDeepLinkFieldKey(fieldParam)) {
+        showToast("Field not found", "error");
+        setTab("dashboard");
+        return;
+      }
+      const meta = lookupCmsFieldByKey(fieldParam);
+      if (!meta) {
+        showToast("Field not found", "error");
+        setTab("dashboard");
+        return;
+      }
+      setTab("pages");
+      setActivePage(meta.page);
+      window.setTimeout(() => highlightField(meta.key), 120);
+      return;
+    }
+
+    if (openParam) {
+      stripDeepParams();
+      if (!isValidDeepLinkPath(openParam)) {
+        showToast("No direct editor for this page", "info");
+        setTab("pages");
+        setActivePage("overview");
+        return;
+      }
+      const target = resolveOpenDeepLink(openParam);
+      if (target.kind === "content_page") {
+        setTab("pages");
+        setActivePage(target.editPage);
+        return;
+      }
+      if (target.kind === "product_slug") {
+        setTab("products");
+        setPendingDeepProductSlug(target.slug);
+        return;
+      }
+      if (target.kind === "blog_slug") {
+        setTab("blog");
+        setPendingDeepBlogSlug(target.slug);
+        return;
+      }
+      if (target.kind === "blog_tab") {
+        setTab("blog");
+        return;
+      }
+      setTab("pages");
+      setActivePage("overview");
+      showToast("No direct editor for this page", "info");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn, authChecking]);
+
+  useEffect(() => {
+    if (!pendingDeepProductSlug) return;
+    const slug = pendingDeepProductSlug;
+    const p = products.find(
+      (x: any) => String(x.slug || "").toLowerCase() === slug.toLowerCase()
+    );
+    if (p) {
+      setPendingDeepProductSlug(null);
+      openEditProduct(p);
+      return;
+    }
+    if (productsLoading) return;
+    if (products.length > 0) {
+      setPendingDeepProductSlug(null);
+      showToast("No direct editor for this page", "info");
+      setTab("pages");
+      setActivePage("overview");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingDeepProductSlug, products, productsLoading]);
+
+  useEffect(() => {
+    if (!pendingDeepBlogSlug) return;
+    const slug = pendingDeepBlogSlug;
+    const b = blogPosts.find(
+      (x: any) => String(x.slug || "").toLowerCase() === slug.toLowerCase()
+    );
+    if (b) {
+      setPendingDeepBlogSlug(null);
+      openEditBlog(b);
+      return;
+    }
+    if (blogPosts.length > 0) {
+      setPendingDeepBlogSlug(null);
+      showToast("No direct editor for this page", "info");
+      setTab("pages");
+      setActivePage("overview");
+      return;
+    }
+    // Still loading an empty list — give up after a short wait
+    const t = window.setTimeout(() => {
+      setPendingDeepBlogSlug((cur) => {
+        if (cur !== slug) return cur;
+        showToast("No direct editor for this page", "info");
+        setTab("pages");
+        setActivePage("overview");
+        return null;
+      });
+    }, 4000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingDeepBlogSlug, blogPosts]);
 
   const handleAdminSearchNavigate = (target: AdminSearchTarget) => {
     requestTab(target.tab);
@@ -7971,9 +8154,9 @@ function AdminPageInner() {
                 testId="settings-section-other"
               >
                 <div className="modal-field" data-cms-field="trust_activation" data-testid="settings-trust-activation">
-                  <label>Activation Trust Text{settingsHistoryBtn("trust_activation","Activation Trust Text")}</label>
+                  <label>Test field (safe to edit — not shown on the website){settingsHistoryBtn("trust_activation","Test field (safe to edit — not shown on the website)")}</label>
                   <div style={{fontSize:11,color:"#888",marginBottom:8,lineHeight:1.45}}>
-                    Internal/denylisted site_content key (not shown on the public site). Used for CMS stale-write drills only.
+                    Used only for CMS safety checks. Changing it has no effect on the public site.
                   </div>
                   <textarea
                     rows={3}

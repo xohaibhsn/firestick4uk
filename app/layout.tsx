@@ -7,6 +7,7 @@ import MiniCartBar from "@/components/MiniCartBar";
 import TrackingConsent from "@/components/TrackingConsent";
 import AdsConversionTracking from "@/components/AdsConversionTracking";
 import SidhuInsightsBeacon from "@/components/SidhuInsightsBeacon";
+import PublicAdminBarStub from "@/components/admin/PublicAdminBarStub";
 import JsonLd from "@/components/JsonLd";
 import { SiteContentProvider } from "@/components/SiteContentProvider";
 import CmsPreviewSeo from "@/components/CmsPreviewSeo";
@@ -203,6 +204,7 @@ export default async function RootLayout({
           <TrackingConsent />
           <AdsConversionTracking />
           <SidhuInsightsBeacon />
+          <PublicAdminBarStub />
           <WhatsAppButton />
         </SiteContentProvider>
       </body>

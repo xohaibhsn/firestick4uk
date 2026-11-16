@@ -7,6 +7,7 @@ import {
   ADMIN_CONTENT_SECTIONS,
   type AdminField,
 } from "@/lib/adminContentFields";
+import { getCmsAppearsOn } from "@/lib/cmsAppearsOn";
 
 export type CmsFindHit = {
   key: string;
@@ -105,6 +106,42 @@ function collectFieldMeta(): FieldMeta[] {
     }
   }
   return out;
+}
+
+const APPEARS_PAGE_TO_EDIT: Record<string, string> = {
+  Home: "home",
+  About: "about",
+  Contact: "contact",
+  FAQ: "faq",
+  Footer: "footer",
+  Products: "products",
+  "Cart / Checkout": "cart",
+  "Order tracking": "tracking",
+  Blog: "blog",
+  Legal: "legal",
+  Global: "global",
+  Subscriptions: "subscription",
+  "Seasonal offers": "home",
+  "Site Settings": "settings",
+};
+
+/** Exact key lookup for Find-text Go / deep links (null if unknown). */
+export function lookupCmsFieldByKey(key: string): FieldMeta | null {
+  const k = String(key || "").trim();
+  if (!k) return null;
+  const meta = collectFieldMeta();
+  const hit = meta.find((m) => m.key === k);
+  if (hit) return hit;
+  const appears = getCmsAppearsOn(k);
+  if (!appears) return null;
+  const page = APPEARS_PAGE_TO_EDIT[appears.pageLabel];
+  if (!page || page === "settings") return null;
+  return {
+    key: k,
+    label: k.replace(/_/g, " "),
+    page,
+    section: appears.sectionLabel,
+  };
 }
 
 function highlightSnippet(value: string, q: string): string {
