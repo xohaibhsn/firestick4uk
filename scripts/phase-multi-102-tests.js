@@ -174,10 +174,12 @@ function loadTs(rel, stubs = {}) {
   ok("settings_section_branding", settingsSlice.includes('settings-section-branding'));
   ok("settings_no_payments_section", !settingsSlice.includes("settings-section-payments"));
   ok(
-    "other_settings_empty",
+    "other_settings_trust_activation",
     Array.isArray(groups.SITE_SETTINGS_OTHER_KEYS) &&
-      groups.SITE_SETTINGS_OTHER_KEYS.length === 0
+      groups.SITE_SETTINGS_OTHER_KEYS.length === 1 &&
+      groups.SITE_SETTINGS_OTHER_KEYS[0] === "trust_activation"
   );
+  ok("settings_section_other", settingsSlice.includes("settings-section-other"));
 
   // Product sections
   ok("product_section_basic", sidhu.includes("product-section-basic_info"));

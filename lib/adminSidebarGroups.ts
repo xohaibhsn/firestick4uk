@@ -289,8 +289,8 @@ export const SITE_SETTINGS_FIELD_MAP: Record<
   tracking_ads: ["ads_conv_label_purchase", "ads_conv_label_whatsapp"],
 };
 
-/** Keys with no confident home → Other (report). Currently none — whatsapp_icon in Contact. */
-export const SITE_SETTINGS_OTHER_KEYS: string[] = [];
+/** Keys with no confident home → Other. Denylisted trust_activation (no public readers). */
+export const SITE_SETTINGS_OTHER_KEYS: string[] = ["trust_activation"];
 
 export const PRODUCT_EDITOR_SECTIONS = [
   "basic_info",

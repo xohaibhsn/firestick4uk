@@ -26,6 +26,7 @@ import ProductSeasonalityPanel from "@/components/admin/ProductSeasonalityPanel"
 import {
   PRODUCT_EDITOR_SECTION_TITLES,
   PRODUCT_EDITOR_SECTIONS,
+  SITE_SETTINGS_OTHER_KEYS,
   SITE_SETTINGS_SECTION_TITLES,
 } from "@/lib/adminSidebarGroups";
 import { buildProductEditorSavePayload } from "@/lib/productEditorSavePayload";
@@ -7961,6 +7962,38 @@ function AdminPageInner() {
                 </div>
 
 </CollapsibleSection>
+
+                <CollapsibleSection
+                title={SITE_SETTINGS_SECTION_TITLES.other}
+                open={!!settingsSectionOpen.other}
+                onToggle={() => setSettingsSectionOpen(st => ({...st, other: !st.other}))}
+                fieldCount={SITE_SETTINGS_OTHER_KEYS.length}
+                testId="settings-section-other"
+              >
+                <div className="modal-field" data-cms-field="trust_activation" data-testid="settings-trust-activation">
+                  <label>Activation Trust Text{settingsHistoryBtn("trust_activation","Activation Trust Text")}</label>
+                  <div style={{fontSize:11,color:"#888",marginBottom:8,lineHeight:1.45}}>
+                    Internal/denylisted site_content key (not shown on the public site). Used for CMS stale-write drills only.
+                  </div>
+                  <textarea
+                    rows={3}
+                    style={{width:"100%",resize:"vertical"}}
+                    value={siteContent.trust_activation||""}
+                    onChange={e=>setSiteContent(s=>({...s,trust_activation:e.target.value}))}
+                    placeholder="Activation trust text"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{marginTop:8}}
+                  disabled={contentSaving}
+                  data-testid="settings-other-save"
+                  onClick={()=>saveContent(dirtyKeysAmong(SITE_SETTINGS_OTHER_KEYS))}
+                >
+                  {contentSaving?"Saving...":"Save other settings"}
+                </button>
+              </CollapsibleSection>
 
                 {adminRole === "super_admin" && (
                 <CollapsibleSection
