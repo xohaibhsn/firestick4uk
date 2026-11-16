@@ -1,0 +1,14 @@
+[
+  { "path": "/", "key": "home" },
+  { "path": "/products", "key": "products" },
+  { "path": "/products/firestick-4k", "key": "pdp_firestick" },
+  { "path": "/products/black-friday-3-year-iptv-deal", "key": "pdp_bf" },
+  { "path": "/iptv-subscriptions-uk", "key": "iptv" },
+  { "path": "/seasonal-offers", "key": "seasonal" },
+  { "path": "/contact", "key": "contact" },
+  { "path": "/faq", "key": "faq" },
+  { "path": "/about", "key": "about" },
+  { "path": "/order-tracking", "key": "tracking" },
+  { "path": "/blog", "key": "blog" },
+  { "path": "/cart", "key": "cart" }
+]
