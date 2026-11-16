@@ -320,7 +320,7 @@ const styles = `
 
 type Tab = "dashboard"|"orders"|"products"|"customers"|"leads"|"reviews"|"blog"|"settings"|"pages"|"coupons"|"builder"|"faqadmin"|"staff"|"audit"|"media"|"history"|"seo"|"redirects"|"insights";
 type AdminRole = "super_admin"|"manager"|"writer";
-type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; };
+type BlogPost = { id:number; title:string; slug:string; excerpt:string; content:string; category:string; emoji:string; badge:string; badgeText:string; featured_image:string; meta_title:string; meta_description:string; focus_keyword:string; status:"published"|"draft"; featured:boolean; canonical_url:string; faqs:Array<{question:string;answer:string}>; base_hash?: string; };
 type ChatLead = { id:number; customer_name:string; customer_whatsapp:string; customer_email:string|null; interested_in:string; chat_history:string; ip_address:string; created_at:string; handled?: number; handled_at?: string|null; };
 
 /** Additive SEO banner from post-save guard (client-safe; no server import). */
@@ -571,6 +571,8 @@ function AdminPageInner() {
   const [editBlog, setEditBlog] = useState<typeof defaultBlog>(defaultBlog);
   /** When true, this edit session opened a published post — slug stays protected even if status toggled to draft. */
   const [blogSlugLocked, setBlogSlugLocked] = useState(false);
+  /** Server base_hash for the open blog editor. Not part of the edit buffer. */
+  const [blogEditorBaseHash, setBlogEditorBaseHash] = useState<string | undefined>(undefined);
 
   // Site Content
   const [siteContent, setSiteContent] = useState<Record<string,string>>({});
@@ -2430,27 +2432,95 @@ function AdminPageInner() {
     fetch("/api/blog").then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setBlogPosts(d); }).catch(()=>{});
   };
 
-  const saveBlog = async () => {
+  const saveBlog = async (opts?: { force?: boolean }) => {
     const content = editorRef.current?.innerHTML || editBlog.content;
     const payload = { ...editBlog, content };
     const isNew = blogModal === "new";
-    const res = await fetch("/api/blog", {
-      method: isNew ? "POST" : "PUT",
-      credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(isNew ? payload : { ...payload, id: (blogModal as BlogPost).id }),
-    }).then(r=>r.json()).catch(()=>({}));
+    const body: Record<string, unknown> = isNew
+      ? { ...payload }
+      : { ...payload, id: (blogModal as BlogPost).id };
+    if (!isNew && typeof blogEditorBaseHash === "string") body.base_hash = blogEditorBaseHash;
+    if (!isNew && opts?.force === true) body.force = true;
+    let status = 0;
+    let res: any = {};
+    try {
+      const r = await fetch("/api/blog", {
+        method: isNew ? "POST" : "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      status = r.status;
+      res = await r.json().catch(() => ({}));
+    } catch {
+      res = {};
+    }
+    if (status === 401) {
+      handleSessionExpired();
+      return;
+    }
+    if (!isNew && status === 409 && res.error === "stale") {
+      // Keep the editor open and keep the unsaved buffer.
+      const conflicts: Array<{ id?: number; title?: string }> = Array.isArray(res.conflicts)
+        ? res.conflicts
+        : [];
+      const title = String(conflicts[0]?.title || editBlog.title || "this post");
+      const choice = await askChoose(
+        `This post was changed by someone else after you opened it: ${title}. Reload to get the latest version, or Overwrite to keep yours.`,
+        [
+          { id: "reload", label: "Reload", variant: "default" },
+          { id: "overwrite", label: "Overwrite", variant: "danger" },
+        ]
+      );
+      if (choice === "reload") {
+        const discard = await askConfirm(
+          "Discard your unsaved edits and reload the latest version of this post?"
+        );
+        if (!discard) return;
+        const id = (blogModal as BlogPost).id;
+        try {
+          const rr = await fetch(`/api/blog?id=${id}`, { credentials: "include" });
+          if (rr.status === 401) {
+            handleSessionExpired();
+            return;
+          }
+          const fresh = await rr.json().catch(() => null);
+          if (fresh && fresh.id) {
+            openEditBlog(fresh);
+            setBlogPosts((prev) =>
+              prev.map((p) => (p.id === fresh.id ? ({ ...p, ...fresh } as BlogPost) : p))
+            );
+            setBlogMsg("Reloaded latest version of this post");
+          } else {
+            setBlogMsg("❌ Could not reload this post — your edits are still here");
+          }
+        } catch {
+          setBlogMsg("❌ Could not reload this post — your edits are still here");
+        }
+        setTimeout(() => setBlogMsg(""), 4000);
+        return;
+      }
+      if (choice === "overwrite") {
+        return saveBlog({ force: true });
+      }
+      setBlogMsg("Save cancelled — unresolved conflict");
+      setTimeout(() => setBlogMsg(""), 4000);
+      return;
+    }
     if (res.success) {
       const isDraft = String((payload as any).status || "").toLowerCase() === "draft";
       const base = isDraft ? "✅ Draft saved" : isNew ? "✅ Post published!" : "✅ Post updated!";
       setBlogMsg(`${base}${formatSeoGuardBannerClient(res.seo_guard)}`);
       setBlogMetaAi({ status: "idle" });
+      const nextHash = typeof res.base_hash === "string" ? res.base_hash : undefined;
+      if (!isNew && nextHash) setBlogEditorBaseHash(nextHash);
       setBlogModal(null);
       // Local update first (temporary negative id for new posts until the refetch lands).
       if (isNew) {
         setBlogPosts((prev) => [{ ...(payload as any), id: -Date.now() } as BlogPost, ...prev]);
       } else {
         const editedId = (blogModal as BlogPost).id;
-        setBlogPosts((prev) => prev.map((p) => (p.id === editedId ? ({ ...p, ...(payload as any), id: editedId } as BlogPost) : p)));
+        setBlogPosts((prev) => prev.map((p) => (p.id === editedId ? ({ ...p, ...(payload as any), id: editedId, ...(nextHash ? { base_hash: nextHash } : {}) } as BlogPost) : p)));
       }
       fetchBlogs();
     } else {
@@ -3094,14 +3164,15 @@ function AdminPageInner() {
     });
   };
 
-  const openEditBlog = (p: any) => {
+  function openEditBlog(p: any) {
     setBlogMetaAi({ status: "idle" });
     const faqsParsed = p.faqs ? (typeof p.faqs === "string" ? JSON.parse(p.faqs) : p.faqs) : [];
     setEditBlog({title:p.title,slug:p.slug||"",excerpt:p.excerpt||"",content:p.content||"",category:p.category||"Guides",emoji:p.emoji||"📝",badge:p.badge||"guide",badgeText:p.badgeText||"Guide",featured_image:p.featured_image||"",meta_title:p.meta_title||"",meta_description:p.meta_description||"",focus_keyword:p.focus_keyword||"",status:p.status||"published",featured:!!p.featured,canonical_url:p.canonical_url||"",faqs:faqsParsed});
+    setBlogEditorBaseHash(typeof p.base_hash === "string" ? p.base_hash : undefined);
     setBlogSlugLocked(p.status === "published");
     setBlogModal(p);
     setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML=p.content||"";},80);
-  };
+  }
 
   // Global search → open a product/blog editor once its list has loaded.
   const [pendingSearchOpen, setPendingSearchOpen] = useState<{ kind: "product" | "blog"; id: string } | null>(null);
@@ -5837,7 +5908,7 @@ function AdminPageInner() {
                   🕘 History
                 </button>
               )}
-              <button className="modal-save" onClick={saveBlog} disabled={!editBlog.title}>
+              <button className="modal-save" onClick={() => { void saveBlog(); }} disabled={!editBlog.title}>
                 {editBlog.status==="published"?"Publish Post":"Save Draft"}
               </button>
             </div>
@@ -6536,7 +6607,7 @@ function AdminPageInner() {
             <div className="section-card">
               <div className="section-header">
                 <div className="section-title">Blog Posts ({blogPosts.length})</div>
-                <button className="add-btn" onClick={() => { setBlogMetaAi({ status: "idle" }); setEditBlog(defaultBlog); setBlogSlugLocked(false); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML="";},50); setBlogModal("new"); }}>+ Add Post</button>
+                <button className="add-btn" onClick={() => { setBlogMetaAi({ status: "idle" }); setEditBlog(defaultBlog); setBlogSlugLocked(false); setBlogEditorBaseHash(undefined); setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML="";},50); setBlogModal("new"); }}>+ Add Post</button>
               </div>
               <div className="table-wrap">
                 <table>

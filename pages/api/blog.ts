@@ -13,7 +13,12 @@ import {
   requireSuppliedBlogStatus,
   updateBlogPost,
 } from '../../lib/blogPersistenceServer';
+import { blogRowBaseHash } from '../../lib/blogBaseHash';
 import { getClientIp, RL_PUBLIC_GET } from '../../lib/rateLimit';
+
+function withAdminBlogBaseHash<T extends Record<string, unknown>>(row: T): T & { base_hash: string } {
+  return { ...row, base_hash: blogRowBaseHash(row) };
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -48,10 +53,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (id) {
         const [rows]: any = await pool.query('SELECT * FROM blog_posts WHERE id = ? LIMIT 1', [id]);
-        return res.status(200).json(rows[0] || null);
+        const row = rows[0] || null;
+        return res.status(200).json(row ? withAdminBlogBaseHash(row) : null);
       }
       const [rows]: any = await pool.query('SELECT * FROM blog_posts WHERE active = 1 ORDER BY created_at DESC');
-      return res.status(200).json(Array.isArray(rows) ? rows : []);
+      const list = Array.isArray(rows) ? rows : [];
+      return res.status(200).json(list.map((row: Record<string, unknown>) => withAdminBlogBaseHash(row)));
     }
 
     if (req.method === 'POST') {
@@ -113,10 +120,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           mode,
           source: 'manual_cms',
           ip,
+          baseHash: typeof body.base_hash === 'string' ? body.base_hash : undefined,
+          force: body.force === true,
         });
         return res.status(200).json(result);
       } catch (err) {
         if (err instanceof BlogPersistenceError) {
+          if (err.code === 'stale') {
+            return res.status(409).json({
+              error: 'stale',
+              conflicts: Array.isArray(err.conflicts) ? err.conflicts : [],
+            });
+          }
           return res.status(err.status).json({ error: err.message, code: err.code });
         }
         throw err;

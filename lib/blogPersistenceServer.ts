@@ -27,6 +27,7 @@ import {
   type BlogPrePublishQaResult,
   type ExistingBlogPostInventoryRow,
 } from "@/lib/blogPrePublishQa";
+import { blogRowBaseHash } from "@/lib/blogBaseHash";
 
 export type BlogWriteMode = "draft" | "publish";
 export type BlogWriteSource = "manual_cms" | "autonomous";
@@ -56,12 +57,20 @@ export type BlogPostPatch = BlogPostInput & {
 export class BlogPersistenceError extends Error {
   status: number;
   code: string;
+  /** Present on stale-write 409 only: [{ id, title }] of the locked row. */
+  conflicts?: Array<{ id: number; title: string }>;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    conflicts?: Array<{ id: number; title: string }>
+  ) {
     super(message);
     this.name = "BlogPersistenceError";
     this.status = status;
     this.code = code;
+    if (conflicts) this.conflicts = conflicts;
   }
 }
 
@@ -536,7 +545,26 @@ export type UpdateBlogPostResult = {
   success: true;
   changed_fields: string[];
   seo_guard: SeoGuardResult;
+  /** Hash of the row as stored after this call (locked row when nothing changed). */
+  base_hash: string;
 };
+
+const BLOG_REREAD_SELECT = "SELECT * FROM blog_posts WHERE id = ? LIMIT 1";
+
+async function auditBlogOverwriteStale(
+  deps: BlogPersistenceDeps,
+  args: { actor: AdminIdentity; id: number; ip?: string | null }
+): Promise<void> {
+  await deps.recordAdminAudit({
+    actor: args.actor,
+    action: "blog.overwrite_stale",
+    entityType: "blog",
+    entityId: args.id,
+    summary: `Overwrote stale blog post ${args.id}`,
+    metadata: { id: args.id },
+    ip: args.ip,
+  });
+}
 
 export async function updateBlogPost(args: {
   actor: AdminIdentity;
@@ -550,6 +578,10 @@ export async function updateBlogPost(args: {
   statusOnly?: boolean;
   /** Enforce locked-row status at the authoritative mutation point. */
   requiredCurrentStatus?: "draft" | "published";
+  /** Admin editor token. Omitted → last-write-wins (legacy). */
+  baseHash?: string;
+  /** Proceed when baseHash does not match the locked row. */
+  force?: boolean;
   deps?: Partial<BlogPersistenceDeps>;
 }): Promise<UpdateBlogPostResult> {
   const deps = { ...defaultDeps(), ...args.deps };
@@ -559,10 +591,14 @@ export async function updateBlogPost(args: {
   }
 
   const patch = (args.patch || {}) as Record<string, unknown>;
+  const hasBaseHash = typeof args.baseHash === "string";
+  const force = args.force === true;
   const conn = await deps.getConnection();
   let nextTitle: unknown = id;
   let changedFields: string[] = [];
   let wrote = false;
+  let noop = false;
+  let resultHash = "";
 
   try {
     await conn.beginTransaction();
@@ -586,6 +622,14 @@ export async function updateBlogPost(args: {
       );
     }
 
+    if (!hasBaseHash) {
+      console.log("blog.save_without_base_hash", id);
+    } else if (!force && blogRowBaseHash(current) !== args.baseHash) {
+      throw new BlogPersistenceError(409, "stale", "stale", [
+        { id, title: String(current.title ?? "") },
+      ]);
+    }
+
     const built = buildNextBlogState({
       current,
       patch,
@@ -599,31 +643,29 @@ export async function updateBlogPost(args: {
 
     if (built.changedFields.length === 0) {
       await conn.commit();
-      const skip = deps.shouldRunPostSaveSeoGuard({
-        entityType: "blog",
-        operation: "update",
-        changedFields: [],
+      resultHash = blogRowBaseHash(current);
+      noop = true;
+    } else {
+      await writeRevisionAndUpdate({
+        deps,
+        conn,
+        actor: args.actor,
+        id,
+        current,
+        next: built.next,
+        changedFields: built.changedFields,
       });
-      return {
-        success: true,
-        changed_fields: [],
-        seo_guard: skippedSeoGuard(id, skip.skip_reason || "noop_update"),
-      };
+      const [freshRows]: any = await conn.query(BLOG_REREAD_SELECT, [id]);
+      const fresh =
+        Array.isArray(freshRows) && freshRows[0] ? freshRows[0] : null;
+      resultHash = blogRowBaseHash(
+        (fresh || built.next) as Record<string, unknown>
+      );
+      await conn.commit();
+      wrote = true;
+      nextTitle = built.next.title;
+      changedFields = built.changedFields;
     }
-
-    await writeRevisionAndUpdate({
-      deps,
-      conn,
-      actor: args.actor,
-      id,
-      current,
-      next: built.next,
-      changedFields: built.changedFields,
-    });
-    await conn.commit();
-    wrote = true;
-    nextTitle = built.next.title;
-    changedFields = built.changedFields;
   } catch (txErr: any) {
     try {
       await conn.rollback();
@@ -639,12 +681,21 @@ export async function updateBlogPost(args: {
     conn.release();
   }
 
+  if (force && (wrote || noop)) {
+    await auditBlogOverwriteStale(deps, { actor: args.actor, id, ip: args.ip });
+  }
+
   if (!wrote) {
-    // unreachable: no-op returns inside try
+    const skip = deps.shouldRunPostSaveSeoGuard({
+      entityType: "blog",
+      operation: "update",
+      changedFields: [],
+    });
     return {
       success: true,
       changed_fields: [],
-      seo_guard: skippedSeoGuard(id, "noop_update"),
+      seo_guard: skippedSeoGuard(id, skip.skip_reason || "noop_update"),
+      base_hash: resultHash,
     };
   }
 
@@ -664,7 +715,7 @@ export async function updateBlogPost(args: {
     operation: "update",
     changedFields,
   });
-  return { success: true, changed_fields: changedFields, seo_guard };
+  return { success: true, changed_fields: changedFields, seo_guard, base_hash: resultHash };
 }
 
 /** Always creates status=draft. Caller cannot override to published. */
