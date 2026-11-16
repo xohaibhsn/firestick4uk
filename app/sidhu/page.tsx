@@ -618,7 +618,7 @@ function AdminPageInner() {
   const [sectionMsg, setSectionMsg] = useState("");
 
   // FAQs
-  type FAQ = { id:number; question:string; answer:string; category:string; sort_order:number; is_visible:number; };
+  type FAQ = { id:number; question:string; answer:string; category:string; sort_order:number; is_visible:number; base_hash?: string; };
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [faqModal, setFaqModal] = useState<FAQ|"new"|null>(null);
   const [editFaq, setEditFaq] = useState({ question:"", answer:"", category:"General" });
@@ -2945,11 +2945,177 @@ function AdminPageInner() {
     if (res.success) {
       setFaqMsg("✅ FAQ order saved");
       setFaqOrderDirty(false);
+      // Refresh list so base_hash values match post-reorder sort_order.
       void loadFaqs();
     } else {
       setFaqMsg(`❌ ${res.error || "Reorder failed"}`);
     }
     setTimeout(() => setFaqMsg(""), 3000);
+  };
+
+  /** PUT /api/faqs for the edit modal — sends base_hash; handles 409 stale. */
+  const saveFaqModal = async (opts?: { force?: boolean }) => {
+    if (!faqModal || faqModal === "new") return;
+    if (!editFaq.question || !editFaq.answer) {
+      setFaqMsg("❌ Question and answer required");
+      return;
+    }
+    const current = faqModal as FAQ;
+    const body: Record<string, unknown> = { ...current, ...editFaq };
+    if (typeof current.base_hash === "string") body.base_hash = current.base_hash;
+    if (opts?.force === true) body.force = true;
+    const res = await fetch("/api/faqs", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        return { status: r.status, ...data };
+      })
+      .catch(() => ({ status: 0 }));
+
+    if (res.status === 401) {
+      handleSessionExpired();
+      return;
+    }
+    if (res.status === 409 && res.error === "stale") {
+      // Keep the modal open and keep the unsaved buffer.
+      const conflicts: Array<{ id?: number; question?: string }> = Array.isArray(res.conflicts)
+        ? res.conflicts
+        : [];
+      const question = String(conflicts[0]?.question || editFaq.question || "this FAQ");
+      const choice = await askChoose(
+        `This FAQ was changed by someone else after you loaded it: ${question}. Reload to get the latest version, or Overwrite to keep yours.`,
+        [
+          { id: "reload", label: "Reload", variant: "default" },
+          { id: "overwrite", label: "Overwrite", variant: "danger" },
+        ]
+      );
+      if (choice === "reload") {
+        const discard = await askConfirm(
+          "Discard your unsaved edits and reload the latest version of this FAQ?"
+        );
+        if (!discard) return;
+        const id = current.id;
+        try {
+          const rr = await fetch("/api/faqs?admin=true", { credentials: "include" });
+          if (rr.status === 401) {
+            handleSessionExpired();
+            return;
+          }
+          const freshList = await rr.json().catch(() => null);
+          if (Array.isArray(freshList)) {
+            setFaqs(freshList);
+            const fresh = freshList.find((f: FAQ) => f.id === id);
+            if (fresh && fresh.id) {
+              setFaqModal(fresh);
+              setEditFaq({
+                question: fresh.question,
+                answer: fresh.answer,
+                category: fresh.category,
+              });
+              setFaqMsg("Reloaded latest version of this FAQ");
+              setTimeout(() => setFaqMsg(""), 4000);
+              return;
+            }
+          }
+          setFaqMsg("❌ Could not reload this FAQ — your edits are still here");
+        } catch {
+          setFaqMsg("❌ Could not reload this FAQ — your edits are still here");
+        }
+        setTimeout(() => setFaqMsg(""), 4000);
+        return;
+      }
+      if (choice === "overwrite") {
+        return saveFaqModal({ force: true });
+      }
+      setFaqMsg("Save cancelled — unresolved conflict");
+      setTimeout(() => setFaqMsg(""), 4000);
+      return;
+    }
+    if (res.success) {
+      const nextHash = typeof res.base_hash === "string" ? res.base_hash : undefined;
+      setFaqMsg("✅ FAQ updated");
+      setFaqs((prev) =>
+        prev.map((x: FAQ) =>
+          x.id === current.id
+            ? ({ ...x, ...editFaq, ...(nextHash ? { base_hash: nextHash } : {}) } as FAQ)
+            : x
+        )
+      );
+      setFaqModal(null);
+      void loadFaqs();
+    } else {
+      setFaqMsg(`❌ ${res.error || "Save failed"}`);
+    }
+    setTimeout(() => setFaqMsg(""), 3000);
+  };
+
+  /** Visible/Hidden toggle PUT — sends base_hash; on 409 does not flip local state. */
+  const toggleFaqVisibility = async (f: FAQ, opts?: { force?: boolean }) => {
+    const nextVisible = f.is_visible ? 0 : 1;
+    const body: Record<string, unknown> = { ...f, is_visible: nextVisible };
+    if (typeof f.base_hash === "string") body.base_hash = f.base_hash;
+    if (opts?.force === true) body.force = true;
+    const res = await fetch("/api/faqs", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        return { status: r.status, ...data };
+      })
+      .catch(() => ({ status: 0 }));
+
+    if (res.status === 401) {
+      handleSessionExpired();
+      return;
+    }
+    if (res.status === 409 && res.error === "stale") {
+      const conflicts: Array<{ id?: number; question?: string }> = Array.isArray(res.conflicts)
+        ? res.conflicts
+        : [];
+      const question = String(conflicts[0]?.question || f.question || "this FAQ");
+      const choice = await askChoose(
+        `This FAQ was changed by someone else after you loaded it: ${question}. Reload to get the latest version, or Overwrite to keep yours.`,
+        [
+          { id: "reload", label: "Reload", variant: "default" },
+          { id: "overwrite", label: "Overwrite", variant: "danger" },
+        ]
+      );
+      if (choice === "reload") {
+        void loadFaqs();
+        setFaqMsg("Reloaded latest FAQ list");
+        setTimeout(() => setFaqMsg(""), 4000);
+        return;
+      }
+      if (choice === "overwrite") {
+        return toggleFaqVisibility(f, { force: true });
+      }
+      // Cancel — local visibility unchanged
+      setFaqMsg("Toggle cancelled — unresolved conflict");
+      setTimeout(() => setFaqMsg(""), 4000);
+      return;
+    }
+    if (res.success) {
+      const nextHash = typeof res.base_hash === "string" ? res.base_hash : undefined;
+      setFaqs((prev) =>
+        prev.map((x: FAQ) =>
+          x.id === f.id
+            ? ({ ...x, is_visible: nextVisible, ...(nextHash ? { base_hash: nextHash } : {}) } as FAQ)
+            : x
+        )
+      );
+      void loadFaqs();
+    } else {
+      setFaqMsg(`❌ ${res.error || "Update failed"}`);
+      setTimeout(() => setFaqMsg(""), 3000);
+      void loadFaqs();
+    }
   };
 
   const handleProductImage = async (file: File) => {
@@ -7234,7 +7400,7 @@ function AdminPageInner() {
                               >↓</button>
                             </td>
                             <td style={{maxWidth:320,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.question}</td>
-                            <td><span style={{fontSize:11,background:f.is_visible?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${f.is_visible?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,color:f.is_visible?"#00c864":"#ff6666",padding:"3px 10px",borderRadius:20,cursor:"pointer"}} onClick={async()=>{const vr=await fetch("/api/faqs",{method:"PUT",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({...f,is_visible:f.is_visible?0:1})}).then(x=>x.json()).catch(()=>({}));if(vr.success){setFaqs(prev=>prev.map((x:FAQ)=>x.id===f.id?{...x,is_visible:f.is_visible?0:1}:x));}else{setFaqMsg(`❌ ${vr.error||"Update failed"}`);setTimeout(()=>setFaqMsg(""),3000);}void loadFaqs();}}>{f.is_visible?"Visible":"Hidden"}</span></td>
+                            <td><span style={{fontSize:11,background:f.is_visible?"rgba(0,200,100,0.1)":"rgba(255,68,68,0.1)",border:`1px solid ${f.is_visible?"rgba(0,200,100,0.3)":"rgba(255,68,68,0.25)"}`,color:f.is_visible?"#00c864":"#ff6666",padding:"3px 10px",borderRadius:20,cursor:"pointer"}} onClick={()=>{void toggleFaqVisibility(f);}}>{f.is_visible?"Visible":"Hidden"}</span></td>
                             <td>
                               <button className="action-btn btn-edit" style={{marginRight:6}} onClick={()=>{setEditFaq({question:f.question,answer:f.answer,category:f.category});setFaqModal(f);}}>Edit</button>
                               <button className="action-btn btn-delete" onClick={async()=>{if (!(await askConfirm("Delete this FAQ?"))) return;const dr=await fetch(`/api/faqs?id=${f.id}`,{method:"DELETE",credentials:"include"}).then(x=>x.json()).catch(()=>({}));if(dr.success){setFaqs(prev=>prev.filter((x:FAQ)=>x.id!==f.id));}else{setFaqMsg(`❌ ${dr.error||"Delete failed"}`);setTimeout(()=>setFaqMsg(""),3000);}void loadFaqs();}}>Delete</button>
@@ -7261,11 +7427,14 @@ function AdminPageInner() {
                   <button className="modal-cancel" onClick={()=>setFaqModal(null)}>Cancel</button>
                   <button className="modal-save" onClick={async()=>{
                     if(!editFaq.question||!editFaq.answer){setFaqMsg("❌ Question and answer required");return;}
-                    let res: any;
-                    if(faqModal==="new"){res=await fetch("/api/faqs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(editFaq)}).then(r=>r.json()).catch(()=>({}));if(res.success){setFaqMsg("✅ FAQ added");setFaqs(prev=>[...prev,{id:res.id,...editFaq,sort_order:0,is_visible:1} as FAQ]);}}
-                    else{res=await fetch("/api/faqs",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...(faqModal as FAQ),...editFaq})}).then(r=>r.json()).catch(()=>({}));if(res.success){setFaqMsg("✅ FAQ updated");setFaqs(prev=>prev.map((x:FAQ)=>x.id===(faqModal as FAQ).id?{...x,...editFaq}:x));}}
-                    if(!res.success) setFaqMsg(`❌ ${res.error||"Save failed"}`); else void loadFaqs();
-                    setFaqModal(null);setTimeout(()=>setFaqMsg(""),3000);
+                    if(faqModal==="new"){
+                      const res=await fetch("/api/faqs",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify(editFaq)}).then(r=>r.json()).catch(()=>({}));
+                      if(res.success){setFaqMsg("✅ FAQ added");setFaqs(prev=>[...prev,{id:res.id,...editFaq,sort_order:0,is_visible:1} as FAQ]);void loadFaqs();setFaqModal(null);}
+                      else setFaqMsg(`❌ ${res.error||"Save failed"}`);
+                      setTimeout(()=>setFaqMsg(""),3000);
+                      return;
+                    }
+                    void saveFaqModal();
                   }}>Save FAQ</button>
                 </div>
               </div>

@@ -4,9 +4,14 @@ import { getRequestMeta, requireAdminPermission } from '../../lib/adminAuth';
 import { recordAdminAudit } from '../../lib/adminAudit';
 import { setAdminNoStore } from '../../lib/adminNoStore';
 import { getClientIp, RL_PUBLIC_GET } from '../../lib/rateLimit';
+import { faqRowBaseHash } from '../../lib/faqBaseHash';
 
 /** Columns used by public FAQ UI (FAQClient, contact preview, PublicFaq). */
 const PUBLIC_FAQ_COLUMNS = 'id, question, answer, category, sort_order';
+
+function withAdminFaqBaseHash<T extends Record<string, unknown>>(row: T): T & { base_hash: string } {
+  return { ...row, base_hash: faqRowBaseHash(row) };
+}
 
 function parseIdList(raw: unknown): number[] | null {
   if (!Array.isArray(raw)) return null;
@@ -38,8 +43,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!identity) return;
         let query = 'SELECT * FROM faqs';
         query += ' ORDER BY category, sort_order ASC';
-        const [rows] = await pool.query(query);
-        return res.status(200).json(Array.isArray(rows)?rows:[]);
+        const [rows]: any = await pool.query(query);
+        const list = Array.isArray(rows) ? rows : [];
+        return res.status(200).json(
+          list.map((row: any) => withAdminFaqBaseHash(row as Record<string, unknown>))
+        );
       }
 
       const ip = getClientIp(req);
@@ -136,12 +144,75 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PUT') {
-      const { id, question, answer, category, sort_order, is_visible } = req.body;
+      const {
+        id,
+        question,
+        answer,
+        category,
+        sort_order,
+        is_visible,
+        base_hash: bodyBaseHash,
+        force: bodyForce,
+      } = req.body;
       if (!id) return res.status(400).json({ error: 'ID required' });
-      await pool.query(
-        'UPDATE faqs SET question=?,answer=?,category=?,sort_order=?,is_visible=? WHERE id=?',
-        [question, answer, category||'General', sort_order||0, is_visible??1, id]
-      );
+      const hasBaseHash = typeof bodyBaseHash === 'string';
+      const force = bodyForce === true;
+      if (!hasBaseHash) {
+        console.log('faq.save_without_base_hash', id);
+      }
+
+      const nextQuestion = question;
+      const nextAnswer = answer;
+      const nextCategory = category || 'General';
+      const nextSortOrder = sort_order || 0;
+      const nextVisible = is_visible ?? 1;
+
+      const conn = await pool.getConnection();
+      let writtenRow: Record<string, unknown> | null = null;
+      try {
+        await conn.beginTransaction();
+        const [lockedRows]: any = await conn.query(
+          'SELECT * FROM faqs WHERE id=? FOR UPDATE',
+          [id]
+        );
+        const locked = lockedRows?.[0] || null;
+
+        // Missing row: keep prior behaviour (no-op UPDATE path + success).
+        if (locked && hasBaseHash && !force) {
+          if (faqRowBaseHash(locked) !== bodyBaseHash) {
+            await conn.rollback();
+            return res.status(409).json({
+              error: 'stale',
+              conflicts: [{ id: Number(locked.id), question: String(locked.question || '') }],
+            });
+          }
+        }
+
+        await conn.query(
+          'UPDATE faqs SET question=?,answer=?,category=?,sort_order=?,is_visible=? WHERE id=?',
+          [nextQuestion, nextAnswer, nextCategory, nextSortOrder, nextVisible, id]
+        );
+        writtenRow = {
+          ...(locked || {}),
+          id,
+          question: nextQuestion,
+          answer: nextAnswer,
+          category: nextCategory,
+          sort_order: nextSortOrder,
+          is_visible: nextVisible,
+        };
+        await conn.commit();
+      } catch (txErr) {
+        try {
+          await conn.rollback();
+        } catch {
+          /* ignore */
+        }
+        throw txErr;
+      } finally {
+        conn.release();
+      }
+
       if (admin) {
         const { ip } = getRequestMeta(req);
         await recordAdminAudit({
@@ -152,8 +223,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           summary: 'Updated FAQ',
           ip,
         });
+        if (force && hasBaseHash) {
+          await recordAdminAudit({
+            actor: admin,
+            action: 'faq.overwrite_stale',
+            entityType: 'faq',
+            entityId: id,
+            summary: 'Overwrote stale FAQ',
+            metadata: { id: Number(id) },
+            ip,
+          });
+        }
       }
-      return res.status(200).json({ success:true });
+      const resultHash = faqRowBaseHash(writtenRow);
+      return res.status(200).json({ success: true, base_hash: resultHash });
     }
 
     if (req.method === 'DELETE') {
