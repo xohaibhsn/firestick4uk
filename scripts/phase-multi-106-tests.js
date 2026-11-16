@@ -587,7 +587,12 @@ function mockRes() {
   ok("sidhu_product_history_only_existing_products", /productModal !== "new" && productModal\.id/.test(sidhu));
   ok("sidhu_mounts_shared_drawer", /<FieldHistoryDrawer\s+target=\{fieldHistoryTarget\}/.test(sidhu) && /role=\{adminRole\}/.test(sidhu));
   ok("sidhu_product_restore_refreshes_editor", /refreshProductAfterHistoryRestore/.test(sidhu) && /applyAuthoritativeProductRow\(row, \{ replaceContent: true, reason: "history-restore" \}\)/.test(sidhu));
-  ok("sidhu_content_restore_refreshes_keys", /refreshRestoredContentKeys/.test(sidhu) && /setSiteContentSaved\(\(s\) => \(\{ \.\.\.s, \.\.\.fresh \}\)\)/.test(sidhu));
+  ok(
+    "sidhu_content_restore_refreshes_keys",
+    /refreshRestoredContentKeys/.test(sidhu) &&
+      (/setSiteContentSaved\(\(s\) => \(\{ \.\.\.s, \.\.\.fresh \}\)\)/.test(sidhu) ||
+        /applySavedContentKeys\(Object\.keys\(fresh\), fresh\)/.test(sidhu))
+  );
   ok("sidhu_preview_force_wired", /forceOverrides=\{cmsPreviewForce\}/.test(sidhu) && /setCmsPreviewForce\(overrides\)/.test(sidhu) && /if \(overrides\) setCmsPreviewOpen\(true\)/.test(sidhu));
   ok("sidhu_preview_cleared_on_pane_close", /setCmsPreviewOpen\(false\); setCmsPreviewForce\(null\)/.test(sidhu));
   ok("sidhu_history_tab_still_gated", /tab==="history" && can\("revisions\.view"\)/.test(sidhu));

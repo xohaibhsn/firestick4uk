@@ -153,8 +153,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const dbPaymentMethod = toDbPaymentMethod(publicPaymentMethod);
 
     // Receipt path allowlist — before any DB / coupon / email work.
-    const receiptPathValue = receipt_path == null ? '' : String(receipt_path);
-    if (!isAllowedReceiptPath(receiptPathValue)) {
+    // COD: ignore receipt_path entirely (pre-MULTI-107 behaviour — never store a receipt).
+    const receiptPathValue =
+      publicPaymentMethod === 'cod'
+        ? ''
+        : receipt_path == null
+          ? ''
+          : String(receipt_path);
+    if (publicPaymentMethod !== 'cod' && !isAllowedReceiptPath(receiptPathValue)) {
       return res.status(400).json({
         error: 'Receipt upload is invalid — please upload your receipt again.',
       });
@@ -333,7 +339,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           postcode,
           notesToStore,
           dbPaymentMethod,
-          receipt_path || '',
+          receiptPathValue || '',
           grandTotal,
           validatedCouponCode,
           discountAmount,
@@ -407,7 +413,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
       const safeAdminPaymentLabel = escapeHtml(adminPaymentLabel);
       // Receipt status only — never attach the file; never link public/guessable receipt URLs.
-      const receiptUploaded = Boolean(String(receipt_path || '').trim());
+      const receiptUploaded = Boolean(String(receiptPathValue || '').trim());
       // Row label is "Receipt"; value must not repeat the "Receipt:" prefix.
       // COD: receipt not required; bank keeps existing attached / not-uploaded strings.
       const receiptStatusLine =

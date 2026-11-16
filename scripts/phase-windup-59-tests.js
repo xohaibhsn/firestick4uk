@@ -193,6 +193,7 @@ const LEGACY_BASELINE_COLS = [
 
 let lastInsertNotes = null;
 let lastInsertPayment = null;
+let lastInsertReceipt = null;
 let sentMails = [];
 
 function sqlText(arg) {
@@ -229,6 +230,7 @@ function makeConn() {
       if (/INSERT INTO orders/i.test(sql)) {
         lastInsertNotes = params[7];
         lastInsertPayment = params[8];
+        lastInsertReceipt = params[9];
         return [{ affectedRows: 1 }, []];
       }
       if (/INSERT INTO order_items/i.test(sql)) return [{ affectedRows: 1 }, []];
@@ -362,6 +364,7 @@ function makeRes() {
 async function invoke(body) {
   lastInsertNotes = null;
   lastInsertPayment = null;
+  lastInsertReceipt = null;
   sentMails = [];
   const handler = loadOrdersHandler();
   const req = {
@@ -481,10 +484,11 @@ function customerMail() {
       payment_method: "cod",
       items: [{ id: 3, qty: 1 }],
       notes: "COD dig <script>x</script>",
-      receipt_path: "",
+      receipt_path: "should-ignore.jpg",
     })
   );
   ok("scenario_cod_digital_ok", res.statusCode === 200 && res.body?.success);
+  ok("cod_digital_db_receipt_ignored", !lastInsertReceipt, JSON.stringify(lastInsertReceipt));
   a = adminMail();
   c = customerMail();
   ok(

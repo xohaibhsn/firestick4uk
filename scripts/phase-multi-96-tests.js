@@ -152,7 +152,7 @@ ok("panel_data_cms_field", /data-cms-field=\{field\.key\}/.test(panel));
 // Save function untouched — still the same async saveContent body signature
 ok(
   "saveContent_untouched_signature",
-  /const saveContent = async \(keys: string\[\], overrides\?: Record<string, string>\) => \{/.test(
+  /const saveContent = async\s*\(\s*keys:\s*string\[\],\s*overrides\?:\s*Record<string,\s*string>(?:\s*,\s*opts\?:\s*\{\s*forceKeys\?:\s*string\[\]\s*\})?\s*\)\s*=>\s*\{/.test(
     sidhu
   ) &&
     /fetch\(["']\/api\/site-content["']\s*,\s*\{\s*method:\s*["']POST["']/.test(sidhu)

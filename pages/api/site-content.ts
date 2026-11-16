@@ -30,6 +30,10 @@ import {
   SEASONAL_HUB_PUBLISHED_KEY,
   validateSeasonalHubPublicationWrite,
 } from '../../lib/seasonalHubPublic';
+import {
+  hashSiteContentValue,
+  SITE_CONTENT_ABSENT_HASH,
+} from '../../lib/siteContentBaseHash';
 
 async function assertSeasonalHubWritesAllowed(
   updateList: Array<{ key: string; value: string }>
@@ -120,7 +124,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'POST') {
       const admin = (req as any).__adminIdentity;
-      const { key, value, updates } = req.body;
+      const { key, value, updates, base_hash: singleBaseHash, force: singleForce } = req.body;
+
+      type UpdateItem = {
+        key: string;
+        value: string;
+        base_hash?: string;
+        force?: boolean;
+      };
 
       const upsert = async (contentKey: string, contentValue: string) => {
         const defaults = DEFAULTS.find((d) => d[0] === contentKey);
@@ -135,19 +146,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
       };
 
-      const updateList: Array<{ key: string; value: string }> = [];
+      const updateList: UpdateItem[] = [];
       if (updates && Array.isArray(updates)) {
         for (const u of updates) {
           if (!u?.key) continue;
           // previous slug is managed server-side only
           if (String(u.key) === 'subscription_previous_slug') continue;
-          updateList.push({ key: String(u.key), value: String(u.value ?? '') });
+          const item: UpdateItem = { key: String(u.key), value: String(u.value ?? '') };
+          if (typeof u.base_hash === 'string') item.base_hash = u.base_hash;
+          if (u.force === true) item.force = true;
+          updateList.push(item);
         }
       } else if (key) {
         if (String(key) === 'subscription_previous_slug') {
           return res.status(400).json({ error: 'subscription_previous_slug is managed automatically' });
         }
-        updateList.push({ key: String(key), value: String(value ?? '') });
+        const item: UpdateItem = { key: String(key), value: String(value ?? '') };
+        if (typeof singleBaseHash === 'string') item.base_hash = singleBaseHash;
+        if (singleForce === true) item.force = true;
+        updateList.push(item);
       } else {
         return res.status(400).json({ error: 'No content keys provided' });
       }
@@ -184,6 +201,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const slugUpdate = updateList.find((u) => u.key === 'subscription_slug');
       let slugChangePrevious: string | undefined;
+      const forcedOverwriteKeys: string[] = [];
+
+      // Legacy items (no base_hash) — accepted as today; log key names only.
+      for (const u of updateList) {
+        if (typeof u.base_hash !== 'string') {
+          console.log('[site-content] legacy_save_no_base_hash', u.key);
+        }
+      }
 
       if (changed.length > 0 || slugUpdate) {
         const entityType = classifySiteContentEntityType(keysForSnapshot);
@@ -194,6 +219,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const conn = await pool.getConnection();
         try {
           await conn.beginTransaction();
+
+          // Stale-write guard: lock submitted keys, compare base_hash (MULTI-108).
+          const [lockedRows]: any = await conn.query(
+            `SELECT content_key, content_value, content_type, page_name, label
+             FROM site_content WHERE content_key IN (${keysForSnapshot.map(() => '?').join(',')})
+             FOR UPDATE`,
+            keysForSnapshot
+          );
+          const lockedValues: Record<string, string> = {};
+          const lockedMeta: Record<string, { label?: string }> = {};
+          for (const r of lockedRows || []) {
+            lockedValues[r.content_key] = r.content_value || '';
+            lockedMeta[r.content_key] = { label: r.label || r.content_key };
+          }
+
+          const conflicts: Array<{ key: string; label?: string }> = [];
+          for (const u of updateList) {
+            if (typeof u.base_hash !== 'string') continue; // legacy — skip guard
+            if (u.force === true) {
+              forcedOverwriteKeys.push(u.key);
+              continue;
+            }
+            const present = Object.prototype.hasOwnProperty.call(lockedValues, u.key);
+            const currentHash = present
+              ? hashSiteContentValue(lockedValues[u.key], true)
+              : SITE_CONTENT_ABSENT_HASH;
+            if (currentHash !== u.base_hash) {
+              conflicts.push({
+                key: u.key,
+                label: lockedMeta[u.key]?.label || u.key,
+              });
+            }
+          }
+          if (conflicts.length > 0) {
+            await conn.rollback();
+            return res.status(409).json({ error: 'stale', conflicts });
+          }
+
           // Re-bind upsert to use conn for transactional consistency
           const upsertTx = async (contentKey: string, contentValue: string) => {
             const defaults = DEFAULTS.find((d) => d[0] === contentKey);
@@ -209,11 +272,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           };
 
           // Build snapshot of previous values for changed keys (+ routing side effects keys)
+          // Prefer locked FOR UPDATE rows for consistency with the stale check.
           const snapKeys = [...new Set([
             ...changed,
             ...(slugUpdate ? ['subscription_slug', 'subscription_previous_slug', 'subscription_canonical'] : []),
           ])];
-          const snapBefore = await loadKeysSnapshot(snapKeys);
+          const snapValues: Record<string, string> = {};
+          const snapRows: Record<string, any> = {};
+          for (const k of snapKeys) {
+            if (Object.prototype.hasOwnProperty.call(lockedValues, k)) {
+              snapValues[k] = lockedValues[k];
+              const row = (lockedRows || []).find((r: any) => r.content_key === k);
+              if (row) {
+                snapRows[k] = {
+                  content_type: row.content_type,
+                  page_name: row.page_name,
+                  label: row.label,
+                };
+              }
+            }
+          }
+          // Keys locked snapshot may miss routing side-effect keys not in the request —
+          // fall back to a non-locking read only for those.
+          const missingSnap = snapKeys.filter((k) => !Object.prototype.hasOwnProperty.call(snapValues, k));
+          if (missingSnap.length) {
+            const [extraRows]: any = await conn.query(
+              `SELECT content_key, content_value, content_type, page_name, label
+               FROM site_content WHERE content_key IN (${missingSnap.map(() => '?').join(',')})
+               FOR UPDATE`,
+              missingSnap
+            );
+            for (const r of extraRows || []) {
+              snapValues[r.content_key] = r.content_value || '';
+              snapRows[r.content_key] = {
+                content_type: r.content_type,
+                page_name: r.page_name,
+                label: r.label,
+              };
+            }
+          }
           await recordContentRevision(
             {
               entityType,
@@ -224,8 +321,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   : `Batch (${keysForSnapshot.length} keys)`,
               revisionAction: 'update',
               snapshot: {
-                values: snapBefore.values,
-                metadata: { rows: snapBefore.rows, keys: snapKeys },
+                values: snapValues,
+                metadata: { rows: snapRows, keys: snapKeys },
               },
               changedFields: snapKeys,
               actor: admin,
@@ -250,7 +347,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                    'subscription_slug',
                    'subscription_previous_slug',
                    'subscription_canonical'
-                 )`
+                 ) FOR UPDATE`
               );
               const currentMap: Record<string, string> = {};
               for (const row of slugRows || []) {
@@ -338,6 +435,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             entityId: null,
             summary: `Updated ${allKeys.length} site content key(s)`,
             metadata: { keys: allKeys, settings_keys: settingsKeys, content_keys: contentKeys },
+            ip,
+          });
+        }
+        if (forcedOverwriteKeys.length > 0) {
+          // Key names only — never values.
+          await recordAdminAudit({
+            actor: admin,
+            action: 'site_content.overwrite_stale',
+            entityType: 'content',
+            entityId: null,
+            summary: `Overwrote stale site_content key(s): ${forcedOverwriteKeys.join(', ')}`,
+            metadata: { keys: forcedOverwriteKeys },
             ip,
           });
         }

@@ -34,6 +34,11 @@ import SeoOverviewPanel from "@/components/admin/SeoOverviewPanel";
 import RedirectManagerPanel from "@/components/admin/RedirectManagerPanel";
 import { AdminDialogProvider, useAdminDialogs } from "@/components/admin/AdminDialogs";
 import {
+  buildBaseHashMap,
+  hashSiteContentValueWeb,
+} from "@/lib/siteContentBaseHashCore";
+
+import {
   applyOrderSummaryDelta as applyOrderSummaryDeltaPure,
   parseMoney as parseMoneyPure,
   REVENUE_ORDER_STATUSES as REVENUE_ORDER_STATUSES_LIB,
@@ -341,7 +346,11 @@ export default function AdminPage() {
 }
 
 function AdminPageInner() {
-  const { showToast, confirm: askConfirm } = useAdminDialogs();
+  const { showToast, confirm: askConfirm, choose: askChoose } = useAdminDialogs();
+  /** MULTI-108 — sha256 hex of loaded site_content values (absent → sentinel hash). */
+  const siteContentBaseHashRef = useRef<Record<string, string>>({});
+  const siteContentAbsentHashRef = useRef<string>("");
+
   const adminAlert = (message: string, kind: "success" | "error" | "info" = "info") => {
     const msg = String(message ?? "");
     const k =
@@ -1383,32 +1392,117 @@ function AdminPageInner() {
     if (!loggedIn) return;
     if (tab !== "settings" && tab !== "pages") return;
     if (!can("content.manage") && !can("settings.manage")) return;
+    let cancelled = false;
     fetch("/api/site-content?page=all&scope=admin", { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => {
-        if (d && typeof d === "object") {
-          setSiteContent(d);
-          setSiteContentSaved(d);
+      .then(async (d) => {
+        if (cancelled || !d || typeof d !== "object") return;
+        setSiteContent(d);
+        setSiteContentSaved(d);
+        try {
+          siteContentAbsentHashRef.current = await hashSiteContentValueWeb(undefined, false);
+          siteContentBaseHashRef.current = await buildBaseHashMap(d as Record<string, string>);
+        } catch {
+          /* hash best-effort — legacy saves still work without base_hash */
         }
       })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [loggedIn, tab, adminRole]);
 
   // Cookie session carries auth — headers are only for Content-Type / optional metadata
   const getRoleHeaders = () => ({});
 
+  const baseHashForKey = (k: string) => {
+    if (Object.prototype.hasOwnProperty.call(siteContentBaseHashRef.current, k)) {
+      return siteContentBaseHashRef.current[k];
+    }
+    return siteContentAbsentHashRef.current || undefined;
+  };
+
   /** Content Editor page saves: only keys that differ from the saved baseline. */
   const dirtyKeysAmong = (keys: string[]) =>
     keys.filter((k) => String(siteContent[k] ?? "") !== String(siteContentSaved[k] ?? ""));
 
-  const saveContent = async (keys: string[], overrides?: Record<string, string>) => {
-    if (!keys.length) {
+  const applySavedContentKeys = async (
+    keys: string[],
+    savedValues: Record<string, string>
+  ) => {
+    setSiteContent((s) => ({ ...s, ...savedValues }));
+    setSiteContentSaved((s) => ({ ...s, ...savedValues }));
+    for (const k of keys) {
+      try {
+        siteContentBaseHashRef.current[k] = await hashSiteContentValueWeb(
+          savedValues[k] ?? "",
+          true
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+
+  const reloadKeepingNonConflicts = async (conflictKeys: string[]) => {
+    const conflictSet = new Set(conflictKeys);
+    const dirtyBefore = Object.keys(siteContent).filter(
+      (k) => String(siteContent[k] ?? "") !== String(siteContentSaved[k] ?? "")
+    );
+    const keepUser: Record<string, string> = {};
+    for (const k of dirtyBefore) {
+      if (!conflictSet.has(k)) keepUser[k] = String(siteContent[k] ?? "");
+    }
+    try {
+      const r = await fetch(
+        "/api/site-content?page=" + "all&scope=admin",
+        { cache: "no-store", credentials: "include" }
+      );
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      const d = await r.json();
+      if (!d || typeof d !== "object") return;
+      const fresh = d as Record<string, string>;
+      siteContentBaseHashRef.current = await buildBaseHashMap(fresh);
+      siteContentAbsentHashRef.current = await hashSiteContentValueWeb(undefined, false);
+      // Server values become the new baseline; restore non-conflicting unsaved edits on top.
+      setSiteContentSaved({ ...fresh });
+      setSiteContent({ ...fresh, ...keepUser });
+    } catch {
+      /* best-effort */
+    }
+  };
+
+  const saveContent = async (
+    keys: string[],
+    overrides?: Record<string, string>,
+    opts?: { forceKeys?: string[] }
+  ) => {
+    // Dirty-only: never send untouched keys (MULTI-104).
+    const dirty = keys.filter(
+      (k) =>
+        String(overrides?.[k] ?? siteContent[k] ?? "") !==
+        String(siteContentSaved[k] ?? "")
+    );
+    if (!dirty.length) {
       setContentMsg("Nothing to save");
       setTimeout(() => setContentMsg(""), 2500);
       return false;
     }
     setContentSaving(true); setContentMsg("");
-    const updates = keys.map(k => ({ key: k, value: overrides?.[k] ?? siteContent[k] ?? "" }));
+    const forceSet = new Set(opts?.forceKeys || []);
+    const updates = dirty.map((k) => {
+      const item: { key: string; value: string; base_hash?: string; force?: boolean } = {
+        key: k,
+        value: overrides?.[k] ?? siteContent[k] ?? "",
+      };
+      const bh = baseHashForKey(k);
+      if (bh) item.base_hash = bh;
+      if (forceSet.has(k)) item.force = true;
+      return item;
+    });
     const res = await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
       body: JSON.stringify({ updates }),
     }).then(async (r) => {
@@ -1422,6 +1516,38 @@ function AdminPageInner() {
     }
     if (res.status === 403) {
       setContentMsg(`❌ ${res.message || res.error || "You do not have permission for this action."}`);
+      setTimeout(() => setContentMsg(""), 4000);
+      return false;
+    }
+    if (res.status === 409 && res.error === "stale") {
+      // Do NOT mark clean — leave siteContent / siteContentSaved untouched.
+      const conflicts: Array<{ key: string; label?: string }> = Array.isArray(res.conflicts)
+        ? res.conflicts
+        : [];
+      const labels = conflicts
+        .map((c) => c.label || c.key)
+        .filter(Boolean)
+        .join(", ");
+      const choice = await askChoose(
+        `These fields were changed by someone else after you opened this page: ${labels}. Reload to get the latest values, or Overwrite to keep yours.`,
+        [
+          { id: "reload", label: "Reload", variant: "default" },
+          { id: "overwrite", label: "Overwrite", variant: "danger" },
+        ]
+      );
+      if (choice === "reload") {
+        await reloadKeepingNonConflicts(conflicts.map((c) => c.key));
+        setContentMsg("Reloaded latest values for conflicting fields");
+        setTimeout(() => setContentMsg(""), 4000);
+        return false;
+      }
+      if (choice === "overwrite") {
+        return saveContent(dirty, overrides, {
+          forceKeys: conflicts.map((c) => c.key),
+        });
+      }
+      // Cancel — stay dirty
+      setContentMsg("Save cancelled — unresolved conflict");
       setTimeout(() => setContentMsg(""), 4000);
       return false;
     }
@@ -1443,20 +1569,21 @@ function AdminPageInner() {
       // Local state first: the saved keys (incl. overrides) become the in-memory values immediately.
       const savedValues: Record<string, string> = {};
       for (const u of updates) savedValues[u.key] = String(u.value ?? "");
-      setSiteContent((s) => ({ ...s, ...savedValues }));
-      setSiteContentSaved((s) => ({ ...s, ...savedValues }));
+      await applySavedContentKeys(
+        updates.map((u) => u.key),
+        savedValues
+      );
       // Background reconcile — only touch the keys we just saved so other unsaved edits survive.
       fetch("/api/site-content?page=all&scope=admin", { cache: "no-store", credentials: "include" })
         .then((r) => r.json())
-        .then((d) => {
+        .then(async (d) => {
           if (!d || typeof d !== "object") return;
           const fresh: Record<string, string> = {};
-          for (const k of keys) {
+          for (const k of dirty) {
             if (typeof (d as any)[k] === "string") fresh[k] = (d as any)[k];
           }
           if (Object.keys(fresh).length) {
-            setSiteContent((s) => ({ ...s, ...fresh }));
-            setSiteContentSaved((s) => ({ ...s, ...fresh }));
+            await applySavedContentKeys(Object.keys(fresh), fresh);
           }
         })
         .catch(() => {});
@@ -1484,12 +1611,30 @@ function AdminPageInner() {
         if (typeof (d as any)[k] === "string") fresh[k] = (d as any)[k];
       }
       if (Object.keys(fresh).length) {
-        setSiteContent((s) => ({ ...s, ...fresh }));
-        setSiteContentSaved((s) => ({ ...s, ...fresh }));
+        await applySavedContentKeys(Object.keys(fresh), fresh);
       }
     } catch {
       /* best-effort refresh — server state is already restored */
     }
+  };
+
+  /** Single-key POST helper used by media uploads — includes base_hash when known. */
+  const postSiteContentKey = async (contentKey: string, contentValue: string) => {
+    const body: { key: string; value: string; base_hash?: string } = {
+      key: contentKey,
+      value: contentValue,
+    };
+    const bh = baseHashForKey(contentKey);
+    if (bh) body.base_hash = bh;
+    return fetch("/api/site-content", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...getRoleHeaders() },
+      body: JSON.stringify(body),
+    }).then(async (r) => {
+      const data = await r.json().catch(() => ({}));
+      return { status: r.status, ...data };
+    });
   };
 
   /** Shared per-field History wiring for Content Editor panels (MULTI-106). */
@@ -1566,10 +1711,11 @@ function AdminPageInner() {
       }).then((r) => r.json());
       if (data.url) {
         setSiteContent((s) => ({ ...s, favicon_url: data.url }));
-        await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
-          body: JSON.stringify({ key: "favicon_url", value: data.url }),
-        });
-        setContentMsg("✅ Favicon uploaded!");
+        const saved = await postSiteContentKey("favicon_url", data.url);
+        if (saved.success) {
+          await applySavedContentKeys(["favicon_url"], { favicon_url: data.url });
+        }
+        setContentMsg(saved.success ? "✅ Favicon uploaded!" : `❌ ${saved.error || "Save failed"}`);
       } else {
         setContentMsg(`❌ ${data.error || "Upload failed"}`);
       }
@@ -1589,10 +1735,11 @@ function AdminPageInner() {
       }).then(r => r.json());
       if (data.path) {
         setSiteContent(s => ({ ...s, site_logo_url: data.path }));
-        await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
-          body: JSON.stringify({ key: "site_logo_url", value: data.path }),
-        });
-        setContentMsg("✅ Logo saved!");
+        const saved = await postSiteContentKey("site_logo_url", data.path);
+        if (saved.success) {
+          await applySavedContentKeys(["site_logo_url"], { site_logo_url: data.path });
+        }
+        setContentMsg(saved.success ? "✅ Logo saved!" : `❌ ${saved.error || "Save failed"}`);
       } else {
         setContentMsg(`❌ ${data.error || "Upload failed"}`);
       }
@@ -1616,10 +1763,11 @@ function AdminPageInner() {
       }).then((r) => r.json());
       if (data.path) {
         setSiteContent((s) => ({ ...s, [key]: data.path }));
-        await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
-          body: JSON.stringify({ key, value: data.path }),
-        });
-        setContentMsg(`✅ Slide ${slideNum} saved!`);
+        const saved = await postSiteContentKey(key, data.path);
+        if (saved.success) {
+          await applySavedContentKeys([key], { [key]: data.path });
+        }
+        setContentMsg(saved.success ? `✅ Slide ${slideNum} saved!` : `❌ ${saved.error || "Save failed"}`);
       } else {
         setContentMsg(`❌ ${data.error || "Upload failed"}`);
       }
@@ -1640,10 +1788,11 @@ function AdminPageInner() {
       if (data.path) {
         const url = `${data.path}${data.path.includes("?") ? "&" : "?"}v=${Date.now()}`;
         setSiteContent(s => ({ ...s, whatsapp_icon_url: url }));
-        await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
-          body: JSON.stringify({ key: "whatsapp_icon_url", value: url }),
-        });
-        setContentMsg("✅ WhatsApp icon saved!");
+        const saved = await postSiteContentKey("whatsapp_icon_url", url);
+        if (saved.success) {
+          await applySavedContentKeys(["whatsapp_icon_url"], { whatsapp_icon_url: url });
+        }
+        setContentMsg(saved.success ? "✅ WhatsApp icon saved!" : `❌ ${saved.error || "Save failed"}`);
       } else {
         setContentMsg(`❌ ${data.error || "Upload failed"}`);
       }
@@ -1667,10 +1816,11 @@ function AdminPageInner() {
       if (data.path) {
         const url = `${data.path}${data.path.includes("?") ? "&" : "?"}v=${Date.now()}`;
         setSiteContent((s) => ({ ...s, og_default_image: url }));
-        await fetch("/api/site-content", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getRoleHeaders() },
-          body: JSON.stringify({ key: "og_default_image", value: url }),
-        });
-        setContentMsg("✅ OG image saved!");
+        const saved = await postSiteContentKey("og_default_image", url);
+        if (saved.success) {
+          await applySavedContentKeys(["og_default_image"], { og_default_image: url });
+        }
+        setContentMsg(saved.success ? "✅ OG image saved!" : `❌ ${saved.error || "Save failed"}`);
       } else {
         setContentMsg(`❌ ${data.error || "Upload failed"}`);
       }

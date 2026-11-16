@@ -385,8 +385,8 @@ function sqlTable(sql) {
   ok("B1_checks_onSave_false", /onSave\(toSave\)/.test(saveDirty) && /===\s*false/.test(saveDirty));
   ok("B1_onSave_type_boolean", /onSave:\s*\(keys:\s*string\[\]\)\s*=>\s*boolean\s*\|\s*void/.test(toolbar));
 
-  // B2
-  const saveContent = slice(sidhu, "const saveContent = async", 4200);
+  // B2 — window widened in MULTI-108 (stale-conflict UX grew saveContent)
+  const saveContent = slice(sidhu, "const saveContent = async", 6000);
   ok("B2_saveContent_exists", saveContent.length > 0);
   ok("B2_saveContent_returns_true", /return true;/.test(saveContent));
   ok("B2_saveContent_returns_false", (saveContent.match(/return false;/g) || []).length >= 3);

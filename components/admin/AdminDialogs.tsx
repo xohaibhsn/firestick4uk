@@ -26,10 +26,25 @@ type PromptState = {
   resolve: (value: string | null) => void;
 };
 
+export type AdminChoiceOption = {
+  id: string;
+  label: string;
+  /** Visual emphasis — primary = Overwrite-style danger/emphasis */
+  variant?: "default" | "primary" | "danger";
+};
+
+type ChoiceState = {
+  message: string;
+  options: AdminChoiceOption[];
+  resolve: (id: string | null) => void;
+};
+
 type AdminDialogApi = {
   showToast: (message: string, kind?: ToastKind) => void;
   confirm: (message: string) => Promise<boolean>;
   prompt: (message: string, defaultValue?: string) => Promise<string | null>;
+  /** Multi-button dialog; resolves to option id, or null when Cancel / dismiss. */
+  choose: (message: string, options: AdminChoiceOption[]) => Promise<string | null>;
 };
 
 const AdminDialogContext = createContext<AdminDialogApi | null>(null);
@@ -49,6 +64,7 @@ export function useAdminDialogs(): AdminDialogApi {
         return false;
       },
       prompt: async () => null,
+      choose: async () => null,
     };
   }
   return ctx;
@@ -70,6 +86,7 @@ export function AdminDialogProvider({ children }: { children: ReactNode }) {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [promptState, setPromptState] = useState<PromptState | null>(null);
   const [promptValue, setPromptValue] = useState("");
+  const [choiceState, setChoiceState] = useState<ChoiceState | null>(null);
 
   const showToast = useCallback((message: string, kind: ToastKind = "info") => {
     const id = ++toastSeq;
@@ -96,7 +113,17 @@ export function AdminDialogProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const api: AdminDialogApi = { showToast, confirm, prompt };
+  const choose = useCallback((message: string, options: AdminChoiceOption[]) => {
+    return new Promise<string | null>((resolve) => {
+      setChoiceState({
+        message: String(message ?? ""),
+        options: Array.isArray(options) ? options : [],
+        resolve,
+      });
+    });
+  }, []);
+
+  const api: AdminDialogApi = { showToast, confirm, prompt, choose };
 
   return (
     <AdminDialogContext.Provider value={api}>
@@ -167,6 +194,20 @@ export function AdminDialogProvider({ children }: { children: ReactNode }) {
           onConfirm={() => {
             promptState.resolve(promptValue);
             setPromptState(null);
+          }}
+        />
+      )}
+      {choiceState && (
+        <AdminChoiceModal
+          message={choiceState.message}
+          options={choiceState.options}
+          onCancel={() => {
+            choiceState.resolve(null);
+            setChoiceState(null);
+          }}
+          onChoose={(id) => {
+            choiceState.resolve(id);
+            setChoiceState(null);
           }}
         />
       )}
@@ -294,6 +335,108 @@ function AdminConfirmModal({
             autoFocus
           >
             OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminChoiceModal({
+  message,
+  options,
+  onCancel,
+  onChoose,
+}: {
+  message: string;
+  options: AdminChoiceOption[];
+  onCancel: () => void;
+  onChoose: (id: string) => void;
+}) {
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(true, panelRef);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  return (
+    <div
+      role="presentation"
+      data-testid="admin-choice-dialog"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 10060,
+        background: "rgba(15,23,42,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <div
+        ref={panelRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        style={{
+          width: "min(480px, 100%)",
+          background: "#fff",
+          color: "#0f172a",
+          borderRadius: 12,
+          padding: "20px 20px 16px",
+          boxShadow: "0 20px 50px rgba(0,0,0,0.28)",
+          outline: "none",
+        }}
+      >
+        <h2 id={titleId} style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 700 }}>
+          Conflict
+        </h2>
+        <p
+          data-testid="admin-choice-message"
+          style={{ margin: "0 0 18px", fontSize: 14, lineHeight: 1.5, whiteSpace: "pre-wrap" }}
+        >
+          {message}
+        </p>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+          {options.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              className={
+                opt.variant === "danger" || opt.variant === "primary"
+                  ? "action-btn btn-delete"
+                  : "action-btn btn-view"
+              }
+              data-testid={`admin-choice-${opt.id}`}
+              onClick={() => onChoose(opt.id)}
+              style={{ padding: "8px 14px" }}
+              autoFocus={opt.id === "reload"}
+            >
+              {opt.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="action-btn"
+            data-testid="admin-choice-cancel"
+            onClick={onCancel}
+            style={{ padding: "8px 14px" }}
+          >
+            Cancel
           </button>
         </div>
       </div>

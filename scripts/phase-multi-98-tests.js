@@ -286,7 +286,12 @@ async function testSectionsApi() {
 }
 
 // --- saveContent unchanged ---
-ok("saveContent_unchanged", /const saveContent = async \(keys: string\[\], overrides\?: Record<string, string>\) => \{/.test(sidhu));
+ok(
+  "saveContent_unchanged",
+  /const saveContent = async\s*\(\s*keys:\s*string\[\],\s*overrides\?:\s*Record<string,\s*string>(?:\s*,\s*opts\?:\s*\{\s*forceKeys\?:\s*string\[\]\s*\})?\s*\)\s*=>\s*\{/.test(
+    sidhu
+  )
+);
 
 // --- diff whitelist (files we expect touched) ---
 const ALLOWED = [
