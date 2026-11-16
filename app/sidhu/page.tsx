@@ -606,11 +606,13 @@ function AdminPageInner() {
   const [heroSlideUploading, setHeroSlideUploading] = useState<number | null>(null);
 
   // Page Builder
-  type SectionItem = { key:string; label:string; page:string; order:number; visible:boolean; data:any; };
+  type SectionItem = { key:string; label:string; page:string; order:number; visible:boolean; data:any; base_hash?: string; };
   const [sections, setSections] = useState<SectionItem[]>([]);
   const [builderPage, setBuilderPage] = useState("home");
   const [sectionModal, setSectionModal] = useState<SectionItem|null>(null);
   const [sectionEditing, setSectionEditing] = useState<any>({});
+  /** Server-issued base_hash for the open section modal (refreshed on load/save). */
+  const [sectionModalBaseHash, setSectionModalBaseHash] = useState<string | undefined>(undefined);
   const [sectionMsg, setSectionMsg] = useState("");
 
   // FAQs
@@ -1158,6 +1160,7 @@ function AdminPageInner() {
 
     if (tab === "builder") {
       if (can("page_builder.manage")) {
+        // Keep literal home bootstrap URL for lazy-bootstrap gate; Refresh/page buttons use loadBuilderSections.
         fetch("/api/sections?page=home&all=1", { credentials: "include" })
           .then((r) => r.json())
           .then((d) => {
@@ -1688,6 +1691,108 @@ function AdminPageInner() {
         }
       />
     ) : null;
+
+  /** Load Page Builder sections for a page (admin ?all=1 includes server base_hash). */
+  const loadBuilderSections = async (page: string): Promise<SectionItem[]> => {
+    try {
+      const r = await fetch(`/api/sections?page=${page}&all=1`, { credentials: "include" });
+      if (r.status === 401) {
+        handleSessionExpired();
+        return [];
+      }
+      const d = await r.json().catch(() => null);
+      const list = Array.isArray(d) ? (d as SectionItem[]) : [];
+      setSections(list);
+      return list;
+    } catch {
+      setSections([]);
+      return [];
+    }
+  };
+
+  /** POST /api/sections with optional base_hash / force; handles 409 stale via Reload/Overwrite/Cancel. */
+  const saveSectionModal = async (opts?: { force?: boolean }): Promise<boolean> => {
+    if (!sectionModal) return false;
+    const key = sectionModal.key;
+    const label = sectionModal.label;
+    const body: { key: string; value: any; base_hash?: string; force?: boolean } = {
+      key,
+      value: sectionEditing,
+    };
+    if (typeof sectionModalBaseHash === "string") body.base_hash = sectionModalBaseHash;
+    if (opts?.force === true) body.force = true;
+    const res = await fetch("/api/sections", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        return { status: r.status, ...data };
+      })
+      .catch(() => ({ status: 0 }));
+
+    if (res.status === 401) {
+      handleSessionExpired();
+      return false;
+    }
+    if (res.status === 409 && res.error === "stale") {
+      // Keep modal open; do not mark saved.
+      const conflicts: Array<{ key: string; label?: string }> = Array.isArray(res.conflicts)
+        ? res.conflicts
+        : [];
+      const conflictLabel = conflicts.map((c) => c.label || c.key).filter(Boolean).join(", ") || label;
+      const choice = await askChoose(
+        `This section was changed by someone else after you opened it: ${conflictLabel}. Reload to get the latest version, or Overwrite to keep yours.`,
+        [
+          { id: "reload", label: "Reload", variant: "default" },
+          { id: "overwrite", label: "Overwrite", variant: "danger" },
+        ]
+      );
+      if (choice === "reload") {
+        const list = await loadBuilderSections(builderPage);
+        const fresh = list.find((s) => s.key === key);
+        if (fresh) {
+          setSectionModal(fresh);
+          setSectionModalBaseHash(
+            typeof fresh.base_hash === "string" ? fresh.base_hash : undefined
+          );
+          setSectionEditing(JSON.parse(JSON.stringify(fresh.data || {})));
+        }
+        setSectionMsg("Reloaded latest version of this section");
+        setTimeout(() => setSectionMsg(""), 4000);
+        return false;
+      }
+      if (choice === "overwrite") {
+        return saveSectionModal({ force: true });
+      }
+      // Cancel — stay on unsaved edit
+      setSectionMsg("Save cancelled — unresolved conflict");
+      setTimeout(() => setSectionMsg(""), 4000);
+      return false;
+    }
+    if (res.success) {
+      const nextHash =
+        typeof res.base_hash === "string" ? (res.base_hash as string) : undefined;
+      if (nextHash) setSectionModalBaseHash(nextHash);
+      setSectionMsg("✅ Section saved!");
+      setSections((s) =>
+        s.map((x) =>
+          x.key === key
+            ? { ...x, data: sectionEditing, ...(nextHash ? { base_hash: nextHash } : {}) }
+            : x
+        )
+      );
+      setSectionModal(null);
+      setSectionModalBaseHash(undefined);
+      setTimeout(() => setSectionMsg(""), 3000);
+      return true;
+    }
+    setSectionMsg(`❌ ${res.error || "Failed"}`);
+    setTimeout(() => setSectionMsg(""), 3000);
+    return false;
+  };
 
   /** PUT /api/sections?action=... — returns true only when the server confirms success. */
   const sectionsPut = async (action: "reorder" | "visibility", body: unknown): Promise<boolean> => {
@@ -6781,10 +6886,10 @@ function AdminPageInner() {
                 {[["home","🏠 Home"],["about","ℹ️ About"]].map(([k,l])=>(
                   <button key={k} className={`action-btn ${builderPage===k?"btn-verify":"btn-view"}`} style={{padding:"10px 20px",fontSize:13}} onClick={()=>{
                     setBuilderPage(k);
-                    fetch(`/api/sections?page=${k}&all=1`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); else setSections([]); }).catch(()=>setSections([]));
+                    void loadBuilderSections(k);
                   }}>{l}</button>
                 ))}
-                <button className="action-btn btn-view" style={{padding:"10px 16px",fontSize:13,marginLeft:"auto"}} onClick={()=>fetch(`/api/sections?page=${builderPage}&all=1`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); }).catch(()=>{})}>🔄 Refresh</button>
+                <button className="action-btn btn-view" style={{padding:"10px 16px",fontSize:13,marginLeft:"auto"}} onClick={()=>void loadBuilderSections(builderPage)}>🔄 Refresh</button>
               </div>
               {/* Sections list */}
               <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -6793,7 +6898,7 @@ function AdminPageInner() {
                     <div style={{fontSize:32,marginBottom:12}}>📋</div>
                     <div style={{fontWeight:600,marginBottom:6}}>No sections found for {builderPage} page</div>
                     <div style={{fontSize:13,marginBottom:16}}>Click Refresh or visit the live website first to auto-create sections.</div>
-                    <button className="add-btn" onClick={()=>fetch(`/api/sections?page=${builderPage}&all=1`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setSections(d); }).catch(()=>{})}>🔄 Load Sections</button>
+                    <button className="add-btn" onClick={()=>void loadBuilderSections(builderPage)}>🔄 Load Sections</button>
                   </div>
                 )}
                 {sections.filter(s=>s.page===builderPage).sort((a,b)=>a.order-b.order).map((sec,i,arr)=>(
@@ -6822,7 +6927,7 @@ function AdminPageInner() {
                         setSections(s=>s.map(x=>x.key===sec.key?{...x,visible:!sec.visible}:x));
                       }}>{sec.visible?"👁 Visible":"🚫 Hidden"}</span>
                       {/* Edit button */}
-                      <button className="action-btn btn-edit" onClick={()=>{ setSectionEditing(JSON.parse(JSON.stringify(sec.data))); setSectionModal(sec); setSectionMsg(""); }}>✏️ Edit</button>
+                      <button className="action-btn btn-edit" onClick={()=>{ setSectionEditing(JSON.parse(JSON.stringify(sec.data))); setSectionModal(sec); setSectionModalBaseHash(typeof sec.base_hash === "string" ? sec.base_hash : undefined); setSectionMsg(""); }}>✏️ Edit</button>
                     </div>
                   </div>
                 ))}
@@ -7003,13 +7108,8 @@ function AdminPageInner() {
                 )}
 
                 <div className="modal-actions">
-                  <button className="modal-cancel" onClick={()=>setSectionModal(null)}>Cancel</button>
-                  <button className="modal-save" onClick={async()=>{
-                    const res=await fetch("/api/sections",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:sectionModal.key,value:sectionEditing})}).then(r=>r.json()).catch(()=>({}));
-                    if(res.success){setSectionMsg("✅ Section saved!");setSections(s=>s.map(x=>x.key===sectionModal.key?{...x,data:sectionEditing}:x));setSectionModal(null);}
-                    else setSectionMsg(`❌ ${res.error||"Failed"}`);
-                    setTimeout(()=>setSectionMsg(""),3000);
-                  }}>💾 Save Section</button>
+                  <button className="modal-cancel" onClick={()=>{ setSectionModal(null); setSectionModalBaseHash(undefined); }}>Cancel</button>
+                  <button className="modal-save" onClick={()=>{ void saveSectionModal(); }}>💾 Save Section</button>
                 </div>
               </div>
             </div>

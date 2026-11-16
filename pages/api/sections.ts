@@ -9,6 +9,7 @@ import {
   invalidatePublicCmsCache,
 } from '../../lib/publicCmsDataServer';
 import { getClientIp, RL_PUBLIC_GET } from '../../lib/rateLimit';
+import { hashSiteContentValue } from '../../lib/siteContentBaseHash';
 
 async function loadSection(key: string) {
   const [rows]: any = await pool.query(
@@ -69,53 +70,100 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!all) query += ' AND is_visible=1';
       query += ' ORDER BY section_order ASC';
       const [rows]: any = await pool.query(query, params);
-      const result = (Array.isArray(rows)?rows:[]).map((r:any) => ({
-        key: r.content_key,
-        label: r.label,
-        page: r.page_name,
-        order: r.section_order,
-        visible: !!r.is_visible,
-        data: (() => { try { return JSON.parse(r.content_value); } catch { return {}; } })(),
-      }));
+      const result = (Array.isArray(rows)?rows:[]).map((r:any) => {
+        const row: Record<string, unknown> = {
+          key: r.content_key,
+          label: r.label,
+          page: r.page_name,
+          order: r.section_order,
+          visible: !!r.is_visible,
+          data: (() => { try { return JSON.parse(r.content_value); } catch { return {}; } })(),
+        };
+        // Admin ?all=1 only — public/cache path never reaches here.
+        if (all) {
+          row.base_hash = hashSiteContentValue(
+            r.content_value == null ? '' : String(r.content_value),
+            true
+          );
+        }
+        return row;
+      });
       return res.status(200).json(result);
     }
 
     if (req.method === 'POST') {
       if (!admin) return;
-      const { key, value } = req.body;
+      const { key, value, base_hash: bodyBaseHash, force: bodyForce } = req.body;
       if (!key) return res.status(400).json({ error: 'Key required' });
       const json = typeof value === 'string' ? value : JSON.stringify(value);
-      const prev = await loadSection(String(key));
-      if (prev && String(prev.content_value || '') !== json) {
-        const conn = await pool.getConnection();
-        try {
-          await conn.beginTransaction();
+      const hasBaseHash = typeof bodyBaseHash === 'string';
+      const force = bodyForce === true;
+      if (!hasBaseHash) {
+        console.log('[sections] legacy_save_no_base_hash', String(key));
+      }
+
+      const conn = await pool.getConnection();
+      let wroteValue = json;
+      try {
+        await conn.beginTransaction();
+        const [lockedRows]: any = await conn.query(
+          `SELECT content_key,content_value,content_type,page_name,label,section_order,is_visible
+           FROM site_content WHERE content_key=? LIMIT 1 FOR UPDATE`,
+          [key]
+        );
+        const locked = lockedRows?.[0] || null;
+
+        if (hasBaseHash && !force) {
+          const present = !!locked;
+          const currentHash = present
+            ? hashSiteContentValue(
+                locked.content_value == null ? '' : String(locked.content_value),
+                true
+              )
+            : hashSiteContentValue(undefined, false);
+          if (currentHash !== bodyBaseHash) {
+            await conn.rollback();
+            return res.status(409).json({
+              error: 'stale',
+              conflicts: [
+                {
+                  key: String(key),
+                  label: String(locked?.label || key),
+                },
+              ],
+            });
+          }
+        }
+
+        const prevValue = locked ? String(locked.content_value || '') : '';
+        const changed = !!locked && prevValue !== json;
+        if (changed) {
           await recordContentRevision(
             {
               entityType: 'section',
               entityId: String(key),
-              entityLabel: String(prev.label || key),
+              entityLabel: String(locked.label || key),
               revisionAction: 'update',
-              snapshot: sectionSnapshot(prev),
+              snapshot: sectionSnapshot(locked),
               changedFields: ['content_value'],
               actor: admin,
             },
             conn
           );
-          await conn.query('UPDATE site_content SET content_value=? WHERE content_key=?', [json, key]);
-          await conn.commit();
-        } catch (txErr: any) {
-          try { await conn.rollback(); } catch { /* ignore */ }
-          if (txErr?.code === 'REVISION_TOO_LARGE') {
-            return res.status(400).json({ error: txErr.message });
-          }
-          throw txErr;
-        } finally {
-          conn.release();
         }
-      } else {
-        await pool.query('UPDATE site_content SET content_value=? WHERE content_key=?', [json, key]);
+        await conn.query('UPDATE site_content SET content_value=? WHERE content_key=?', [json, key]);
+        wroteValue = json;
+        await conn.commit();
+      } catch (txErr: any) {
+        try { await conn.rollback(); } catch { /* ignore */ }
+        if (txErr?.code === 'REVISION_TOO_LARGE') {
+          return res.status(400).json({ error: txErr.message });
+        }
+        throw txErr;
+      } finally {
+        conn.release();
       }
+
       const { ip } = getRequestMeta(req);
       await recordAdminAudit({
         actor: admin,
@@ -126,8 +174,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         metadata: { section_key: key },
         ip,
       });
+      if (force && hasBaseHash) {
+        // Key only — never values.
+        await recordAdminAudit({
+          actor: admin,
+          action: 'page_builder.overwrite_stale',
+          entityType: 'page_builder',
+          entityId: key,
+          summary: `Overwrote stale page section ${key}`,
+          metadata: { section_key: key },
+          ip,
+        });
+      }
       invalidatePublicCmsCache();
-      return res.status(200).json({ success: true });
+      const newBaseHash = hashSiteContentValue(wroteValue, true);
+      return res.status(200).json({ success: true, base_hash: newBaseHash });
     }
 
     if (req.method === 'PUT') {
