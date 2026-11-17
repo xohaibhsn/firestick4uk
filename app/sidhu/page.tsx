@@ -616,6 +616,8 @@ function AdminPageInner() {
   /** Server-issued base_hash for the open section modal (refreshed on load/save). */
   const [sectionModalBaseHash, setSectionModalBaseHash] = useState<string | undefined>(undefined);
   const [sectionMsg, setSectionMsg] = useState("");
+  /** section_order baseline as last loaded from GET (or last successful reorder) — not from in-flight local drag. */
+  const sectionsOrderBaselineRef = useRef<Record<string, number>>({});
 
   // FAQs
   type FAQ = { id:number; question:string; answer:string; category:string; sort_order:number; is_visible:number; base_hash?: string; };
@@ -1166,11 +1168,19 @@ function AdminPageInner() {
         fetch("/api/sections?page=home&all=1", { credentials: "include" })
           .then((r) => r.json())
           .then((d) => {
-            if (Array.isArray(d)) setSections(d);
+            if (Array.isArray(d)) {
+              setSections(d);
+              const baseline: Record<string, number> = {};
+              for (const s of d as SectionItem[]) {
+                if (s?.key) baseline[s.key] = Number(s.order) || 0;
+              }
+              sectionsOrderBaselineRef.current = baseline;
+            }
           })
           .catch(() => {});
       } else {
         setSections([]);
+        sectionsOrderBaselineRef.current = {};
       }
     }
 
@@ -1705,9 +1715,15 @@ function AdminPageInner() {
       const d = await r.json().catch(() => null);
       const list = Array.isArray(d) ? (d as SectionItem[]) : [];
       setSections(list);
+      const baseline: Record<string, number> = {};
+      for (const s of list) {
+        if (s?.key) baseline[s.key] = Number(s.order) || 0;
+      }
+      sectionsOrderBaselineRef.current = baseline;
       return list;
     } catch {
       setSections([]);
+      sectionsOrderBaselineRef.current = {};
       return [];
     }
   };
@@ -1796,22 +1812,82 @@ function AdminPageInner() {
     return false;
   };
 
+  /** Attach base_orders (GET baseline) + optional force for reorder PUT. */
+  const buildReorderPayload = (body: unknown, force?: boolean) => {
+    const order = Array.isArray((body as any)?.order) ? (body as any).order : [];
+    const base_orders: Record<string, number> = {};
+    for (const item of order) {
+      const k = item?.key;
+      if (k && Object.prototype.hasOwnProperty.call(sectionsOrderBaselineRef.current, k)) {
+        base_orders[k] = sectionsOrderBaselineRef.current[k];
+      }
+    }
+    return { ...(body as object), base_orders, ...(force === true ? { force: true } : {}) };
+  };
+
+  /** After successful reorder, advance order baseline to the applied orders. */
+  const commitReorderBaseline = (body: unknown) => {
+    if (!Array.isArray((body as any)?.order)) return;
+    const nextBaseline = { ...sectionsOrderBaselineRef.current };
+    for (const item of (body as any).order) {
+      if (item?.key != null && item?.section_order != null) {
+        nextBaseline[item.key] = Number(item.section_order);
+      }
+    }
+    sectionsOrderBaselineRef.current = nextBaseline;
+  };
+
+  /** Handle reorder 409 stale: Reload / Overwrite / Cancel (mirrors POST saveSectionModal). */
+  const handleReorderStaleConflict = async (data: any, body: unknown): Promise<boolean> => {
+    const conflicts: Array<{ key: string }> = Array.isArray(data?.conflicts) ? data.conflicts : [];
+    const conflictLabel = conflicts.map((c) => c.key).filter(Boolean).join(", ") || "sections";
+    const choice = await askChoose(
+      `Section order was changed by someone else: ${conflictLabel}. Reload to get the latest order, or Overwrite to keep yours.`,
+      [
+        { id: "reload", label: "Reload", variant: "default" },
+        { id: "overwrite", label: "Overwrite", variant: "danger" },
+      ]
+    );
+    if (choice === "reload") {
+      await loadBuilderSections(builderPage);
+      setSectionMsg("Reloaded latest section order");
+      setTimeout(() => setSectionMsg(""), 4000);
+      return false;
+    }
+    if (choice === "overwrite") return sectionsPut("reorder", body, { force: true });
+    setSectionMsg("Reorder cancelled — unresolved conflict");
+    setTimeout(() => setSectionMsg(""), 4000);
+    return false;
+  };
+
   /** PUT /api/sections?action=... — returns true only when the server confirms success. */
-  const sectionsPut = async (action: "reorder" | "visibility", body: unknown): Promise<boolean> => {
+  const sectionsPut = async (
+    action: "reorder" | "visibility",
+    body: unknown,
+    opts?: { force?: boolean }
+  ): Promise<boolean> => {
     try {
+      const payload =
+        action === "reorder" && body && typeof body === "object"
+          ? buildReorderPayload(body, opts?.force)
+          : body;
       const r = await fetch(`/api/sections?action=${action}`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
       if (r.status === 401) { handleSessionExpired(); return false; }
       if (r.status === 403) { showPermError(); return false; }
       const data = await r.json().catch(() => ({}));
+      if (action === "reorder" && r.status === 409 && (data as any)?.error === "stale") {
+        return handleReorderStaleConflict(data, body);
+      }
       if (!r.ok || (data && (data as any).error)) {
         adminAlert((data as any)?.error || `Could not update section ${action}.`);
         return false;
       }
+      if (action === "reorder") commitReorderBaseline(body);
       return true;
     } catch {
       adminAlert(`Could not update section ${action}. Check your connection.`);
