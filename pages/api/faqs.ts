@@ -240,16 +240,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'DELETE') {
-      const { id } = req.query;
-      await pool.query('DELETE FROM faqs WHERE id=?', [id]);
+      const rawId = req.query.id;
+      const idNum = typeof rawId === 'string' || typeof rawId === 'number' ? Number(rawId) : NaN;
+      if (!Number.isInteger(idNum) || idNum <= 0) {
+        return res.status(400).json({ error: 'invalid_id' });
+      }
+
+      const conn = await pool.getConnection();
+      let deleted: { id: number; question: string; category: string };
+      try {
+        await conn.beginTransaction();
+        const [rows]: any = await conn.query(
+          'SELECT id, question, category FROM faqs WHERE id=? FOR UPDATE',
+          [idNum]
+        );
+        if (!rows?.length) {
+          await conn.rollback();
+          return res.status(404).json({ error: 'not_found' });
+        }
+        deleted = {
+          id: Number(rows[0].id),
+          question: String(rows[0].question || ''),
+          category: String(rows[0].category || ''),
+        };
+        await conn.query('DELETE FROM faqs WHERE id=?', [idNum]);
+        await conn.commit();
+      } catch (txErr) {
+        try {
+          await conn.rollback();
+        } catch {
+          /* ignore */
+        }
+        throw txErr;
+      } finally {
+        conn.release();
+      }
+
       if (admin) {
         const { ip } = getRequestMeta(req);
         await recordAdminAudit({
           actor: admin,
           action: 'faq.deleted',
           entityType: 'faq',
-          entityId: id as string,
+          entityId: String(deleted.id),
           summary: 'Deleted FAQ',
+          metadata: {
+            question: deleted.question.slice(0, 200),
+            category: deleted.category,
+          },
           ip,
         });
       }

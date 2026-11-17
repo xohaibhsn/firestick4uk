@@ -370,18 +370,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const admin = await requireAdminPermission(req, res, "orders.manage");
       if (!admin) return;
 
-      const { order_id } = req.body || {};
-      if (!order_id) return res.status(400).json({ error: "order_id required" });
+      const rawOrderId = (req.body || {}).order_id;
+      const order_id =
+        typeof rawOrderId === "string"
+          ? rawOrderId.trim()
+          : typeof rawOrderId === "number"
+            ? String(rawOrderId).trim()
+            : "";
+      if (!order_id || order_id.length > 64) {
+        return res.status(400).json({ error: "order_id required" });
+      }
 
-      const [orderRows]: any = await pool.query(
-        "SELECT order_id, status, total FROM orders WHERE order_id=?",
-        [order_id]
-      );
-      if (!orderRows.length) return res.status(404).json({ error: "Order not found" });
-      const order = orderRows[0];
+      const conn = await pool.getConnection();
+      let order: { order_id: string; status: unknown; total: unknown };
+      let itemsDeleted = 0;
+      try {
+        await conn.beginTransaction();
+        const [orderRows]: any = await conn.query(
+          "SELECT order_id, status, total FROM orders WHERE order_id=? FOR UPDATE",
+          [order_id]
+        );
+        if (!orderRows.length) {
+          await conn.rollback();
+          return res.status(404).json({ error: "Order not found" });
+        }
+        order = orderRows[0];
 
-      await pool.query("DELETE FROM order_items WHERE order_id=?", [order_id]);
-      await pool.query("DELETE FROM orders WHERE order_id=?", [order_id]);
+        const [itemsResult]: any = await conn.query(
+          "DELETE FROM order_items WHERE order_id=?",
+          [order_id]
+        );
+        itemsDeleted = Number(itemsResult?.affectedRows || 0);
+        await conn.query("DELETE FROM orders WHERE order_id=?", [order_id]);
+        await conn.commit();
+      } catch (txErr) {
+        try {
+          await conn.rollback();
+        } catch {
+          /* ignore */
+        }
+        throw txErr;
+      } finally {
+        conn.release();
+      }
 
       const { ip } = getRequestMeta(req);
       await recordAdminAudit({
@@ -390,7 +421,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         entityType: "order",
         entityId: order_id,
         summary: `Deleted order ${order_id}`,
-        metadata: { was_status: order.status },
+        metadata: { was_status: order.status, items_deleted: itemsDeleted },
         ip,
       });
 

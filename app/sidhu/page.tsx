@@ -7175,6 +7175,7 @@ function AdminPageInner() {
                               const nextActive = !(c.is_active === true || c.is_active === 1 || c.is_active === "1");
                               const tr = await fetch("/api/coupons",{method:"PUT",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({...c,is_active: nextActive})}).then(x=>x.json()).catch(()=>({}));
                               if (tr.success) setCoupons(prev=>prev.map((x:any)=>x.id===c.id?{...x,is_active:nextActive?1:0}:x));
+                              else { setCouponMsg(`❌ ${tr.error||"Update failed"}`); setTimeout(()=>setCouponMsg(""),3000); }
                               void loadCoupons();
                             }}>
                               {c.is_active?"Active":"Inactive"}

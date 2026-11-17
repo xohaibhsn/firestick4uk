@@ -119,10 +119,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!activeParsed.ok) return res.status(400).json({ error: activeParsed.error });
 
       const v = parsed.value;
-      const [result]: any = await pool.query(
-        'UPDATE coupons SET code=?,type=?,value=?,minimum_order=?,usage_limit=?,expires_at=?,is_active=? WHERE id=?',
-        [v.code, v.type, v.value, v.minimumOrder, v.usageLimit, v.expiresAt, activeParsed.value ? 1 : 0, idParsed.value]
-      );
+      let result: any;
+      try {
+        const [r]: any = await pool.query(
+          'UPDATE coupons SET code=?,type=?,value=?,minimum_order=?,usage_limit=?,expires_at=?,is_active=? WHERE id=?',
+          [v.code, v.type, v.value, v.minimumOrder, v.usageLimit, v.expiresAt, activeParsed.value ? 1 : 0, idParsed.value]
+        );
+        result = r;
+      } catch (updateErr: unknown) {
+        if (isDuplicateKeyError(updateErr)) {
+          return res.status(409).json({ error: 'Coupon code already exists' });
+        }
+        throw updateErr;
+      }
       if (!result || Number(result.affectedRows) === 0) {
         return res.status(404).json({ error: 'Coupon not found' });
       }
