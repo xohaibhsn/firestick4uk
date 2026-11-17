@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSiteContent } from "@/hooks/useSiteContent";
 
 export interface NavbarProps {
@@ -12,6 +12,8 @@ export interface NavbarProps {
   /** Extra content before the hamburger (e.g. products search) */
   children?: ReactNode;
 }
+
+const NAV_CART_BUMP_MS = 2400;
 
 function normalizeSubscriptionSlug(raw: string): string {
   return (
@@ -38,10 +40,36 @@ export default function Navbar({
   const [logo, setLogo] = useState(logoUrl || "");
   /** Client-only header cart icon — false on SSR so nav link HTML is unchanged. */
   const [headerCartMounted, setHeaderCartMounted] = useState(false);
+  const [cartBump, setCartBump] = useState(false);
+  const prevCartCountRef = useRef<number | null>(null);
+  const bumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuId = useId();
 
   useEffect(() => {
     setHeaderCartMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const prev = prevCartCountRef.current;
+    if (prev === null) {
+      prevCartCountRef.current = cartCount;
+      return;
+    }
+    if (cartCount > prev) {
+      setCartBump(true);
+      if (bumpTimerRef.current) clearTimeout(bumpTimerRef.current);
+      bumpTimerRef.current = setTimeout(() => {
+        setCartBump(false);
+        bumpTimerRef.current = null;
+      }, NAV_CART_BUMP_MS);
+    }
+    prevCartCountRef.current = cartCount;
+  }, [cartCount]);
+
+  useEffect(() => {
+    return () => {
+      if (bumpTimerRef.current) clearTimeout(bumpTimerRef.current);
+    };
   }, []);
 
   const labels = useMemo(() => {
@@ -149,14 +177,40 @@ export default function Navbar({
           background: #5B21B6 !important; color: #FFFFFF !important;
           padding: 10px 24px !important; border-radius: 30px !important; font-weight: 600 !important;
           font-family: var(--font-body), 'Inter', system-ui, sans-serif !important;
+          display: inline-flex !important; align-items: center; gap: 8px;
         }
         .site-nav .nav-cta:hover { background: #4C1D95 !important; color: #FFFFFF !important; }
+        .site-nav .nav-cta .nav-cta__icon {
+          display: block; flex-shrink: 0; color: inherit;
+        }
         /* Open-menu links are dark; keep Cart pill readable (white on purple). */
         .site-nav .nav-links.open a.nav-cta,
         .site-nav .nav-links.open a.nav-cta:hover,
         .site-nav .nav-links.open a.nav-cta:focus-visible {
           background: #5B21B6 !important;
           color: #FFFFFF !important;
+        }
+        @keyframes nav-cart-bump-scale {
+          0% { transform: scale(1); }
+          40% { transform: scale(1.12); }
+          100% { transform: scale(1); }
+        }
+        @keyframes nav-cart-bump-ring {
+          0% { box-shadow: 0 0 0 0 rgba(91,33,182,0.45); }
+          70% { box-shadow: 0 0 0 10px rgba(91,33,182,0); }
+          100% { box-shadow: 0 0 0 0 rgba(91,33,182,0); }
+        }
+        .site-nav .nav-cta.nav-cart-bump,
+        .site-nav .nav-header-cart.nav-cart-bump {
+          animation:
+            nav-cart-bump-scale 400ms ease-out 1,
+            nav-cart-bump-ring 800ms ease-out 3;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .site-nav .nav-cta.nav-cart-bump,
+          .site-nav .nav-header-cart.nav-cart-bump {
+            animation: none;
+          }
         }
         .site-nav .hamburger {
           display: none; flex-direction: column; gap: 5px; cursor: pointer;
@@ -225,7 +279,32 @@ export default function Navbar({
           <li><a href="/contact" onClick={close}>Contact</a></li>
           {cta === "cart" && (
             <li>
-              <a href="/cart" className="nav-cta" onClick={close}>
+              <a
+                href="/cart"
+                className={`nav-cta${cartBump ? " nav-cart-bump" : ""}`}
+                onClick={close}
+              >
+                {headerCartMounted ? (
+                  <svg
+                    className="nav-cta__icon"
+                    viewBox="0 0 24 24"
+                    width="17"
+                    height="17"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path
+                      d="M7 4h-2l-1 2v1h2l2.4 10.4a2 2 0 0 0 2 1.6h7.2a2 2 0 0 0 2-1.6L21 8H8"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="10" cy="20" r="1.5" fill="currentColor" />
+                    <circle cx="18" cy="20" r="1.5" fill="currentColor" />
+                  </svg>
+                ) : null}
                 {labels.cart}{cartCount > 0 ? ` (${cartCount})` : ""}
               </a>
             </li>
@@ -243,7 +322,7 @@ export default function Navbar({
           {headerCartMounted && cta === "cart" && (
             <a
               href="/cart"
-              className="nav-header-cart"
+              className={`nav-header-cart${cartBump ? " nav-cart-bump" : ""}`}
               aria-label={
                 cartCount > 0
                   ? `Cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`

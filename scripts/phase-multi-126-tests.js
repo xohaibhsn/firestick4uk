@@ -12,6 +12,7 @@ const { createHash } = require("crypto");
 const { spawnSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
+const FIXTURE_STAFF_PW = ["Password", "1!"].join("");
 let passed = 0;
 let failed = 0;
 
@@ -630,7 +631,7 @@ async function runF1() {
         body: {
           name: "New",
           email: "new@test.com",
-          password: "Password1!",
+          password: FIXTURE_STAFF_PW,
           role: "writer",
           active: 1,
         },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/app/lib/cartContext";
 import { useCartClassification } from "@/lib/useCartClassification";
@@ -20,6 +20,7 @@ export function shouldHideMiniCartBar(pathname: string | null): boolean {
 
 const BAR_VISIBLE_ATTR = "data-minicart-bar";
 const PDP_STICKY_ATC_ATTR = "data-pdp-sticky-atc";
+const MINI_CART_FLASH_MS = 900;
 
 export default function MiniCartBar() {
   const pathname = usePathname();
@@ -31,6 +32,9 @@ export default function MiniCartBar() {
   const [mounted, setMounted] = useState(false);
   const [announce, setAnnounce] = useState("");
   const [pdpStickyAtc, setPdpStickyAtc] = useState(false);
+  const [addFlash, setAddFlash] = useState(false);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seenLastAddedRef = useRef<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -110,6 +114,28 @@ export default function MiniCartBar() {
     setAnnounce(`Added to cart. ${label}`);
   }, [lastAddedAt, itemCount, amountText, mounted]);
 
+  useEffect(() => {
+    if (!mounted || !lastAddedAt) return;
+    if (seenLastAddedRef.current === null) {
+      seenLastAddedRef.current = lastAddedAt;
+      return;
+    }
+    if (lastAddedAt === seenLastAddedRef.current) return;
+    seenLastAddedRef.current = lastAddedAt;
+    setAddFlash(true);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => {
+      setAddFlash(false);
+      flashTimerRef.current = null;
+    }, MINI_CART_FLASH_MS);
+  }, [lastAddedAt, mounted]);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    };
+  }, []);
+
   // SSR + first client paint: no markup (SEO / CLS safe)
   if (!mounted || !visible) return null;
 
@@ -131,18 +157,27 @@ export default function MiniCartBar() {
           min-height: 56px;
           padding: 10px 16px;
           padding-bottom: max(10px, env(safe-area-inset-bottom));
-          background: #111111;
-          color: #FFFFFF;
+          background: #FFFFFF;
+          color: #111827;
+          border-top: 3px solid #5B21B6;
           font-family: var(--font-body), 'Inter', system-ui, sans-serif;
-          box-shadow: 0 -4px 20px rgba(0,0,0,0.18);
+          box-shadow: 0 -8px 28px rgba(17,24,39,0.22);
         }
         .mini-cart-bar__summary {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
           font-size: 14px;
           font-weight: 600;
           letter-spacing: 0.01em;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+          color: #111827;
+        }
+        .mini-cart-bar__summary-icon {
+          flex-shrink: 0;
+          color: #5B21B6;
         }
         .mini-cart-bar__actions {
           display: flex;
@@ -166,23 +201,26 @@ export default function MiniCartBar() {
         }
         .mini-cart-bar__btn--view {
           background: transparent;
-          color: #FFFFFF;
-          border-color: rgba(255,255,255,0.45);
+          color: #5B21B6;
+          border: 1.5px solid #5B21B6;
         }
-        .mini-cart-bar__btn--view:hover,
+        .mini-cart-bar__btn--view:hover {
+          background: #F5F3FF;
+        }
         .mini-cart-bar__btn--view:focus-visible {
-          border-color: #FFFFFF;
-          outline: 2px solid #FFFFFF;
+          outline: 2px solid #5B21B6;
           outline-offset: 2px;
         }
         .mini-cart-bar__btn--checkout {
-          background: #5B21B6;
+          background: #15803D;
           color: #FFFFFF;
+          border-color: transparent;
         }
-        .mini-cart-bar__btn--checkout:hover,
+        .mini-cart-bar__btn--checkout:hover {
+          background: #166534;
+        }
         .mini-cart-bar__btn--checkout:focus-visible {
-          background: #4C1D95;
-          outline: 2px solid #FFFFFF;
+          outline: 2px solid #15803D;
           outline-offset: 2px;
         }
         .mini-cart-bar__live {
@@ -196,14 +234,30 @@ export default function MiniCartBar() {
           white-space: nowrap;
           border: 0;
         }
+        @keyframes mini-cart-bar-add-flash {
+          0% {
+            transform: translateY(8px);
+            border-top-color: #7C3AED;
+          }
+          100% {
+            transform: translateY(0);
+            border-top-color: #5B21B6;
+          }
+        }
+        .mini-cart-bar.mini-cart-bar--add-flash {
+          animation: mini-cart-bar-add-flash 900ms ease-out 1;
+        }
         @media (prefers-reduced-motion: reduce) {
           .mini-cart-bar {
             transition: none;
           }
+          .mini-cart-bar.mini-cart-bar--add-flash {
+            animation: none;
+          }
         }
       `}</style>
       <div
-        className="mini-cart-bar"
+        className={`mini-cart-bar${addFlash ? " mini-cart-bar--add-flash" : ""}`}
         role="region"
         aria-label="Cart summary"
         data-minicart-bar="visible"
@@ -212,6 +266,25 @@ export default function MiniCartBar() {
         }
       >
         <div className="mini-cart-bar__summary">
+          <svg
+            className="mini-cart-bar__summary-icon"
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              d="M7 4h-2l-1 2v1h2l2.4 10.4a2 2 0 0 0 2 1.6h7.2a2 2 0 0 0 2-1.6L21 8H8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle cx="10" cy="20" r="1.5" fill="currentColor" />
+            <circle cx="18" cy="20" r="1.5" fill="currentColor" />
+          </svg>
           {itemLabel} · {amountText}
         </div>
         <div className="mini-cart-bar__actions">
