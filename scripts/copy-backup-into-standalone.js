@@ -1,6 +1,6 @@
 /**
- * Postbuild: copy the off-site backup script into Next.js standalone output
- * so Hostinger's hbuilds/current/nodejs tree includes it for Cron.
+ * Postbuild: copy the whole scripts/backup/*.js tree into Next.js standalone
+ * output so Hostinger's hbuilds/current/nodejs tree includes Cron tools.
  *
  * No-op when .next/standalone is absent (non-standalone local builds).
  * Ensures full mysql2 + cloudinary packages (file tracing may omit entry files)
@@ -14,10 +14,15 @@ const { spawnSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
 const STANDALONE = path.join(ROOT, ".next", "standalone");
-const SRC = path.join(ROOT, "scripts", "backup", "offsite-db-backup.js");
+const SRC_DIR = path.join(ROOT, "scripts", "backup");
 const DEST_DIR = path.join(STANDALONE, "scripts", "backup");
-const DEST = path.join(DEST_DIR, "offsite-db-backup.js");
 const REQUIRED_PKGS = ["mysql2", "cloudinary"];
+const REQUIRED_SCRIPTS = [
+  "offsite-db-backup.js",
+  "decrypt-backup.js",
+  "verify-latest-backup.js",
+  "sql-tuple-parser.js",
+];
 
 function fail(msg) {
   console.error("[copy-backup-into-standalone] ERROR: " + msg);
@@ -33,6 +38,27 @@ function copyDir(src, dest) {
     if (ent.isDirectory()) copyDir(from, to);
     else fs.copyFileSync(from, to);
   }
+}
+
+function copyBackupScripts() {
+  if (!fs.existsSync(SRC_DIR)) {
+    fail("source missing: " + SRC_DIR);
+  }
+  fs.mkdirSync(DEST_DIR, { recursive: true });
+  const copied = [];
+  for (const ent of fs.readdirSync(SRC_DIR, { withFileTypes: true })) {
+    if (!ent.isFile() || !ent.name.endsWith(".js")) continue;
+    const from = path.join(SRC_DIR, ent.name);
+    const to = path.join(DEST_DIR, ent.name);
+    fs.copyFileSync(from, to);
+    copied.push(ent.name);
+  }
+  for (const name of REQUIRED_SCRIPTS) {
+    if (!copied.includes(name)) {
+      fail("required backup script not copied: " + name);
+    }
+  }
+  return copied.sort();
 }
 
 function readDeps(pkgDir) {
@@ -69,13 +95,14 @@ if (!fs.existsSync(STANDALONE)) {
   process.exit(0);
 }
 
-if (!fs.existsSync(SRC)) {
-  fail("source missing: " + SRC);
-}
-
-fs.mkdirSync(DEST_DIR, { recursive: true });
-fs.copyFileSync(SRC, DEST);
-console.log("[copy-backup-into-standalone] copied → " + path.relative(ROOT, DEST));
+const copied = copyBackupScripts();
+console.log(
+  "[copy-backup-into-standalone] copied → " +
+    path.relative(ROOT, DEST_DIR) +
+    " (" +
+    copied.join(", ") +
+    ")"
+);
 
 const seen = new Set();
 for (const name of REQUIRED_PKGS) {

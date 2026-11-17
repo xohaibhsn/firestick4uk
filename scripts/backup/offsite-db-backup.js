@@ -205,9 +205,11 @@ function utcStamp(d = new Date()) {
 }
 
 function parseStampFromPublicId(publicId) {
-  // firestick4uk-backups/f4uk-db-YYYYMMDD-HHMMSS
+  // firestick4uk-backups/f4uk-db-YYYYMMDD-HHMMSS[.enc]
+  // Cloudinary raw upload of *.enc appends ".enc" to the returned public_id;
+  // retention must accept that suffix (OFFSITE-118 retained_count=0 root cause).
   const base = String(publicId).split("/").pop() || "";
-  const m = /^f4uk-db-(\d{8}-\d{6})$/.exec(base);
+  const m = /^f4uk-db-(\d{8}-\d{6})(?:\.enc)?$/i.exec(base);
   return m ? m[1] : null;
 }
 
