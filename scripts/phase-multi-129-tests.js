@@ -364,8 +364,8 @@ function makeHarness(opts = {}) {
   // Ensure SMTP so email path can fire (must not on replay).
   const prevUser = process.env.SMTP_USER;
   const prevPass = process.env.SMTP_PASS;
-  process.env.SMTP_USER = "fixture@example.com";
-  process.env.SMTP_PASS = "fixture-pass";
+  process.env.SMTP_USER = "stub-smtp-user";
+  process.env.SMTP_PASS = "x";
 
   const mod = loadTs("pages/api/orders.ts", stubs);
   const handler = mod.default || mod;
