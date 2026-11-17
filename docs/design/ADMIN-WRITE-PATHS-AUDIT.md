@@ -2,7 +2,7 @@
 
 Scope: every mutating admin/write handler under `pages/api/**` (`app/api/**` empty). Excludes frozen `/erp`. Pure public reads omitted. Coupon `action=validate` omitted (no durable admin write). Non-mutating AI POSTs (`admin-seo-ai`, `admin-blog-research`) omitted.
 
-Hardened releases marked in notes: **108 / 109 / 111 / 113 / 114 / 122 / 123**.
+Hardened releases marked in notes: **108 / 109 / 111 / 113 / 114 / 122 / 123 / 124**.
 
 | endpoint | method/action | permission | input validation (Y/partial/N) | transaction (Y/N) | row lock FOR UPDATE (Y/N) | stale guard (Y/N/NA) | revision (Y/N) | audit (Y/N) | cache invalidation (Y/N/NA) | risk (H/M/L) + one-line note |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -14,7 +14,7 @@ Hardened releases marked in notes: **108 / 109 / 111 / 113 / 114 / 122 / 123**.
 | `/api/admin-staff` | DELETE | `staff.manage` | Y | N | N | NA | N | Y | NA | **M** — session destroy then delete not transactional |
 | `/api/admin-staff-password` | POST reset | `staff.manage` | Y | N | N | NA | N | Y | NA | **L** — reset + session revoke; no FOR UPDATE |
 | `/api/site-content` | POST upsert (single/batch) | `content.manage` / `settings.manage` | partial | Y | Y | Y | Y | Y | Y | **L** — hardened MULTI-108/109 (stale `base_hash` + FOR UPDATE; legacy omit allowed) |
-| `/api/site-content` | PUT upsert by `content_key` | `content.manage` / `settings.manage` | partial | Y | N | N | Y | Y | Y | **H** — alternate CMS write path bypasses POST FOR UPDATE/stale |
+| `/api/site-content` | PUT upsert by `content_key` | `content.manage` / `settings.manage` | partial | Y | Y | Y | Y | Y | Y | **L** — hardened MULTI-124 (FOR UPDATE + optional `base_hash`; legacy omit allowed; returns `base_hash`) |
 | `/api/site-content` | DELETE by key | `content.manage` / `settings.manage` | partial | Y | N | NA | Y | Y | Y | **M** — revision+delete tx without FOR UPDATE (TOCTOU snapshot) |
 | `/api/sections` | POST update section JSON | `page_builder.manage` | partial | Y | Y | Y | Y | Y | Y | **L** — hardened MULTI-111 |
 | `/api/sections` | PUT `?action=visibility` | `page_builder.manage` | Y | Y | Y | N | Y | Y | Y | **L** — hardened MULTI-122 (atomic+lock; no visibility stale token) |
@@ -46,9 +46,9 @@ Hardened releases marked in notes: **108 / 109 / 111 / 113 / 114 / 122 / 123**.
 | `/api/admin-redirects` | POST create | `redirects.manage` | Y | N | N | NA | N | Y | NA | **M** — graph validation not under lock |
 | `/api/admin-redirects` | PUT update | `redirects.manage` | Y | N | N | N | N | Y | NA | **M** — concurrent source/graph races |
 | `/api/admin-redirects` | DELETE | `redirects.manage` | Y | N | N | NA | N | Y | NA | **M** — unlocked delete |
-| `/api/admin-revisions/restore` | POST restore | `revisions.view` + entity restore ACL | Y | Y | partial | partial | Y | Y | Y | **H** — product: FOR UPDATE+version; blog/section/site_content: no FOR UPDATE/stale |
+| `/api/admin-revisions/restore` | POST restore | `revisions.view` + entity restore ACL | Y | Y | Y | partial | Y | Y | Y | **L** — hardened MULTI-124 (blog/section/site_content FOR UPDATE; product unchanged FOR UPDATE+version; restore = intentional overwrite, no new stale guard) |
 | `/api/upload` | POST media | admin + purpose ACL | Y | N | N | NA | N | Y | NA | **L** — validated image upload + media audit |
-| `/api/upload-favicon` | POST | `settings.manage` | Y | N | N | NA | N | Y | Y | **M** — writes `favicon_url` outside hardened site-content POST (no revision/stale) |
+| `/api/upload-favicon` | POST | `settings.manage` | Y | Y | Y | NA | Y | Y | Y | **L** — hardened MULTI-124 (TX + FOR UPDATE + revision when `favicon_url` changes; file/Cloudinary path unchanged) |
 | `/api/upload-receipt` | POST | public | Y | N | N | NA | N | N | NA | **L** — hardened MULTI-108 (receipt contract; COD ignore on orders) |
 | `/api/orders` | POST create order | public | Y | Y | Y | NA | N | N | NA | **L** — hardened MULTI-108 (COD receipt ignored; product+coupon FOR UPDATE) |
 | `/api/contact` | POST message | public | Y | N | N | NA | N | N | NA | **L** — rate-limited insert |
@@ -57,14 +57,14 @@ Hardened releases marked in notes: **108 / 109 / 111 / 113 / 114 / 122 / 123**.
 | `/api/admin-seo-issues/reconcile` | POST reconcile | admin + scope ACL | Y | Y | N | NA | N | Y | NA | **M** — reconcile tx without FOR UPDATE; concurrent runs can race |
 | `/api/admin-orders-export` | GET export (side-effect audit) | `orders.view` / export ACL | Y | N | N | NA | N | Y | NA | **L** — read+audit only; no row mutation |
 
-Restore locking detail: **product** = FOR UPDATE + `expected_version`; **blog / section / site_content / site_settings** = transaction without FOR UPDATE or stale/version guard.
+Restore locking detail: **product** = FOR UPDATE + `expected_version`; **blog / section / site_content / site_settings** = FOR UPDATE inside the restore transaction (MULTI-124); restore remains an intentional overwrite (no stale/version guard on restore).
 
 ## Top 5 remaining risks
 
-1. **`/api/site-content` PUT** — unlocked alternate CMS write path (no `FOR UPDATE`, no stale guard) that bypasses MULTI-108/109 POST hardening.
-2. **`/api/admin-orders` PATCH** — order status / cancel_reason updates without transaction, row lock, or stale guard.
-3. **`/api/admin-revisions/restore`** — blog / section / site_content restores run in a transaction but without `FOR UPDATE` or stale/version guards (can clobber concurrent CMS edits).
-4. **`/api/upload-favicon`** — mutates `site_content.favicon_url` outside the hardened site-content POST path (no revision snapshot, no stale guard).
-5. **`/api/admin/leads` DELETE (esp. bulk) and `/api/admin-redirects` mutations** — destructive / graph-changing writes without transactions or row locks.
+1. **`/api/admin-orders` PATCH** — order status / cancel_reason updates without transaction, row lock, or stale guard.
+2. **`/api/site-content` DELETE** — revision+delete tx without FOR UPDATE (TOCTOU snapshot).
+3. **`/api/blog` DELETE** — tx+revision without FOR UPDATE; weak `id` validation.
+4. **`/api/admin/leads` DELETE (esp. bulk) and `/api/admin-redirects` mutations** — destructive / graph-changing writes without transactions or row locks.
+5. **`/api/admin-staff` PUT/DELETE and `/api/admin-reviews` mutations** — concurrent staff/moderation races without FOR UPDATE.
 
-No fixes in this document — inventory only (MULTI-123).
+Inventory updated MULTI-124 (PUT / restore lock / favicon revision hardened).

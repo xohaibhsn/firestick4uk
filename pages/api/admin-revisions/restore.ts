@@ -301,7 +301,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (revision.entity_type === "blog") {
       const blogId = Number(revision.entity_id);
       const [rows] = await conn.query<RowDataPacket[]>(
-        "SELECT * FROM blog_posts WHERE id=? LIMIT 1",
+        "SELECT * FROM blog_posts WHERE id=? LIMIT 1 FOR UPDATE",
         [blogId]
       );
       const current = rows[0];
@@ -474,7 +474,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const [prevRows] = await conn.query<RowDataPacket[]>(
         `SELECT content_key, content_value, content_type, page_name, label
-         FROM site_content WHERE content_key IN (${keys.map(() => "?").join(",")})`,
+         FROM site_content WHERE content_key IN (${keys.map(() => "?").join(",")}) FOR UPDATE`,
         keys
       );
       const prevMap: Record<string, any> = {};
@@ -541,7 +541,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const key = revision.entity_id;
       const [rows] = await conn.query<RowDataPacket[]>(
         `SELECT content_key, content_value, content_type, page_name, label, section_order, is_visible
-         FROM site_content WHERE content_key=? LIMIT 1`,
+         FROM site_content WHERE content_key=? LIMIT 1 FOR UPDATE`,
         [key]
       );
       const current = rows[0];

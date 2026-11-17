@@ -478,7 +478,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'PUT') {
       const admin = (req as any).__adminIdentity;
-      const { content_key, content_value, content_type, page_name, label } = req.body;
+      const {
+        content_key,
+        content_value,
+        content_type,
+        page_name,
+        label,
+        base_hash: putBaseHash,
+        force: putForce,
+      } = req.body;
       const ck = String(content_key || '');
       if (!ck) return res.status(400).json({ error: 'content_key required' });
 
@@ -496,18 +504,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      const before = await loadKeysSnapshot([ck]);
       const nextVal = String(content_value ?? '');
       const hubGate = await assertSeasonalHubWritesAllowed([{ key: ck, value: nextVal }]);
       if (!hubGate.ok) {
         return res.status(hubGate.status).json({ error: hubGate.error, code: 'seasonal_hub_publish_rejected' });
       }
-      const changed = before.values[ck] === undefined || before.values[ck] !== nextVal;
-      if (changed) {
-        const entityType = classifySiteContentEntityType([ck]);
-        const conn = await pool.getConnection();
-        try {
-          await conn.beginTransaction();
+
+      if (typeof putBaseHash !== 'string') {
+        console.log('[site-content] legacy_put_no_base_hash', ck);
+      }
+
+      let changed = false;
+      let forcedOverwrite = false;
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+
+        // Locked read builds the revision "before" snapshot (same shape as loadKeysSnapshot).
+        const [lockedRows]: any = await conn.query(
+          `SELECT content_key, content_value, content_type, page_name, label
+           FROM site_content WHERE content_key=? FOR UPDATE`,
+          [ck]
+        );
+        const locked = lockedRows?.[0];
+        const beforeValues: Record<string, string> = {};
+        const beforeRows: Record<string, any> = {};
+        if (locked) {
+          beforeValues[ck] = locked.content_value || '';
+          beforeRows[ck] = {
+            content_type: locked.content_type,
+            page_name: locked.page_name,
+            label: locked.label,
+          };
+        }
+
+        if (typeof putBaseHash === 'string') {
+          if (putForce === true) {
+            forcedOverwrite = true;
+          } else {
+            const present = !!locked;
+            const currentHash = present
+              ? hashSiteContentValue(beforeValues[ck], true)
+              : SITE_CONTENT_ABSENT_HASH;
+            if (currentHash !== putBaseHash) {
+              await conn.rollback();
+              return res.status(409).json({ error: 'stale', conflicts: [ck] });
+            }
+          }
+        }
+
+        changed = beforeValues[ck] === undefined || beforeValues[ck] !== nextVal;
+        if (changed) {
+          const entityType = classifySiteContentEntityType([ck]);
           await recordContentRevision(
             {
               entityType,
@@ -515,8 +563,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               entityLabel: ck,
               revisionAction: 'update',
               snapshot: {
-                values: before.values,
-                metadata: { rows: before.rows, keys: [ck] },
+                values: beforeValues,
+                metadata: { rows: beforeRows, keys: [ck] },
               },
               changedFields: [ck],
               actor: admin,
@@ -527,16 +575,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             'INSERT INTO site_content (content_key,content_value,content_type,page_name,label) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE content_value=?,label=?',
             [ck, nextVal, content_type||'text', page_name||'', label||ck, nextVal, label||ck]
           );
-          await conn.commit();
-        } catch (txErr: any) {
-          try { await conn.rollback(); } catch { /* ignore */ }
-          if (txErr?.code === 'REVISION_TOO_LARGE') {
-            return res.status(400).json({ error: txErr.message });
-          }
-          throw txErr;
-        } finally {
-          conn.release();
         }
+
+        await conn.commit();
+      } catch (txErr: any) {
+        try { await conn.rollback(); } catch { /* ignore */ }
+        if (txErr?.code === 'REVISION_TOO_LARGE') {
+          return res.status(400).json({ error: txErr.message });
+        }
+        throw txErr;
+      } finally {
+        conn.release();
       }
 
       const { ip } = getRequestMeta(req);
@@ -551,6 +600,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           metadata: { keys: [ck] },
           ip,
         });
+        if (forcedOverwrite) {
+          // Key names only — never values. Mirrors POST site_content.overwrite_stale.
+          await recordAdminAudit({
+            actor: admin,
+            action: 'site_content.overwrite_stale',
+            entityType: 'content',
+            entityId: ck,
+            summary: `Overwrote stale site_content key(s): ${ck}`,
+            metadata: { keys: [ck] },
+            ip,
+          });
+        }
         if (siteContentKeysAffectSitemap([ck])) {
           invalidateSitemapCache();
         }
@@ -559,7 +620,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
       invalidatePublicCmsCache();
-      return res.status(200).json({ success: true });
+      return res.status(200).json({
+        success: true,
+        base_hash: hashSiteContentValue(nextVal, true),
+      });
     }
 
     if (req.method === 'DELETE') {

@@ -14,6 +14,10 @@ import {
 import { invalidateFaviconCache } from "../../lib/hostingerResourceInvalidation";
 import { invalidatePublicCmsCache } from "../../lib/publicCmsDataServer";
 import { getClientIp } from "../../lib/rateLimit";
+import {
+  classifySiteContentEntityType,
+  recordContentRevision,
+} from "../../lib/contentRevisions";
 
 export const config = { api: { bodyParser: { sizeLimit: "2mb" } } };
 
@@ -102,8 +106,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    const conn = await pool.getConnection();
     try {
-      await pool.query(
+      await conn.beginTransaction();
+      const [lockedRows]: any = await conn.query(
+        `SELECT content_key, content_value, content_type, page_name, label
+         FROM site_content WHERE content_key=? FOR UPDATE`,
+        ["favicon_url"]
+      );
+      const locked = lockedRows?.[0];
+      const prevVal = locked ? String(locked.content_value || "") : "";
+      if (prevVal !== publicUrl) {
+        const beforeValues: Record<string, string> = {};
+        const beforeRows: Record<string, any> = {};
+        if (locked) {
+          beforeValues.favicon_url = prevVal;
+          beforeRows.favicon_url = {
+            content_type: locked.content_type,
+            page_name: locked.page_name,
+            label: locked.label,
+          };
+        }
+        await recordContentRevision(
+          {
+            entityType: classifySiteContentEntityType(["favicon_url"]),
+            entityId: "favicon_url",
+            entityLabel: "favicon_url",
+            revisionAction: "update",
+            snapshot: {
+              values: beforeValues,
+              metadata: { rows: beforeRows, keys: ["favicon_url"] },
+            },
+            changedFields: ["favicon_url"],
+            actor: admin,
+          },
+          conn
+        );
+      }
+      await conn.query(
         `INSERT INTO site_content (content_key, content_value, content_type, page_name, label)
          VALUES ('favicon_url', ?, 'image', 'settings', 'Favicon URL')
          ON DUPLICATE KEY UPDATE
@@ -113,9 +153,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
            label = 'Favicon URL'`,
         [publicUrl]
       );
+      await conn.commit();
     } catch (err: unknown) {
+      try {
+        await conn.rollback();
+      } catch {
+        /* ignore */
+      }
       console.error("[upload-favicon] site_content update failed", (err as Error)?.message || err);
       return res.status(500).json({ error: "Favicon upload failed" });
+    } finally {
+      conn.release();
     }
 
     invalidateFaviconCache();
