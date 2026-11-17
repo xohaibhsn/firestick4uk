@@ -789,6 +789,62 @@ export default function CartPage() {
       return;
     }
 
+    // Stable checkout Idempotency-Key for this cart signature (retry-safe).
+    const checkoutSig = JSON.stringify({
+      items: [...cart]
+        .map((i) => [i.id, i.qty] as [number, number])
+        .sort((a, b) => a[0] - b[0]),
+      coupon: couponApplied?.code || "",
+      payment: paymentMethod,
+      email: String(identity.customer_email || "")
+        .trim()
+        .toLowerCase(),
+    });
+    const uuidV4Re =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+    const newCheckoutKey = (): string => {
+      try {
+        if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+          const k = crypto.randomUUID().toLowerCase();
+          if (uuidV4Re.test(k)) return k;
+        }
+      } catch {
+        /* fall through */
+      }
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    };
+    let checkoutKey = newCheckoutKey();
+    try {
+      const raw = sessionStorage.getItem("f4uk_checkout_key");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { key?: unknown; sig?: unknown };
+        if (
+          typeof parsed?.key === "string" &&
+          uuidV4Re.test(parsed.key) &&
+          parsed.sig === checkoutSig
+        ) {
+          checkoutKey = parsed.key;
+        } else {
+          sessionStorage.setItem(
+            "f4uk_checkout_key",
+            JSON.stringify({ key: checkoutKey, sig: checkoutSig })
+          );
+        }
+      } else {
+        sessionStorage.setItem(
+          "f4uk_checkout_key",
+          JSON.stringify({ key: checkoutKey, sig: checkoutSig })
+        );
+      }
+    } catch {
+      /* keep generated key; sessionStorage may be unavailable */
+    }
+
     placingRef.current = true;
     setPlacing(true);
 
@@ -826,7 +882,10 @@ export default function CartPage() {
 
       const res = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": checkoutKey,
+        },
         body: JSON.stringify({
           customer_name: identity.customer_name,
           customer_email: identity.customer_email,
@@ -851,6 +910,11 @@ export default function CartPage() {
 
       const data = await res.json();
       if (data.order_id) {
+        try {
+          sessionStorage.removeItem("f4uk_checkout_key");
+        } catch {
+          /* ignore */
+        }
         const oid = data.order_id;
 
         // After success, server pricing/items are authoritative (ignore client/tampered figures).
@@ -937,6 +1001,19 @@ export default function CartPage() {
         }));
         clearCart();
         router.push("/cart/success");
+      } else if (res.status === 422 && data?.code === "idempotency_key_reused") {
+        try {
+          sessionStorage.removeItem("f4uk_checkout_key");
+        } catch {
+          /* ignore */
+        }
+        setOrderError(
+          data.error ||
+            t(
+              "cart_err_failed",
+              "Order could not be placed. Please try again or contact us on WhatsApp or Telegram."
+            )
+        );
       } else {
         setOrderError(data.error?.includes("connect") || data.error?.includes("timeout")
           ? t("cart_err_unavailable", "Our system is temporarily unavailable. Please try again in a moment.")

@@ -185,20 +185,31 @@ function main() {
     String(applyNoAllow.status)
   );
 
-  // 7. No runtime references yet (Part 2)
+  // 7. Runtime refs (MULTI-129 Part 2) — only approved order-idempotency paths.
+  const ALLOWED_RUNTIME_REFS = new Set([
+    path.normalize("lib/orderIdempotency.ts"),
+    path.normalize("pages/api/orders.ts"),
+    path.normalize("pages/api/admin-orders.ts"),
+  ]);
   const scanDirs = ["app", "lib", "pages"].map((d) => path.join(ROOT, d));
-  let runtimeHit = null;
+  const runtimeHits = [];
   for (const dir of scanDirs) {
     for (const file of walkFiles(dir)) {
       const text = fs.readFileSync(file, "utf8");
       if (text.includes("migrate-order-idempotency") || text.includes("order_idempotency_keys")) {
-        runtimeHit = path.relative(ROOT, file);
-        break;
+        runtimeHits.push(path.normalize(path.relative(ROOT, file)));
       }
     }
-    if (runtimeHit) break;
   }
-  ok("no_runtime_refs_yet", runtimeHit == null, runtimeHit || "clean");
+  const unexpected = runtimeHits.filter((f) => !ALLOWED_RUNTIME_REFS.has(f));
+  ok(
+    "runtime_refs_only_approved_multi129",
+    unexpected.length === 0 &&
+      ALLOWED_RUNTIME_REFS.has(path.normalize("pages/api/orders.ts")) &&
+      runtimeHits.some((f) => f === path.normalize("pages/api/orders.ts")) &&
+      runtimeHits.some((f) => f === path.normalize("pages/api/admin-orders.ts")),
+    unexpected.length ? unexpected.join(",") : runtimeHits.join(",") || "none"
+  );
 
   // 8. check-runtime-ddl
   const ddl = spawnSync(NODE, [path.join("scripts", "check-runtime-ddl.js")], {

@@ -473,6 +473,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
         itemsDeleted = Number(itemsResult?.affectedRows || 0);
         await conn.query("DELETE FROM orders WHERE order_id=?", [order_id]);
+        await conn.query("DELETE FROM order_idempotency_keys WHERE order_id=?", [
+          order_id,
+        ]);
         await conn.commit();
       } catch (txErr) {
         try {

@@ -40,6 +40,13 @@ import {
 } from '../../lib/pricesIncludeVatServer';
 import { lockAndAuthorizeOrderProducts } from '../../lib/orderProductEligibility';
 import { isAllowedReceiptPath } from '../../lib/receiptPathPolicy';
+import {
+  computeOrderRequestHash,
+  dupKeyName,
+  isDupEntry,
+  isPrimaryDupKey,
+  isValidIdempotencyKey,
+} from '../../lib/orderIdempotency';
 
 const PRICING_UNAVAILABLE_MSG =
   'Pricing temporarily unavailable. Please try again.';
@@ -101,6 +108,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { allowed } = RL_GENERAL(getClientIp(req));
   if (!allowed) return res.status(429).json({ error: 'Too many requests' });
+
+  // Idempotency-Key (optional): validate before any DB / coupon / receipt / email work.
+  const rawIdemHeader = req.headers['idempotency-key'];
+  let idempotencyKey: string | null = null;
+  if (rawIdemHeader !== undefined) {
+    if (typeof rawIdemHeader !== 'string' || !isValidIdempotencyKey(rawIdemHeader)) {
+      return res.status(400).json({
+        error: 'Invalid checkout session. Please refresh the page and try again.',
+        code: 'invalid_idempotency_key',
+      });
+    }
+    idempotencyKey = rawIdemHeader;
+  }
 
   try {
     const {
@@ -207,10 +227,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const uniqueIds = [...qtyById.keys()];
     const rawCoupon = normalizeCouponCode(coupon_code);
     const customerNotes = typeof notes === 'string' ? notes : '';
-    const order_id = generateOrderId();
     // Contact/SMTP stay outside the short DB transaction.
     const contact = await getContactConfig();
 
+    const requestHash = idempotencyKey
+      ? computeOrderRequestHash({
+          items: uniqueIds.map((id) => ({ id, qty: qtyById.get(id)! })),
+          couponCode: rawCoupon,
+          paymentMethod: publicPaymentMethod,
+          email: customer_email,
+        })
+      : null;
+
+    let order_id = '';
     let validatedCouponCode: string | null = null;
     let discountAmount = 0;
     let grandTotal = 0;
@@ -223,155 +252,319 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let orderPricesIncludeVat =
       typeof pricesIncludeVatEarly === 'boolean' ? pricesIncludeVatEarly : false;
 
-    const conn = await pool.getConnection();
-    try {
-      await conn.beginTransaction();
+    type CreateOutcome =
+      | { kind: 'created' }
+      | { kind: 'replay_primary' }
+      | { kind: 'retry_collision' };
 
-      // Lock products in ascending id order; sample eligibility time inside the TX.
-      const authorized = await lockAndAuthorizeOrderProducts({
-        conn,
-        productIds: uniqueIds,
-      });
-      if (!authorized.ok) {
-        throw new OrderValidationError(authorized.error);
-      }
-
-      // Re-check CMS payment toggles inside the TX (early check is a fast path only).
-      const paymentTogglesTx = await getPaymentMethodSettings({ db: conn, ttlMs: 0 });
-      if (!isPaymentMethodEffectivelyEnabled(publicPaymentMethod, paymentTogglesTx)) {
-        throw new OrderValidationError('Payment method unavailable.');
-      }
-
-      // Re-read VAT mode inside TX (authoritative for this order).
-      // Unknown/error → roll back + 503; never INSERT or email with a guessed OFF.
-      try {
-        orderPricesIncludeVat = await getPricesIncludeVat({ db: conn, ttlMs: 0 });
-      } catch (vatErr) {
-        if (isPricesIncludeVatReadError(vatErr)) {
-          throw new OrderValidationError(PRICING_UNAVAILABLE_MSG, 503);
-        }
-        throw vatErr;
-      }
-
-      authoritativeItems = [];
-      for (const id of uniqueIds) {
-        const p = authorized.productsById.get(id)!;
-        const price = Number(p.price);
-        if (!isFiniteNonNegativeMoney(price)) {
-          throw new OrderValidationError(
-            'Unable to process order due to an invalid product price. Please contact support.',
-            500
-          );
-        }
-        authoritativeItems.push({
-          id: Number(p.id),
-          name: String(p.name),
-          price: roundMoney(price),
-          qty: qtyById.get(id)!,
-          category: p.category,
-          stock: p.stock,
-        });
-      }
-
-      const digitalProducts = authoritativeItems.filter((p) => isDigitalProduct(p));
-      hasDigital = digitalProducts.length > 0;
-      if (hasDigital && digital_supply_acknowledgement !== true) {
-        throw new OrderValidationError(
-          'Digital supply acknowledgement is required for subscription/digital items.'
-        );
-      }
-
-      const pricing = calculateAuthoritativePricing(authoritativeItems, {
-        pricesIncludeVat: orderPricesIncludeVat,
-      });
-      subtotal = pricing.subtotal;
-      shipping = pricing.shipping;
-      vatAmount = pricing.vatAmount;
-
-      const recordedAt = new Date().toISOString();
-      notesToStore = hasDigital
-        ? buildDigitalSupplyAckNotes({
-            customerNotes,
-            digitalProductIds: digitalProducts.map((p) => Number(p.id)),
-            recordedAtIso: recordedAt,
-          })
-        : customerNotes || '';
-
-      if (rawCoupon) {
-        const [couponRows]: any = await conn.query(
-          'SELECT * FROM coupons WHERE code=? AND is_active=1 LIMIT 1 FOR UPDATE',
-          [rawCoupon]
-        );
-        if (!Array.isArray(couponRows) || !couponRows.length) {
-          throw new OrderValidationError('Invalid coupon code.');
-        }
-        const evaluated = evaluateLockedCoupon({
-          coupon: couponRows[0],
-          cartTotalForCoupon: roundMoney(subtotal + shipping),
-        });
-        if (!evaluated.ok) {
-          throw new OrderValidationError(evaluated.error);
-        }
-        discountAmount = evaluated.discountAmount;
-        validatedCouponCode = evaluated.code;
-      }
-
-      grandTotal = calculateGrandTotal({
-        subtotal,
-        shipping,
-        vatAmount,
-        discountAmount,
-        pricesIncludeVat: orderPricesIncludeVat,
-      });
-      if (orderPricesIncludeVat) {
-        vatAmount = extractVatFromInclusiveGrandTotal(grandTotal);
-      }
-
-      await conn.query(
-        'INSERT INTO orders (order_id,customer_name,customer_email,customer_phone,delivery_address,city,postcode,notes,payment_method,receipt_path,total,coupon_code,discount_amount,vat_amount,payment_reference,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-        [
-          order_id,
-          customer_name,
-          customer_email,
-          customer_phone,
-          delivery_address,
-          city,
-          postcode,
-          notesToStore,
-          dbPaymentMethod,
-          receiptPathValue || '',
-          grandTotal,
-          validatedCouponCode,
-          discountAmount,
-          vatAmount,
-          payment_reference || null,
-          'pending',
-        ]
-      );
-
-      for (const item of authoritativeItems) {
-        await conn.query(
-          'INSERT INTO order_items (order_id,product_id,product_name,price,quantity) VALUES (?,?,?,?,?)',
-          [order_id, item.id, item.name, item.price, item.qty]
-        );
-      }
-
-      if (validatedCouponCode) {
-        await conn.query('UPDATE coupons SET used_count=used_count+1 WHERE code=?', [
-          validatedCouponCode,
-        ]);
-      }
-
-      await conn.commit();
-    } catch (txErr) {
+    async function safeRollback(conn: { rollback: () => Promise<void> }) {
       try {
         await conn.rollback();
       } catch {
         /* ignore */
       }
-      throw txErr;
-    } finally {
-      conn.release();
+    }
+
+    async function attemptCreate(candidateOrderId: string): Promise<CreateOutcome> {
+      validatedCouponCode = null;
+      discountAmount = 0;
+      grandTotal = 0;
+      authoritativeItems = [];
+      notesToStore = customerNotes || '';
+      subtotal = 0;
+      shipping = 0;
+      vatAmount = 0;
+      hasDigital = false;
+      orderPricesIncludeVat =
+        typeof pricesIncludeVatEarly === 'boolean' ? pricesIncludeVatEarly : false;
+      order_id = candidateOrderId;
+
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+
+        // Fixed lock order: claim idempotency key before product/coupon FOR UPDATE.
+        if (idempotencyKey && requestHash) {
+          try {
+            await conn.query(
+              'INSERT INTO order_idempotency_keys (idempotency_key, request_hash, order_id, created_at) VALUES (?, ?, ?, UTC_TIMESTAMP(3))',
+              [idempotencyKey, requestHash, order_id]
+            );
+          } catch (insErr) {
+            if (isDupEntry(insErr)) {
+              await safeRollback(conn);
+              const keyName = dupKeyName(insErr);
+              if (isPrimaryDupKey(keyName)) return { kind: 'replay_primary' };
+              if (
+                keyName === 'uq_oik_order_id' ||
+                (typeof keyName === 'string' && keyName.endsWith('.uq_oik_order_id'))
+              ) {
+                return { kind: 'retry_collision' };
+              }
+            }
+            throw insErr;
+          }
+        }
+
+        // Lock products in ascending id order; sample eligibility time inside the TX.
+        const authorized = await lockAndAuthorizeOrderProducts({
+          conn,
+          productIds: uniqueIds,
+        });
+        if (!authorized.ok) {
+          throw new OrderValidationError(authorized.error);
+        }
+
+        // Re-check CMS payment toggles inside the TX (early check is a fast path only).
+        const paymentTogglesTx = await getPaymentMethodSettings({ db: conn, ttlMs: 0 });
+        if (!isPaymentMethodEffectivelyEnabled(publicPaymentMethod, paymentTogglesTx)) {
+          throw new OrderValidationError('Payment method unavailable.');
+        }
+
+        // Re-read VAT mode inside TX (authoritative for this order).
+        // Unknown/error → roll back + 503; never INSERT or email with a guessed OFF.
+        try {
+          orderPricesIncludeVat = await getPricesIncludeVat({ db: conn, ttlMs: 0 });
+        } catch (vatErr) {
+          if (isPricesIncludeVatReadError(vatErr)) {
+            throw new OrderValidationError(PRICING_UNAVAILABLE_MSG, 503);
+          }
+          throw vatErr;
+        }
+
+        authoritativeItems = [];
+        for (const id of uniqueIds) {
+          const p = authorized.productsById.get(id)!;
+          const price = Number(p.price);
+          if (!isFiniteNonNegativeMoney(price)) {
+            throw new OrderValidationError(
+              'Unable to process order due to an invalid product price. Please contact support.',
+              500
+            );
+          }
+          authoritativeItems.push({
+            id: Number(p.id),
+            name: String(p.name),
+            price: roundMoney(price),
+            qty: qtyById.get(id)!,
+            category: p.category,
+            stock: p.stock,
+          });
+        }
+
+        const digitalProducts = authoritativeItems.filter((p) => isDigitalProduct(p));
+        hasDigital = digitalProducts.length > 0;
+        if (hasDigital && digital_supply_acknowledgement !== true) {
+          throw new OrderValidationError(
+            'Digital supply acknowledgement is required for subscription/digital items.'
+          );
+        }
+
+        const pricing = calculateAuthoritativePricing(authoritativeItems, {
+          pricesIncludeVat: orderPricesIncludeVat,
+        });
+        subtotal = pricing.subtotal;
+        shipping = pricing.shipping;
+        vatAmount = pricing.vatAmount;
+
+        const recordedAt = new Date().toISOString();
+        notesToStore = hasDigital
+          ? buildDigitalSupplyAckNotes({
+              customerNotes,
+              digitalProductIds: digitalProducts.map((p) => Number(p.id)),
+              recordedAtIso: recordedAt,
+            })
+          : customerNotes || '';
+
+        if (rawCoupon) {
+          const [couponRows]: any = await conn.query(
+            'SELECT * FROM coupons WHERE code=? AND is_active=1 LIMIT 1 FOR UPDATE',
+            [rawCoupon]
+          );
+          if (!Array.isArray(couponRows) || !couponRows.length) {
+            throw new OrderValidationError('Invalid coupon code.');
+          }
+          const evaluated = evaluateLockedCoupon({
+            coupon: couponRows[0],
+            cartTotalForCoupon: roundMoney(subtotal + shipping),
+          });
+          if (!evaluated.ok) {
+            throw new OrderValidationError(evaluated.error);
+          }
+          discountAmount = evaluated.discountAmount;
+          validatedCouponCode = evaluated.code;
+        }
+
+        grandTotal = calculateGrandTotal({
+          subtotal,
+          shipping,
+          vatAmount,
+          discountAmount,
+          pricesIncludeVat: orderPricesIncludeVat,
+        });
+        if (orderPricesIncludeVat) {
+          vatAmount = extractVatFromInclusiveGrandTotal(grandTotal);
+        }
+
+        try {
+          await conn.query(
+            'INSERT INTO orders (order_id,customer_name,customer_email,customer_phone,delivery_address,city,postcode,notes,payment_method,receipt_path,total,coupon_code,discount_amount,vat_amount,payment_reference,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            [
+              order_id,
+              customer_name,
+              customer_email,
+              customer_phone,
+              delivery_address,
+              city,
+              postcode,
+              notesToStore,
+              dbPaymentMethod,
+              receiptPathValue || '',
+              grandTotal,
+              validatedCouponCode,
+              discountAmount,
+              vatAmount,
+              payment_reference || null,
+              'pending',
+            ]
+          );
+        } catch (ordErr) {
+          if (isDupEntry(ordErr)) {
+            await safeRollback(conn);
+            return { kind: 'retry_collision' };
+          }
+          throw ordErr;
+        }
+
+        for (const item of authoritativeItems) {
+          await conn.query(
+            'INSERT INTO order_items (order_id,product_id,product_name,price,quantity) VALUES (?,?,?,?,?)',
+            [order_id, item.id, item.name, item.price, item.qty]
+          );
+        }
+
+        if (validatedCouponCode) {
+          await conn.query('UPDATE coupons SET used_count=used_count+1 WHERE code=?', [
+            validatedCouponCode,
+          ]);
+        }
+
+        await conn.commit();
+        return { kind: 'created' };
+      } catch (txErr) {
+        await safeRollback(conn);
+        throw txErr;
+      } finally {
+        conn.release();
+      }
+    }
+
+    /** Replay path: pool only, outside any TX. */
+    async function replayIdempotentOrder(
+      key: string,
+      expectedHash: string
+    ): Promise<
+      | { kind: 'response'; status: number; body: Record<string, unknown> }
+      | { kind: 'restart' }
+    > {
+      const [keyRows]: any = await pool.query(
+        'SELECT request_hash, order_id FROM order_idempotency_keys WHERE idempotency_key=?',
+        [key]
+      );
+      if (!Array.isArray(keyRows) || !keyRows.length) {
+        return { kind: 'restart' };
+      }
+      const keyRow = keyRows[0];
+      if (String(keyRow.request_hash) !== expectedHash) {
+        return {
+          kind: 'response',
+          status: 422,
+          body: {
+            error:
+              'This checkout was already used for a different order. Please refresh the page and try again.',
+            code: 'idempotency_key_reused',
+          },
+        };
+      }
+      const existingOrderId = String(keyRow.order_id);
+      const [orderRows]: any = await pool.query(
+        'SELECT order_id, total, discount_amount, vat_amount, coupon_code FROM orders WHERE order_id=?',
+        [existingOrderId]
+      );
+      if (!Array.isArray(orderRows) || !orderRows.length) {
+        await pool.query(
+          'DELETE FROM order_idempotency_keys WHERE idempotency_key=? AND order_id=?',
+          [key, existingOrderId]
+        );
+        return { kind: 'restart' };
+      }
+      const [itemRows]: any = await pool.query(
+        'SELECT product_id, product_name, price, quantity FROM order_items WHERE order_id=? ORDER BY id',
+        [existingOrderId]
+      );
+      const replayItems = (Array.isArray(itemRows) ? itemRows : []).map((row: any) => ({
+        id: Number(row.product_id),
+        name: String(row.product_name),
+        price: Number(row.price),
+        qty: Number(row.quantity),
+      }));
+      let replaySubtotal = 0;
+      for (const it of replayItems) {
+        replaySubtotal = roundMoney(replaySubtotal + Number(it.price) * Number(it.qty));
+      }
+      const o = orderRows[0];
+      console.log('[orders] idempotent replay', existingOrderId);
+      return {
+        kind: 'response',
+        status: 200,
+        body: {
+          success: true,
+          replayed: true,
+          order_id: existingOrderId,
+          whatsappUrl: contact.whatsappUrl,
+          telegramUrl: contact.telegramUrl,
+          pricing: {
+            subtotal: replaySubtotal,
+            total: Number(o.total),
+            vat_amount: Number(o.vat_amount),
+            discount_amount: Number(o.discount_amount),
+            coupon_code: o.coupon_code ?? null,
+          },
+          items: replayItems,
+        },
+      };
+    }
+
+    // Collision / orphan / missing-key: at most one restart/retry of the create TX
+    // (a second collision or restart → generic 500). Hard ceiling: 2 restarts total.
+    let restartsUsed = 0;
+    const maxRestarts = 2;
+    let created = false;
+    while (!created) {
+      const outcome = await attemptCreate(generateOrderId());
+      if (outcome.kind === 'created') {
+        created = true;
+        break;
+      }
+      if (outcome.kind === 'replay_primary') {
+        const replay = await replayIdempotentOrder(idempotencyKey!, requestHash!);
+        if (replay.kind === 'response') {
+          return res.status(replay.status).json(replay.body);
+        }
+        // orphan / missing key → restart create once (within budget)
+        if (restartsUsed >= maxRestarts) {
+          console.error('[orders] Order creation failed:', 'Error', 'idempotency_restart_exhausted');
+          return res.status(500).json({ error: 'Unable to create order. Please try again.' });
+        }
+        restartsUsed += 1;
+        continue;
+      }
+      // retry_collision: RETRY ONCE; a second collision → 500
+      if (restartsUsed >= 1 || restartsUsed >= maxRestarts) {
+        console.error('[orders] Order creation failed:', 'Error', 'ER_DUP_ENTRY');
+        return res.status(500).json({ error: 'Unable to create order. Please try again.' });
+      }
+      restartsUsed += 1;
     }
 
     const responseItems = authoritativeItems.map((i) => ({
