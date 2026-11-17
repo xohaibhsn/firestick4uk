@@ -139,6 +139,7 @@ import {
   type EditProductDraft,
 } from "@/lib/productContentDraftClient";
 import ProductListToolbar from "@/components/admin/ProductListToolbar";
+import ProductBulkBar from "@/components/admin/ProductBulkBar";
 import ProductQuickEditRow from "@/components/admin/ProductQuickEditRow";
 import ProductEditorSidebar from "@/components/admin/ProductEditorSidebar";
 import ProductSeoSnippetPreview from "@/components/admin/ProductSeoSnippetPreview";
@@ -156,6 +157,22 @@ import {
   buildQuickEditPutBody,
   shouldAbortQuickEditOnConflict,
 } from "@/lib/productAdminQuickEdit";
+import {
+  PRODUCT_BULK_MAX_SELECTION,
+  buildBulkConfirmMessage,
+  buildBulkPriceStockPutBody,
+  buildBulkVisibilityPatchBody,
+  clearProductBulkSelection,
+  formatBulkRunSummaryMessage,
+  partitionBulkVisibilityTargets,
+  productBulkDisplayName,
+  runProductBulkSequential,
+  selectAllVisibleProductIds,
+  toggleProductBulkSelection,
+  type BulkAction,
+  type BulkRequestResult,
+  type BulkRequestSpec,
+} from "@/lib/productAdminBulk";
 import {
   isProductEditorDraftDirty,
   snapshotProductEditorDraft,
@@ -525,6 +542,12 @@ function AdminPageInner() {
   const [quickEditSaving, setQuickEditSaving] = useState(false);
   const [quickEditError, setQuickEditError] = useState<string | null>(null);
   const [quickEditConflictReload, setQuickEditConflictReload] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
+  const [productBulkSelectionCapped, setProductBulkSelectionCapped] = useState(false);
+  const [productBulkRunning, setProductBulkRunning] = useState(false);
+  const [productBulkProgress, setProductBulkProgress] = useState<string | null>(null);
+  const [productBulkPrice, setProductBulkPrice] = useState("");
+  const [productBulkStock, setProductBulkStock] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ordersPage, setOrdersPage] = useState(1);
   const ORDERS_PER_PAGE = 25;
@@ -2215,6 +2238,21 @@ function AdminPageInner() {
     return () => window.clearTimeout(t);
   }, [productListSearch]);
 
+  /** Clear bulk selection when tab/search/filter changes (defer while a run is in progress). */
+  useEffect(() => {
+    if (productBulkRunning) return;
+    setSelectedProductIds(clearProductBulkSelection());
+    setProductBulkSelectionCapped(false);
+    // productBulkRunning: when a run ends, re-evaluate so a mid-run filter change still clears.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional filter-keyed clear
+  }, [
+    productListSearchDebounced,
+    productListTab,
+    productVisibilityFilter,
+    productSeoFilter,
+    productBulkRunning,
+  ]);
+
   /** Search → tab/visibility/SEO filters → SEO review ordering (filterAndOrderProductsForSeoReview inside). */
   const displayedProducts = useMemo(
     () =>
@@ -2232,6 +2270,18 @@ function AdminPageInner() {
     () => countProductAdminListTabs(products, productSeoReviewById),
     [products, productSeoReviewById]
   );
+
+  const displayedProductIds = useMemo(
+    () =>
+      displayedProducts
+        .map((p: any) => Number(p.id))
+        .filter((id: number) => Number.isInteger(id) && id > 0),
+    [displayedProducts]
+  );
+
+  const allVisibleProductsSelected =
+    displayedProductIds.length > 0 &&
+    displayedProductIds.every((id: number) => selectedProductIds.includes(id));
 
   const changeProductListTab = (next: ProductAdminListTab) => {
     const legacy = mapListTabToLegacyFilters(next);
@@ -4101,6 +4151,243 @@ function AdminPageInner() {
   const reloadAfterQuickEditConflict = async () => {
     resetQuickEdit();
     await loadProducts();
+  };
+
+  const clearProductSelection = () => {
+    setSelectedProductIds(clearProductBulkSelection());
+    setProductBulkSelectionCapped(false);
+  };
+
+  const toggleProductSelection = (id: number) => {
+    if (productBulkRunning) return;
+    const { next, capped } = toggleProductBulkSelection(
+      selectedProductIds,
+      id,
+      PRODUCT_BULK_MAX_SELECTION
+    );
+    setSelectedProductIds(next);
+    setProductBulkSelectionCapped(capped || next.length >= PRODUCT_BULK_MAX_SELECTION);
+  };
+
+  const toggleSelectAllVisibleProducts = () => {
+    if (productBulkRunning) return;
+    if (allVisibleProductsSelected) {
+      setSelectedProductIds((prev) =>
+        prev.filter((id) => !displayedProductIds.includes(id))
+      );
+      setProductBulkSelectionCapped(false);
+      return;
+    }
+    const { next, capped } = selectAllVisibleProductIds(
+      displayedProductIds,
+      selectedProductIds,
+      PRODUCT_BULK_MAX_SELECTION
+    );
+    setSelectedProductIds(next);
+    setProductBulkSelectionCapped(capped || next.length >= PRODUCT_BULK_MAX_SELECTION);
+  };
+
+  const sendBulkAdminProductRequest = async (
+    spec: BulkRequestSpec
+  ): Promise<BulkRequestResult> => {
+    const r = await fetch("/api/admin-products", {
+      method: spec.method,
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(spec.body),
+    });
+    const data = await r.json().catch(() => ({}));
+    return {
+      status: r.status,
+      ok: r.ok,
+      code: (data as { code?: unknown })?.code,
+      error: (data as { error?: unknown })?.error,
+      success: (data as { success?: unknown })?.success,
+    };
+  };
+
+  const finishBulkRun = async (
+    summary: Awaited<ReturnType<typeof runProductBulkSequential>>
+  ) => {
+    if (summary.aborted === "session") {
+      handleSessionExpired();
+      return;
+    }
+    if (summary.aborted === "permission") {
+      showPermError();
+    }
+    await loadProducts();
+    clearProductSelection();
+    setProductMsg(
+      `${summary.failed.length || summary.aborted ? "❌" : "✅"} ${formatBulkRunSummaryMessage(summary)}`
+    );
+    setTimeout(() => setProductMsg(""), 8000);
+  };
+
+  const runBulkVisibility = async (action: "make_public" | "make_private") => {
+    if (!can("products.manage")) {
+      showPermError();
+      return;
+    }
+    if (
+      productBulkRunning ||
+      productSaving ||
+      productVisibilityPendingId != null ||
+      productDeletingId != null ||
+      productModal != null ||
+      quickEditProductId != null
+    ) {
+      return;
+    }
+    const selected = products.filter((p: any) =>
+      selectedProductIds.includes(Number(p.id))
+    );
+    if (!selected.length) return;
+
+    const { eligible, skipped } = partitionBulkVisibilityTargets(selected, action);
+    const confirmed = await askConfirm(
+      buildBulkConfirmMessage({ action, eligible, skipped })
+    );
+    if (!confirmed) return;
+
+    const nextActive: 0 | 1 = action === "make_public" ? 1 : 0;
+    const items = [
+      ...skipped.map((s) => ({
+        id: s.id ?? 0,
+        name: s.name,
+        request: null as BulkRequestSpec | null,
+        preSkipReason: String(s.reason),
+      })),
+      ...eligible.map((p) => {
+        const built = buildBulkVisibilityPatchBody(p, nextActive);
+        if (!built.ok) {
+          return {
+            id: Number(p.id),
+            name: productBulkDisplayName(p),
+            request: null as BulkRequestSpec | null,
+            preSkipReason: built.error,
+          };
+        }
+        return {
+          id: Number(p.id),
+          name: productBulkDisplayName(p),
+          request: { method: "PATCH" as const, body: built.body },
+        };
+      }),
+    ];
+
+    setProductBulkRunning(true);
+    setProductBulkProgress(`0/${eligible.length || items.length}`);
+    setProductMsg("");
+    try {
+      const summary = await runProductBulkSequential({
+        items,
+        send: sendBulkAdminProductRequest,
+        onProgress: (done, total) => setProductBulkProgress(`${done}/${total}`),
+      });
+      await finishBulkRun(summary);
+    } finally {
+      setProductBulkRunning(false);
+      setProductBulkProgress(null);
+    }
+  };
+
+  const runBulkPriceOrStock = async (action: Extract<BulkAction, "set_price" | "set_stock">) => {
+    if (!can("products.manage")) {
+      showPermError();
+      return;
+    }
+    if (
+      productBulkRunning ||
+      productSaving ||
+      productVisibilityPendingId != null ||
+      productDeletingId != null ||
+      productModal != null ||
+      quickEditProductId != null
+    ) {
+      return;
+    }
+    const selected = products.filter((p: any) =>
+      selectedProductIds.includes(Number(p.id))
+    );
+    if (!selected.length) return;
+
+    if (action === "set_price") {
+      const probe = buildBulkPriceStockPutBody(
+        selected[0],
+        { price: productBulkPrice },
+        "set_price"
+      );
+      if (!probe.ok) {
+        setProductMsg(`❌ ${probe.error}`);
+        setTimeout(() => setProductMsg(""), 4000);
+        return;
+      }
+      // Validate every selected row's price body before any request
+      for (const p of selected) {
+        const built = buildBulkPriceStockPutBody(
+          p,
+          { price: productBulkPrice },
+          "set_price"
+        );
+        if (!built.ok) {
+          setProductMsg(`❌ ${built.error}`);
+          setTimeout(() => setProductMsg(""), 4000);
+          return;
+        }
+      }
+    }
+
+    const eligible = selected;
+    const skipped: { id: number | null; name: string; reason: string }[] = [];
+    const confirmed = await askConfirm(
+      buildBulkConfirmMessage({
+        action,
+        eligible,
+        skipped,
+        priceValue: productBulkPrice,
+        stockValue: productBulkStock,
+      })
+    );
+    if (!confirmed) return;
+
+    const items = eligible.map((p) => {
+      const built = buildBulkPriceStockPutBody(
+        p,
+        action === "set_price"
+          ? { price: productBulkPrice }
+          : { stock: productBulkStock },
+        action
+      );
+      if (!built.ok) {
+        return {
+          id: Number(p.id),
+          name: productBulkDisplayName(p),
+          request: null as BulkRequestSpec | null,
+          preSkipReason: built.error,
+        };
+      }
+      return {
+        id: Number(p.id),
+        name: productBulkDisplayName(p),
+        request: { method: "PUT" as const, body: built.body },
+      };
+    });
+
+    setProductBulkRunning(true);
+    setProductBulkProgress(`0/${items.length}`);
+    setProductMsg("");
+    try {
+      const summary = await runProductBulkSequential({
+        items,
+        send: sendBulkAdminProductRequest,
+        onProgress: (done, total) => setProductBulkProgress(`${done}/${total}`),
+      });
+      await finishBulkRun(summary);
+    } finally {
+      setProductBulkRunning(false);
+      setProductBulkProgress(null);
+    }
   };
 
   const migrateProductUrl = async () => {
@@ -7149,18 +7436,66 @@ function AdminPageInner() {
                 seoSummary={productSeoSummary}
               />
 
+              {can("products.manage") && selectedProductIds.length > 0 ? (
+                <ProductBulkBar
+                  selectedCount={selectedProductIds.length}
+                  maxSelection={PRODUCT_BULK_MAX_SELECTION}
+                  selectionCapped={
+                    productBulkSelectionCapped ||
+                    selectedProductIds.length >= PRODUCT_BULK_MAX_SELECTION
+                  }
+                  disabled={
+                    productBulkRunning ||
+                    productSaving ||
+                    productVisibilityPendingId != null ||
+                    productDeletingId != null ||
+                    productModal != null ||
+                    quickEditProductId != null
+                  }
+                  running={productBulkRunning}
+                  progressText={productBulkProgress}
+                  priceValue={productBulkPrice}
+                  stockValue={productBulkStock}
+                  onPriceChange={setProductBulkPrice}
+                  onStockChange={setProductBulkStock}
+                  onMakePublic={() => void runBulkVisibility("make_public")}
+                  onMakePrivate={() => void runBulkVisibility("make_private")}
+                  onSetPrice={() => void runBulkPriceOrStock("set_price")}
+                  onSetStock={() => void runBulkPriceOrStock("set_stock")}
+                  onClear={clearProductSelection}
+                />
+              ) : null}
+
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Image</th><th>Name</th><th>Visibility</th><th>Category</th><th>Price</th><th>Stock</th><th>Content</th><th>SEO</th><th>Actions</th></tr></thead>
+                  <thead><tr>
+                    {can("products.manage") ? (
+                      <th style={{ width: 36 }}>
+                        <input
+                          type="checkbox"
+                          data-testid="product-select-all"
+                          checked={allVisibleProductsSelected}
+                          disabled={
+                            productBulkRunning ||
+                            displayedProductIds.length === 0 ||
+                            productSaving
+                          }
+                          onChange={toggleSelectAllVisibleProducts}
+                          aria-label="Select all visible products"
+                        />
+                      </th>
+                    ) : null}
+                    <th>Image</th><th>Name</th><th>Visibility</th><th>Category</th><th>Price</th><th>Stock</th><th>Content</th><th>SEO</th><th>Actions</th>
+                  </tr></thead>
                   <tbody>
                     {productsLoading && (
-                      <tr><td colSpan={9} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>Loading products…</td></tr>
+                      <tr><td colSpan={can("products.manage") ? 10 : 9} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>Loading products…</td></tr>
                     )}
                     {!productsLoading && !productsError && products.length === 0 && (
-                      <tr><td colSpan={9} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No products found{can("products.manage") ? ". Add a product above." : "."}</td></tr>
+                      <tr><td colSpan={can("products.manage") ? 10 : 9} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>No products found{can("products.manage") ? ". Add a product above." : "."}</td></tr>
                     )}
                     {!productsLoading && !productsError && products.length > 0 && displayedProducts.length === 0 && (
-                      <tr><td colSpan={9} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>
+                      <tr><td colSpan={can("products.manage") ? 10 : 9} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>
                         {productListSearchDebounced.trim()
                           ? `No products match “${productListSearchDebounced.trim()}” with the current filters.`
                           : productVisibilityFilter !== "all"
@@ -7184,11 +7519,28 @@ function AdminPageInner() {
                       const isVisible = Number(p.active) === 1;
                       const slugPath = p.slug ? `/products/${p.slug}` : "";
                       const visibilityBusy = productVisibilityPendingId === p.id;
-                      const rowBusy = productSaving || productDeletingId != null || productVisibilityPendingId != null;
+                      const rowBusy = productSaving || productDeletingId != null || productVisibilityPendingId != null || productBulkRunning;
                       const quickEditOpen = quickEditProductId != null && quickEditProductId === Number(p.id);
+                      const productIdNum = Number(p.id);
+                      const isSelected = selectedProductIds.includes(productIdNum);
+                      const selectDisabled =
+                        productBulkRunning ||
+                        (!isSelected && selectedProductIds.length >= PRODUCT_BULK_MAX_SELECTION);
                       return (
                       <Fragment key={p.id}>
                       <tr data-testid={`product-row-${p.id}`} className="product-list-row">
+                        {can("products.manage") ? (
+                          <td>
+                            <input
+                              type="checkbox"
+                              data-testid={`product-select-${p.id}`}
+                              checked={isSelected}
+                              disabled={selectDisabled}
+                              onChange={() => toggleProductSelection(productIdNum)}
+                              aria-label={`Select product ${p.name || p.id}`}
+                            />
+                          </td>
+                        ) : null}
                         <td><div className="product-thumb">{p.image ? <img src={p.image} alt="" style={{width:36,height:36,objectFit:"cover",borderRadius:6}} /> : (p.emoji || "📦")}</div></td>
                         <td style={{fontWeight:600}}>
                           <div>{p.name}</div>
@@ -7341,7 +7693,7 @@ function AdminPageInner() {
                           onSave={() => void saveQuickEdit()}
                           onCancel={resetQuickEdit}
                           onReload={() => void reloadAfterQuickEditConflict()}
-                          colSpan={9}
+                          colSpan={10}
                         />
                       ) : null}
                       </Fragment>
