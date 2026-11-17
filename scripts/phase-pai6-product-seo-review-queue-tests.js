@@ -61,7 +61,15 @@ function loadTsModule(rel, stubs = {}) {
 }
 
 const helperSrc = read("lib/productSeoReviewClient.ts");
-const sidhuSrc = read("app/sidhu/page.tsx");
+// MULTI-130: SEO summary/filter markup lives in ProductListToolbar; editor/list wiring stays in page.tsx.
+const sidhuPageSrc = read("app/sidhu/page.tsx");
+const sidhuSrc = [
+  sidhuPageSrc,
+  read("components/admin/ProductListToolbar.tsx"),
+  read("components/admin/ProductQuickEditRow.tsx"),
+  read("components/admin/ProductEditorSidebar.tsx"),
+  read("components/admin/ProductSeoSnippetPreview.tsx"),
+].join("\n");
 const diagSrc = read("lib/seoDiagnostics.ts");
 const rowsSrc = read("lib/seoDiagnosticRows.ts");
 const productsApiSrc = read("pages/api/admin-products.ts");

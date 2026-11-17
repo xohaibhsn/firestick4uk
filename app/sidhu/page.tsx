@@ -138,6 +138,31 @@ import {
   type ContentDraftSession,
   type EditProductDraft,
 } from "@/lib/productContentDraftClient";
+import ProductListToolbar from "@/components/admin/ProductListToolbar";
+import ProductQuickEditRow from "@/components/admin/ProductQuickEditRow";
+import ProductEditorSidebar from "@/components/admin/ProductEditorSidebar";
+import ProductSeoSnippetPreview from "@/components/admin/ProductSeoSnippetPreview";
+import {
+  PRODUCT_ADMIN_SEARCH_DEBOUNCE_MS,
+  countProductAdminListTabs,
+  deriveListTabFromLegacyFilters,
+  filterProductsForAdminList,
+  mapListTabToLegacyFilters,
+  type ProductAdminListTab,
+  type ProductVisibilityFilter,
+} from "@/lib/productAdminListFilters";
+import {
+  QUICK_EDIT_CONCURRENT_RELOAD_MESSAGE,
+  buildQuickEditPutBody,
+  shouldAbortQuickEditOnConflict,
+} from "@/lib/productAdminQuickEdit";
+import {
+  isProductEditorDraftDirty,
+  snapshotProductEditorDraft,
+  type ProductEditorDraftSnapshot,
+} from "@/lib/productAdminEditorDirty";
+import { resolveSeasonPhase } from "@/lib/productSeasonEligibility";
+import { utcSqlToLondonWall } from "@/lib/productSeasonLondon";
 const TipTapEditor = dynamic(() => import("../../components/admin/TipTapEditor"), { ssr: false });
 
 const styles = `
@@ -239,6 +264,45 @@ const styles = `
   .btn-edit:hover { background:#5B21B6; color:#FFFFFF; }
 
   .modal-product { max-width:760px; width:96vw; max-height:92vh; }
+
+  /* PRODUCT EDITOR — full screen (F4UK-MULTI-130) */
+  .product-editor-fullscreen { position:fixed; inset:0; z-index:200; background:#0f0f12; overflow:auto; color:#F3F4F6; }
+  .product-editor-topbar { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 24px; background:rgba(15,15,18,0.96); border-bottom:1px solid rgba(255,255,255,0.1); backdrop-filter:blur(6px); }
+  .product-editor-back { background:none; border:1px solid rgba(255,255,255,0.18); color:#E5E7EB; padding:7px 12px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; white-space:nowrap; }
+  .product-editor-back:hover { background:rgba(255,255,255,0.08); }
+  .product-editor-topbar-title { flex:1 1 200px; min-width:0; font-family:var(--font-display); font-size:16px; font-weight:700; color:#F9FAFB; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .product-editor-dirty-pill { background:rgba(234,88,12,0.15); border:1px solid rgba(234,88,12,0.45); color:#FDBA74; font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; white-space:nowrap; }
+  .product-editor-topbar-actions { display:flex; gap:10px; align-items:center; margin-left:auto; }
+  .product-editor-view-link { color:#C4B5FD; font-size:13px; font-weight:600; text-decoration:none; padding:7px 10px; border-radius:8px; border:1px solid rgba(196,181,253,0.3); white-space:nowrap; }
+  .product-editor-view-link:hover { background:rgba(196,181,253,0.1); }
+  .product-editor-topbar .modal-save:disabled { opacity:0.55; cursor:not-allowed; }
+  .product-editor-body { max-width:1440px; margin:0 auto; padding:24px; }
+  .product-editor-layout { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(280px,0.5fr); gap:20px; align-items:start; }
+  .product-editor-main { min-width:0; }
+  .product-editor-sidebar { min-width:0; color:#E5E7EB; }
+  .product-editor-fullscreen .modal-title { color:#F9FAFB; margin-bottom:16px; }
+  .product-editor-fullscreen .modal-field label { color:rgba(255,255,255,0.6); }
+  .product-editor-fullscreen .seo-box { background:rgba(255,255,255,0.03); border-color:rgba(255,255,255,0.1); }
+  .product-editor-fullscreen .seo-box-title { color:rgba(255,255,255,0.6); }
+  .product-editor-fullscreen .modal-actions { justify-content:flex-start; }
+  .product-editor-name-field input { font-size:20px; font-weight:600; padding:14px 16px; }
+  .product-editor-permalink { display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin:-6px 0 14px; font-size:12px; color:rgba(255,255,255,0.75); }
+  .product-editor-permalink code { background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:4px; word-break:break-all; }
+  .product-editor-help { display:block; margin-top:4px; font-size:11px; color:rgba(255,255,255,0.5); }
+  @media (max-width:1099px) {
+    .product-editor-layout { grid-template-columns:1fr; }
+    .product-editor-body { padding:16px; }
+    .product-editor-topbar { padding:10px 16px; }
+  }
+
+  /* PRODUCT LIST — row hover actions */
+  .product-row-actions { display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin-top:4px; font-size:12px; font-weight:500; opacity:0; transition:opacity 0.15s; }
+  .product-list-row:hover .product-row-actions, .product-list-row:focus-within .product-row-actions { opacity:1; }
+  .product-row-action { background:none; border:none; padding:0; color:#5B21B6; font-size:12px; font-weight:600; cursor:pointer; text-decoration:none; }
+  .product-row-action:hover { text-decoration:underline; }
+  .product-row-action:disabled { opacity:0.5; cursor:not-allowed; text-decoration:none; }
+  .product-row-sep { color:#BBBBBB; }
+  @media (hover:none) { .product-row-actions { opacity:1; } }
   .seo-box { background:#F9F9F9; border:1px solid #E5E5E5; border-radius:10px; padding:16px; margin-top:4px; }
   .seo-box-title { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#666666; margin-bottom:12px; }
   .char-bar { height:3px; border-radius:3px; margin-top:5px; transition:width 0.2s; }
@@ -453,6 +517,14 @@ function AdminPageInner() {
   const [productDeletingId, setProductDeletingId] = useState<number | null>(null);
   const [productVisibilityPendingId, setProductVisibilityPendingId] = useState<number | null>(null);
   const [productVisibilityFilter, setProductVisibilityFilter] = useState<"all" | "visible" | "hidden">("all");
+  const [productListSearch, setProductListSearch] = useState("");
+  const [productListSearchDebounced, setProductListSearchDebounced] = useState("");
+  const [productListTab, setProductListTab] = useState<ProductAdminListTab>("all");
+  const [quickEditProductId, setQuickEditProductId] = useState<number | null>(null);
+  const [quickEditDraft, setQuickEditDraft] = useState<{ price: string; stock: string }>({ price: "", stock: "" });
+  const [quickEditSaving, setQuickEditSaving] = useState(false);
+  const [quickEditError, setQuickEditError] = useState<string | null>(null);
+  const [quickEditConflictReload, setQuickEditConflictReload] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [ordersPage, setOrdersPage] = useState(1);
   const ORDERS_PER_PAGE = 25;
@@ -477,6 +549,10 @@ function AdminPageInner() {
   const [fieldHistoryTarget, setFieldHistoryTarget] = useState<FieldHistoryTarget | null>(null);
   const [seasonalWizardOpen, setSeasonalWizardOpen] = useState(false);
   const [editProduct, setEditProduct] = useState({ name:"", slug:"", category:"", price:"", stock:"", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
+  /** Snapshot of editProduct when the editor opened / last authoritative load — drives the unsaved guard. */
+  const [productEditorBaseline, setProductEditorBaseline] = useState<ProductEditorDraftSnapshot | null>(null);
+  const productEditorOpenedAtRef = useRef(0);
+  const [productUrlChangeOpen, setProductUrlChangeOpen] = useState(false);
   /** Base product_version for the open content draft — not advanced by arbitrary list refresh/409. */
   const [contentDraftBaseVersion, setContentDraftBaseVersion] = useState<number | null>(null);
   const [contentConflict, setContentConflict] = useState<null | {
@@ -2131,18 +2207,48 @@ function AdminPageInner() {
     [productSeoReviewRows]
   );
 
-  const displayedProducts = useMemo(() => {
-    const seoFiltered = filterAndOrderProductsForSeoReview(
-      products,
-      productSeoReviewById,
-      productSeoFilter
+  useEffect(() => {
+    const t = window.setTimeout(
+      () => setProductListSearchDebounced(productListSearch),
+      PRODUCT_ADMIN_SEARCH_DEBOUNCE_MS
     );
-    if (productVisibilityFilter === "all") return seoFiltered;
-    return seoFiltered.filter((p) => {
-      const visible = Number((p as { active?: unknown }).active) === 1;
-      return productVisibilityFilter === "visible" ? visible : !visible;
-    });
-  }, [products, productSeoReviewById, productSeoFilter, productVisibilityFilter]);
+    return () => window.clearTimeout(t);
+  }, [productListSearch]);
+
+  /** Search → tab/visibility/SEO filters → SEO review ordering (filterAndOrderProductsForSeoReview inside). */
+  const displayedProducts = useMemo(
+    () =>
+      filterProductsForAdminList(products, {
+        search: productListSearchDebounced,
+        tab: productListTab,
+        visibilityFilter: productVisibilityFilter,
+        seoFilter: productSeoFilter,
+        reviewById: productSeoReviewById,
+      }),
+    [products, productListSearchDebounced, productListTab, productSeoReviewById, productSeoFilter, productVisibilityFilter]
+  );
+
+  const productListCounts = useMemo(
+    () => countProductAdminListTabs(products, productSeoReviewById),
+    [products, productSeoReviewById]
+  );
+
+  const changeProductListTab = (next: ProductAdminListTab) => {
+    const legacy = mapListTabToLegacyFilters(next);
+    setProductListTab(next);
+    setProductVisibilityFilter(legacy.visibility);
+    setProductSeoFilter(legacy.seo);
+  };
+
+  const changeProductVisibilityFilter = (next: ProductVisibilityFilter) => {
+    setProductVisibilityFilter(next);
+    setProductListTab((prev) => deriveListTabFromLegacyFilters(next, productSeoFilter, prev));
+  };
+
+  const changeProductSeoFilter = (next: ProductSeoReviewFilter) => {
+    setProductSeoFilter(next);
+    setProductListTab((prev) => deriveListTabFromLegacyFilters(productVisibilityFilter, next, prev));
+  };
 
   const productSeoBadgeColors = (status: ProductSeoReviewRow["status"]) => {
     if (status === "needs-attention") {
@@ -2735,6 +2841,7 @@ function AdminPageInner() {
       }
       const draft = productRowToEditDraft(row);
       setEditProduct(draft);
+      setProductEditorBaseline(snapshotProductEditorDraft(draft));
       if (row.product_version != null) setContentDraftBaseVersion(Number(row.product_version));
       setContentConflict(null);
     }
@@ -2840,6 +2947,7 @@ function AdminPageInner() {
       }
       const session = next as ContentDraftSession;
       setEditProduct(session.editProduct);
+      setProductEditorBaseline(snapshotProductEditorDraft(session.editProduct));
       setContentDraftBaseVersion(session.contentDraftBaseVersion);
       setContentConflict(null);
       setProductModal((prev: any) =>
@@ -2941,6 +3049,7 @@ function AdminPageInner() {
         )
       );
       void loadProducts();
+      return data as { active?: unknown; product_version?: unknown; noop?: unknown };
     } catch {
       setProductMsg(`❌ Failed to ${actionLabel.toLowerCase()} product`);
       await loadProducts();
@@ -3364,6 +3473,7 @@ function AdminPageInner() {
       setContentDraftBaseVersion(null);
       setContentConflict(null);
       invalidateEditorSession();
+      setProductEditorBaseline(snapshotProductEditorDraft(editProduct));
       const savedModal = productModal;
       setProductModal(null);
       setProductMsg(`✅ Product saved${formatSeoGuardBannerClient(res.seo_guard)}`);
@@ -3425,6 +3535,9 @@ function AdminPageInner() {
     setContentConflict(null);
     setContentDraftBaseVersion(session.contentDraftBaseVersion);
     setEditProduct(session.editProduct);
+    setProductEditorBaseline(snapshotProductEditorDraft(session.editProduct));
+    productEditorOpenedAtRef.current = Date.now();
+    setProductUrlChangeOpen(false);
     setProductModal(p);
     setProductSectionOpen(() => {
       const init: Record<string, boolean> = {};
@@ -3664,7 +3777,11 @@ function AdminPageInner() {
     setProductUrlMigration({ newSlug: "", status: "idle", message: "" });
     setContentConflict(null);
     setContentDraftBaseVersion(null);
-    setEditProduct({ name:"", slug:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" });
+    const blank = { name:"", slug:"", category:"Subscription", price:"", stock:"Digital", image:"", short_description:"", full_description:"", features:"", seo_title:"", meta_description:"", focus_keyword:"", og_image:"" };
+    setEditProduct(blank);
+    setProductEditorBaseline(snapshotProductEditorDraft(blank));
+    productEditorOpenedAtRef.current = Date.now();
+    setProductUrlChangeOpen(false);
     setProductModal("new");
     setProductSectionOpen(() => {
       const init: Record<string, boolean> = {};
@@ -3688,7 +3805,7 @@ function AdminPageInner() {
     setContentConflict(null);
     setContentDraftBaseVersion(null);
     const copy = buildDuplicateEditProduct(p);
-    setEditProduct({
+    const duplicateDraft = {
       name: String(copy.name || ""),
       slug: String(copy.slug || ""),
       category: String(copy.category || "Subscription"),
@@ -3702,13 +3819,288 @@ function AdminPageInner() {
       meta_description: String(copy.meta_description || ""),
       focus_keyword: String(copy.focus_keyword || ""),
       og_image: String(copy.og_image || ""),
-    });
+    };
+    setEditProduct(duplicateDraft);
+    setProductEditorBaseline(snapshotProductEditorDraft(duplicateDraft));
+    productEditorOpenedAtRef.current = Date.now();
+    setProductUrlChangeOpen(false);
     setProductModal("new");
     setProductSectionOpen(() => {
       const init: Record<string, boolean> = {};
       for (const id of PRODUCT_EDITOR_SECTIONS) init[id] = id === "basic_info";
       return init;
     });
+  };
+
+  // ── F4UK-MULTI-130 — full-screen product editor: unsaved guard, shortcuts, sidebar helpers ──
+  const productEditorDirty = useMemo(
+    () => !!productModal && isProductEditorDraftDirty(editProduct, productEditorBaseline),
+    [productModal, editProduct, productEditorBaseline]
+  );
+
+  // TipTap may re-emit normalized HTML right after mount; absorb that into the baseline so
+  // opening a product never reads as "Unsaved changes" before the admin has typed anything.
+  useEffect(() => {
+    if (!productModal || !productEditorBaseline) return;
+    if (Date.now() - productEditorOpenedAtRef.current > 1500) return;
+    const snap = snapshotProductEditorDraft(editProduct);
+    if (
+      snap.short_description === productEditorBaseline.short_description &&
+      snap.full_description === productEditorBaseline.full_description
+    ) {
+      return;
+    }
+    setProductEditorBaseline((prev) =>
+      prev
+        ? { ...prev, short_description: snap.short_description, full_description: snap.full_description }
+        : prev
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editProduct.short_description, editProduct.full_description]);
+
+  const closeProductEditor = () => {
+    setProductAiUi(createIdleProductAiUi());
+    setProductReviewUi(createIdleProductReviewUi());
+    setProductImageBriefUi(createIdleProductImageBriefUi());
+    setProductAiFacts(createDefaultProductAiFacts("Subscription"));
+    invalidateEditorSession();
+    setProductEditorBaseline(null);
+    setProductUrlChangeOpen(false);
+    setProductMetaAi({ status: "idle" });
+    setProductModal(null);
+  };
+
+  const confirmDiscardProductEdits = async (): Promise<boolean> => {
+    if (!productEditorDirty) return true;
+    return askConfirm("You have unsaved changes to this product. Discard them and leave the editor?");
+  };
+
+  const requestCloseProductEditor = async () => {
+    if (!(await confirmDiscardProductEdits())) return;
+    closeProductEditor();
+  };
+
+  const openProductHistoryFromEditor = async () => {
+    if (!productModal || productModal === "new" || !productModal.id) return;
+    if (!(await confirmDiscardProductEdits())) return;
+    setHistoryFilter({ entityType: "product", entityId: String(productModal.id) });
+    setProductMetaAi({ status: "idle" });
+    resetProductAiState("Subscription");
+    invalidateEditorSession();
+    setProductEditorBaseline(null);
+    setProductUrlChangeOpen(false);
+    setProductModal(null);
+    setTab("history");
+  };
+
+  const productEditorSaveDisabled = imageUploading || productSaving || !!contentConflict;
+  const productEditorKeyRef = useRef<{
+    save: () => void;
+    close: () => void;
+    saveDisabled: boolean;
+    overlayOpen: boolean;
+  }>({ save: () => {}, close: () => {}, saveDisabled: true, overlayOpen: false });
+  productEditorKeyRef.current = {
+    save: () => void saveProduct(),
+    close: () => void requestCloseProductEditor(),
+    saveDisabled: productEditorSaveDisabled,
+    overlayOpen: !!mediaPicker || !!fieldHistoryTarget,
+  };
+
+  const productEditorOpen = !!productModal;
+  useEffect(() => {
+    if (!productEditorOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const k = productEditorKeyRef.current;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && String(e.key).toLowerCase() === "s") {
+        e.preventDefault();
+        if (!k.saveDisabled) k.save();
+        return;
+      }
+      if (e.key === "Escape" && !e.defaultPrevented && !k.overlayOpen) {
+        if (
+          document.querySelector(
+            '[role="alertdialog"], [role="dialog"]:not([data-testid="product-editor-fullscreen"])'
+          )
+        ) {
+          return;
+        }
+        e.preventDefault();
+        k.close();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [productEditorOpen]);
+
+  useEffect(() => {
+    if (!productEditorOpen || !productEditorDirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [productEditorOpen, productEditorDirty]);
+
+  /** Sidebar Make Private/Public — same toggleProductVisibility; keeps the open draft's version base in step. */
+  const toggleEditorProductVisibility = async () => {
+    if (!productModal || productModal === "new" || !productModal.id) return;
+    const sessionId = editorSessionIdRef.current;
+    const productId = Number(productModal.id);
+    const startedAt =
+      productModal.product_version != null && Number.isFinite(Number(productModal.product_version))
+        ? Number(productModal.product_version)
+        : null;
+    const snap = contentDraftSessionSnapshot();
+    const data = await toggleProductVisibility(productModal);
+    if (!data || sessionId !== editorSessionIdRef.current) return;
+    const nextVersion =
+      data.product_version != null && Number.isFinite(Number(data.product_version))
+        ? Number(data.product_version)
+        : null;
+    if (snap && nextVersion != null) {
+      const next = applyOwnContentPreservingActionResult(snap, {
+        editorSessionId: sessionId,
+        productId,
+        actionStartedAtVersion: startedAt,
+        nextVersion,
+        noop: !!data.noop,
+        clearConflict: false,
+      });
+      setContentDraftBaseVersion(next.contentDraftBaseVersion);
+    }
+    applyAuthoritativeProductRow(
+      {
+        id: productId,
+        active: Number(data.active) === 1 ? 1 : 0,
+        ...(nextVersion != null ? { product_version: nextVersion } : {}),
+      },
+      { editorSessionId: sessionId }
+    );
+  };
+
+  const scrollToProductSeasonalSection = () => {
+    setProductSectionOpen((st) => ({ ...st, seasonal: true }));
+    window.setTimeout(() => {
+      document
+        .querySelector('[data-testid="product-section-seasonal"]')
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  };
+
+  const openProductUrlChange = () => {
+    setProductUrlChangeOpen(true);
+    window.setTimeout(() => {
+      document
+        .querySelector('[data-testid="product-url-migration-panel"]')
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  };
+
+  // ── Quick Edit (price + stock only) ──
+  const resetQuickEdit = () => {
+    setQuickEditProductId(null);
+    setQuickEditDraft({ price: "", stock: "" });
+    setQuickEditSaving(false);
+    setQuickEditError(null);
+    setQuickEditConflictReload(false);
+  };
+
+  const openQuickEdit = (p: any) => {
+    if (!can("products.manage")) {
+      showPermError();
+      return;
+    }
+    setQuickEditProductId(Number(p.id));
+    setQuickEditDraft({ price: String(p.price ?? ""), stock: String(p.stock ?? "") });
+    setQuickEditSaving(false);
+    setQuickEditError(null);
+    setQuickEditConflictReload(false);
+  };
+
+  const saveQuickEdit = async () => {
+    if (!can("products.manage")) {
+      showPermError();
+      return;
+    }
+    if (quickEditProductId == null || quickEditSaving || quickEditConflictReload) return;
+    const row = products.find((x: any) => Number(x.id) === quickEditProductId);
+    if (!row) {
+      setQuickEditError("Product no longer in the list — reload and try again.");
+      return;
+    }
+    const built = buildQuickEditPutBody(row.id, quickEditDraft, row.product_version);
+    if (!built.ok) {
+      setQuickEditError(built.error);
+      return;
+    }
+    const productId = built.body.id;
+    setQuickEditSaving(true);
+    setQuickEditError(null);
+    try {
+      const r = await fetch("/api/admin-products", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: built.body.id,
+          price: built.body.price,
+          stock: built.body.stock,
+          expected_version: built.body.expected_version,
+        }),
+      });
+      if (r.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      if (r.status === 403) {
+        showPermError();
+        setQuickEditError("You do not have permission to edit products.");
+        return;
+      }
+      const res = await r.json().catch(() => ({}));
+      if (r.status === 409 && shouldAbortQuickEditOnConflict(r.status, res.code)) {
+        setQuickEditError(QUICK_EDIT_CONCURRENT_RELOAD_MESSAGE);
+        setQuickEditConflictReload(true);
+        return;
+      }
+      if (!r.ok || res.error) {
+        setQuickEditError(String(res.error || "Failed to save price/stock."));
+        return;
+      }
+      const fresh =
+        res.product && typeof res.product === "object" ? (res.product as Record<string, unknown>) : null;
+      setProducts((prev) =>
+        prev.map((x: any) =>
+          Number(x.id) === productId
+            ? {
+                ...x,
+                price: fresh?.price ?? built.body.price,
+                stock: fresh?.stock ?? built.body.stock,
+                ...(res.product_version != null
+                  ? { product_version: res.product_version }
+                  : fresh?.product_version != null
+                    ? { product_version: fresh.product_version }
+                    : {}),
+              }
+            : x
+        )
+      );
+      resetQuickEdit();
+      setProductMsg(res.noop ? "✅ No price/stock change to save" : "✅ Price & stock updated");
+      setTimeout(() => setProductMsg(""), 3000);
+      void loadProducts();
+    } catch {
+      setQuickEditError("Network error — price/stock not saved.");
+    } finally {
+      setQuickEditSaving(false);
+    }
+  };
+
+  const reloadAfterQuickEditConflict = async () => {
+    resetQuickEdit();
+    await loadProducts();
   };
 
   const migrateProductUrl = async () => {
@@ -4722,13 +5114,68 @@ function AdminPageInner() {
         </div>
       )}
 
-      {/* PRODUCT MODAL */}
+      {/* PRODUCT EDITOR — full-screen inside /sidhu (same productModal / editProduct state) */}
       {productModal && (
-        <div className="modal-overlay">
-          <div className="modal modal-product" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
+        <div
+          className="product-editor-fullscreen"
+          data-testid="product-editor-fullscreen"
+          role="dialog"
+          aria-modal="true"
+          aria-label={productModal === "new" ? "Add New Product" : "Edit Product"}
+        >
+          <div className="product-editor-topbar" data-testid="product-editor-topbar">
+            <button
+              type="button"
+              className="product-editor-back"
+              data-testid="product-editor-back"
+              onClick={() => void requestCloseProductEditor()}
+            >
+              ← All products
+            </button>
+            <div className="product-editor-topbar-title" title={editProduct.name || undefined}>
+              {editProduct.name || (productModal === "new" ? "New product" : "Untitled product")}
+            </div>
+            {productEditorDirty ? (
+              <span className="product-editor-dirty-pill" data-testid="product-editor-dirty">
+                Unsaved changes
+              </span>
+            ) : null}
+            <div className="product-editor-topbar-actions">
+              {productModal !== "new" && productModal?.id && (productModal.slug || editProduct.slug) ? (
+                <a
+                  className="product-editor-view-link"
+                  data-testid="product-editor-view"
+                  href={`/products/${productModal.slug || editProduct.slug}`}
+                  target="_blank"
+                  rel="noopener"
+                >
+                  View ↗
+                </a>
+              ) : null}
+              <button
+                className="modal-save"
+                onClick={saveProduct}
+                disabled={imageUploading || productSaving || !!contentConflict}
+                data-testid="product-save-btn"
+                title="Save (Ctrl/Cmd+S)"
+              >
+                {productSaving ? "Saving…" : contentConflict ? "Resolve conflict to save" : productModal === "new" ? "Publish" : "Update"}
+              </button>
+            </div>
+          </div>
+          <div className="product-editor-body">
+          <div className="product-editor-layout">
+          <div className="product-editor-main" data-testid="product-editor-main">
             <div className="modal-title">{productModal === "new" ? "Add New Product" : "Edit Product"}</div>
-            {productMsg && productMsg.startsWith("❌") && (
-              <div style={{marginBottom:12,padding:"10px 12px",background:"rgba(220,38,38,0.1)",border:"1px solid rgba(220,38,38,0.25)",borderRadius:8,fontSize:13,color:"#DC2626"}}>{productMsg}</div>
+            {productMsg && (
+              <div
+                data-testid="product-editor-message"
+                style={productMsg.startsWith("❌")
+                  ? {marginBottom:12,padding:"10px 12px",background:"rgba(220,38,38,0.1)",border:"1px solid rgba(220,38,38,0.25)",borderRadius:8,fontSize:13,color:"#DC2626"}
+                  : {marginBottom:12,padding:"10px 12px",background:"rgba(22,163,74,0.1)",border:"1px solid rgba(22,163,74,0.3)",borderRadius:8,fontSize:13,color:"#16A34A"}}
+              >
+                {productMsg}
+              </div>
             )}
             {productModal !== "new" && (() => {
               const health = productHealth({
@@ -4828,11 +5275,11 @@ function AdminPageInner() {
               variant="dark"
               testId="product-section-basic_info"
             >
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-              <div className="modal-field">
+              <div className="modal-field product-editor-name-field">
                 <label>Product Name *{productHistoryBtn("name","Product Name")}</label>
                 <input
                   placeholder="e.g. B1G 1 Year Plan"
+                  data-testid="product-editor-name-input"
                   value={editProduct.name}
                   onChange={e => {
                     const name = e.target.value;
@@ -4843,29 +5290,24 @@ function AdminPageInner() {
                   }}
                 />
               </div>
-              <div className="modal-field">
-                <label>Category</label>
-                <select
-                  value={editProduct.category}
-                  onChange={(e) => {
-                    const category = e.target.value;
-                    setEditProduct({ ...editProduct, category });
-                    if (productModal === "new") {
-                      setProductAiFacts((f) =>
-                        f.productKindOverridden
-                          ? f
-                          : {
-                              ...f,
-                              productKind: defaultProductKindFromCategory(category),
-                            }
-                      );
-                    }
-                  }}
-                >
-                  <option>Subscription</option><option>Device</option><option>Bundle</option>
-                </select>
+            {productModal !== "new" ? (
+              <div className="product-editor-permalink" data-testid="product-editor-permalink">
+                <span style={{opacity:0.7}}>Permalink:</span>{" "}
+                <code>firestick4uk.com/products/{editProduct.slug || "product-slug"}</code>
+                {productModal?.id && can("products.manage") && can("redirects.manage") ? (
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    data-testid="product-editor-change-url"
+                    style={{marginLeft:8,padding:"2px 8px",fontSize:11}}
+                    onClick={() => (productUrlChangeOpen ? setProductUrlChangeOpen(false) : openProductUrlChange())}
+                    aria-expanded={productUrlChangeOpen}
+                  >
+                    {productUrlChangeOpen ? "Hide URL change" : "Change URL"}
+                  </button>
+                ) : null}
               </div>
-            </div>
+            ) : null}
             <div className="modal-field">
               <label>URL Slug{productHistoryBtn("slug","URL Slug")}</label>
               <input
@@ -4952,7 +5394,7 @@ function AdminPageInner() {
                   </div>
                 </div>
               ) : null}
-              {productModal !== "new" && productModal?.id && can("products.manage") && can("redirects.manage") ? (
+              {productModal !== "new" && productModal?.id && can("products.manage") && can("redirects.manage") && productUrlChangeOpen ? (
                 <div
                   data-testid="product-url-migration-panel"
                   style={{
@@ -5022,55 +5464,6 @@ function AdminPageInner() {
             </div>
 </CollapsibleSection>
             <CollapsibleSection
-              title={PRODUCT_EDITOR_SECTION_TITLES.price_stock}
-              open={!!productSectionOpen.price_stock}
-              onToggle={() => setProductSectionOpen(st => ({...st, price_stock: !st.price_stock}))}
-              fieldCount={2}
-              variant="dark"
-              testId="product-section-price_stock"
-            >
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-              <div className="modal-field"><label>Price{productHistoryBtn("price","Price")}</label><input placeholder="e.g. £9.99" value={editProduct.price} onChange={e => setEditProduct({...editProduct,price:e.target.value})} /></div>
-              <div className="modal-field"><label>Stock / Type</label><input placeholder="e.g. 10 or Digital" value={editProduct.stock} onChange={e => setEditProduct({...editProduct,stock:e.target.value})} /></div>
-            </div>
-
-</CollapsibleSection>
-            <CollapsibleSection
-              title={PRODUCT_EDITOR_SECTION_TITLES.images}
-              open={!!productSectionOpen.images}
-              onToggle={() => setProductSectionOpen(st => ({...st, images: !st.images}))}
-              fieldCount={1}
-              variant="dark"
-              testId="product-section-images"
-            >
-            <div className="modal-field">
-              <label>Product Image</label>
-              <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
-                {editProduct.image
-                  ? <img src={editProduct.image} alt="product" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid rgba(139,0,255,0.3)"}} />
-                  : <div style={{width:60,height:60,background:"rgba(139,0,255,0.1)",border:"1px dashed rgba(139,0,255,0.4)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📦</div>
-                }
-                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.35)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6"}}>
-                  {imageUploading ? "Uploading..." : "Upload Image"}
-                  <input type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files?.[0] && handleProductImage(e.target.files[0])} disabled={imageUploading} />
-                </label>
-                <button
-                  type="button"
-                  style={{cursor:"pointer",background:"rgba(91,33,182,0.08)",border:"1px solid rgba(91,33,182,0.3)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6"}}
-                  onClick={() => setMediaPicker({
-                    purposes: ["products"],
-                    title: "Choose Product Image",
-                    onSelect: (asset) => setEditProduct((p) => ({ ...p, image: asset.url })),
-                  })}
-                >
-                  Choose from Library
-                </button>
-                {editProduct.image && <button style={{background:"none",border:"none",color:"rgba(255,100,100,0.7)",cursor:"pointer",fontSize:13}} onClick={() => setEditProduct(p=>({...p,image:""}))}>Remove</button>}
-              </div>
-            </div>
-
-</CollapsibleSection>
-            <CollapsibleSection
               title={PRODUCT_EDITOR_SECTION_TITLES.description_features}
               open={!!productSectionOpen.description_features}
               onToggle={() => setProductSectionOpen(st => ({...st, description_features: !st.description_features}))}
@@ -5114,8 +5507,477 @@ function AdminPageInner() {
             </div>
 
 </CollapsibleSection>
+            <CollapsibleSection
+              title={PRODUCT_EDITOR_SECTION_TITLES.images}
+              open={!!productSectionOpen.images}
+              onToggle={() => setProductSectionOpen(st => ({...st, images: !st.images}))}
+              fieldCount={1}
+              variant="dark"
+              testId="product-section-images"
+            >
+            <div className="modal-field">
+              <label>Product Image</label>
+              <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
+                {editProduct.image
+                  ? <img src={editProduct.image} alt="product" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid rgba(139,0,255,0.3)"}} />
+                  : <div style={{width:60,height:60,background:"rgba(139,0,255,0.1)",border:"1px dashed rgba(139,0,255,0.4)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📦</div>
+                }
+                <label style={{cursor:"pointer",background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.35)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6"}}>
+                  {imageUploading ? "Uploading..." : "Upload Image"}
+                  <input type="file" accept="image/*" style={{display:"none"}} onChange={e => e.target.files?.[0] && handleProductImage(e.target.files[0])} disabled={imageUploading} />
+                </label>
+                <button
+                  type="button"
+                  style={{cursor:"pointer",background:"rgba(91,33,182,0.08)",border:"1px solid rgba(91,33,182,0.3)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6"}}
+                  onClick={() => setMediaPicker({
+                    purposes: ["products"],
+                    title: "Choose Product Image",
+                    onSelect: (asset) => setEditProduct((p) => ({ ...p, image: asset.url })),
+                  })}
+                >
+                  Choose from Library
+                </button>
+                {editProduct.image && <button style={{background:"none",border:"none",color:"rgba(255,100,100,0.7)",cursor:"pointer",fontSize:13}} onClick={() => setEditProduct(p=>({...p,image:""}))}>Remove</button>}
+              </div>
+            </div>
 
-                        {/* PAI-3 — New Product AI Assistant (new modal only) */}
+</CollapsibleSection>
+
+<CollapsibleSection
+              title={PRODUCT_EDITOR_SECTION_TITLES.seo}
+              open={!!productSectionOpen.seo}
+              onToggle={() => setProductSectionOpen(st => ({...st, seo: !st.seo}))}
+              fieldCount={4}
+              variant="dark"
+              testId="product-section-seo"
+            >
+            <div className="seo-box">
+              <div className="seo-box-title">🔍 SEO Settings</div>
+              <ProductSeoSnippetPreview
+                name={editProduct.name}
+                slug={editProduct.slug}
+                seoTitle={editProduct.seo_title}
+                metaDescription={editProduct.meta_description}
+                shortDescription={editProduct.short_description}
+              />
+              {productModal !== "new" && productModal?.id ? (
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    disabled={productMetaAi.status === "loading"}
+                    onClick={() => void draftProductMetadata("gemini")}
+                  >
+                    Draft with Gemini
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    disabled={productMetaAi.status === "loading"}
+                    onClick={() => void draftProductMetadata("openai")}
+                  >
+                    Draft with OpenAI
+                  </button>
+                </div>
+              ) : null}
+              {productMetaAi.status === "loading" ? (
+                <div style={{fontSize:12,color:"rgba(255,255,255,0.55)",marginBottom:10}}>
+                  {productMetaAi.provider === "gemini" ? "Drafting with Gemini…" : "Drafting with OpenAI…"}
+                </div>
+              ) : null}
+              {productMetaAi.status === "error" ? (
+                <div style={{fontSize:12,color:"#ff6666",marginBottom:10}}>
+                  {productMetaAi.error || "Draft failed."}
+                </div>
+              ) : null}
+              {productMetaAi.status === "ok" && productMetaAi.result ? (
+                <div style={{fontSize:12,marginBottom:14,padding:"10px 12px",background:"rgba(255,255,255,0.04)",borderRadius:8}}>
+                  <div style={{marginBottom:8}}>
+                    <strong>Provider:</strong>{" "}
+                    {productMetaAi.provider === "gemini" ? "Gemini" : "OpenAI"}
+                  </div>
+                  <div style={{fontWeight:600,marginBottom:6}}>SEO title suggestions</div>
+                  {productMetaAi.result.titles.map((t) => (
+                    <div key={t} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:6}}>
+                      <div style={{flex:1}}>
+                        {t}{" "}
+                        <span style={{opacity:0.5}}>({t.length})</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="action-btn btn-edit"
+                        onClick={() => setEditProduct((p) => ({ ...p, seo_title: t }))}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{fontWeight:600,margin:"10px 0 6px"}}>Meta description suggestions</div>
+                  {productMetaAi.result.meta_descriptions.map((d) => (
+                    <div key={d} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:6}}>
+                      <div style={{flex:1}}>
+                        {d}{" "}
+                        <span style={{opacity:0.5}}>({d.length})</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="action-btn btn-edit"
+                        onClick={() => setEditProduct((p) => ({ ...p, meta_description: d }))}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <div className="modal-field">
+                <label style={{display:"flex",justifyContent:"space-between"}}>
+                  <span>SEO Title{productHistoryBtn("seo_title","SEO Title")}</span> <span style={{fontSize:11,color:editProduct.seo_title.length>55?"#ff6666":editProduct.seo_title.length>40?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.seo_title.length}/60</span>
+                </label>
+                <input placeholder={`Auto: "${editProduct.name || 'Product Name'} | Firestick4UK"`} maxLength={60} value={editProduct.seo_title} onChange={e => setEditProduct({...editProduct,seo_title:e.target.value})} />
+                <div className="char-bar" style={{background:"rgba(255,255,255,0.08)",width:"100%"}}><div className="char-bar" style={{width:`${Math.min(100,(editProduct.seo_title.length/60)*100)}%`,background:editProduct.seo_title.length>55?"#ff6666":editProduct.seo_title.length>40?"#00c864":"rgba(139,0,255,0.5)"}} /></div>
+              </div>
+              <div className="modal-field">
+                <label style={{display:"flex",justifyContent:"space-between"}}>
+                  <span>Meta Description{productHistoryBtn("meta_description","Meta Description")}</span> <span style={{fontSize:11,color:editProduct.meta_description.length>=175?"#ff6666":editProduct.meta_description.length>=140?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.meta_description.length}/180</span>
+                </label>
+                <textarea rows={2} placeholder={`Auto: Short description will be used if empty (max 180 chars)`} maxLength={180} value={editProduct.meta_description} onChange={e => setEditProduct({...editProduct,meta_description:e.target.value})} style={{resize:"none"}} />
+                <div className="char-bar" style={{background:"rgba(255,255,255,0.08)",width:"100%"}}><div className="char-bar" style={{width:`${Math.min(100,(editProduct.meta_description.length/180)*100)}%`,background:editProduct.meta_description.length>=175?"#ff6666":editProduct.meta_description.length>=140?"#00c864":"rgba(139,0,255,0.5)"}} /></div>
+              </div>
+              <div className="modal-field"><label>Focus Keyword{productHistoryBtn("focus_keyword","Focus Keyword")}</label><input placeholder="e.g. firestick 4k uk" value={editProduct.focus_keyword} onChange={e => setEditProduct({...editProduct,focus_keyword:e.target.value})} /></div>
+              <div className="modal-field" style={{marginBottom:0}}>
+                <label>Social / OG Image{productHistoryBtn("og_image","Social / OG Image")}</label>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",marginBottom:8}}>
+                  Used for social sharing previews. If empty, the normal product image/global fallback is used.
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
+                  {editProduct.og_image
+                    ? <img src={editProduct.og_image} alt="OG preview" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid rgba(139,0,255,0.3)"}} />
+                    : <div style={{width:60,height:60,background:"rgba(139,0,255,0.1)",border:"1px dashed rgba(139,0,255,0.4)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"rgba(255,255,255,0.35)"}}>OG</div>
+                  }
+                  <button
+                    type="button"
+                    style={{cursor:"pointer",background:"rgba(91,33,182,0.08)",border:"1px solid rgba(91,33,182,0.3)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6"}}
+                    onClick={() => setMediaPicker({
+                      purposes: ["products"],
+                      title: "Choose Product OG Image",
+                      onSelect: (asset) => setEditProduct((p) => ({ ...p, og_image: asset.url })),
+                    })}
+                  >
+                    Choose from Library
+                  </button>
+                  {editProduct.og_image && (
+                    <button
+                      type="button"
+                      style={{background:"none",border:"none",color:"rgba(255,100,100,0.7)",cursor:"pointer",fontSize:13}}
+                      onClick={() => setEditProduct((p) => ({ ...p, og_image: "" }))}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+</CollapsibleSection>
+            <CollapsibleSection
+              title={PRODUCT_EDITOR_SECTION_TITLES.seasonal}
+              open={!!productSectionOpen.seasonal}
+              onToggle={() => setProductSectionOpen(st => ({...st, seasonal: !st.seasonal}))}
+              fieldCount={1}
+              variant="dark"
+              testId="product-section-seasonal"
+            >
+              {canViewRevisions && productModal !== "new" && productModal?.id ? (
+                <div
+                  data-testid="product-seasonal-history"
+                  style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 12, marginBottom: 10 }}
+                >
+                  {([
+                    ["season_name", "Season name"],
+                    ["season_starts_at", "Season starts"],
+                    ["season_ends_at", "Season ends"],
+                    ["lifecycle_mode", "Lifecycle"],
+                  ] as const).map(([f, l]) => (
+                    <span key={f}>
+                      {l}
+                      {productHistoryBtn(f, l)}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {productModal !== "new" && productModal?.id && can("products.manage") ? (
+                <ProductSeasonalityPanel
+                  product={productModal as any}
+                  editorSessionId={editorSessionId}
+                  disabled={productSaving}
+                  pending={productVisibilityPendingId === productModal.id}
+                  onSessionExpired={handleSessionExpired}
+                  onForbidden={showPermError}
+                  onMessage={(msg) => {
+                    setProductMsg(msg);
+                    setTimeout(() => setProductMsg(""), 5000);
+                  }}
+                  onRefresh={async () => {
+                    await loadProducts();
+                  }}
+                  onProductUpdate={(row, meta) => {
+                    // Seasonal/ops action succeeded: reflect it in the products list immediately
+                    // (background loadProducts via onRefresh reconciles with the server).
+                    if (row && (row as any).id != null) {
+                      const rowId = Number((row as any).id);
+                      setProducts((prev) =>
+                        prev.map((x: any) => (Number(x.id) === rowId ? { ...x, ...(row as any) } : x))
+                      );
+                    }
+                    // Compare captured dispatch context against CURRENT active editor — never
+                    // re-label an old response with editorSessionIdRef.current.
+                    const activeProductId =
+                      productModal && productModal !== "new" ? Number(productModal.id) : null;
+                    if (
+                      !isActiveEditorRequest(
+                        editorSessionIdRef.current,
+                        activeProductId,
+                        meta
+                      )
+                    ) {
+                      return;
+                    }
+                    const snap = contentDraftSessionSnapshot();
+                    if (!snap) {
+                      applyAuthoritativeProductRow(row as any, {
+                        replaceContent: false,
+                        editorSessionId: meta.editorSessionId,
+                      });
+                      return;
+                    }
+                    const next = applyOwnContentPreservingActionResult(snap, {
+                      editorSessionId: meta.editorSessionId,
+                      productId: meta.productId,
+                      actionStartedAtVersion: meta.actionStartedAtVersion,
+                      nextVersion: meta.nextVersion,
+                      noop: meta.noop,
+                      // Successful Pause does not resolve an existing content conflict.
+                      clearConflict: false,
+                    });
+                    setContentDraftBaseVersion(next.contentDraftBaseVersion);
+                    // Keep outstanding conflict; only refresh ops fields + live version.
+                    applyAuthoritativeProductRow(
+                      {
+                        ...row,
+                        product_version: next.liveProductVersion ?? row.product_version,
+                      } as any,
+                      {
+                        replaceContent: false,
+                        editorSessionId: meta.editorSessionId,
+                      }
+                    );
+                  }}
+                  onVersionUpdate={(version, ctx) => {
+                    // Live ops version only — NEVER advance content draft base from unqualified callback.
+                    // Reject late responses that belong to a closed/switched editor session.
+                    const activeProductId =
+                      productModal && productModal !== "new" ? Number(productModal.id) : null;
+                    if (
+                      !isActiveEditorRequest(
+                        editorSessionIdRef.current,
+                        activeProductId,
+                        ctx
+                      )
+                    ) {
+                      return;
+                    }
+                    const snap = contentDraftSessionSnapshot();
+                    if (snap) {
+                      const next = applyLiveVersionOnly(snap, Number(version));
+                      setProductModal((prev: any) =>
+                        prev && prev !== "new" && Number(prev.id) === Number(ctx.productId)
+                          ? { ...prev, product_version: next.liveProductVersion }
+                          : prev
+                      );
+                    } else {
+                      setProductModal((prev: any) =>
+                        prev && prev !== "new" && Number(prev.id) === Number(ctx.productId)
+                          ? { ...prev, product_version: version }
+                          : prev
+                      );
+                    }
+                  }}
+
+                />
+              ) : (
+                <div style={{fontSize:12,color:"rgba(255,255,255,0.45)"}}>Seasonal controls appear when editing an existing product.</div>
+              )}
+            </CollapsibleSection>
+            <CollapsibleSection
+              title={PRODUCT_EDITOR_SECTION_TITLES.visibility}
+              open={!!productSectionOpen.visibility}
+              onToggle={() => setProductSectionOpen(st => ({...st, visibility: !st.visibility}))}
+              fieldCount={2}
+              variant="dark"
+              testId="product-section-visibility"
+            >
+              {productModal !== "new" && Number(productModal?.active) !== 1 ? (
+                <small
+                  data-testid="product-editor-hidden-url-note"
+                  style={{display:"block",marginTop:6,fontSize:11,color:"#EA580C",lineHeight:1.45}}
+                >
+                  This product is Private (active=0). Stored slug is retained, but the public page is unavailable (404) until Make Public. Ordinary Save preserves Private status and does not change seasonal/shop controls.
+                </small>
+              ) : (
+                <div style={{fontSize:12,color:"rgba(255,255,255,0.55)",lineHeight:1.45}} data-testid="product-editor-visibility-status">
+                  {productModal === "new"
+                    ? "New products are created Public (active=1) unless you change visibility from the products list after save."
+                    : ("Visibility: active=" + String(Number(productModal?.active) === 1 ? 1 : 0) + ", shop_listed=" + String(Number(productModal?.shop_listed) === 0 ? 0 : 1) + ". Use list actions or Seasonal settings for Make Public/Private and shop listing.")}
+                </div>
+              )}
+            </CollapsibleSection>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="modal-cancel"
+                data-testid="product-editor-cancel"
+                onClick={() => void requestCloseProductEditor()}
+              >
+                Cancel
+              </button>
+              {productModal !== "new" && productModal?.id && can("revisions.view") && (
+                <button
+                  type="button"
+                  className="modal-cancel"
+                  onClick={() => void openProductHistoryFromEditor()}
+                >
+                  🕘 History
+                </button>
+              )}
+            </div>
+          </div>
+
+          <ProductEditorSidebar
+            publish={{
+              isNew: productModal === "new",
+              isPublic: productModal === "new" ? true : Number(productModal?.active) === 1,
+              shopListed: productModal === "new" ? true : Number(productModal?.shop_listed) !== 0,
+              seasonal: productModal !== "new" && String(productModal?.lifecycle_mode || "") === "seasonal",
+              lastUpdated:
+                productModal !== "new" && productModal?.updated_at
+                  ? String(productModal.updated_at)
+                  : null,
+            }}
+            canManage={can("products.manage")}
+            canViewHistory={can("revisions.view")}
+            visibilityPending={productModal !== "new" && productVisibilityPendingId === productModal?.id}
+            onToggleVisibility={() => void toggleEditorProductVisibility()}
+            onOpenHistory={() => void openProductHistoryFromEditor()}
+            onScrollToSeasonal={scrollToProductSeasonalSection}
+            priceStockSlot={
+              <div data-testid="product-section-price_stock">
+                <div className="modal-field">
+                  <label>Price{productHistoryBtn("price","Price")}</label>
+                  <input placeholder="e.g. £9.99" value={editProduct.price} onChange={e => setEditProduct({...editProduct,price:e.target.value})} />
+                  <small className="product-editor-help" data-testid="product-editor-price-vat-note">incl. VAT</small>
+                </div>
+                <div className="modal-field" style={{marginBottom:0}}>
+                  <label>Stock / Type</label>
+                  <input placeholder="e.g. 10 or Digital" value={editProduct.stock} onChange={e => setEditProduct({...editProduct,stock:e.target.value})} />
+                </div>
+              </div>
+            }
+            categorySlot={
+              <div className="modal-field" style={{marginBottom:0}}>
+                <label>Category</label>
+                <select
+                  value={editProduct.category}
+                  onChange={(e) => {
+                    const category = e.target.value;
+                    setEditProduct({ ...editProduct, category });
+                    if (productModal === "new") {
+                      setProductAiFacts((f) =>
+                        f.productKindOverridden
+                          ? f
+                          : {
+                              ...f,
+                              productKind: defaultProductKindFromCategory(category),
+                            }
+                      );
+                    }
+                  }}
+                >
+                  <option>Subscription</option><option>Device</option><option>Bundle</option>
+                </select>
+              </div>
+            }
+            featuredImageSlot={
+              <div data-testid="product-editor-featured-image">
+                {editProduct.image
+                  ? <img src={editProduct.image} alt="Featured" style={{width:"100%",maxHeight:180,objectFit:"cover",borderRadius:8,border:"1px solid rgba(255,255,255,0.12)",marginBottom:10}} />
+                  : <div style={{height:96,background:"rgba(139,0,255,0.1)",border:"1px dashed rgba(139,0,255,0.4)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,marginBottom:10}}>📦</div>
+                }
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    onClick={() => setMediaPicker({
+                      purposes: ["products"],
+                      title: "Choose Product Image",
+                      onSelect: (asset) => setEditProduct((p) => ({ ...p, image: asset.url })),
+                    })}
+                  >
+                    {editProduct.image ? "Replace" : "Set image"}
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn btn-view"
+                    data-testid="product-editor-open-images"
+                    onClick={() => {
+                      setProductSectionOpen((st) => ({ ...st, images: true }));
+                      window.setTimeout(() => {
+                        document
+                          .querySelector('[data-testid="product-section-images"]')
+                          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }, 60);
+                    }}
+                  >
+                    Upload / more…
+                  </button>
+                </div>
+              </div>
+            }
+            seasonalSummary={
+              productModal !== "new" && String(productModal?.lifecycle_mode || "") === "seasonal"
+                ? (() => {
+                    const start = utcSqlToLondonWall(productModal.season_starts_at);
+                    const end = utcSqlToLondonWall(productModal.season_ends_at);
+                    const phase = resolveSeasonPhase(productModal, Date.now(), {
+                      mode: "expanded",
+                      present: [],
+                      missing: [],
+                      reason: "admin_editor_summary",
+                    });
+                    return (
+                      <div data-testid="product-editor-seasonal-summary" style={{fontSize:13,lineHeight:1.55}}>
+                        {productModal.season_name ? (
+                          <div><strong>{String(productModal.season_name)}</strong></div>
+                        ) : null}
+                        <div>
+                          Window:{" "}
+                          {start && end
+                            ? `${start.wall.replace("T", " ")} → ${end.wall.replace("T", " ")} (London)`
+                            : "Not set"}
+                        </div>
+                        <div>
+                          Phase: <strong data-testid="product-editor-seasonal-phase">{phase}</strong>
+                        </div>
+                      </div>
+                    );
+                  })()
+                : undefined
+            }
+            aiAssistantSlot={
+              can("products.manage") ? (
+                <div data-testid="product-editor-ai-slot">
+            {/* PAI-3 — New Product AI Assistant (new modal only) */}
             {productModal === "new" && can("products.manage") ? (
               <div
                 className="seo-box"
@@ -5620,329 +6482,12 @@ function AdminPageInner() {
               </div>
             ) : null}
 
-<CollapsibleSection
-              title={PRODUCT_EDITOR_SECTION_TITLES.seo}
-              open={!!productSectionOpen.seo}
-              onToggle={() => setProductSectionOpen(st => ({...st, seo: !st.seo}))}
-              fieldCount={4}
-              variant="dark"
-              testId="product-section-seo"
-            >
-            <div className="seo-box">
-              <div className="seo-box-title">🔍 SEO Settings</div>
-              {productModal !== "new" && productModal?.id ? (
-                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
-                  <button
-                    type="button"
-                    className="action-btn btn-view"
-                    disabled={productMetaAi.status === "loading"}
-                    onClick={() => void draftProductMetadata("gemini")}
-                  >
-                    Draft with Gemini
-                  </button>
-                  <button
-                    type="button"
-                    className="action-btn btn-view"
-                    disabled={productMetaAi.status === "loading"}
-                    onClick={() => void draftProductMetadata("openai")}
-                  >
-                    Draft with OpenAI
-                  </button>
                 </div>
-              ) : null}
-              {productMetaAi.status === "loading" ? (
-                <div style={{fontSize:12,color:"rgba(255,255,255,0.55)",marginBottom:10}}>
-                  {productMetaAi.provider === "gemini" ? "Drafting with Gemini…" : "Drafting with OpenAI…"}
-                </div>
-              ) : null}
-              {productMetaAi.status === "error" ? (
-                <div style={{fontSize:12,color:"#ff6666",marginBottom:10}}>
-                  {productMetaAi.error || "Draft failed."}
-                </div>
-              ) : null}
-              {productMetaAi.status === "ok" && productMetaAi.result ? (
-                <div style={{fontSize:12,marginBottom:14,padding:"10px 12px",background:"rgba(255,255,255,0.04)",borderRadius:8}}>
-                  <div style={{marginBottom:8}}>
-                    <strong>Provider:</strong>{" "}
-                    {productMetaAi.provider === "gemini" ? "Gemini" : "OpenAI"}
-                  </div>
-                  <div style={{fontWeight:600,marginBottom:6}}>SEO title suggestions</div>
-                  {productMetaAi.result.titles.map((t) => (
-                    <div key={t} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:6}}>
-                      <div style={{flex:1}}>
-                        {t}{" "}
-                        <span style={{opacity:0.5}}>({t.length})</span>
-                      </div>
-                      <button
-                        type="button"
-                        className="action-btn btn-edit"
-                        onClick={() => setEditProduct((p) => ({ ...p, seo_title: t }))}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  ))}
-                  <div style={{fontWeight:600,margin:"10px 0 6px"}}>Meta description suggestions</div>
-                  {productMetaAi.result.meta_descriptions.map((d) => (
-                    <div key={d} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:6}}>
-                      <div style={{flex:1}}>
-                        {d}{" "}
-                        <span style={{opacity:0.5}}>({d.length})</span>
-                      </div>
-                      <button
-                        type="button"
-                        className="action-btn btn-edit"
-                        onClick={() => setEditProduct((p) => ({ ...p, meta_description: d }))}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              <div className="modal-field">
-                <label style={{display:"flex",justifyContent:"space-between"}}>
-                  <span>SEO Title{productHistoryBtn("seo_title","SEO Title")}</span> <span style={{fontSize:11,color:editProduct.seo_title.length>55?"#ff6666":editProduct.seo_title.length>40?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.seo_title.length}/60</span>
-                </label>
-                <input placeholder={`Auto: "${editProduct.name || 'Product Name'} | Firestick4UK"`} maxLength={60} value={editProduct.seo_title} onChange={e => setEditProduct({...editProduct,seo_title:e.target.value})} />
-                <div className="char-bar" style={{background:"rgba(255,255,255,0.08)",width:"100%"}}><div className="char-bar" style={{width:`${Math.min(100,(editProduct.seo_title.length/60)*100)}%`,background:editProduct.seo_title.length>55?"#ff6666":editProduct.seo_title.length>40?"#00c864":"rgba(139,0,255,0.5)"}} /></div>
-              </div>
-              <div className="modal-field">
-                <label style={{display:"flex",justifyContent:"space-between"}}>
-                  <span>Meta Description{productHistoryBtn("meta_description","Meta Description")}</span> <span style={{fontSize:11,color:editProduct.meta_description.length>=175?"#ff6666":editProduct.meta_description.length>=140?"#00c864":"rgba(255,255,255,0.3)"}}>{editProduct.meta_description.length}/180</span>
-                </label>
-                <textarea rows={2} placeholder={`Auto: Short description will be used if empty (max 180 chars)`} maxLength={180} value={editProduct.meta_description} onChange={e => setEditProduct({...editProduct,meta_description:e.target.value})} style={{resize:"none"}} />
-                <div className="char-bar" style={{background:"rgba(255,255,255,0.08)",width:"100%"}}><div className="char-bar" style={{width:`${Math.min(100,(editProduct.meta_description.length/180)*100)}%`,background:editProduct.meta_description.length>=175?"#ff6666":editProduct.meta_description.length>=140?"#00c864":"rgba(139,0,255,0.5)"}} /></div>
-              </div>
-              <div className="modal-field"><label>Focus Keyword{productHistoryBtn("focus_keyword","Focus Keyword")}</label><input placeholder="e.g. firestick 4k uk" value={editProduct.focus_keyword} onChange={e => setEditProduct({...editProduct,focus_keyword:e.target.value})} /></div>
-              <div className="modal-field" style={{marginBottom:0}}>
-                <label>Social / OG Image{productHistoryBtn("og_image","Social / OG Image")}</label>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.45)",marginBottom:8}}>
-                  Used for social sharing previews. If empty, the normal product image/global fallback is used.
-                </div>
-                <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
-                  {editProduct.og_image
-                    ? <img src={editProduct.og_image} alt="OG preview" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"1px solid rgba(139,0,255,0.3)"}} />
-                    : <div style={{width:60,height:60,background:"rgba(139,0,255,0.1)",border:"1px dashed rgba(139,0,255,0.4)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"rgba(255,255,255,0.35)"}}>OG</div>
-                  }
-                  <button
-                    type="button"
-                    style={{cursor:"pointer",background:"rgba(91,33,182,0.08)",border:"1px solid rgba(91,33,182,0.3)",padding:"8px 16px",borderRadius:8,fontSize:13,color:"#5B21B6"}}
-                    onClick={() => setMediaPicker({
-                      purposes: ["products"],
-                      title: "Choose Product OG Image",
-                      onSelect: (asset) => setEditProduct((p) => ({ ...p, og_image: asset.url })),
-                    })}
-                  >
-                    Choose from Library
-                  </button>
-                  {editProduct.og_image && (
-                    <button
-                      type="button"
-                      style={{background:"none",border:"none",color:"rgba(255,100,100,0.7)",cursor:"pointer",fontSize:13}}
-                      onClick={() => setEditProduct((p) => ({ ...p, og_image: "" }))}
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-</CollapsibleSection>
-            <CollapsibleSection
-              title={PRODUCT_EDITOR_SECTION_TITLES.seasonal}
-              open={!!productSectionOpen.seasonal}
-              onToggle={() => setProductSectionOpen(st => ({...st, seasonal: !st.seasonal}))}
-              fieldCount={1}
-              variant="dark"
-              testId="product-section-seasonal"
-            >
-              {canViewRevisions && productModal !== "new" && productModal?.id ? (
-                <div
-                  data-testid="product-seasonal-history"
-                  style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 12, marginBottom: 10 }}
-                >
-                  {([
-                    ["season_name", "Season name"],
-                    ["season_starts_at", "Season starts"],
-                    ["season_ends_at", "Season ends"],
-                    ["lifecycle_mode", "Lifecycle"],
-                  ] as const).map(([f, l]) => (
-                    <span key={f}>
-                      {l}
-                      {productHistoryBtn(f, l)}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-              {productModal !== "new" && productModal?.id && can("products.manage") ? (
-                <ProductSeasonalityPanel
-                  product={productModal as any}
-                  editorSessionId={editorSessionId}
-                  disabled={productSaving}
-                  pending={productVisibilityPendingId === productModal.id}
-                  onSessionExpired={handleSessionExpired}
-                  onForbidden={showPermError}
-                  onMessage={(msg) => {
-                    setProductMsg(msg);
-                    setTimeout(() => setProductMsg(""), 5000);
-                  }}
-                  onRefresh={async () => {
-                    await loadProducts();
-                  }}
-                  onProductUpdate={(row, meta) => {
-                    // Seasonal/ops action succeeded: reflect it in the products list immediately
-                    // (background loadProducts via onRefresh reconciles with the server).
-                    if (row && (row as any).id != null) {
-                      const rowId = Number((row as any).id);
-                      setProducts((prev) =>
-                        prev.map((x: any) => (Number(x.id) === rowId ? { ...x, ...(row as any) } : x))
-                      );
-                    }
-                    // Compare captured dispatch context against CURRENT active editor — never
-                    // re-label an old response with editorSessionIdRef.current.
-                    const activeProductId =
-                      productModal && productModal !== "new" ? Number(productModal.id) : null;
-                    if (
-                      !isActiveEditorRequest(
-                        editorSessionIdRef.current,
-                        activeProductId,
-                        meta
-                      )
-                    ) {
-                      return;
-                    }
-                    const snap = contentDraftSessionSnapshot();
-                    if (!snap) {
-                      applyAuthoritativeProductRow(row as any, {
-                        replaceContent: false,
-                        editorSessionId: meta.editorSessionId,
-                      });
-                      return;
-                    }
-                    const next = applyOwnContentPreservingActionResult(snap, {
-                      editorSessionId: meta.editorSessionId,
-                      productId: meta.productId,
-                      actionStartedAtVersion: meta.actionStartedAtVersion,
-                      nextVersion: meta.nextVersion,
-                      noop: meta.noop,
-                      // Successful Pause does not resolve an existing content conflict.
-                      clearConflict: false,
-                    });
-                    setContentDraftBaseVersion(next.contentDraftBaseVersion);
-                    // Keep outstanding conflict; only refresh ops fields + live version.
-                    applyAuthoritativeProductRow(
-                      {
-                        ...row,
-                        product_version: next.liveProductVersion ?? row.product_version,
-                      } as any,
-                      {
-                        replaceContent: false,
-                        editorSessionId: meta.editorSessionId,
-                      }
-                    );
-                  }}
-                  onVersionUpdate={(version, ctx) => {
-                    // Live ops version only — NEVER advance content draft base from unqualified callback.
-                    // Reject late responses that belong to a closed/switched editor session.
-                    const activeProductId =
-                      productModal && productModal !== "new" ? Number(productModal.id) : null;
-                    if (
-                      !isActiveEditorRequest(
-                        editorSessionIdRef.current,
-                        activeProductId,
-                        ctx
-                      )
-                    ) {
-                      return;
-                    }
-                    const snap = contentDraftSessionSnapshot();
-                    if (snap) {
-                      const next = applyLiveVersionOnly(snap, Number(version));
-                      setProductModal((prev: any) =>
-                        prev && prev !== "new" && Number(prev.id) === Number(ctx.productId)
-                          ? { ...prev, product_version: next.liveProductVersion }
-                          : prev
-                      );
-                    } else {
-                      setProductModal((prev: any) =>
-                        prev && prev !== "new" && Number(prev.id) === Number(ctx.productId)
-                          ? { ...prev, product_version: version }
-                          : prev
-                      );
-                    }
-                  }}
-
-                />
-              ) : (
-                <div style={{fontSize:12,color:"rgba(255,255,255,0.45)"}}>Seasonal controls appear when editing an existing product.</div>
-              )}
-            </CollapsibleSection>
-            <CollapsibleSection
-              title={PRODUCT_EDITOR_SECTION_TITLES.visibility}
-              open={!!productSectionOpen.visibility}
-              onToggle={() => setProductSectionOpen(st => ({...st, visibility: !st.visibility}))}
-              fieldCount={2}
-              variant="dark"
-              testId="product-section-visibility"
-            >
-              {productModal !== "new" && Number(productModal?.active) !== 1 ? (
-                <small
-                  data-testid="product-editor-hidden-url-note"
-                  style={{display:"block",marginTop:6,fontSize:11,color:"#EA580C",lineHeight:1.45}}
-                >
-                  This product is Private (active=0). Stored slug is retained, but the public page is unavailable (404) until Make Public. Ordinary Save preserves Private status and does not change seasonal/shop controls.
-                </small>
-              ) : (
-                <div style={{fontSize:12,color:"rgba(255,255,255,0.55)",lineHeight:1.45}} data-testid="product-editor-visibility-status">
-                  {productModal === "new"
-                    ? "New products are created Public (active=1) unless you change visibility from the products list after save."
-                    : ("Visibility: active=" + String(Number(productModal?.active) === 1 ? 1 : 0) + ", shop_listed=" + String(Number(productModal?.shop_listed) === 0 ? 0 : 1) + ". Use list actions or Seasonal settings for Make Public/Private and shop listing.")}
-                </div>
-              )}
-            </CollapsibleSection>
-
-            <div className="modal-actions">
-              <button
-                className="modal-cancel"
-                onClick={() => {
-                  setProductAiUi(createIdleProductAiUi());
-                  setProductReviewUi(createIdleProductReviewUi());
-                  setProductImageBriefUi(createIdleProductImageBriefUi());
-                  setProductAiFacts(createDefaultProductAiFacts("Subscription"));
-                  invalidateEditorSession();
-                  setProductMetaAi({ status: "idle" });
-                  setProductModal(null);
-                }}
-              >
-                Cancel
-              </button>
-              {productModal !== "new" && productModal?.id && can("revisions.view") && (
-                <button
-                  type="button"
-                  className="modal-cancel"
-                  onClick={() => {
-                    setHistoryFilter({ entityType: "product", entityId: String(productModal.id) });
-                    setProductMetaAi({ status: "idle" });
-                    resetProductAiState("Subscription");
-                    invalidateEditorSession();
-                    setProductModal(null);
-                    setTab("history");
-                  }}
-                >
-                  🕘 History
-                </button>
-              )}
-              <button
-                className="modal-save"
-                onClick={saveProduct}
-                disabled={imageUploading || productSaving || !!contentConflict}
-                data-testid="product-save-btn"
-              >
-                {productSaving ? "Saving…" : contentConflict ? "Resolve conflict to save" : "Save Product"}
-              </button>
-            </div>
+              ) : undefined
+            }
+            aiCollapsedDefault
+          />
+          </div>
           </div>
         </div>
       )}
@@ -6590,122 +7135,19 @@ function AdminPageInner() {
                 </div>
               )}
 
-              {!productsLoading && !productsError && products.length > 0 ? (
-                <div
-                  data-testid="product-visibility-filters"
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 8,
-                    marginBottom: 12,
-                    alignItems: "center",
-                  }}
-                >
-                  <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.85, marginRight: 4 }}>Visibility</span>
-                  {(
-                    [
-                      ["all", "All"],
-                      ["visible", "Public"],
-                      ["hidden", "Private"],
-                    ] as const
-                  ).map(([value, label]) => {
-                    const selected = productVisibilityFilter === value;
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        data-testid={`product-visibility-filter-${value}`}
-                        className="action-btn btn-view"
-                        aria-pressed={selected}
-                        onClick={() => setProductVisibilityFilter(value)}
-                        style={{
-                          opacity: selected ? 1 : 0.7,
-                          borderColor: selected ? "rgba(91,33,182,0.55)" : undefined,
-                          background: selected ? "rgba(91,33,182,0.12)" : undefined,
-                        }}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-
-              {!productsLoading && !productsError && products.length > 0 ? (
-                <div
-                  data-testid="product-seo-review-summary"
-                  style={{
-                    marginBottom: 12,
-                    padding: "10px 12px",
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 10,
-                    fontSize: 12,
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 10,
-                    alignItems: "center",
-                  }}
-                >
-                  <span style={{ fontWeight: 700, opacity: 0.85 }}>Deterministic SEO</span>
-                  <span data-testid="product-seo-count-needs-attention">
-                    Needs attention: {productSeoSummary.needsAttention}
-                  </span>
-                  <span data-testid="product-seo-count-review">
-                    Review: {productSeoSummary.review}
-                  </span>
-                  <span data-testid="product-seo-count-healthy">
-                    Healthy: {productSeoSummary.healthy}
-                  </span>
-                  <span data-testid="product-seo-count-inactive">
-                    Inactive: {productSeoSummary.inactive}
-                  </span>
-                  <span data-testid="product-seo-count-review-queue" style={{ fontWeight: 600 }}>
-                    Review Queue: {productSeoSummary.reviewQueue}
-                  </span>
-                </div>
-              ) : null}
-
-              {!productsLoading && !productsError && products.length > 0 ? (
-                <div
-                  data-testid="product-seo-review-filters"
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 8,
-                    marginBottom: 12,
-                  }}
-                >
-                  {(
-                    [
-                      ["all", "All"],
-                      ["review-queue", "Review Queue"],
-                      ["needs-attention", "Needs attention"],
-                      ["review", "Review"],
-                      ["healthy", "Healthy"],
-                      ["inactive", "Inactive"],
-                    ] as const
-                  ).map(([value, label]) => {
-                    const active = productSeoFilter === value;
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        data-testid={`product-seo-filter-${value}`}
-                        className="action-btn btn-view"
-                        onClick={() => setProductSeoFilter(value)}
-                        style={{
-                          opacity: active ? 1 : 0.7,
-                          borderColor: active ? "rgba(91,33,182,0.55)" : undefined,
-                          background: active ? "rgba(91,33,182,0.12)" : undefined,
-                        }}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
+              <ProductListToolbar
+                showFilters={!productsLoading && !productsError && products.length > 0}
+                search={productListSearch}
+                onSearchChange={setProductListSearch}
+                tab={productListTab}
+                onTabChange={changeProductListTab}
+                counts={productListCounts}
+                visibilityFilter={productVisibilityFilter}
+                onVisibilityFilterChange={changeProductVisibilityFilter}
+                seoFilter={productSeoFilter}
+                onSeoFilterChange={changeProductSeoFilter}
+                seoSummary={productSeoSummary}
+              />
 
               <div className="table-wrap">
                 <table>
@@ -6719,9 +7161,13 @@ function AdminPageInner() {
                     )}
                     {!productsLoading && !productsError && products.length > 0 && displayedProducts.length === 0 && (
                       <tr><td colSpan={9} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",padding:"24px"}}>
-                        {productVisibilityFilter !== "all"
-                          ? `No ${productVisibilityFilter} products match the current filters.`
-                          : "No products match this SEO filter."}
+                        {productListSearchDebounced.trim()
+                          ? `No products match “${productListSearchDebounced.trim()}” with the current filters.`
+                          : productVisibilityFilter !== "all"
+                            ? `No ${productVisibilityFilter} products match the current filters.`
+                            : productListTab === "seasonal" || productListTab === "out_of_stock"
+                              ? "No products in this tab."
+                              : "No products match this SEO filter."}
                       </td></tr>
                     )}
                     {!productsLoading && displayedProducts.map(p => {
@@ -6738,11 +7184,68 @@ function AdminPageInner() {
                       const isVisible = Number(p.active) === 1;
                       const slugPath = p.slug ? `/products/${p.slug}` : "";
                       const visibilityBusy = productVisibilityPendingId === p.id;
+                      const rowBusy = productSaving || productDeletingId != null || productVisibilityPendingId != null;
+                      const quickEditOpen = quickEditProductId != null && quickEditProductId === Number(p.id);
                       return (
-                      <tr key={p.id} data-testid={`product-row-${p.id}`}>
+                      <Fragment key={p.id}>
+                      <tr data-testid={`product-row-${p.id}`} className="product-list-row">
                         <td><div className="product-thumb">{p.image ? <img src={p.image} alt="" style={{width:36,height:36,objectFit:"cover",borderRadius:6}} /> : (p.emoji || "📦")}</div></td>
                         <td style={{fontWeight:600}}>
                           <div>{p.name}</div>
+                          <div className="product-row-actions" data-testid={`product-row-actions-${p.id}`}>
+                            {can("products.manage") ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="product-row-action"
+                                  data-testid={`product-edit-${p.id}`}
+                                  onClick={() => openEditProduct(p)}
+                                  disabled={rowBusy}
+                                >
+                                  Edit
+                                </button>
+                                <span className="product-row-sep" aria-hidden="true">·</span>
+                                <button
+                                  type="button"
+                                  className="product-row-action"
+                                  data-testid={`product-quick-edit-${p.id}`}
+                                  onClick={() => (quickEditOpen ? resetQuickEdit() : openQuickEdit(p))}
+                                  disabled={rowBusy || (quickEditSaving && !quickEditOpen)}
+                                  aria-expanded={quickEditOpen}
+                                >
+                                  Quick Edit
+                                </button>
+                              </>
+                            ) : null}
+                            {p.slug ? (
+                              <>
+                                {can("products.manage") ? <span className="product-row-sep" aria-hidden="true">·</span> : null}
+                                <a
+                                  className="product-row-action"
+                                  data-testid={`product-view-${p.id}`}
+                                  href={`/products/${p.slug}`}
+                                  target="_blank"
+                                  rel="noopener"
+                                >
+                                  View ↗
+                                </a>
+                              </>
+                            ) : null}
+                            {can("products.manage") ? (
+                              <>
+                                <span className="product-row-sep" aria-hidden="true">·</span>
+                                <button
+                                  type="button"
+                                  className="product-row-action"
+                                  data-testid={`product-duplicate-${p.id}`}
+                                  onClick={() => openDuplicateProduct(p)}
+                                  disabled={rowBusy}
+                                >
+                                  Duplicate
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
                           {slugPath ? (
                             <div style={{marginTop:4,fontSize:11,fontWeight:400,color:"rgba(255,255,255,0.45)",lineHeight:1.35}}>
                               <span data-testid={`product-stored-url-${p.id}`}>{slugPath}</span>
@@ -6795,22 +7298,6 @@ function AdminPageInner() {
                           {can("products.manage") && (
                             <>
                               <button
-                                className="action-btn btn-edit"
-                                onClick={() => openEditProduct(p)}
-                                disabled={productSaving || productDeletingId != null || productVisibilityPendingId != null}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className="action-btn btn-view"
-                                data-testid={`product-duplicate-${p.id}`}
-                                onClick={() => openDuplicateProduct(p)}
-                                disabled={productSaving || productDeletingId != null || productVisibilityPendingId != null}
-                              >
-                                Duplicate
-                              </button>
-                              <button
                                 type="button"
                                 className={`action-btn ${isVisible ? "btn-view" : "btn-verify"}`}
                                 data-testid={`product-visibility-toggle-${p.id}`}
@@ -6841,6 +7328,23 @@ function AdminPageInner() {
                           )}
                         </td>
                       </tr>
+                      {quickEditOpen && can("products.manage") ? (
+                        <ProductQuickEditRow
+                          productId={Number(p.id)}
+                          price={quickEditDraft.price}
+                          stock={quickEditDraft.stock}
+                          saving={quickEditSaving}
+                          error={quickEditError}
+                          conflictReload={quickEditConflictReload}
+                          onPriceChange={(price) => setQuickEditDraft((d) => ({ ...d, price }))}
+                          onStockChange={(stock) => setQuickEditDraft((d) => ({ ...d, stock }))}
+                          onSave={() => void saveQuickEdit()}
+                          onCancel={resetQuickEdit}
+                          onReload={() => void reloadAfterQuickEditConflict()}
+                          colSpan={9}
+                        />
+                      ) : null}
+                      </Fragment>
                       );
                     })}
                   </tbody>

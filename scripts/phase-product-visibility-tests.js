@@ -117,7 +117,16 @@ const {
 } = loadTsModule("lib/productVisibility.ts");
 
 const api = read("pages/api/admin-products.ts");
-const sidhu = read("app/sidhu/page.tsx");
+// MULTI-130: product list filter markup lives in ProductListToolbar; handlers stay in page.tsx.
+// Union for markup assertions; keep sidhuPage for saveProduct / openEditProduct extractions.
+const sidhuPage = read("app/sidhu/page.tsx");
+const sidhu = [
+  sidhuPage,
+  read("components/admin/ProductListToolbar.tsx"),
+  read("components/admin/ProductQuickEditRow.tsx"),
+  read("components/admin/ProductEditorSidebar.tsx"),
+  read("components/admin/ProductSeoSnippetPreview.tsx"),
+].join("\n");
 const publicProducts = read("lib/publicProductsServer.ts");
 const productsApi = read("pages/api/products.ts");
 const searchApi = read("pages/api/search.ts");
@@ -211,10 +220,10 @@ ok(
 );
 
 // --- Ordinary edit still omits active (preservation) ---
-const saveIdx = sidhu.indexOf("const saveProduct = async () => {");
-const saveEnd = sidhu.indexOf("const resetProductAiState", saveIdx);
+const saveIdx = sidhuPage.indexOf("const saveProduct = async () => {");
+const saveEnd = sidhuPage.indexOf("const resetProductAiState", saveIdx);
 const saveSnippet =
-  saveIdx >= 0 && saveEnd > saveIdx ? sidhu.slice(saveIdx, saveEnd) : "";
+  saveIdx >= 0 && saveEnd > saveIdx ? sidhuPage.slice(saveIdx, saveEnd) : "";
 // 16a0887: post-success local state for NEW products is `{ id: res.id, active: 1, ...localFields }` (page.tsx:2404).
 // The PUT body is only `...payload` + id + expected_version; assert on the request body, not the whole function.
 const payloadHelperVis = read("lib/productEditorSavePayload.ts");
