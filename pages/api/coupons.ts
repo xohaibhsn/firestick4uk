@@ -155,7 +155,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const prev = Array.isArray(prevRows) && prevRows[0] ? prevRows[0] : null;
       if (!prev) return res.status(404).json({ error: 'Coupon not found' });
 
-      await pool.query('DELETE FROM coupons WHERE id=?', [idParsed.value]);
+      const [delResult]: any = await pool.query('DELETE FROM coupons WHERE id=?', [idParsed.value]);
+      if (!delResult || Number(delResult.affectedRows) === 0) {
+        return res.status(404).json({ error: 'Coupon not found' });
+      }
       const { ip } = getRequestMeta(req);
       await recordAdminAudit({
         actor: admin,

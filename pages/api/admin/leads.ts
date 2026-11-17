@@ -154,30 +154,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === "DELETE") {
-      const ids = Array.isArray(req.body?.ids)
-        ? req.body.ids
-            .map((value: unknown) => Number(value))
-            .filter((value: number) => Number.isInteger(value) && value > 0)
-        : [];
-      if (ids.length > 0) {
-        const placeholders = ids.map(() => "?").join(",");
-        await pool.query(`DELETE FROM chat_leads WHERE id IN (${placeholders})`, ids);
-        const { ip } = getRequestMeta(req);
-        await recordAdminAudit({
-          actor: admin,
-          action: "lead.bulk_deleted",
-          entityType: "lead",
-          entityId: null,
-          summary: `Bulk deleted ${ids.length} lead(s)`,
-          metadata: { count: ids.length },
-          ip,
-        });
-        return res.status(200).json({ success: true, deleted: ids.length });
+      if (Array.isArray(req.body?.ids)) {
+        const rawIds = req.body.ids as unknown[];
+        if (rawIds.length > 500) {
+          return res.status(400).json({ error: "invalid_ids" });
+        }
+        const ids: number[] = [];
+        for (const value of rawIds) {
+          const n = Number(value);
+          if (!Number.isInteger(n) || n <= 0) {
+            return res.status(400).json({ error: "invalid_ids" });
+          }
+          ids.push(n);
+        }
+        if (ids.length > 0) {
+          const placeholders = ids.map(() => "?").join(",");
+          const [delResult]: any = await pool.query(
+            `DELETE FROM chat_leads WHERE id IN (${placeholders})`,
+            ids
+          );
+          const deleted = Number(delResult?.affectedRows) || 0;
+          const { ip } = getRequestMeta(req);
+          await recordAdminAudit({
+            actor: admin,
+            action: "lead.bulk_deleted",
+            entityType: "lead",
+            entityId: null,
+            summary: `Bulk deleted ${deleted} lead(s)`,
+            metadata: { count: deleted },
+            ip,
+          });
+          return res.status(200).json({ success: true, deleted });
+        }
       }
 
       const id = Number(req.query.id || req.body?.id);
-      if (!id) return res.status(400).json({ error: "id required" });
-      await pool.query("DELETE FROM chat_leads WHERE id=?", [id]);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ error: "id required" });
+      }
+      const [delResult]: any = await pool.query("DELETE FROM chat_leads WHERE id=?", [id]);
+      if (!delResult || Number(delResult.affectedRows) === 0) {
+        return res.status(404).json({ error: "not_found" });
+      }
       const { ip } = getRequestMeta(req);
       await recordAdminAudit({
         actor: admin,

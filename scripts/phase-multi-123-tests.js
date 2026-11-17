@@ -122,7 +122,8 @@ const EXPECTED = {
   adminOrders_nonDelete:
     "a74ee2cfe2b780bd898bbb1adef6387e3f1fdb0e90132c0802b27db007dc5f90",
   faqs_nonDelete: "dd0e190ea9edd6e6ec8479be3717a45c261d7b92affd475c348f2f6af7a33b1a",
-  coupons_nonPut: "d96a39e9df639714ac16eee00e773c3e174a1bca23ac589045dcb36b2aada05f",
+  // Refresh MULTI-126: DELETE affectedRows hardening intentionally changes non-PUT surface.
+  coupons_nonPut: "3ed00d3f93c9b4e44a382f7e1b87c5752ee41833d9fbab5ec9cf108419a91be0",
 };
 
 // ─── E1: admin-orders DELETE ───────────────────────────────────────────────
