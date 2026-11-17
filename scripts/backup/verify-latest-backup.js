@@ -201,15 +201,52 @@ async function gunzipToString(gzipBuf) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
+/**
+ * Build candidate signed download URLs for a private raw backup.
+ * Cloudinary may store public_id WITH the ".enc" suffix (no separate format)
+ * or as base + format=enc — try both download API shapes, then signed delivery.
+ */
+function buildSignedDownloadCandidates(cloudinary, publicId, type) {
+  const t = type || "private";
+  const opts = { resource_type: "raw", type: t, attachment: true };
+  const { publicId: stripped, format } = splitPublicIdFormat(publicId);
+  const candidates = [];
+  // 1) public_id as listed (includes .enc) + empty format — matches OFFSITE-118 upload result
+  candidates.push({
+    label: "download_full_id",
+    url: cloudinary.utils.private_download_url(publicId, "", opts),
+    publicId,
+    format: "",
+  });
+  // 2) strip .enc + format=enc
+  if (format === "enc" && stripped !== publicId) {
+    candidates.push({
+      label: "download_strip_format",
+      url: cloudinary.utils.private_download_url(stripped, "enc", opts),
+      publicId: stripped,
+      format: "enc",
+    });
+  }
+  // 3) signed delivery URL for private raw
+  if (typeof cloudinary.url === "function") {
+    candidates.push({
+      label: "signed_delivery",
+      url: cloudinary.url(publicId, {
+        resource_type: "raw",
+        type: t,
+        sign_url: true,
+        secure: true,
+      }),
+      publicId,
+      format: null,
+    });
+  }
+  return candidates;
+}
+
 function buildSignedDownloadUrl(cloudinary, publicId, type) {
-  const { publicId: pid, format } = splitPublicIdFormat(publicId);
-  const opts = {
-    resource_type: "raw",
-    type: type || "private",
-    attachment: true,
-  };
-  // Cloudinary private_download_url(public_id, format, options)
-  return cloudinary.utils.private_download_url(pid, format || null, opts);
+  const cands = buildSignedDownloadCandidates(cloudinary, publicId, type);
+  return cands[0].url;
 }
 
 async function verifyLatestBackup(options = {}) {
@@ -283,28 +320,54 @@ async function verifyLatestBackup(options = {}) {
     );
     console.log("newest_bytes=" + encBytesListed);
 
-    const downloadType =
-      /authenticated/.test(listed.listing_variant)
-        ? "authenticated"
-        : /type=upload|\/upload\//.test(listed.listing_variant)
-          ? "upload"
-          : "private";
     // Prefer variant type from listing_variant string
     let type = "private";
     if (listed.listing_variant.startsWith("authenticated/")) type = "authenticated";
     else if (listed.listing_variant.startsWith("upload/")) type = "upload";
-    else type = downloadType;
 
-    const signedUrl =
-      options.signedUrl ||
-      buildSignedDownloadUrl(cloudinary, publicId, type);
+    const candidates =
+      options.signedUrl
+        ? [{ label: "injected", url: options.signedUrl, publicId, format: null }]
+        : buildSignedDownloadCandidates(cloudinary, publicId, type);
     console.log("signed_download=1");
+    console.log("download_candidates=" + candidates.length);
 
-    if (options.downloadFn) {
-      await options.downloadFn(signedUrl, encPath);
-    } else {
-      await downloadUrlToFile(signedUrl, encPath);
+    let signedUrl = null;
+    let downloadLabel = null;
+    let lastDownloadErr = null;
+    for (const cand of candidates) {
+      try {
+        if (options.downloadFn) {
+          await options.downloadFn(cand.url, encPath, cand);
+        } else {
+          await downloadUrlToFile(cand.url, encPath);
+        }
+        signedUrl = cand.url;
+        downloadLabel = cand.label;
+        break;
+      } catch (e) {
+        lastDownloadErr = e;
+        const msg = e && e.message ? String(e.message) : "";
+        // Only fall through on HTTP 404; other errors abort
+        if (!/download_http_404/.test(msg)) {
+          throw e;
+        }
+        try {
+          if (fs.existsSync(encPath)) fs.unlinkSync(encPath);
+        } catch {
+          /* ignore */
+        }
+      }
     }
+    if (!signedUrl) {
+      console.log("verify=fail");
+      console.log("reason=download_failed");
+      throw (
+        lastDownloadErr ||
+        Object.assign(new Error("download_failed"), { code: 4 })
+      );
+    }
+    console.log("download_variant=" + downloadLabel);
 
     const encBuf = fs.readFileSync(encPath);
     const encSha256 = crypto.createHash("sha256").update(encBuf).digest("hex");
@@ -445,6 +508,7 @@ module.exports = {
   pickNewest,
   downloadUrlToFile,
   buildSignedDownloadUrl,
+  buildSignedDownloadCandidates,
   gunzipToString,
   verifyLatestBackup,
 };
