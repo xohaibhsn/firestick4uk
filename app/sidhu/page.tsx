@@ -2367,7 +2367,8 @@ function AdminPageInner() {
   const updateStatus = (
     id: string,
     status: OrderStatus,
-    cancelReason?: CancelReason | null
+    cancelReason?: CancelReason | null,
+    baseStatus?: string
   ) => {
     const body: Record<string, unknown> = { order_id: id, status };
     if (status === "cancelled") {
@@ -2377,6 +2378,17 @@ function AdminPageInner() {
       }
       body.cancel_reason = cancelReason;
     }
+    const resolvedBase =
+      baseStatus != null && String(baseStatus).trim() !== ""
+        ? String(baseStatus)
+        : String(
+            (
+              orders.find((o) => o.id === id) ||
+              recentOrders.find((o) => o.id === id) ||
+              (orderModal && orderModal.id === id ? orderModal : null)
+            )?.status || ""
+          );
+    if (resolvedBase) body.base_status = resolvedBase;
     if (statusPatchInFlight.current.has(id)) return;
     statusPatchInFlight.current.add(id);
     fetch("/api/admin-orders", {
@@ -2387,6 +2399,16 @@ function AdminPageInner() {
       .then(async (r) => {
         if (r.status === 401) { handleSessionExpired(); return; }
         if (r.status === 403) { showPermError(); return; }
+        if (r.status === 409) {
+          const data = await r.json().catch(() => ({}));
+          const cur = data?.current_status || "unknown";
+          adminAlert(
+            `This order was updated by someone else (now ${cur}). The list has been refreshed — please try again.`
+          );
+          setOrderStatusSelectKey((k) => k + 1);
+          void refreshAfterOrderMutation();
+          return;
+        }
         if (!r.ok) {
           const data = await r.json().catch(() => ({}));
           adminAlert(data?.error || "Status update failed");
@@ -2424,7 +2446,7 @@ function AdminPageInner() {
       setOrderStatusSelectKey((k) => k + 1);
       return;
     }
-    updateStatus(id, status);
+    updateStatus(id, status, undefined, fromStatus);
   };
 
   const deleteOrder = async (orderId: string, total: string, status: string) => {
@@ -2607,13 +2629,18 @@ function AdminPageInner() {
 
   const deleteBlog = async (id: number) => {
     if (!(await askConfirm("Delete this blog post?"))) return;
-    const res = await fetch(`/api/blog?id=${id}`, { method: "DELETE", credentials: "include" }).then(r=>r.json()).catch(()=>({}));
+    const r = await fetch(`/api/blog?id=${id}`, { method: "DELETE", credentials: "include" });
+    const res = await r.json().catch(() => ({}));
     if (res.success) {
       setBlogPosts((prev) => prev.filter(p => p.id !== id));
       setBlogMsg("✅ Post deleted");
       fetchBlogs();
     } else {
-      setBlogMsg(`❌ ${res.error || "Delete failed"}`);
+      const errMsg = res.error || "Delete failed";
+      setBlogMsg(`❌ ${errMsg}`);
+      if (r.status === 400 || r.status === 404) {
+        adminAlert(errMsg);
+      }
     }
     setTimeout(()=>setBlogMsg(""),3000);
   };
@@ -4653,7 +4680,12 @@ function AdminPageInner() {
                 disabled={!cancelReasonDraft}
                 onClick={() => {
                   if (!cancelReasonDraft) return;
-                  updateStatus(cancelReasonModal.orderId, "cancelled", cancelReasonDraft);
+                  updateStatus(
+                    cancelReasonModal.orderId,
+                    "cancelled",
+                    cancelReasonDraft,
+                    cancelReasonModal.fromStatus
+                  );
                 }}
               >
                 Confirm cancel

@@ -645,17 +645,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      const before = await loadKeysSnapshot([key]);
-      const [fullRows]: any = await pool.query(
-        'SELECT content_key, content_value, content_type, page_name, label FROM site_content WHERE content_key=? LIMIT 1',
-        [key]
-      );
-      const row = fullRows?.[0];
-      if (row) {
-        const entityType = classifySiteContentEntityType([key]);
-        const conn = await pool.getConnection();
-        try {
-          await conn.beginTransaction();
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [fullRows]: any = await conn.query(
+          'SELECT content_key, content_value, content_type, page_name, label FROM site_content WHERE content_key=? FOR UPDATE',
+          [key]
+        );
+        const row = fullRows?.[0];
+        if (!row) {
+          await conn.rollback();
+        } else {
+          const entityType = classifySiteContentEntityType([key]);
           await recordContentRevision(
             {
               entityType,
@@ -686,15 +687,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           );
           await conn.query('DELETE FROM site_content WHERE content_key=?', [key]);
           await conn.commit();
-        } catch (txErr: any) {
-          try { await conn.rollback(); } catch { /* ignore */ }
-          if (txErr?.code === 'REVISION_TOO_LARGE') {
-            return res.status(400).json({ error: txErr.message });
-          }
-          throw txErr;
-        } finally {
-          conn.release();
         }
+      } catch (txErr: any) {
+        try { await conn.rollback(); } catch { /* ignore */ }
+        if (txErr?.code === 'REVISION_TOO_LARGE') {
+          return res.status(400).json({ error: txErr.message });
+        }
+        throw txErr;
+      } finally {
+        conn.release();
       }
 
       const { ip } = getRequestMeta(req);

@@ -228,8 +228,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const admin = await requireAdminPermission(req, res, "orders.manage");
       if (!admin) return;
 
-      const { order_id, status, cancel_reason: rawCancelReason } = req.body || {};
-      if (!order_id) return res.status(400).json({ error: "order_id required" });
+      const {
+        order_id: rawOrderId,
+        status,
+        cancel_reason: rawCancelReason,
+        base_status: rawBaseStatus,
+      } = req.body || {};
+      const order_id =
+        typeof rawOrderId === "string"
+          ? rawOrderId.trim()
+          : typeof rawOrderId === "number"
+            ? String(rawOrderId).trim()
+            : "";
+      if (!order_id || order_id.length > 64) {
+        return res.status(400).json({ error: "order_id required" });
+      }
       const newStatus = String(status || "").toLowerCase();
       if (!(ORDER_STATUSES as readonly string[]).includes(newStatus)) {
         return res.status(400).json({ error: "Invalid status" });
@@ -244,102 +257,160 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         nextReason = reasonCode;
       }
 
-      let prev: { order_id: string; status: unknown; cancel_reason: unknown } | null = null;
+      const baseStatusProvided =
+        rawBaseStatus !== undefined &&
+        rawBaseStatus !== null &&
+        String(rawBaseStatus).trim() !== "";
+      const expectedBaseStatus = baseStatusProvided
+        ? String(rawBaseStatus).trim().toLowerCase()
+        : null;
+
+      const conn = await pool.getConnection();
+      let oldStatus = "";
+      let committedChange = false;
       try {
-        const [prevRows]: any = await pool.query(
-          "SELECT order_id, status, cancel_reason FROM orders WHERE order_id = ? LIMIT 1",
-          [order_id]
-        );
-        prev = Array.isArray(prevRows) && prevRows[0] ? prevRows[0] : null;
-      } catch (error: any) {
-        if (error?.code === "ER_BAD_FIELD_ERROR") {
-          console.error("[admin-orders] status change blocked", error?.code || error?.name || "Error");
-          return res.status(500).json({
-            error: "Status could not be saved. Please contact the site admin.",
-          });
-        }
-        throw error;
-      }
-      if (!prev) return res.status(404).json({ error: "Order not found" });
+        await conn.beginTransaction();
 
-      const oldStatus = String(prev.status || "");
-      const oldReason =
-        prev.cancel_reason == null || prev.cancel_reason === ""
-          ? null
-          : String(prev.cancel_reason);
-
-      try {
-        await pool.query(
-          "UPDATE orders SET status = ?, cancel_reason = ? WHERE order_id = ?",
-          [newStatus, nextReason, order_id]
-        );
-      } catch (error: any) {
-        if (error?.code === "ER_BAD_FIELD_ERROR") {
-          console.error("[admin-orders] status change blocked", error?.code || error?.name || "Error");
-          return res.status(500).json({
-            error: "Status could not be saved. Please contact the site admin.",
-          });
-        }
-        throw error;
-      }
-
-      // Non-strict ENUM guard: MySQL may silently store '' when ENUM rejects the value.
-      let storedStatus = "";
-      let storedReason: string | null = null;
-      try {
-        const [checkRows]: any = await pool.query(
-          "SELECT status, cancel_reason FROM orders WHERE order_id = ? LIMIT 1",
-          [order_id]
-        );
-        const row = Array.isArray(checkRows) && checkRows[0] ? checkRows[0] : null;
-        storedStatus = row ? String(row.status ?? "") : "";
-        storedReason =
-          row?.cancel_reason == null || row.cancel_reason === ""
-            ? null
-            : String(row.cancel_reason);
-      } catch (error: any) {
-        if (error?.code === "ER_BAD_FIELD_ERROR") {
-          console.error("[admin-orders] status change blocked", error?.code || error?.name || "Error");
-          return res.status(500).json({
-            error: "Status could not be saved. Please contact the site admin.",
-          });
-        }
-        throw error;
-      }
-
-      const reasonOk =
-        newStatus === "cancelled"
-          ? storedReason === nextReason
-          : storedReason == null;
-      if (storedStatus !== newStatus || !reasonOk) {
+        let prev: { order_id: string; status: unknown; cancel_reason: unknown } | null =
+          null;
         try {
-          await pool.query(
+          const [prevRows]: any = await conn.query(
+            "SELECT order_id, status, cancel_reason FROM orders WHERE order_id = ? FOR UPDATE",
+            [order_id]
+          );
+          prev = Array.isArray(prevRows) && prevRows[0] ? prevRows[0] : null;
+        } catch (error: any) {
+          if (error?.code === "ER_BAD_FIELD_ERROR") {
+            await conn.rollback();
+            console.error(
+              "[admin-orders] status change blocked",
+              error?.code || error?.name || "Error"
+            );
+            return res.status(500).json({
+              error: "Status could not be saved. Please contact the site admin.",
+            });
+          }
+          throw error;
+        }
+        if (!prev) {
+          await conn.rollback();
+          return res.status(404).json({ error: "Order not found" });
+        }
+
+        oldStatus = String(prev.status || "");
+        const oldReason =
+          prev.cancel_reason == null || prev.cancel_reason === ""
+            ? null
+            : String(prev.cancel_reason);
+
+        if (
+          expectedBaseStatus != null &&
+          expectedBaseStatus !== oldStatus.toLowerCase()
+        ) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "stale",
+            current_status: oldStatus,
+          });
+        }
+
+        if (
+          oldStatus.toLowerCase() === newStatus &&
+          oldReason === nextReason
+        ) {
+          await conn.commit();
+          return res.status(200).json({ success: true, changed: 0 });
+        }
+
+        try {
+          await conn.query(
             "UPDATE orders SET status = ?, cancel_reason = ? WHERE order_id = ?",
-            [oldStatus || null, oldReason, order_id]
+            [newStatus, nextReason, order_id]
           );
         } catch (error: any) {
-          console.error(
-            "[admin-orders] status restore failed",
-            error?.code || error?.name || "Error"
-          );
+          if (error?.code === "ER_BAD_FIELD_ERROR") {
+            await conn.rollback();
+            console.error(
+              "[admin-orders] status change blocked",
+              error?.code || error?.name || "Error"
+            );
+            return res.status(500).json({
+              error: "Status could not be saved. Please contact the site admin.",
+            });
+          }
+          throw error;
         }
-        const { ip } = getRequestMeta(req);
-        await recordAdminAudit({
-          actor: admin,
-          action: "order.status_change_failed",
-          entityType: "order",
-          entityId: order_id,
-          summary: `Order status change failed ${oldStatus} → ${newStatus}`,
-          metadata: {
-            old_status: oldStatus,
-            requested_status: newStatus,
-            stored_status: storedStatus,
-            requested_cancel_reason: nextReason,
-            stored_cancel_reason: storedReason,
-          },
-          ip,
-        });
-        console.error("[admin-orders] status mismatch after update", "ER_ENUM_GUARD");
+
+        // Non-strict ENUM guard: MySQL may silently store '' when ENUM rejects the value.
+        let storedStatus = "";
+        let storedReason: string | null = null;
+        try {
+          const [checkRows]: any = await conn.query(
+            "SELECT status, cancel_reason FROM orders WHERE order_id = ? LIMIT 1",
+            [order_id]
+          );
+          const row = Array.isArray(checkRows) && checkRows[0] ? checkRows[0] : null;
+          storedStatus = row ? String(row.status ?? "") : "";
+          storedReason =
+            row?.cancel_reason == null || row.cancel_reason === ""
+              ? null
+              : String(row.cancel_reason);
+        } catch (error: any) {
+          if (error?.code === "ER_BAD_FIELD_ERROR") {
+            await conn.rollback();
+            console.error(
+              "[admin-orders] status change blocked",
+              error?.code || error?.name || "Error"
+            );
+            return res.status(500).json({
+              error: "Status could not be saved. Please contact the site admin.",
+            });
+          }
+          throw error;
+        }
+
+        const reasonOk =
+          newStatus === "cancelled"
+            ? storedReason === nextReason
+            : storedReason == null;
+        if (storedStatus !== newStatus || !reasonOk) {
+          await conn.rollback();
+          const { ip } = getRequestMeta(req);
+          await recordAdminAudit({
+            actor: admin,
+            action: "order.status_change_failed",
+            entityType: "order",
+            entityId: order_id,
+            summary: `Order status change failed ${oldStatus} → ${newStatus}`,
+            metadata: {
+              old_status: oldStatus,
+              requested_status: newStatus,
+              stored_status: storedStatus,
+              requested_cancel_reason: nextReason,
+              stored_cancel_reason: storedReason,
+            },
+            ip,
+          });
+          console.error("[admin-orders] status mismatch after update", "ER_ENUM_GUARD");
+          return res.status(500).json({
+            error: "Status could not be saved. Please contact the site admin.",
+          });
+        }
+
+        await conn.commit();
+        committedChange = true;
+      } catch (txErr) {
+        try {
+          await conn.rollback();
+        } catch {
+          /* ignore */
+        }
+        throw txErr;
+      } finally {
+        conn.release();
+      }
+
+      if (!committedChange) {
         return res.status(500).json({
           error: "Status could not be saved. Please contact the site admin.",
         });

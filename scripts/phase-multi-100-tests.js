@@ -109,18 +109,27 @@ function makeRes() {
 
 function makePool(handlers) {
   const calls = [];
+  async function runQuery(sql, params) {
+    calls.push({ sql: String(sql), params });
+    for (const h of handlers) {
+      if (h.match(String(sql), params || [])) {
+        if (h.throw) throw h.throw;
+        return h.result;
+      }
+    }
+    throw new Error("Unexpected SQL: " + String(sql).slice(0, 120));
+  }
+  const conn = {
+    beginTransaction: async () => {},
+    commit: async () => {},
+    rollback: async () => {},
+    release() {},
+    query: runQuery,
+  };
   return {
     calls,
-    query: async (sql, params) => {
-      calls.push({ sql: String(sql), params });
-      for (const h of handlers) {
-        if (h.match(String(sql), params || [])) {
-          if (h.throw) throw h.throw;
-          return h.result;
-        }
-      }
-      throw new Error("Unexpected SQL: " + String(sql).slice(0, 120));
-    },
+    query: runQuery,
+    getConnection: async () => conn,
   };
 }
 
@@ -345,25 +354,33 @@ function makePool(handlers) {
   {
     audits.length = 0;
     let step = 0;
+    async function runQuery(sql, params) {
+      pool.calls.push({ sql: String(sql), params });
+      const s = String(sql);
+      if (step === 0 && /SELECT order_id, status, cancel_reason/.test(s)) {
+        step = 1;
+        return [[{ order_id: "FK-2", status: "pending", cancel_reason: null }], []];
+      }
+      if (step === 1 && /UPDATE orders SET status/.test(s)) {
+        step = 2;
+        return [{ affectedRows: 1 }, undefined];
+      }
+      if (step === 2 && /SELECT status, cancel_reason/.test(s)) {
+        step = 3;
+        return [[{ status: "cancelled", cancel_reason: "cod_refused" }], []];
+      }
+      throw new Error("Unexpected SQL at step " + step + ": " + s.slice(0, 120));
+    }
     const pool = {
       calls: [],
-      query: async (sql, params) => {
-        pool.calls.push({ sql: String(sql), params });
-        const s = String(sql);
-        if (step === 0 && /SELECT order_id, status, cancel_reason/.test(s)) {
-          step = 1;
-          return [[{ order_id: "FK-2", status: "pending", cancel_reason: null }], []];
-        }
-        if (step === 1 && /UPDATE orders SET status/.test(s)) {
-          step = 2;
-          return [{ affectedRows: 1 }, undefined];
-        }
-        if (step === 2 && /SELECT status, cancel_reason/.test(s)) {
-          step = 3;
-          return [[{ status: "cancelled", cancel_reason: "cod_refused" }], []];
-        }
-        throw new Error("Unexpected SQL at step " + step + ": " + s.slice(0, 120));
-      },
+      query: runQuery,
+      getConnection: async () => ({
+        beginTransaction: async () => {},
+        commit: async () => {},
+        rollback: async () => {},
+        release() {},
+        query: runQuery,
+      }),
     };
     const handler = loadTs("pages/api/admin-orders.ts", baseStubs(pool)).default;
     const res = makeRes();
@@ -394,7 +411,7 @@ function makePool(handlers) {
     );
   }
 
-  // GUARD: stored '' after update → restore + 500
+  // GUARD: stored '' after update → rollback (no compensating UPDATE) + 500
   {
     audits.length = 0;
     const pool = makePool([
@@ -411,12 +428,6 @@ function makePool(handlers) {
       {
         match: (sql) => /SELECT status, cancel_reason FROM orders WHERE order_id/.test(sql),
         result: [[{ status: "", cancel_reason: null }], []],
-      },
-      {
-        match: (sql, params) =>
-          /UPDATE orders SET status = \?, cancel_reason = \?/.test(sql) &&
-          params[0] === "pending",
-        result: [{ affectedRows: 1 }, undefined],
       },
     ]);
     const handler = loadTs("pages/api/admin-orders.ts", baseStubs(pool)).default;
@@ -443,13 +454,13 @@ function makePool(handlers) {
     );
     ok(
       "guard_restores_previous",
-      pool.calls.some(
-        (c) =>
-          /UPDATE orders SET status/.test(c.sql) &&
-          c.params &&
-          c.params[0] === "pending" &&
-          c.params[1] === null
-      )
+      pool.calls.filter((c) => /UPDATE orders SET status/.test(c.sql)).length === 1 &&
+        !pool.calls.some(
+          (c) =>
+            /UPDATE orders SET status/.test(c.sql) &&
+            c.params &&
+            c.params[0] === "pending"
+        )
     );
     ok(
       "guard_audits_failed",
@@ -487,7 +498,7 @@ function makePool(handlers) {
     ok("missing_column_500", res.statusCode === 500);
     ok(
       "missing_column_no_update",
-      !pool.calls.some((c) => /UPDATE/i.test(c.sql))
+      !pool.calls.some((c) => /^\s*UPDATE\b/i.test(c.sql))
     );
   }
 

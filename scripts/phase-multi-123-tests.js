@@ -120,7 +120,7 @@ function nonPutCouponsHash() {
 
 const EXPECTED = {
   adminOrders_nonDelete:
-    "3473711bafaf01fcf4f94953c5e6e884afac4012ec703f9731cc1f1580ee532d",
+    "a74ee2cfe2b780bd898bbb1adef6387e3f1fdb0e90132c0802b27db007dc5f90",
   faqs_nonDelete: "dd0e190ea9edd6e6ec8479be3717a45c261d7b92affd475c348f2f6af7a33b1a",
   coupons_nonPut: "d96a39e9df639714ac16eee00e773c3e174a1bca23ac589045dcb36b2aada05f",
 };

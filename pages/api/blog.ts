@@ -140,45 +140,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'DELETE') {
       if (!admin) return;
-      const { id } = req.query;
-      const [prevRows]: any = await pool.query('SELECT * FROM blog_posts WHERE id = ? LIMIT 1', [id]);
-      const prev = Array.isArray(prevRows) && prevRows[0] ? prevRows[0] : null;
-      if (prev) {
-        const conn = await pool.getConnection();
-        try {
-          await conn.beginTransaction();
-          await recordContentRevision(
-            {
-              entityType: 'blog',
-              entityId: String(id),
-              entityLabel: String(prev.title || ''),
-              revisionAction: 'delete',
-              snapshot: snapshotBlog(prev),
-              changedFields: ['delete'],
-              actor: admin,
-            },
-            conn
-          );
-          await conn.query('DELETE FROM blog_posts WHERE id = ?', [id]);
-          await conn.commit();
-        } catch (txErr: any) {
-          try { await conn.rollback(); } catch { /* ignore */ }
-          if (txErr?.code === 'REVISION_TOO_LARGE') {
-            return res.status(400).json({ error: txErr.message });
-          }
-          throw txErr;
-        } finally {
-          conn.release();
-        }
-      } else {
-        await pool.query('DELETE FROM blog_posts WHERE id = ?', [id]);
+      const rawId = Array.isArray(req.query.id) ? req.query.id[0] : req.query.id;
+      const id = Number(rawId);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ error: 'invalid_id' });
       }
+
+      const conn = await pool.getConnection();
+      let prev: Record<string, unknown> | null = null;
+      try {
+        await conn.beginTransaction();
+        const [prevRows]: any = await conn.query(
+          'SELECT * FROM blog_posts WHERE id = ? FOR UPDATE',
+          [id]
+        );
+        prev = Array.isArray(prevRows) && prevRows[0] ? prevRows[0] : null;
+        if (!prev) {
+          await conn.rollback();
+          return res.status(404).json({ error: 'not_found' });
+        }
+        await recordContentRevision(
+          {
+            entityType: 'blog',
+            entityId: String(id),
+            entityLabel: String(prev.title || ''),
+            revisionAction: 'delete',
+            snapshot: snapshotBlog(prev),
+            changedFields: ['delete'],
+            actor: admin,
+          },
+          conn
+        );
+        await conn.query('DELETE FROM blog_posts WHERE id = ?', [id]);
+        await conn.commit();
+      } catch (txErr: any) {
+        try { await conn.rollback(); } catch { /* ignore */ }
+        if (txErr?.code === 'REVISION_TOO_LARGE') {
+          return res.status(400).json({ error: txErr.message });
+        }
+        throw txErr;
+      } finally {
+        conn.release();
+      }
+
       const { ip } = getRequestMeta(req);
       await recordAdminAudit({
         actor: admin,
         action: 'blog.deleted',
         entityType: 'blog',
-        entityId: id as string,
+        entityId: String(id),
         summary: `Deleted blog post ${prev?.title || id}`,
         ip,
       });
