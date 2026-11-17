@@ -37,7 +37,10 @@ const {
   CLOUDINARY_ENV_NAMES,
   parseStampFromPublicId,
 } = require("./offsite-db-backup");
-const { countRowsByTable, countSqlForbidden } = require("./sql-tuple-parser");
+const {
+  createInsertRowCounter,
+  countSqlForbidden,
+} = require("./sql-tuple-parser");
 
 const LIST_PREFIX = CLOUD_FOLDER + "/" + PUBLIC_ID_PREFIX;
 
@@ -199,6 +202,18 @@ async function gunzipToString(gzipBuf) {
     }
   });
   return Buffer.concat(chunks).toString("utf8");
+}
+
+/** Gunzip → quote-aware INSERT row counts (scanner state survives chunk boundaries). */
+async function gunzipCountRowsByTable(gzipBuf) {
+  const counter = createInsertRowCounter();
+  const gunzip = zlib.createGunzip();
+  await pipeline(Readable.from(gzipBuf), gunzip, async function consume(source) {
+    for await (const chunk of source) {
+      counter.write(chunk);
+    }
+  });
+  return counter.end();
 }
 
 /**
@@ -402,8 +417,25 @@ async function verifyLatestBackup(options = {}) {
       }
     }
 
-    const sql = await gunzipToString(gzipPlain);
-    const parsedTables = countRowsByTable(sql);
+    // Single gunzip pass: quote-aware row counts (state across chunks) + forbidden scan.
+    const counter = createInsertRowCounter();
+    const sqlChunks = [];
+    {
+      const gunzip = zlib.createGunzip();
+      await pipeline(
+        Readable.from(gzipPlain),
+        gunzip,
+        async function consume(source) {
+          for await (const chunk of source) {
+            const buf = Buffer.from(chunk);
+            sqlChunks.push(buf);
+            counter.write(buf);
+          }
+        }
+      );
+    }
+    const parsedTables = counter.end();
+    const sql = Buffer.concat(sqlChunks).toString("utf8");
     const forbidden = countSqlForbidden(sql);
 
     const manifestTables =
@@ -412,15 +444,31 @@ async function verifyLatestBackup(options = {}) {
         : {};
     const manifestTableNames = Object.keys(manifestTables).sort();
     const parsedTableNames = Object.keys(parsedTables).sort();
-    const allNames = Array.from(
-      new Set([...manifestTableNames, ...parsedTableNames])
-    ).sort();
+
+    // Equality only for tables with manifest rows > 0; empty tables listed separately.
+    const emptyManifestTables = manifestTableNames.filter(
+      (name) => Number(manifestTables[name] || 0) === 0
+    );
+    const nonEmptyManifestTables = manifestTableNames.filter(
+      (name) => Number(manifestTables[name] || 0) > 0
+    );
 
     const mismatches = [];
-    for (const name of allNames) {
+    for (const name of nonEmptyManifestTables) {
       const m = Number(manifestTables[name] || 0);
       const p = Number(parsedTables[name] || 0);
       if (m !== p) mismatches.push(name);
+    }
+    // Parsed tables unknown to the manifest (or with rows when manifest says empty).
+    for (const name of parsedTableNames) {
+      const m = Number(manifestTables[name] || 0);
+      const p = Number(parsedTables[name] || 0);
+      if (m === 0 && p > 0 && !mismatches.includes(name)) {
+        mismatches.push(name);
+      }
+      if (!(name in manifestTables) && !mismatches.includes(name)) {
+        mismatches.push(name);
+      }
     }
 
     const manifest_total_rows = Number(
@@ -434,6 +482,7 @@ async function verifyLatestBackup(options = {}) {
     );
 
     console.log("manifest_tables=" + manifestTableNames.length);
+    console.log("manifest_empty_tables=" + emptyManifestTables.length);
     console.log("manifest_total_rows=" + manifest_total_rows);
     console.log("parsed_tables=" + parsedTableNames.length);
     console.log("parsed_total_rows=" + parsed_total_rows);
@@ -445,7 +494,6 @@ async function verifyLatestBackup(options = {}) {
     const ok =
       gcm_ok &&
       mismatches.length === 0 &&
-      manifestTableNames.length === parsedTableNames.length &&
       manifest_total_rows === parsed_total_rows &&
       forbidden.use_database === 0 &&
       forbidden.create_database === 0 &&
@@ -466,6 +514,7 @@ async function verifyLatestBackup(options = {}) {
       enc_bytes: encBuf.length,
       enc_sha256: encSha256,
       manifest_tables: manifestTableNames.length,
+      manifest_empty_tables: emptyManifestTables.length,
       manifest_total_rows,
       parsed_tables: parsedTableNames.length,
       parsed_total_rows,
@@ -510,6 +559,7 @@ module.exports = {
   buildSignedDownloadUrl,
   buildSignedDownloadCandidates,
   gunzipToString,
+  gunzipCountRowsByTable,
   verifyLatestBackup,
 };
 
