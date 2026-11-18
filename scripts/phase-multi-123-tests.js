@@ -121,9 +121,10 @@ function nonPutCouponsHash() {
 const EXPECTED = {
   adminOrders_nonDelete:
     "a74ee2cfe2b780bd898bbb1adef6387e3f1fdb0e90132c0802b27db007dc5f90",
-  faqs_nonDelete: "dd0e190ea9edd6e6ec8479be3717a45c261d7b92affd475c348f2f6af7a33b1a",
-  // Refresh MULTI-126: DELETE affectedRows hardening intentionally changes non-PUT surface.
-  coupons_nonPut: "3ed00d3f93c9b4e44a382f7e1b87c5752ee41833d9fbab5ec9cf108419a91be0",
+  // Refresh MULTI-137: FAQ reorder optional base_hashes stale guard.
+  faqs_nonDelete: "fb4d12f15e7d9740a09c58ab9e4997767e4c4d01bdd3f2b5c01ae4dc8ac63875",
+  // Refresh MULTI-137: admin GET base_hash + PUT transactional stale guard.
+  coupons_nonPut: "21b876c9c7d8cdb0bfc1e78d2012eb8605982a08cf4755f6c686843db0215b92",
 };
 
 // ─── E1: admin-orders DELETE ───────────────────────────────────────────────
@@ -501,42 +502,96 @@ function makeCouponsHarness(opts = {}) {
   const calls = [];
   const audits = [];
 
+  async function runQuery(sqlOrObj, maybeParams) {
+    const sql =
+      typeof sqlOrObj === "string" ? sqlOrObj : String(sqlOrObj?.sql || "");
+    const params = sqlOrObj?.values || maybeParams || [];
+    calls.push({ sql, params });
+    if (/UPDATE coupons SET code=/i.test(sql)) {
+      if (mode === "dup") {
+        const err = new Error("Duplicate entry");
+        err.code = "ER_DUP_ENTRY";
+        err.errno = 1062;
+        throw err;
+      }
+      if (mode === "other") {
+        const err = new Error("boom");
+        err.code = "ER_BAD_FIELD_ERROR";
+        throw err;
+      }
+      if (mode === "missing") {
+        return [{ affectedRows: 0 }, []];
+      }
+      return [{ affectedRows: 1 }, []];
+    }
+    if (/INSERT INTO coupons/i.test(sql)) {
+      return [{ insertId: 1, affectedRows: 1 }, []];
+    }
+    if (/SELECT \* FROM coupons WHERE id=\? FOR UPDATE/i.test(sql)) {
+      if (mode === "missing") return [[], []];
+      return [
+        [
+          {
+            id: 1,
+            code: "SAVE10",
+            type: "percentage",
+            value: 10,
+            minimum_order: 0,
+            usage_limit: null,
+            expires_at: null,
+            is_active: 1,
+            used_count: 0,
+            created_at: "2020-01-01",
+          },
+        ],
+        [],
+      ];
+    }
+    if (/SELECT \* FROM coupons WHERE id=\?/i.test(sql)) {
+      return [
+        [
+          {
+            id: 1,
+            code: "SAVE10",
+            type: "percentage",
+            value: 10,
+            minimum_order: 0,
+            usage_limit: null,
+            expires_at: null,
+            is_active: 1,
+            used_count: 0,
+            created_at: "2020-01-01",
+          },
+        ],
+        [],
+      ];
+    }
+    if (/SELECT \* FROM coupons/i.test(sql)) {
+      return [[], []];
+    }
+    if (/SELECT id, code FROM coupons/i.test(sql)) {
+      return [[{ id: 1, code: "SAVE10" }], []];
+    }
+    if (/DELETE FROM coupons/i.test(sql)) {
+      return [{ affectedRows: 1 }, []];
+    }
+    return [[], []];
+  }
+
   const pool = {
     async query(sqlOrObj, maybeParams) {
-      const sql =
-        typeof sqlOrObj === "string" ? sqlOrObj : String(sqlOrObj?.sql || "");
-      const params = sqlOrObj?.values || maybeParams || [];
-      calls.push({ sql, params });
-      if (/UPDATE coupons SET code=/i.test(sql)) {
-        if (mode === "dup") {
-          const err = new Error("Duplicate entry");
-          err.code = "ER_DUP_ENTRY";
-          err.errno = 1062;
-          throw err;
-        }
-        if (mode === "other") {
-          const err = new Error("boom");
-          err.code = "ER_BAD_FIELD_ERROR";
-          throw err;
-        }
-        if (mode === "missing") {
-          return [{ affectedRows: 0 }, []];
-        }
-        return [{ affectedRows: 1 }, []];
-      }
-      if (/INSERT INTO coupons/i.test(sql)) {
-        return [{ insertId: 1, affectedRows: 1 }, []];
-      }
-      if (/SELECT \* FROM coupons/i.test(sql)) {
-        return [[], []];
-      }
-      if (/SELECT id, code FROM coupons/i.test(sql)) {
-        return [[{ id: 1, code: "SAVE10" }], []];
-      }
-      if (/DELETE FROM coupons/i.test(sql)) {
-        return [{ affectedRows: 1 }, []];
-      }
-      return [[], []];
+      return runQuery(sqlOrObj, maybeParams);
+    },
+    async getConnection() {
+      return {
+        async query(sqlOrObj, maybeParams) {
+          return runQuery(sqlOrObj, maybeParams);
+        },
+        async beginTransaction() {},
+        async commit() {},
+        async rollback() {},
+        release() {},
+      };
     },
   };
 

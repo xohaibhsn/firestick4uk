@@ -72,12 +72,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(400).json({ error: 'Invalid id list' });
         }
 
+        const rawBaseHashes = req.body?.base_hashes;
+        const forceReorder = req.body?.force === true;
+        const baseHashes =
+          rawBaseHashes != null &&
+          typeof rawBaseHashes === 'object' &&
+          !Array.isArray(rawBaseHashes)
+            ? (rawBaseHashes as Record<string, unknown>)
+            : null;
+
         const conn = await pool.getConnection();
         try {
           await conn.beginTransaction();
-          const [existingRows]: any = await conn.query('SELECT id FROM faqs FOR UPDATE');
-          const existing = new Set(
-            (Array.isArray(existingRows) ? existingRows : []).map((r: any) => Number(r.id))
+          const [existingRows]: any = await conn.query('SELECT * FROM faqs FOR UPDATE');
+          const existingList = Array.isArray(existingRows) ? existingRows : [];
+          const existing = new Set(existingList.map((r: any) => Number(r.id)));
+          const byId = new Map(
+            existingList.map((r: any) => [Number(r.id), r as Record<string, unknown>])
           );
           if (ids.length !== existing.size) {
             await conn.rollback();
@@ -87,6 +98,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             if (!existing.has(id)) {
               await conn.rollback();
               return res.status(400).json({ error: 'Invalid id list' });
+            }
+          }
+
+          if (baseHashes && !forceReorder) {
+            for (const id of ids) {
+              const row = byId.get(id);
+              const expected = baseHashes[id] ?? baseHashes[String(id)];
+              if (
+                typeof expected !== 'string' ||
+                !row ||
+                faqRowBaseHash(row) !== expected
+              ) {
+                await conn.rollback();
+                return res.status(409).json({
+                  error: 'stale',
+                  message:
+                    'FAQs were changed by someone else - list reloaded, please reorder again.',
+                });
+              }
             }
           }
 

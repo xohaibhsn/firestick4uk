@@ -205,7 +205,21 @@ ok("api_no_truthy_is_active", !/is_active\s*\?\s*1\s*:\s*0/.test(api));
 ok("api_duplicate_409", /Coupon code already exists/.test(api) && /1062|ER_DUP_ENTRY/.test(api));
 ok("api_put_404", /Coupon not found/.test(api));
 ok("api_still_uses_calculateCouponDiscount", /calculateCouponDiscount/.test(api));
-ok("api_no_for_update_in_preview", !/FOR UPDATE/.test(api));
+// MULTI-137: admin PUT uses FOR UPDATE; public validate must stay free of it.
+{
+  const validateStart = api.indexOf("action === 'validate'");
+  const adminGate = api.indexOf(
+    "requireAdminPermission(req, res, 'coupons.manage')"
+  );
+  const validateSlice =
+    validateStart >= 0 && adminGate > validateStart
+      ? api.slice(validateStart, adminGate)
+      : "";
+  ok(
+    "api_no_for_update_in_preview",
+    validateSlice.length > 0 && !/FOR UPDATE/.test(validateSlice)
+  );
+}
 
 const orders = read("pages/api/orders.ts");
 ok("orders_for_update_intact", /FOR UPDATE/.test(orders) && /evaluateLockedCoupon/.test(orders));

@@ -153,6 +153,26 @@ const APPROVED = new Set([
   "scripts/phase-ads-conv-70-tests.js",
   "scripts/phase-csp-report-only-tests.js",
   "scripts/phase-proc-clarity-71-tests.js",
+  // F4UK-MULTI-137 stale-write guards + coupled plumbing.
+  "lib/couponBaseHash.ts",
+  "lib/reviewModerationHash.ts",
+  "pages/api/coupons.ts",
+  "pages/api/faqs.ts",
+  "pages/api/admin-reviews.ts",
+  "app/sidhu/page.tsx",
+  "components/sidhu/ReviewsPanel.tsx",
+  "scripts/phase-multi-137-tests.js",
+  "scripts/phase-multi-97-tests.js",
+  "scripts/phase-multi-114-tests.js",
+  "scripts/phase-multi-116-tests.js",
+  "scripts/phase-multi-123-tests.js",
+  "scripts/phase-multi-126-tests.js",
+  "scripts/phase-multi-130-tests.js",
+  "scripts/phase-multi-131-tests.js",
+  "scripts/phase-multi-132-tests.js",
+  "scripts/phase-multi-133-tests.js",
+  "scripts/phase-coupon-validation-tests.js",
+  "scripts/phase-multi-105-tests.js",
 ]);
 
 const NOT_APPROVED = [
@@ -496,15 +516,26 @@ const NOT_APPROVED = [
     ok("zero_diff_not_approved_list", bad.length === 0, bad.join(",") || "clean");
   }
   {
+    const MULTI137_API_OK = new Set([
+      "pages/api/coupons.ts",
+      "pages/api/faqs.ts",
+      "pages/api/admin-reviews.ts",
+    ]);
     const r = spawnSync(
       "git",
       ["diff", "--name-only", BASE_SHA, "--", "pages/api"],
       { cwd: ROOT, encoding: "utf8" }
     );
-    const names = (r.stdout || "")
+    const workingApi = spawnSync(
+      "git",
+      ["diff", "--name-only", "HEAD", "--", "pages/api"],
+      { cwd: ROOT, encoding: "utf8" }
+    );
+    const names = `${r.stdout || ""}\n${workingApi.stdout || ""}`
       .split(/\r?\n/)
       .map((s) => s.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((n) => !MULTI137_API_OK.has(n));
     ok("zero_pages_api_diff", names.length === 0, names.join(",") || "clean");
   }
 

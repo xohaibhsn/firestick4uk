@@ -3202,16 +3202,28 @@ function AdminPageInner() {
     if (!faqOrderDirty) return;
     if (!(await askConfirm("Save the new FAQ order?"))) return;
     const ids = faqs.map((f) => f.id);
+    const base_hashes = Object.fromEntries(
+      faqs
+        .map((f) => [f.id, f.base_hash] as const)
+        .filter(([, h]) => typeof h === "string")
+    );
     const res = await fetch("/api/faqs", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "reorder", ids }),
-    }).then((r) => r.json()).catch(() => ({}));
+      body: JSON.stringify({ action: "reorder", ids, base_hashes }),
+    }).then(async (r) => {
+      const body = await r.json().catch(() => ({}));
+      return { status: r.status, ...body };
+    }).catch(() => ({}));
     if (res.success) {
       setFaqMsg("✅ FAQ order saved");
       setFaqOrderDirty(false);
       // Refresh list so base_hash values match post-reorder sort_order.
+      void loadFaqs();
+    } else if (res.status === 409 && res.error === "stale") {
+      setFaqMsg(`❌ ${res.message || "FAQs changed elsewhere - reloaded"}`);
+      setFaqOrderDirty(false);
       void loadFaqs();
     } else {
       setFaqMsg(`❌ ${res.error || "Reorder failed"}`);

@@ -13,6 +13,7 @@ import { setAdminNoStore } from "../../lib/adminNoStore";
 import { validateReviewFields } from "../../lib/customerReviews";
 import { reviewTextHash } from "../../lib/customerReviewsHash";
 import { clearPublicReviewsCache } from "../../lib/customerReviewsServer";
+import { reviewModerationBaseHash } from "../../lib/reviewModerationHash";
 
 const PAGE_SIZE = 20;
 
@@ -34,6 +35,12 @@ function parseId(raw: unknown): number | null {
   const n = typeof raw === "number" ? raw : Number(raw);
   if (!Number.isInteger(n) || n <= 0) return null;
   return n;
+}
+
+function withAdminReviewBaseHash<T extends Record<string, unknown>>(
+  row: T
+): T & { base_hash: string } {
+  return { ...row, base_hash: reviewModerationBaseHash(row) };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -75,8 +82,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         [...params, PAGE_SIZE, offset]
       );
 
+      const items = (Array.isArray(rows) ? rows : []).map((row: any) =>
+        withAdminReviewBaseHash(row as Record<string, unknown>)
+      );
+
       return res.status(200).json({
-        items: Array.isArray(rows) ? rows : [],
+        items,
         total,
         page,
         pageSize: PAGE_SIZE,
@@ -97,91 +108,146 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: "Invalid action" });
       }
 
-      const [existingRows]: any = await pool.query(
-        `SELECT ${ADMIN_SELECT} FROM customer_reviews WHERE id = ? LIMIT 1`,
-        [id]
-      );
-      const existing = Array.isArray(existingRows) ? existingRows[0] : null;
-      if (!existing) return res.status(404).json({ error: "Not found" });
-
       const { ip } = getRequestMeta(req);
       const now = mysqlNow3();
       const moderator = String(admin.name || "Admin").slice(0, 100);
 
-      if (action === "approve" || action === "reject") {
-        const newStatus = action === "approve" ? "approved" : "rejected";
-        await pool.query(
-          `UPDATE customer_reviews
-           SET status = ?, moderated_at = ?, moderated_by = ?
-           WHERE id = ?`,
-          [newStatus, now, moderator, id]
+      const conn = await pool.getConnection();
+      let responsePayload: Record<string, unknown> | null = null;
+      let auditAction: string | null = null;
+      let auditSummary: string | null = null;
+      let auditMetadata: Record<string, unknown> | undefined;
+      try {
+        await conn.beginTransaction();
+        const [existingRows]: any = await conn.query(
+          `SELECT ${ADMIN_SELECT} FROM customer_reviews WHERE id = ? LIMIT 1 FOR UPDATE`,
+          [id]
         );
-        clearPublicReviewsCache();
+        const existing = Array.isArray(existingRows) ? existingRows[0] : null;
+        if (!existing) {
+          await conn.rollback();
+          return res.status(404).json({ error: "Not found" });
+        }
+
+        if (action === "approve" || action === "reject") {
+          const expectedStatus = body.expected_status;
+          if (
+            typeof expectedStatus === "string" &&
+            expectedStatus !== existing.status
+          ) {
+            await conn.rollback();
+            return res.status(409).json({
+              error: "This review was already moderated by someone else.",
+              code: "stale",
+              current_status: existing.status,
+            });
+          }
+
+          const newStatus = action === "approve" ? "approved" : "rejected";
+          await conn.query(
+            `UPDATE customer_reviews
+             SET status = ?, moderated_at = ?, moderated_by = ?
+             WHERE id = ?`,
+            [newStatus, now, moderator, id]
+          );
+          await conn.commit();
+          responsePayload = { success: true, status: newStatus };
+          auditAction =
+            action === "approve" ? "review.approved" : "review.rejected";
+          auditSummary = `${action === "approve" ? "Approved" : "Rejected"} review #${id}`;
+          auditMetadata = { action };
+        } else {
+          // edit
+          const editNote = String(body.edit_note || "").trim();
+          if (!editNote) {
+            await conn.rollback();
+            return res.status(400).json({ error: "edit_note is required." });
+          }
+          if (editNote.length > 255) {
+            await conn.rollback();
+            return res.status(400).json({ error: "edit_note is too long." });
+          }
+
+          const bodyBaseHash = body.base_hash;
+          if (
+            typeof bodyBaseHash === "string" &&
+            bodyBaseHash !==
+              reviewModerationBaseHash(existing as Record<string, unknown>)
+          ) {
+            await conn.rollback();
+            return res.status(409).json({
+              error:
+                "This review was changed by someone else - reloaded, try again.",
+              code: "stale",
+              current_status: existing.status,
+            });
+          }
+
+          const validated = validateReviewFields({
+            display_name:
+              body.display_name != null ? body.display_name : existing.display_name,
+            rating: body.rating != null ? body.rating : existing.rating,
+            review_text:
+              body.review_text != null ? body.review_text : existing.review_text,
+          });
+          if (!validated.ok) {
+            await conn.rollback();
+            return res.status(400).json({ error: validated.error });
+          }
+
+          const originalText =
+            existing.original_text != null &&
+            String(existing.original_text).length > 0
+              ? existing.original_text
+              : existing.review_text;
+          const textHash = reviewTextHash(validated.review_text);
+
+          await conn.query(
+            `UPDATE customer_reviews
+             SET display_name = ?, rating = ?, review_text = ?, original_text = ?,
+                 text_hash = ?, edited_at = ?, edit_note = ?
+             WHERE id = ?`,
+            [
+              validated.display_name,
+              validated.rating,
+              validated.review_text,
+              originalText,
+              textHash,
+              now,
+              editNote.slice(0, 255),
+              id,
+            ]
+          );
+          await conn.commit();
+          responsePayload = { success: true };
+          auditAction = "review.edited";
+          auditSummary = `Edited review #${id}`;
+          auditMetadata = { action: "edit", edit_note: editNote.slice(0, 255) };
+        }
+      } catch (txErr) {
+        try {
+          await conn.rollback();
+        } catch {
+          /* ignore */
+        }
+        throw txErr;
+      } finally {
+        conn.release();
+      }
+
+      clearPublicReviewsCache();
+      if (auditAction && auditSummary) {
         await recordAdminAudit({
           actor: admin,
-          action: action === "approve" ? "review.approved" : "review.rejected",
+          action: auditAction,
           entityType: "customer_review",
           entityId: id,
-          summary: `${action === "approve" ? "Approved" : "Rejected"} review #${id}`,
-          metadata: { action },
+          summary: auditSummary,
+          metadata: auditMetadata,
           ip,
         });
-        return res.status(200).json({ success: true, status: newStatus });
       }
-
-      // edit
-      const editNote = String(body.edit_note || "").trim();
-      if (!editNote) {
-        return res.status(400).json({ error: "edit_note is required." });
-      }
-      if (editNote.length > 255) {
-        return res.status(400).json({ error: "edit_note is too long." });
-      }
-
-      const validated = validateReviewFields({
-        display_name:
-          body.display_name != null ? body.display_name : existing.display_name,
-        rating: body.rating != null ? body.rating : existing.rating,
-        review_text:
-          body.review_text != null ? body.review_text : existing.review_text,
-      });
-      if (!validated.ok) {
-        return res.status(400).json({ error: validated.error });
-      }
-
-      const originalText =
-        existing.original_text != null && String(existing.original_text).length > 0
-          ? existing.original_text
-          : existing.review_text;
-      const textHash = reviewTextHash(validated.review_text);
-
-      await pool.query(
-        `UPDATE customer_reviews
-         SET display_name = ?, rating = ?, review_text = ?, original_text = ?,
-             text_hash = ?, edited_at = ?, edit_note = ?
-         WHERE id = ?`,
-        [
-          validated.display_name,
-          validated.rating,
-          validated.review_text,
-          originalText,
-          textHash,
-          now,
-          editNote.slice(0, 255),
-          id,
-        ]
-      );
-      clearPublicReviewsCache();
-      await recordAdminAudit({
-        actor: admin,
-        action: "review.edited",
-        entityType: "customer_review",
-        entityId: id,
-        summary: `Edited review #${id}`,
-        metadata: { action: "edit", edit_note: editNote.slice(0, 255) },
-        ip,
-      });
-      return res.status(200).json({ success: true });
+      return res.status(200).json(responsePayload || { success: true });
     }
 
     if (req.method === "DELETE") {
@@ -194,15 +260,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
       if (!id) return res.status(400).json({ error: "id required" });
 
-      const [existingRows]: any = await pool.query(
-        `SELECT id FROM customer_reviews WHERE id = ? LIMIT 1`,
-        [id]
-      );
-      if (!Array.isArray(existingRows) || !existingRows.length) {
-        return res.status(404).json({ error: "Not found" });
+      const expectedRaw = Array.isArray(req.query.expected_status)
+        ? req.query.expected_status[0]
+        : req.query.expected_status;
+      const expectedStatus =
+        typeof expectedRaw === "string" ? expectedRaw : undefined;
+
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [existingRows]: any = await conn.query(
+          `SELECT ${ADMIN_SELECT} FROM customer_reviews WHERE id = ? LIMIT 1 FOR UPDATE`,
+          [id]
+        );
+        if (!Array.isArray(existingRows) || !existingRows.length) {
+          await conn.rollback();
+          return res.status(404).json({ error: "Not found" });
+        }
+        const existing = existingRows[0];
+        if (
+          typeof expectedStatus === "string" &&
+          expectedStatus !== existing.status
+        ) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: "This review was already moderated by someone else.",
+            code: "stale",
+            current_status: existing.status,
+          });
+        }
+
+        await conn.query(`DELETE FROM customer_reviews WHERE id = ?`, [id]);
+        await conn.commit();
+      } catch (txErr) {
+        try {
+          await conn.rollback();
+        } catch {
+          /* ignore */
+        }
+        throw txErr;
+      } finally {
+        conn.release();
       }
 
-      await pool.query(`DELETE FROM customer_reviews WHERE id = ?`, [id]);
       clearPublicReviewsCache();
 
       const { ip } = getRequestMeta(req);

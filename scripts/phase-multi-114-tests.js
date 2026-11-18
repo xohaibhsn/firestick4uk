@@ -155,8 +155,8 @@ function makeHarness() {
       }
       return [{ affectedRows: row ? 1 : 0 }, []];
     }
-    if (/SELECT id FROM faqs FOR UPDATE/i.test(s)) {
-      return [rows.map((r) => ({ id: r.id })), []];
+    if (/SELECT \* FROM faqs FOR UPDATE/i.test(s) || /SELECT id FROM faqs FOR UPDATE/i.test(s)) {
+      return [rows.map((r) => ({ ...r })), []];
     }
     if (/^UPDATE faqs SET sort_order = \? WHERE id = \?/i.test(s)) {
       stats.updates += 1;
@@ -583,11 +583,14 @@ async function invoke(handler, req) {
     postBlock.indexOf("action === 'reorder'"),
     postBlock.indexOf("const { question, answer, category, sort_order }")
   );
+  // MULTI-137: reorder gained optional base_hashes stale guard (still FOR UPDATE TX).
   ok(
-    "source_reorder_unchanged",
+    "source_reorder_stale_guard",
     reorderBlock.length > 0 &&
-      /FOR UPDATE/.test(reorderBlock) &&
-      !/base_hash|baseHash|\bforce\b/.test(reorderBlock)
+      /SELECT \* FROM faqs FOR UPDATE/.test(reorderBlock) &&
+      /base_hashes/.test(reorderBlock) &&
+      /error:\s*'stale'/.test(reorderBlock) &&
+      /body\.force === true|forceReorder/.test(reorderBlock)
   );
   ok(
     "source_post_create_unchanged",

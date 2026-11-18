@@ -426,6 +426,17 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "components/TrackingConsent.tsx",
     "scripts/phase-multi-136-tests.js",
   ]);
+  // F4UK-MULTI-137: stale-write guards (coupons / FAQ reorder / review moderation).
+  const MULTI137_OK = new Set([
+    "lib/couponBaseHash.ts",
+    "lib/reviewModerationHash.ts",
+    "pages/api/coupons.ts",
+    "pages/api/faqs.ts",
+    "pages/api/admin-reviews.ts",
+    "app/sidhu/page.tsx",
+    "components/sidhu/ReviewsPanel.tsx",
+    "scripts/phase-multi-137-tests.js",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -435,9 +446,15 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       !MULTI132_OK.has(n) &&
       !MULTI133_OK.has(n) &&
       !MULTI135_OK.has(n) &&
-      !MULTI136_OK.has(n)
+      !MULTI136_OK.has(n) &&
+      !MULTI137_OK.has(n)
   );
-  ok("no_pages_api_changes", apiTouched.length === 0, apiTouched.join(","));
+  const apiTouchedUnexpected = apiTouched.filter((n) => !MULTI137_OK.has(n));
+  ok(
+    "no_pages_api_changes",
+    apiTouchedUnexpected.length === 0,
+    apiTouchedUnexpected.join(",")
+  );
   ok(
     "no_public_app_component_changes",
     publicTouched.length === 0,
@@ -470,6 +487,13 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "scripts/phase-multi-133-tests.js",
     "scripts/phase-multi-135-tests.js",
     "scripts/phase-multi-136-tests.js",
+    "scripts/phase-multi-137-tests.js",
+    "scripts/phase-multi-97-tests.js",
+    "scripts/phase-multi-114-tests.js",
+    "scripts/phase-multi-123-tests.js",
+    "scripts/phase-multi-126-tests.js",
+    "scripts/phase-coupon-validation-tests.js",
+    "scripts/phase-multi-105-tests.js",
   ]);
   const unexpected = [...new Set(allChanged)].filter((n) => {
     if (
@@ -477,6 +501,7 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       MULTI133_OK.has(n) ||
       MULTI135_OK.has(n) ||
       MULTI136_OK.has(n) ||
+      MULTI137_OK.has(n) ||
       PLUMBING_OK.has(n)
     ) {
       return false;
@@ -488,7 +513,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       n !== "lib/productAdminBulk.ts" &&
       !MULTI133_OK.has(n) &&
       !MULTI135_OK.has(n) &&
-      !MULTI136_OK.has(n)
+      !MULTI136_OK.has(n) &&
+      !MULTI137_OK.has(n)
     ) {
       return true;
     }
@@ -497,7 +523,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       n !== "components/admin/ProductBulkBar.tsx" &&
       n !== "components/admin/ProductListToolbar.tsx" &&
       n !== "components/admin/ProductPreviewPane.tsx" &&
-      !MULTI136_OK.has(n)
+      !MULTI136_OK.has(n) &&
+      !MULTI137_OK.has(n)
     ) {
       return true;
     }

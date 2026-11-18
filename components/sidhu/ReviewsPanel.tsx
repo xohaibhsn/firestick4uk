@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import type { AdminCustomerReview, CustomerReviewStatus } from "@/lib/customerReviews";
 
+type ReviewItem = AdminCustomerReview & { base_hash?: string };
+
 type ListResponse = {
-  items: AdminCustomerReview[];
+  items: ReviewItem[];
   total: number;
   page: number;
   pageSize: number;
@@ -41,14 +43,14 @@ export default function ReviewsPanel({
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
   const [showOriginalIds, setShowOriginalIds] = useState<Record<number, boolean>>({});
-  const [editTarget, setEditTarget] = useState<AdminCustomerReview | null>(null);
+  const [editTarget, setEditTarget] = useState<ReviewItem | null>(null);
   const [editName, setEditName] = useState("");
   const [editRating, setEditRating] = useState(5);
   const [editText, setEditText] = useState("");
   const [editNote, setEditNote] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<AdminCustomerReview | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ReviewItem | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const editTitleId = useId();
   const deleteTitleId = useId();
@@ -115,25 +117,30 @@ export default function ReviewsPanel({
   async function patchAction(
     id: number,
     action: "approve" | "reject",
+    expectedStatus: CustomerReviewStatus
   ) {
     setMsg(null);
     const res = await fetch("/api/admin-reviews", {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, action }),
+      body: JSON.stringify({ id, action, expected_status: expectedStatus }),
     });
     if (handleAuth(res)) return;
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
       setMsg((j as any).error || "Action failed.");
+      if (res.status === 409) {
+        await load();
+        await refreshPendingBadge();
+      }
       return;
     }
     await load();
     await refreshPendingBadge();
   }
 
-  function openEdit(item: AdminCustomerReview) {
+  function openEdit(item: ReviewItem) {
     setEditTarget(item);
     setEditName(item.display_name);
     setEditRating(Number(item.rating));
@@ -162,12 +169,17 @@ export default function ReviewsPanel({
           rating: editRating,
           review_text: editText,
           edit_note: editNote.trim(),
+          base_hash: editTarget.base_hash,
         }),
       });
       if (handleAuth(res)) return;
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
         setEditError((j as any).error || "Edit failed.");
+        if (res.status === 409) {
+          await load();
+          await refreshPendingBadge();
+        }
         return;
       }
       setEditTarget(null);
@@ -181,7 +193,11 @@ export default function ReviewsPanel({
     if (!deleteTarget) return;
     setDeleteBusy(true);
     try {
-      const res = await fetch(`/api/admin-reviews?id=${deleteTarget.id}`, {
+      const qs = new URLSearchParams({
+        id: String(deleteTarget.id),
+        expected_status: deleteTarget.status,
+      });
+      const res = await fetch(`/api/admin-reviews?${qs.toString()}`, {
         method: "DELETE",
         credentials: "include",
       });
@@ -189,6 +205,10 @@ export default function ReviewsPanel({
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         setMsg((j as any).error || "Delete failed.");
+        if (res.status === 409) {
+          await load();
+          await refreshPendingBadge();
+        }
         return;
       }
       setDeleteTarget(null);
@@ -364,7 +384,7 @@ export default function ReviewsPanel({
                       type="button"
                       className="btn-primary"
                       style={{ fontSize: 13 }}
-                      onClick={() => void patchAction(item.id, "approve")}
+                      onClick={() => void patchAction(item.id, "approve", item.status)}
                     >
                       Approve
                     </button>
@@ -374,7 +394,7 @@ export default function ReviewsPanel({
                       type="button"
                       className="btn-secondary"
                       style={{ fontSize: 13 }}
-                      onClick={() => void patchAction(item.id, "reject")}
+                      onClick={() => void patchAction(item.id, "reject", item.status)}
                     >
                       Reject
                     </button>

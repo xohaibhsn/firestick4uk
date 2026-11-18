@@ -500,6 +500,17 @@ async function main() {
     "components/TrackingConsent.tsx",
     "scripts/phase-multi-136-tests.js",
   ]);
+  // F4UK-MULTI-137: stale-write guards (coupons / FAQ reorder / review moderation).
+  const MULTI137_OK = new Set([
+    "lib/couponBaseHash.ts",
+    "lib/reviewModerationHash.ts",
+    "pages/api/coupons.ts",
+    "pages/api/faqs.ts",
+    "pages/api/admin-reviews.ts",
+    "app/sidhu/page.tsx",
+    "components/sidhu/ReviewsPanel.tsx",
+    "scripts/phase-multi-137-tests.js",
+  ]);
   const dirtyNames = (diffCheck.stdout || "")
     .split(/\r?\n/)
     .map((s) => s.trim())
@@ -509,7 +520,8 @@ async function main() {
         !MULTI132_OK.has(n) &&
         !MULTI133_OK.has(n) &&
         !MULTI135_OK.has(n) &&
-        !MULTI136_OK.has(n)
+        !MULTI136_OK.has(n) &&
+        !MULTI137_OK.has(n)
     );
   ok("no_app_tree_diff", dirtyNames.length === 0, dirtyNames.join(",") || "clean");
 

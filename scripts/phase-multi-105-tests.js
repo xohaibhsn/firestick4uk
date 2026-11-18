@@ -221,10 +221,19 @@ ok("D11_sidhu_up_down", /Move FAQ/.test(read("app/sidhu/page.tsx")) && /Save ord
 {
   const audits = [];
   const faqIds = [3, 1, 2];
+  // MULTI-137: reorder lock read is SELECT * (was SELECT id) for optional base_hashes.
   const pool = makePool([
     {
-      match: (sql) => /SELECT id FROM faqs FOR UPDATE/i.test(sql),
-      result: [[{ id: 1 }, { id: 2 }, { id: 3 }]],
+      match: (sql) =>
+        /SELECT \* FROM faqs FOR UPDATE/i.test(sql) ||
+        /SELECT id FROM faqs FOR UPDATE/i.test(sql),
+      result: [
+        [
+          { id: 1, question: "Q1", answer: "A1", category: "General", sort_order: 10, is_visible: 1 },
+          { id: 2, question: "Q2", answer: "A2", category: "General", sort_order: 20, is_visible: 1 },
+          { id: 3, question: "Q3", answer: "A3", category: "General", sort_order: 30, is_visible: 1 },
+        ],
+      ],
     },
     {
       match: (sql) => /UPDATE faqs SET sort_order/i.test(sql),

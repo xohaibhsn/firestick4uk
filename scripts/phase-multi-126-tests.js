@@ -1215,22 +1215,20 @@ function runSourceChecks() {
   void leadsGetNow;
   void leadsGetHead;
 
+  // MULTI-137 owns GET base_hash + PUT stale TX; MULTI-126 owns DELETE only.
   const couponsNow = read("pages/api/coupons.ts");
   const couponsHead = gitShow("pages/api/coupons.ts");
-  const cpNonDelNow =
-    couponsNow.slice(0, couponsNow.indexOf("if (req.method === 'DELETE')")) +
-    couponsNow.slice(
-      couponsNow.indexOf("return res.status(405)", couponsNow.indexOf("if (req.method === 'DELETE')"))
-    );
-  const cpNonDelHead =
-    couponsHead.slice(0, couponsHead.indexOf("if (req.method === 'DELETE')")) +
-    couponsHead.slice(
-      couponsHead.indexOf("return res.status(405)", couponsHead.indexOf("if (req.method === 'DELETE')"))
-    );
+  function couponsDeleteBlock(src) {
+    const a = src.indexOf("if (req.method === 'DELETE')");
+    const b = src.indexOf("return res.status(405)", a);
+    if (a < 0 || b < 0) return "";
+    return src.slice(a, b);
+  }
   ok(
-    "src_coupons_non_delete_identical",
-    sha256(cpNonDelNow) === sha256(cpNonDelHead),
-    sha256(cpNonDelNow).slice(0, 12)
+    "src_coupons_delete_identical",
+    sha256(couponsDeleteBlock(couponsNow)) ===
+      sha256(couponsDeleteBlock(couponsHead)),
+    sha256(couponsDeleteBlock(couponsNow)).slice(0, 12)
   );
 
   ok(

@@ -314,7 +314,7 @@ ok(
 function makeDb(state) {
   const inserts = [];
   const logs = [];
-  return {
+  const db = {
     inserts,
     logs,
     async query(sql, params) {
@@ -408,7 +408,7 @@ function makeDb(state) {
       }
       if (/UPDATE customer_reviews/.test(s)) {
         const id = params[params.length - 1];
-        const row = state.reviews.find((r) => r.id === id);
+        const row = state.reviews.find((r) => Number(r.id) === Number(id));
         if (row && /SET status = \?/.test(s)) {
           row.status = params[0];
           row.moderated_at = params[1];
@@ -429,6 +429,15 @@ function makeDb(state) {
       return [[], []];
     },
   };
+  // MULTI-137: PATCH/DELETE use short FOR UPDATE transactions.
+  db.getConnection = async () => ({
+    query: (...args) => db.query(...args),
+    beginTransaction: async () => {},
+    commit: async () => {},
+    rollback: async () => {},
+    release: () => {},
+  });
+  return db;
 }
 
 function buildPublicHandler(state, extras = {}) {

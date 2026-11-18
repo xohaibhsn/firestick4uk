@@ -470,7 +470,15 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
     .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean);
-  const apiTouched = names.filter((n) => n.startsWith("pages/api/"));
+  // MULTI-137: approved admin API stale-write surfaces.
+  const MULTI137_API_OK = new Set([
+    "pages/api/coupons.ts",
+    "pages/api/faqs.ts",
+    "pages/api/admin-reviews.ts",
+  ]);
+  const apiTouched = names.filter(
+    (n) => n.startsWith("pages/api/") && !MULTI137_API_OK.has(n)
+  );
   // MULTI-132: ProductDetail.tsx may receive additive preview listener (still no pages/api).
   // MULTI-133: lib-only tracking gates (no public app/components required).
   // MULTI-136: TrackingConsent suppression gate (+ pathname watcher) on public component.
@@ -510,7 +518,7 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
   if (committed.length) {
     const bad = committed.filter(
       (n) =>
-        n.startsWith("pages/api/") ||
+        (n.startsWith("pages/api/") && !MULTI137_API_OK.has(n)) ||
         (n.startsWith("app/") &&
           n !== "app/sidhu/page.tsx" &&
           n !== "app/products/[slug]/ProductDetail.tsx")

@@ -106,6 +106,20 @@ const APPROVED = new Set([
   // F4UK-MULTI-136 suppress Google tags on /sidhu + admin preview iframes.
   "components/TrackingConsent.tsx",
   "scripts/phase-multi-136-tests.js",
+  // F4UK-MULTI-137 stale-write guards + coupled plumbing.
+  "lib/couponBaseHash.ts",
+  "lib/reviewModerationHash.ts",
+  "pages/api/coupons.ts",
+  "pages/api/faqs.ts",
+  "pages/api/admin-reviews.ts",
+  "components/sidhu/ReviewsPanel.tsx",
+  "scripts/phase-multi-137-tests.js",
+  "scripts/phase-multi-97-tests.js",
+  "scripts/phase-multi-114-tests.js",
+  "scripts/phase-multi-123-tests.js",
+  "scripts/phase-multi-126-tests.js",
+  "scripts/phase-coupon-validation-tests.js",
+  "scripts/phase-multi-105-tests.js",
 ]);
 
 (async () => {
@@ -352,6 +366,11 @@ const APPROVED = new Set([
   ok("pdp_page_ssr_still_active_filter", /active\s*=\s*1/.test(pageSsr));
 
   {
+    const MULTI137_API_OK = new Set([
+      "pages/api/coupons.ts",
+      "pages/api/faqs.ts",
+      "pages/api/admin-reviews.ts",
+    ]);
     const r = spawnSync(
       "git",
       ["diff", "--name-only", "origin/main", "--", "pages/api", "app/products/[slug]/page.tsx"],
@@ -360,7 +379,8 @@ const APPROVED = new Set([
     const names = (r.stdout || "")
       .split(/\r?\n/)
       .map((s) => s.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((n) => !MULTI137_API_OK.has(n));
     ok("zero_diff_pages_api_and_pdp_page", names.length === 0, names.join(",") || "clean");
   }
 

@@ -15,6 +15,7 @@ import {
   parseCouponId,
   parseIsActive,
 } from '../../lib/couponValidation';
+import { couponRowBaseHash } from '../../lib/couponBaseHash';
 
 function isDuplicateKeyError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -77,7 +78,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'GET') {
       setAdminNoStore(res);
       const [rows] = await pool.query('SELECT * FROM coupons ORDER BY created_at DESC');
-      return res.status(200).json(Array.isArray(rows)?rows:[]);
+      const list = Array.isArray(rows) ? rows : [];
+      return res.status(200).json(
+        list.map((row: any) => ({
+          ...row,
+          base_hash: couponRowBaseHash(row as Record<string, unknown>),
+        }))
+      );
     }
 
     if (req.method === 'POST') {
@@ -119,22 +126,97 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!activeParsed.ok) return res.status(400).json({ error: activeParsed.error });
 
       const v = parsed.value;
-      let result: any;
+      const bodyBaseHash = req.body?.base_hash;
+      const force = req.body?.force === true;
+      if (typeof bodyBaseHash !== 'string') {
+        console.log('coupon.save_without_base_hash', idParsed.value);
+      }
+
+      const conn = await pool.getConnection();
+      let newBaseHash: string | null = null;
       try {
-        const [r]: any = await pool.query(
-          'UPDATE coupons SET code=?,type=?,value=?,minimum_order=?,usage_limit=?,expires_at=?,is_active=? WHERE id=?',
-          [v.code, v.type, v.value, v.minimumOrder, v.usageLimit, v.expiresAt, activeParsed.value ? 1 : 0, idParsed.value]
+        await conn.beginTransaction();
+        const [lockedRows]: any = await conn.query(
+          'SELECT * FROM coupons WHERE id=? FOR UPDATE',
+          [idParsed.value]
         );
-        result = r;
-      } catch (updateErr: unknown) {
-        if (isDuplicateKeyError(updateErr)) {
-          return res.status(409).json({ error: 'Coupon code already exists' });
+        const current =
+          Array.isArray(lockedRows) && lockedRows[0] ? lockedRows[0] : null;
+        if (!current) {
+          await conn.rollback();
+          return res.status(404).json({ error: 'Coupon not found' });
         }
-        throw updateErr;
+
+        if (
+          typeof bodyBaseHash === 'string' &&
+          bodyBaseHash !== couponRowBaseHash(current as Record<string, unknown>) &&
+          !force
+        ) {
+          await conn.rollback();
+          return res.status(409).json({
+            error:
+              'This coupon was changed by someone else - list reloaded, try again.',
+            code: 'stale',
+          });
+        }
+
+        let result: any;
+        try {
+          const [r]: any = await conn.query(
+            'UPDATE coupons SET code=?,type=?,value=?,minimum_order=?,usage_limit=?,expires_at=?,is_active=? WHERE id=?',
+            [
+              v.code,
+              v.type,
+              v.value,
+              v.minimumOrder,
+              v.usageLimit,
+              v.expiresAt,
+              activeParsed.value ? 1 : 0,
+              idParsed.value,
+            ]
+          );
+          result = r;
+        } catch (updateErr: unknown) {
+          if (isDuplicateKeyError(updateErr)) {
+            await conn.rollback();
+            return res.status(409).json({ error: 'Coupon code already exists' });
+          }
+          throw updateErr;
+        }
+        if (!result || Number(result.affectedRows) === 0) {
+          await conn.rollback();
+          return res.status(404).json({ error: 'Coupon not found' });
+        }
+
+        const [afterRows]: any = await conn.query(
+          'SELECT * FROM coupons WHERE id=?',
+          [idParsed.value]
+        );
+        const after =
+          Array.isArray(afterRows) && afterRows[0] ? afterRows[0] : null;
+        newBaseHash = couponRowBaseHash(
+          (after || {
+            code: v.code,
+            type: v.type,
+            value: v.value,
+            minimum_order: v.minimumOrder,
+            usage_limit: v.usageLimit,
+            expires_at: v.expiresAt,
+            is_active: activeParsed.value ? 1 : 0,
+          }) as Record<string, unknown>
+        );
+        await conn.commit();
+      } catch (txErr) {
+        try {
+          await conn.rollback();
+        } catch {
+          /* ignore */
+        }
+        throw txErr;
+      } finally {
+        conn.release();
       }
-      if (!result || Number(result.affectedRows) === 0) {
-        return res.status(404).json({ error: 'Coupon not found' });
-      }
+
       const { ip } = getRequestMeta(req);
       await recordAdminAudit({
         actor: admin,
@@ -144,7 +226,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         summary: `Updated coupon ${v.code}`,
         ip,
       });
-      return res.status(200).json({ success:true });
+      return res.status(200).json({ success: true, base_hash: newBaseHash });
     }
 
     if (req.method === 'DELETE') {
