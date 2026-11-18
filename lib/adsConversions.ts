@@ -3,6 +3,7 @@
  * Labels come from CMS (ads_conv_label_*). Never sends PII.
  */
 
+import { isCmsPreviewFrameFromWindow } from "./cmsPreview";
 import { GOOGLE_ADS_ID, readTrackingConsent } from "./trackingConsent";
 
 export const ADS_CONV_LABEL_PURCHASE_KEY = "ads_conv_label_purchase";
@@ -179,6 +180,7 @@ export function firePurchase(opts: {
 }): void {
   if (typeof window === "undefined") return;
   if (isSidhuPath()) return;
+  if (isCmsPreviewFrameFromWindow()) return;
 
   const orderId = String(opts.orderId || "").trim();
   if (!orderId) return;
@@ -231,6 +233,7 @@ export function fireWhatsAppClick(
 ): void {
   if (typeof window === "undefined") return;
   if (isSidhuPath()) return;
+  if (isCmsPreviewFrameFromWindow()) return;
 
   const pref = readTrackingConsent();
   const labels = getAdsLabels(contentMap);

@@ -48,6 +48,38 @@ export function isCmsPreviewQueryParam(search: string | null | undefined): boole
   }
 }
 
+/**
+ * Pure: admin preview iframe only when BOTH cms_preview=1 AND embedded (iframe).
+ * A normal top-level tab with ?cms_preview=1 is NOT a preview frame.
+ */
+export function isCmsPreviewFrame(opts: {
+  search: string | null | undefined;
+  isIframe: boolean;
+}): boolean {
+  return isCmsPreviewQueryParam(opts.search) && opts.isIframe === true;
+}
+
+/**
+ * Window-reading wrapper for isCmsPreviewFrame. SSR-safe: false when window is unavailable.
+ * Uses self !== top for iframe detection (safe across origins; does not read parent.location).
+ */
+export function isCmsPreviewFrameFromWindow(win?: Window | null): boolean {
+  const w =
+    win ||
+    (typeof window !== "undefined" ? window : null);
+  if (!w) return false;
+  try {
+    const search =
+      w.location && typeof w.location.search === "string"
+        ? w.location.search
+        : "";
+    const isIframe = w.self !== w.top;
+    return isCmsPreviewFrame({ search, isIframe });
+  } catch {
+    return false;
+  }
+}
+
 export function cmsPreviewHref(path: string): string {
   const base = path.startsWith("/") ? path : `/${path}`;
   const joiner = base.includes("?") ? "&" : "?";

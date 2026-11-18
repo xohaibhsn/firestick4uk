@@ -94,6 +94,12 @@ const APPROVED = new Set([
   "scripts/phase-multi-116-tests.js",
   "scripts/phase-multi-130-tests.js",
   "scripts/phase-multi-131-tests.js",
+  // F4UK-MULTI-133 preview-frame tracking exclusion (+ its plumbing).
+  "lib/cmsPreview.ts",
+  "lib/insightsClient.ts",
+  "lib/adsConversions.ts",
+  "scripts/phase-multi-133-tests.js",
+  "scripts/phase-city-cleanup-64-tests.js",
 ]);
 
 (async () => {

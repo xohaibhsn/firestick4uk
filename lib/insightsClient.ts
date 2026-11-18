@@ -7,6 +7,10 @@
  * reused by the server ingest so both sides agree on the shape.
  */
 
+import {
+  isCmsPreviewFrame,
+  isCmsPreviewFrameFromWindow,
+} from "./cmsPreview";
 import { readTrackingConsent } from "./trackingConsent";
 
 /** Query keys that strip when the lower-cased key CONTAINS the token. */
@@ -245,12 +249,24 @@ export function shouldRecordInsights(opts: {
   pathname: string;
   gpc?: boolean;
   storage?: Storage | null;
+  /** When both provided, use pure preview-frame check; otherwise read window. */
+  search?: string | null;
+  isIframe?: boolean;
 }): boolean {
   if (opts.gpc === true) return false;
   if (hasGlobalPrivacyControl()) return false;
   if (hasInsightsOptOut(opts.storage)) return false;
   if (!hasAnalyticsConsent(opts.preference)) return false;
   if (isInsightsExcludedPath(opts.pathname || "/")) return false;
+  // Admin CMS/product preview iframe: do not count as a visitor.
+  // Normal top-level tab with ?cms_preview=1 remains recorded.
+  if (opts.search !== undefined && opts.isIframe !== undefined) {
+    if (isCmsPreviewFrame({ search: opts.search, isIframe: opts.isIframe })) {
+      return false;
+    }
+  } else if (isCmsPreviewFrameFromWindow()) {
+    return false;
+  }
   return true;
 }
 
@@ -911,7 +927,8 @@ export function createInsightsController(hooks: InsightsRuntimeHooks): InsightsC
     running &&
     !stoppedFor204 &&
     consecutive204 < INSIGHTS_CONSECUTIVE_204_STOP &&
-    !hasInsightsOptOut(hooks.localStorage);
+    !hasInsightsOptOut(hooks.localStorage) &&
+    !isCmsPreviewFrameFromWindow();
 
   const clearFlushTimer = () => {
     if (flushTimer != null) {

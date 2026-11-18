@@ -41,6 +41,10 @@ function loadTs(rel, extra = {}) {
     if (id === "./trackingConsent" || id.endsWith("/trackingConsent")) {
       return loadTs("lib/trackingConsent.ts");
     }
+    // F4UK-MULTI-133: insightsClient imports ./cmsPreview (preview-frame gate).
+    if (id === "./cmsPreview" || id.endsWith("/cmsPreview")) {
+      return loadTs("lib/cmsPreview.ts");
+    }
     if (extra[id]) return extra[id];
     return require(id);
   };

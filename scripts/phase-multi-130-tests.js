@@ -472,6 +472,7 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
     .filter(Boolean);
   const apiTouched = names.filter((n) => n.startsWith("pages/api/"));
   // MULTI-132: ProductDetail.tsx may receive additive preview listener (still no pages/api).
+  // MULTI-133: lib-only tracking gates (no public app/components required).
   const MULTI132_PUBLIC_OK = new Set(["app/products/[slug]/ProductDetail.tsx"]);
   const publicTouched = names.filter(
     (n) =>

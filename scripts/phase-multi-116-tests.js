@@ -476,17 +476,24 @@ async function main() {
     { cwd: ROOT, encoding: "utf8" }
   );
   // MULTI-132 may touch ProductDetail + product preview channel (approved for that task only).
+  // MULTI-133: preview-frame tracking exclusion (lib only + phase test).
   const MULTI132_OK = new Set([
     "app/products/[slug]/ProductDetail.tsx",
     "app/sidhu/page.tsx",
     "lib/productPreview.ts",
     "components/admin/ProductPreviewPane.tsx",
   ]);
+  const MULTI133_OK = new Set([
+    "lib/cmsPreview.ts",
+    "lib/insightsClient.ts",
+    "lib/adsConversions.ts",
+    "scripts/phase-multi-133-tests.js",
+  ]);
   const dirtyNames = (diffCheck.stdout || "")
     .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean)
-    .filter((n) => !MULTI132_OK.has(n));
+    .filter((n) => !MULTI132_OK.has(n) && !MULTI133_OK.has(n));
   ok("no_app_tree_diff", dirtyNames.length === 0, dirtyNames.join(",") || "clean");
 
   // scripts + docs exist

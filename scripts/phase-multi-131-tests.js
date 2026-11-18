@@ -409,13 +409,20 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "components/admin/ProductPreviewPane.tsx",
     "scripts/phase-multi-132-tests.js",
   ]);
+  const MULTI133_OK = new Set([
+    "lib/cmsPreview.ts",
+    "lib/insightsClient.ts",
+    "lib/adsConversions.ts",
+    "scripts/phase-multi-133-tests.js",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
         (n.startsWith("components/") &&
           !n.startsWith("components/admin/") &&
           !n.startsWith("components/sidhu/"))) &&
-      !MULTI132_OK.has(n)
+      !MULTI132_OK.has(n) &&
+      !MULTI133_OK.has(n)
   );
   ok("no_pages_api_changes", apiTouched.length === 0, apiTouched.join(","));
   ok(
@@ -447,12 +454,19 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "scripts/phase-multi-130-tests.js",
     "scripts/phase-multi-131-tests.js",
     "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-133-tests.js",
   ]);
   const unexpected = [...new Set(allChanged)].filter((n) => {
-    if (MULTI132_OK.has(n) || PLUMBING_OK.has(n)) return false;
+    if (MULTI132_OK.has(n) || MULTI133_OK.has(n) || PLUMBING_OK.has(n)) return false;
     if (n.startsWith("pages/api/")) return true;
     if (n.startsWith("app/") && n !== "app/sidhu/page.tsx") return true;
-    if (n.startsWith("lib/") && n !== "lib/productAdminBulk.ts") return true;
+    if (
+      n.startsWith("lib/") &&
+      n !== "lib/productAdminBulk.ts" &&
+      !MULTI133_OK.has(n)
+    ) {
+      return true;
+    }
     if (
       n.startsWith("components/") &&
       n !== "components/admin/ProductBulkBar.tsx" &&
