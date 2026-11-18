@@ -415,6 +415,11 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "lib/adsConversions.ts",
     "scripts/phase-multi-133-tests.js",
   ]);
+  // F4UK-MULTI-135: public bank-identity redaction (+ phase test).
+  const MULTI135_OK = new Set([
+    "lib/publicSiteContentFilter.ts",
+    "scripts/phase-multi-135-tests.js",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -422,7 +427,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
           !n.startsWith("components/admin/") &&
           !n.startsWith("components/sidhu/"))) &&
       !MULTI132_OK.has(n) &&
-      !MULTI133_OK.has(n)
+      !MULTI133_OK.has(n) &&
+      !MULTI135_OK.has(n)
   );
   ok("no_pages_api_changes", apiTouched.length === 0, apiTouched.join(","));
   ok(
@@ -455,15 +461,24 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "scripts/phase-multi-131-tests.js",
     "scripts/phase-multi-132-tests.js",
     "scripts/phase-multi-133-tests.js",
+    "scripts/phase-multi-135-tests.js",
   ]);
   const unexpected = [...new Set(allChanged)].filter((n) => {
-    if (MULTI132_OK.has(n) || MULTI133_OK.has(n) || PLUMBING_OK.has(n)) return false;
+    if (
+      MULTI132_OK.has(n) ||
+      MULTI133_OK.has(n) ||
+      MULTI135_OK.has(n) ||
+      PLUMBING_OK.has(n)
+    ) {
+      return false;
+    }
     if (n.startsWith("pages/api/")) return true;
     if (n.startsWith("app/") && n !== "app/sidhu/page.tsx") return true;
     if (
       n.startsWith("lib/") &&
       n !== "lib/productAdminBulk.ts" &&
-      !MULTI133_OK.has(n)
+      !MULTI133_OK.has(n) &&
+      !MULTI135_OK.has(n)
     ) {
       return true;
     }

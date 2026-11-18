@@ -6,6 +6,11 @@
  * server-side readers (getPublicSiteContent, layout seed, etc.) are unaffected.
  */
 import denylistJson from "./publicSiteContentDenylist.json";
+import {
+  effectivePaymentMethods,
+  PAYMENT_BANK_ENABLED_KEY,
+  PAYMENT_COD_ENABLED_KEY,
+} from "./paymentMethodSettings";
 
 export const PUBLIC_SITE_CONTENT_DENYLIST: ReadonlySet<string> = new Set(
   denylistJson as string[]
@@ -37,7 +42,36 @@ export const PUBLIC_SITE_CONTENT_CRITICAL_KEYS: readonly string[] = [
   "track_email_help",
 ] as const;
 
+/** Bank identity keys blanked on the public map when Bank Transfer is effectively disabled. */
+export const BANK_IDENTITY_PUBLIC_KEYS = [
+  "bank_account_name",
+  "bank_sort_code",
+  "bank_account_no",
+] as const;
+
 export const SITE_CONTENT_PAGE_LOCKED_BODY = { error: "Unauthorized" } as const;
+
+/**
+ * When Bank Transfer is effectively OFF, return a copy with bank identity values
+ * set to "" for keys that already exist. Does not mutate the input (may be the
+ * shared public cache object). Does not add absent keys.
+ */
+export function redactBankIdentityWhenBankDisabled<T extends Record<string, unknown>>(
+  map: T
+): T {
+  const toggles = effectivePaymentMethods(
+    map[PAYMENT_BANK_ENABLED_KEY],
+    map[PAYMENT_COD_ENABLED_KEY]
+  );
+  if (toggles.bankEnabled) return map;
+  const out = { ...map } as T;
+  for (const key of BANK_IDENTITY_PUBLIC_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(out, key)) {
+      (out as Record<string, unknown>)[key] = "";
+    }
+  }
+  return out;
+}
 
 export function filterPublicSiteContentMap<T extends Record<string, unknown>>(
   map: T
@@ -48,5 +82,5 @@ export function filterPublicSiteContentMap<T extends Record<string, unknown>>(
       delete (out as Record<string, unknown>)[key];
     }
   }
-  return out;
+  return redactBankIdentityWhenBankDisabled(out);
 }

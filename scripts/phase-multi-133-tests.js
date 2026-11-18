@@ -203,6 +203,9 @@ const APPROVED = new Set([
   "scripts/phase-ads-csp-77-tests.js",
   "scripts/phase-tracking-consent-final-tests.js",
   "scripts/phase-city-cleanup-64-tests.js",
+  // F4UK-MULTI-135 public bank-identity redaction (+ plumbing).
+  "lib/publicSiteContentFilter.ts",
+  "scripts/phase-multi-135-tests.js",
 ]);
 
 const LABEL_OK = "AbCdEf123456";

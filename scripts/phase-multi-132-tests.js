@@ -100,6 +100,9 @@ const APPROVED = new Set([
   "lib/adsConversions.ts",
   "scripts/phase-multi-133-tests.js",
   "scripts/phase-city-cleanup-64-tests.js",
+  // F4UK-MULTI-135 public bank-identity redaction (+ plumbing).
+  "lib/publicSiteContentFilter.ts",
+  "scripts/phase-multi-135-tests.js",
 ]);
 
 (async () => {
