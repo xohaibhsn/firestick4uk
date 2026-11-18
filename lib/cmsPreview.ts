@@ -48,20 +48,35 @@ export function isCmsPreviewQueryParam(search: string | null | undefined): boole
   }
 }
 
+/** Pure: /sidhu admin pathname (exact or nested). */
+export function isSidhuAdminPathname(
+  p: string | null | undefined
+): boolean {
+  if (typeof p !== "string" || !p) return false;
+  return p === "/sidhu" || p.startsWith("/sidhu/");
+}
+
 /**
- * Pure: admin preview iframe only when BOTH cms_preview=1 AND embedded (iframe).
+ * Pure: admin preview iframe when embedded AND (cms_preview=1 OR same-origin parent is /sidhu).
+ * Optional parentPathname preserves the MULTI-133 truth table when omitted.
  * A normal top-level tab with ?cms_preview=1 is NOT a preview frame.
  */
 export function isCmsPreviewFrame(opts: {
   search: string | null | undefined;
   isIframe: boolean;
+  parentPathname?: string | null;
 }): boolean {
-  return isCmsPreviewQueryParam(opts.search) && opts.isIframe === true;
+  return (
+    opts.isIframe === true &&
+    (isCmsPreviewQueryParam(opts.search) ||
+      isSidhuAdminPathname(opts.parentPathname))
+  );
 }
 
 /**
  * Window-reading wrapper for isCmsPreviewFrame. SSR-safe: false when window is unavailable.
- * Uses self !== top for iframe detection (safe across origins; does not read parent.location).
+ * Uses self !== top for iframe detection. When embedded, may read parent.location.pathname
+ * (same-origin only; cross-origin throws → treat parentPathname as null).
  */
 export function isCmsPreviewFrameFromWindow(win?: Window | null): boolean {
   const w =
@@ -74,7 +89,21 @@ export function isCmsPreviewFrameFromWindow(win?: Window | null): boolean {
         ? w.location.search
         : "";
     const isIframe = w.self !== w.top;
-    return isCmsPreviewFrame({ search, isIframe });
+    let parentPathname: string | null = null;
+    if (isIframe) {
+      try {
+        const pp =
+          w.parent &&
+          w.parent.location &&
+          typeof w.parent.location.pathname === "string"
+            ? w.parent.location.pathname
+            : null;
+        parentPathname = pp;
+      } catch {
+        parentPathname = null;
+      }
+    }
+    return isCmsPreviewFrame({ search, isIframe, parentPathname });
   } catch {
     return false;
   }

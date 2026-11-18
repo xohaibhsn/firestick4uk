@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useId, useState } from "react";
+import { usePathname } from "next/navigation";
+import { isSidhuPath } from "@/lib/adsConversions";
+import { isCmsPreviewFrameFromWindow } from "@/lib/cmsPreview";
 import {
   GA_MEASUREMENT_ID,
   GOOGLE_ADS_ID,
@@ -28,7 +31,24 @@ const session = {
   gaConfigured: false,
   adsConfigured: false,
   consentDefaultsIssued: false,
+  pendingApply: false,
 };
+
+function isGoogleTagSuppressedContext(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    (isSidhuPath() || isCmsPreviewFrameFromWindow())
+  );
+}
+
+function setGoogleTagDisableFlags(on: boolean): void {
+  (window as unknown as Record<string, unknown>)[
+    "ga-disable-" + GA_MEASUREMENT_ID
+  ] = on;
+  (window as unknown as Record<string, unknown>)[
+    "ga-disable-" + GOOGLE_ADS_ID
+  ] = on;
+}
 
 function ensureGtagStub(): void {
   window.dataLayer = window.dataLayer || [];
@@ -145,6 +165,12 @@ function applyTrackingPreference(
     return;
   }
 
+  if (isGoogleTagSuppressedContext()) {
+    session.pendingApply = true;
+    setGoogleTagDisableFlags(true);
+    return;
+  }
+
   issueConsentDefaults();
   issueConsentUpdate(preference);
   injectGtagScriptOnce();
@@ -153,6 +179,7 @@ function applyTrackingPreference(
 }
 
 export default function TrackingConsent() {
+  const pathname = usePathname();
   const [hydrated, setHydrated] = useState(false);
   const [preference, setPreference] = useState<TrackingConsentPreference | null>(
     null
@@ -174,6 +201,19 @@ export default function TrackingConsent() {
       applyTrackingPreference(saved);
     }
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const suppressed = isGoogleTagSuppressedContext();
+    setGoogleTagDisableFlags(suppressed);
+    if (!suppressed && session.pendingApply) {
+      const saved = readTrackingConsent();
+      session.pendingApply = false;
+      if (saved && anyOptionalTrackingGranted(saved)) {
+        applyTrackingPreference(saved);
+      }
+    }
+  }, [hydrated, pathname]);
 
   // Signal consent banner for float collision avoidance (client-only; no SSR).
   useEffect(() => {

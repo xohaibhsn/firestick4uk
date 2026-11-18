@@ -206,6 +206,9 @@ const APPROVED = new Set([
   // F4UK-MULTI-135 public bank-identity redaction (+ plumbing).
   "lib/publicSiteContentFilter.ts",
   "scripts/phase-multi-135-tests.js",
+  // F4UK-MULTI-136 suppress Google tags on /sidhu + admin preview iframes.
+  "components/TrackingConsent.tsx",
+  "scripts/phase-multi-136-tests.js",
 ]);
 
 const LABEL_OK = "AbCdEf123456";
@@ -539,7 +542,11 @@ const LABEL_WA = "WaLabel_99xyz";
     "cms_helper_pure_and_wrapper",
     /export function isCmsPreviewFrame\(/.test(cmsSrc) &&
       /export function isCmsPreviewFrameFromWindow\(/.test(cmsSrc) &&
-      /isCmsPreviewQueryParam\(opts\.search\) && opts\.isIframe === true/.test(cmsSrc)
+      // MULTI-136: iframe AND (cms_preview param OR same-origin /sidhu parent).
+      // Without parentPathname, isSidhuAdminPathname is false → MULTI-133 truth table unchanged.
+      /opts\.isIframe === true &&\s*\(\s*isCmsPreviewQueryParam\(opts\.search\)\s*\|\|\s*isSidhuAdminPathname\(opts\.parentPathname\)\s*\)/.test(
+        cmsSrc
+      )
   );
   ok(
     "existing_cms_exports_preserved",

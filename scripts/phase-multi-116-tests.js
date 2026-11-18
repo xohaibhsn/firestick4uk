@@ -494,13 +494,22 @@ async function main() {
     "lib/publicSiteContentFilter.ts",
     "scripts/phase-multi-135-tests.js",
   ]);
+  // F4UK-MULTI-136: suppress Google tags on /sidhu + admin preview iframes.
+  const MULTI136_OK = new Set([
+    "lib/cmsPreview.ts",
+    "components/TrackingConsent.tsx",
+    "scripts/phase-multi-136-tests.js",
+  ]);
   const dirtyNames = (diffCheck.stdout || "")
     .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean)
     .filter(
       (n) =>
-        !MULTI132_OK.has(n) && !MULTI133_OK.has(n) && !MULTI135_OK.has(n)
+        !MULTI132_OK.has(n) &&
+        !MULTI133_OK.has(n) &&
+        !MULTI135_OK.has(n) &&
+        !MULTI136_OK.has(n)
     );
   ok("no_app_tree_diff", dirtyNames.length === 0, dirtyNames.join(",") || "clean");
 

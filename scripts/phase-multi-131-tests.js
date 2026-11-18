@@ -420,6 +420,12 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "lib/publicSiteContentFilter.ts",
     "scripts/phase-multi-135-tests.js",
   ]);
+  // F4UK-MULTI-136: suppress Google tags on /sidhu + admin preview iframes.
+  const MULTI136_OK = new Set([
+    "lib/cmsPreview.ts",
+    "components/TrackingConsent.tsx",
+    "scripts/phase-multi-136-tests.js",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -428,7 +434,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
           !n.startsWith("components/sidhu/"))) &&
       !MULTI132_OK.has(n) &&
       !MULTI133_OK.has(n) &&
-      !MULTI135_OK.has(n)
+      !MULTI135_OK.has(n) &&
+      !MULTI136_OK.has(n)
   );
   ok("no_pages_api_changes", apiTouched.length === 0, apiTouched.join(","));
   ok(
@@ -462,12 +469,14 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "scripts/phase-multi-132-tests.js",
     "scripts/phase-multi-133-tests.js",
     "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-136-tests.js",
   ]);
   const unexpected = [...new Set(allChanged)].filter((n) => {
     if (
       MULTI132_OK.has(n) ||
       MULTI133_OK.has(n) ||
       MULTI135_OK.has(n) ||
+      MULTI136_OK.has(n) ||
       PLUMBING_OK.has(n)
     ) {
       return false;
@@ -478,7 +487,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       n.startsWith("lib/") &&
       n !== "lib/productAdminBulk.ts" &&
       !MULTI133_OK.has(n) &&
-      !MULTI135_OK.has(n)
+      !MULTI135_OK.has(n) &&
+      !MULTI136_OK.has(n)
     ) {
       return true;
     }
@@ -486,7 +496,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       n.startsWith("components/") &&
       n !== "components/admin/ProductBulkBar.tsx" &&
       n !== "components/admin/ProductListToolbar.tsx" &&
-      n !== "components/admin/ProductPreviewPane.tsx"
+      n !== "components/admin/ProductPreviewPane.tsx" &&
+      !MULTI136_OK.has(n)
     ) {
       return true;
     }

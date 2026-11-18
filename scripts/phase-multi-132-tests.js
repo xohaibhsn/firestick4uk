@@ -103,6 +103,9 @@ const APPROVED = new Set([
   // F4UK-MULTI-135 public bank-identity redaction (+ plumbing).
   "lib/publicSiteContentFilter.ts",
   "scripts/phase-multi-135-tests.js",
+  // F4UK-MULTI-136 suppress Google tags on /sidhu + admin preview iframes.
+  "components/TrackingConsent.tsx",
+  "scripts/phase-multi-136-tests.js",
 ]);
 
 (async () => {
