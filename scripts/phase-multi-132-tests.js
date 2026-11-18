@@ -131,6 +131,11 @@ const APPROVED = new Set([
       built.seo_title === undefined
   );
 
+  ok(
+    "builder_strips_pound_prefix",
+    pp.buildProductPreviewOverrides({ price: "£47.99" }).price === "47.99"
+  );
+
   // Sanitizer coercion + drop foreign keys
   const sanitized = pp.sanitizeProductPreviewOverrides({
     name: 42,

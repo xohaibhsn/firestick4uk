@@ -54,9 +54,14 @@ export function buildProductPreviewOverrides(
   for (const key of PRODUCT_PREVIEW_OVERRIDE_KEYS) {
     if (!Object.prototype.hasOwnProperty.call(src, key)) continue;
     const v = (src as Record<string, unknown>)[key];
-    if (typeof v === "string") out[key] = v;
-    else if (v == null) out[key] = "";
-    else if (typeof v === "number" || typeof v === "boolean") out[key] = String(v);
+    let s: string;
+    if (typeof v === "string") s = v;
+    else if (v == null) s = "";
+    else if (typeof v === "number" || typeof v === "boolean") s = String(v);
+    else continue;
+    // Display-only: editor may store a leading £; PriceDisplay uses Number() (not parseStrictPriceGbp).
+    if (key === "price") s = s.replace(/^£\s*/, "");
+    out[key] = s;
   }
   return out;
 }
