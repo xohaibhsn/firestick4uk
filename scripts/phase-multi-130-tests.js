@@ -471,12 +471,15 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
     .map((s) => s.trim())
     .filter(Boolean);
   const apiTouched = names.filter((n) => n.startsWith("pages/api/"));
+  // MULTI-132: ProductDetail.tsx may receive additive preview listener (still no pages/api).
+  const MULTI132_PUBLIC_OK = new Set(["app/products/[slug]/ProductDetail.tsx"]);
   const publicTouched = names.filter(
     (n) =>
-      (n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
-      (n.startsWith("components/") &&
-        !n.startsWith("components/admin/") &&
-        !n.startsWith("components/sidhu/"))
+      ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
+        (n.startsWith("components/") &&
+          !n.startsWith("components/admin/") &&
+          !n.startsWith("components/sidhu/"))) &&
+      !MULTI132_PUBLIC_OK.has(n)
   );
   ok("no_pages_api_changes", apiTouched.length === 0, apiTouched.join(","));
   ok(
@@ -504,7 +507,9 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
     const bad = committed.filter(
       (n) =>
         n.startsWith("pages/api/") ||
-        (n.startsWith("app/") && n !== "app/sidhu/page.tsx")
+        (n.startsWith("app/") &&
+          n !== "app/sidhu/page.tsx" &&
+          n !== "app/products/[slug]/ProductDetail.tsx")
     );
     ok("committed_diff_no_api_public", bad.length === 0, bad.join(","));
   } else {

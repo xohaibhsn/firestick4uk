@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import xss from "xss";
 import { fixContentLinkRels } from "@/lib/seoLinks";
@@ -28,6 +28,14 @@ import {
 import { isDigitalProduct } from "@/lib/productFulfilment";
 import { stockBadgeLabel } from "@/lib/stockBadgeLabel";
 import PriceDisplay from "@/components/PriceDisplay";
+import CmsPreviewBadge from "@/components/CmsPreviewBadge";
+import { parentIsSidhuAdmin } from "@/lib/cmsPreview";
+import {
+  applyProductPreviewOverrides,
+  isTrustedProductPreviewEvent,
+  sanitizeProductPreviewOverrides,
+  shouldAttachCmsPreviewListener,
+} from "@/lib/productPreview";
 
 const xssOptions = {
   whiteList: {
@@ -105,6 +113,9 @@ export default function ProductDetail({
   const [revalidating, setRevalidating] = useState(false);
   const [revalidateFailed, setRevalidateFailed] = useState(false);
   const [purchaseBlockedLocal, setPurchaseBlockedLocal] = useState(false);
+  /** F4UK-MULTI-132 — live unsaved draft overlays; in-memory only, never persisted. */
+  const [productPreviewMode, setProductPreviewMode] = useState(false);
+  const [previewOverrides, setPreviewOverrides] = useState<Record<string, string> | null>(null);
   const boundaryRef = useRef<BoundaryCoordinatorState>(createBoundaryCoordinator());
   // Bind coordinator to the current product/slug on route changes (never via late callbacks).
   useEffect(() => {
@@ -117,6 +128,56 @@ export default function ProductDetail({
   const contact = useContactConfig();
   const { t } = useSiteContent();
   const vars = { phone: contact.phone, telegram: contact.telegram };
+
+  // MULTI-132: attach product-preview listener ONLY when the existing four-condition CMS gate is true.
+  // Normal visitors: no listener, no state writes → HTML stays identical to pre-132.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isIframe = window.self !== window.top;
+    const parentOk = parentIsSidhuAdmin({
+      tryParentPathname: () => {
+        try {
+          return window.parent.location.pathname;
+        } catch {
+          return null;
+        }
+      },
+      referrer: document.referrer || "",
+    });
+    if (
+      !shouldAttachCmsPreviewListener({
+        search: window.location.search,
+        isIframe,
+        parentIsSidhu: parentOk,
+      })
+    ) {
+      return;
+    }
+    setProductPreviewMode(true);
+    const onMessage = (event: MessageEvent) => {
+      if (
+        !isTrustedProductPreviewEvent(event, window.location.origin, window.parent)
+      ) {
+        return;
+      }
+      const overrides = sanitizeProductPreviewOverrides(
+        (event.data as { overrides: Record<string, unknown> }).overrides
+      );
+      setPreviewOverrides(overrides);
+    };
+    window.addEventListener("message", onMessage);
+    return () => {
+      window.removeEventListener("message", onMessage);
+    };
+  }, []);
+
+  const displayProduct = useMemo(() => {
+    if (!product || !previewOverrides) return product;
+    return applyProductPreviewOverrides(
+      product as unknown as Record<string, unknown>,
+      previewOverrides
+    ) as unknown as Product;
+  }, [product, previewOverrides]);
 
   // SSR / router.refresh props replace stale client state — never re-enable an expired CTA
   // from stale purchasable=true while a boundary block is active. After a settled boundary
@@ -167,6 +228,8 @@ export default function ProductDetail({
 
   const handleBoundary = useCallback(
     async (kind: "start" | "end") => {
+      // MULTI-132: never run purchase-boundary fetches while in Sidhu product preview iframe.
+      if (productPreviewMode) return;
       const p = product;
       if (!p?.id) return;
       const targetIso = kind === "start" ? p.season_starts_at : p.season_ends_at;
@@ -253,14 +316,15 @@ export default function ProductDetail({
         router.refresh();
       }
     },
-    [product, slug, router, doFetch, revalidating]
+    [product, slug, router, doFetch, revalidating, productPreviewMode]
   );
 
   const onSeasonBoundary = useCallback(
     (kind: "start" | "end") => {
+      if (productPreviewMode) return;
       void handleBoundary(kind);
     },
-    [handleBoundary]
+    [handleBoundary, productPreviewMode]
   );
 
   // Test-only fixture controls (present only when a coherent getNowMs clock is injected).
@@ -293,6 +357,7 @@ export default function ProductDetail({
 
   // Purchase-state boundary handling even when countdown display is OFF.
   useEffect(() => {
+    if (productPreviewMode) return;
     if (phase !== "upcoming" && phase !== "live") return;
     const targetIso =
       phase === "upcoming" ? product?.season_starts_at : product?.season_ends_at;
@@ -316,7 +381,7 @@ export default function ProductDetail({
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", tick);
     };
-  }, [phase, product?.id, product?.season_starts_at, product?.season_ends_at, handleBoundary, getNowMs]);
+  }, [phase, product?.id, product?.season_starts_at, product?.season_ends_at, handleBoundary, getNowMs, productPreviewMode]);
 
   const isInCart = product ? cart.some(i => i.id === product.id) : false;
 
@@ -327,6 +392,8 @@ export default function ProductDetail({
     !purchaseBlockedLocal &&
     !revalidating;
   const handleAdd = () => {
+    // MULTI-132: ATC inert inside Sidhu product preview iframe (no cart mutation).
+    if (productPreviewMode) return;
     if (!product || isInCart || !canPurchase) return;
     addToCart({
       id: product.id,
@@ -339,13 +406,19 @@ export default function ProductDetail({
     setTimeout(() => setAdded(false), 2000);
   };
 
-  const isDigital = product
-    ? isDigitalProduct({ category: product.category, stock: product.stock })
+  const handleRemove = () => {
+    if (productPreviewMode) return;
+    if (!product) return;
+    removeFromCart(product.id);
+  };
+
+  const isDigital = displayProduct
+    ? isDigitalProduct({ category: displayProduct.category, stock: displayProduct.stock })
     : false;
 
   // Sticky mobile ATC: hide mini-cart while this bar is active (combined CTA surface).
   useEffect(() => {
-    if (!product) return;
+    if (!displayProduct) return;
     const mq = window.matchMedia("(max-width: 768px)");
     const sync = () => {
       const on = mq.matches;
@@ -364,14 +437,17 @@ export default function ProductDetail({
       document.body.classList.remove("pdp-sticky-atc-visible");
       document.documentElement.removeAttribute("data-pdp-sticky-atc");
     };
-  }, [product]);
+  }, [displayProduct]);
 
-  const featureList = product?.features
-    ? product.features.split('\n').map(f => f.trim()).filter(Boolean)
+  const featureList = displayProduct?.features
+    ? displayProduct.features.split('\n').map(f => f.trim()).filter(Boolean)
     : [];
+
+  const previewOverridesActive = previewOverrides != null;
 
   return (
     <>
+      {previewOverridesActive ? <CmsPreviewBadge /> : null}
       <style>{`
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
         body{background:#FFFFFF;color:#111111;font-family:var(--font-body);}
@@ -464,7 +540,7 @@ export default function ProductDetail({
       <main className="page-wrap">
         {loading ? (
           <div className="loading-state">Loading product...</div>
-        ) : !product ? (
+        ) : !displayProduct ? (
           <div className="loading-state">
             <a href="/products" style={{color:"#5B21B6"}}>{t("pd_not_found", "Product not found. Browse all products →")}</a>
           </div>
@@ -473,25 +549,25 @@ export default function ProductDetail({
             <a href="/products" className="back-link">{t("pd_back", "← Back to Products")}</a>
             <div className="product-layout">
               <div className="product-img-box">
-                {product.image
-                  ? <img src={product.image} alt={product.name} loading="eager" />
+                {displayProduct.image
+                  ? <img src={displayProduct.image} alt={displayProduct.name} loading="eager" />
                   : <div className="placeholder-img">📦</div>
                 }
               </div>
               <div>
-                <div className="product-category">{product.category}</div>
-                {product.badge && <div className="badge-tag">{product.badge}</div>}
-                <h1 className="product-name">{product.name}</h1>
-                {product.short_description && (
+                <div className="product-category">{displayProduct.category}</div>
+                {displayProduct.badge && <div className="badge-tag">{displayProduct.badge}</div>}
+                <h1 className="product-name">{displayProduct.name}</h1>
+                {displayProduct.short_description && (
                   <div
                     className="product-description"
                     dangerouslySetInnerHTML={{
-                      __html: fixContentLinkRels(xss(product.short_description, xssOptions)),
+                      __html: fixContentLinkRels(xss(displayProduct.short_description, xssOptions)),
                     }}
                   />
                 )}
                 <div className="product-price">
-                  <PriceDisplay price={product.price} />
+                  <PriceDisplay price={displayProduct.price} />
                   {(phase === "ended" || phase === "paused") && (
                     <span
                       data-testid="historical-price-label"
@@ -518,8 +594,8 @@ export default function ProductDetail({
                     {revalidateFailed
                       ? "Offer status could not be refreshed. Purchasing is unavailable until you reload."
                       : phase === "upcoming"
-                      ? `Upcoming seasonal offer${product.season_name ? `: ${product.season_name}` : ""}. Purchasing is not available yet.`
-                      : product.season_ended_notice ||
+                      ? `Upcoming seasonal offer${displayProduct.season_name ? `: ${displayProduct.season_name}` : ""}. Purchasing is not available yet.`
+                      : displayProduct.season_ended_notice ||
                         (phase === "paused"
                           ? "This seasonal offer is paused. Historical information remains available; purchasing is disabled."
                           : "This seasonal offer has ended. Prices shown are historical; purchasing is disabled.")}
@@ -532,9 +608,9 @@ export default function ProductDetail({
                 ) : null}
                 <SeasonalCountdown
                   phase={phase}
-                  show={product.season_show_countdown !== false}
-                  startsAt={product.season_starts_at}
-                  endsAt={product.season_ends_at}
+                  show={displayProduct.season_show_countdown !== false}
+                  startsAt={displayProduct.season_starts_at}
+                  endsAt={displayProduct.season_ends_at}
                   onBoundary={onSeasonBoundary}
                   getNowMs={getNowMs}
                   prefix={t("season_countdown_prefix", "Offer ends in")}
@@ -544,7 +620,7 @@ export default function ProductDetail({
                   )}
                 />
                 <div className="meta-row">
-                  <span className="meta-pill" data-stock-badge="1">{stockBadgeLabel(product.stock, t("pd_stock_fallback", "In stock"))}</span>
+                  <span className="meta-pill" data-stock-badge="1">{stockBadgeLabel(displayProduct.stock, t("pd_stock_fallback", "In stock"))}</span>
                   {canPurchase ? (
                     <>
                       <span className="meta-pill">🚚 {t("pd_pill_delivery", "Fast Delivery")}</span>
@@ -569,10 +645,11 @@ export default function ProductDetail({
                     className={`add-btn${added ? " added" : ""}`}
                     data-pdp-atc="inline"
                     data-insights-id="cart_add"
-                    style={{background: isInCart ? (hovering ? "#DC2626" : "#16A34A") : (added ? "#16A34A" : "#5B21B6"), cursor: isInCart && !hovering ? "default" : "pointer", transform: "none"}}
-                    onMouseEnter={() => isInCart && setHovering(true)}
+                    data-product-preview-inert={productPreviewMode ? "1" : undefined}
+                    style={{background: isInCart ? (hovering ? "#DC2626" : "#16A34A") : (added ? "#16A34A" : "#5B21B6"), cursor: productPreviewMode ? "not-allowed" : (isInCart && !hovering ? "default" : "pointer"), transform: "none"}}
+                    onMouseEnter={() => !productPreviewMode && isInCart && setHovering(true)}
                     onMouseLeave={() => setHovering(false)}
-                    onClick={() => isInCart ? removeFromCart(product!.id) : handleAdd()}
+                    onClick={() => (productPreviewMode ? undefined : isInCart ? handleRemove() : handleAdd())}
                   >
                     {added && !isInCart
                       ? "✅ Added!"
@@ -591,7 +668,16 @@ export default function ProductDetail({
                     {phase === "upcoming" ? "Purchasing opens soon" : "Offer not available to purchase"}
                   </button>
                 )}
-                <a href={t("pd_view_cart_link", "/cart")} className="cart-link">{t("pd_view_cart", "View Cart & Checkout →")}</a>
+                <a
+                  href={t("pd_view_cart_link", "/cart")}
+                  className="cart-link"
+                  data-product-preview-inert={productPreviewMode ? "1" : undefined}
+                  onClick={(e) => {
+                    if (productPreviewMode) e.preventDefault();
+                  }}
+                >
+                  {t("pd_view_cart", "View Cart & Checkout →")}
+                </a>
                 {showHubLink ? (
                   <a
                     href="/seasonal-offers"
@@ -615,15 +701,15 @@ export default function ProductDetail({
         )}
       </main>
 
-      {product && (product.full_description || featureList.length > 0) && (
+      {displayProduct && (displayProduct.full_description || featureList.length > 0) && (
         <div className="product-sections">
-          {product.full_description && (
+          {displayProduct.full_description && (
             <div className="section-block">
               <div className="section-heading">{t("pd_about_heading", "About This Product")}</div>
               <div
                 className="product-full-description"
                 dangerouslySetInnerHTML={{
-                  __html: fixContentLinkRels(xss(product.full_description, xssOptions)),
+                  __html: fixContentLinkRels(xss(displayProduct.full_description, xssOptions)),
                 }}
               />
             </div>
@@ -639,35 +725,36 @@ export default function ProductDetail({
             </div>
           )}
           <SeasonalAlternativeCards
-            heading={product.available_offers_heading}
+            heading={displayProduct.available_offers_heading}
             available={availAlts}
             upcoming={upAlts}
           />
         </div>
       )}
-      {product && !(product.full_description || featureList.length > 0) && (
+      {displayProduct && !(displayProduct.full_description || featureList.length > 0) && (
         <div className="product-sections">
           <SeasonalAlternativeCards
-            heading={product.available_offers_heading}
+            heading={displayProduct.available_offers_heading}
             available={availableOffers}
             upcoming={upcomingOffers}
           />
         </div>
       )}
-      {product ? (
+      {displayProduct ? (
         <div
           className="pdp-sticky-atc"
           data-pdp-sticky-atc-bar="1"
           role="region"
           aria-label="Add to cart"
         >
-          <div className="pdp-sticky-atc__price"><PriceDisplay price={product.price} /></div>
+          <div className="pdp-sticky-atc__price"><PriceDisplay price={displayProduct.price} /></div>
           {canPurchase ? (
             <button
               type="button"
               className={`pdp-sticky-atc__btn${added || isInCart ? " added" : ""}`}
               data-pdp-atc="sticky"
-              onClick={() => (isInCart ? removeFromCart(product.id) : handleAdd())}
+              data-product-preview-inert={productPreviewMode ? "1" : undefined}
+              onClick={() => (productPreviewMode ? undefined : isInCart ? handleRemove() : handleAdd())}
             >
               {added && !isInCart
                 ? "✅ Added!"

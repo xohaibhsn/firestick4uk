@@ -12,7 +12,9 @@ import CmsEaseToolbar, {
 import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
 import type { AdminSearchTarget } from "@/components/admin/AdminGlobalSearch";
 import CmsPreviewPane from "@/components/admin/CmsPreviewPane";
+import ProductPreviewPane from "@/components/admin/ProductPreviewPane";
 import CmsUpdatesAfterSaveChip from "@/components/admin/CmsUpdatesAfterSaveChip";
+import { productPreviewDisabledReason } from "@/lib/productPreview";
 import SeasonalOfferWizard from "@/components/admin/SeasonalOfferWizard";
 import SubscriptionContentEditor from "@/components/admin/SubscriptionContentEditor";
 import MediaLibraryPanel from "@/components/admin/MediaLibraryPanel";
@@ -568,6 +570,8 @@ function AdminPageInner() {
   const [cmsPreviewOpen, setCmsPreviewOpen] = useState(false);
   /** MULTI-106 — temporary "Preview restore" overrides pushed to Live Preview only (never editor state). */
   const [cmsPreviewForce, setCmsPreviewForce] = useState<Record<string, string> | null>(null);
+  /** MULTI-132 — live PDP preview of unsaved product editor draft (never persisted). */
+  const [productPreviewOpen, setProductPreviewOpen] = useState(false);
   /** MULTI-106 — per-field History drawer for Site Settings + product editor fields. */
   const [fieldHistoryTarget, setFieldHistoryTarget] = useState<FieldHistoryTarget | null>(null);
   const [seasonalWizardOpen, setSeasonalWizardOpen] = useState(false);
@@ -3916,6 +3920,7 @@ function AdminPageInner() {
     invalidateEditorSession();
     setProductEditorBaseline(null);
     setProductUrlChangeOpen(false);
+    setProductPreviewOpen(false);
     setProductMetaAi({ status: "idle" });
     setProductModal(null);
   };
@@ -3939,6 +3944,7 @@ function AdminPageInner() {
     invalidateEditorSession();
     setProductEditorBaseline(null);
     setProductUrlChangeOpen(false);
+    setProductPreviewOpen(false);
     setProductModal(null);
     setTab("history");
   };
@@ -5428,6 +5434,45 @@ function AdminPageInner() {
               </span>
             ) : null}
             <div className="product-editor-topbar-actions">
+              {(() => {
+                const previewDisabledReason = productPreviewDisabledReason({
+                  isNew: productModal === "new",
+                  productId: productModal !== "new" ? productModal?.id : null,
+                  savedSlug: productModal !== "new" ? productModal?.slug : null,
+                  active: productModal !== "new" ? productModal?.active : null,
+                });
+                const previewEnabled = !previewDisabledReason;
+                return (
+                  <button
+                    type="button"
+                    className="product-editor-view-link"
+                    data-testid="product-preview-toggle"
+                    disabled={!previewEnabled}
+                    title={previewDisabledReason || (productPreviewOpen ? "Close live preview" : "Live preview unsaved changes")}
+                    aria-pressed={productPreviewOpen}
+                    onClick={() => {
+                      if (!previewEnabled) return;
+                      setProductPreviewOpen((v) => !v);
+                    }}
+                    style={{
+                      background: productPreviewOpen ? "rgba(196,181,253,0.18)" : undefined,
+                      opacity: previewEnabled ? 1 : 0.55,
+                      cursor: previewEnabled ? "pointer" : "not-allowed",
+                      border: "1px solid rgba(196,181,253,0.3)",
+                    }}
+                  >
+                    Preview
+                    {!previewEnabled && previewDisabledReason ? (
+                      <span
+                        data-testid="product-preview-disabled-reason"
+                        style={{ display: "block", fontSize: 10, fontWeight: 500, opacity: 0.85, maxWidth: 180, whiteSpace: "normal", lineHeight: 1.3, marginTop: 2 }}
+                      >
+                        {previewDisabledReason}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })()}
               {productModal !== "new" && productModal?.id && (productModal.slug || editProduct.slug) ? (
                 <a
                   className="product-editor-view-link"
@@ -5450,6 +5495,23 @@ function AdminPageInner() {
               </button>
             </div>
           </div>
+          {productModal !== "new" && productModal?.slug ? (
+            <ProductPreviewPane
+              open={productPreviewOpen}
+              onClose={() => setProductPreviewOpen(false)}
+              slug={String(productModal.slug)}
+              draft={{
+                name: editProduct.name,
+                short_description: editProduct.short_description,
+                full_description: editProduct.full_description,
+                features: editProduct.features,
+                price: editProduct.price,
+                badge: (productModal as { badge?: string | null })?.badge ?? null,
+                image: editProduct.image,
+                stock: editProduct.stock,
+              }}
+            />
+          ) : null}
           <div className="product-editor-body">
           <div className="product-editor-layout">
           <div className="product-editor-main" data-testid="product-editor-main">

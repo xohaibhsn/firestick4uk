@@ -239,7 +239,8 @@ ok(
 );
 ok(
   "stock_badge_uses_helper",
-  /stockBadgeLabel\(product\.stock/.test(pd) &&
+  // MULTI-132: displayProduct for preview merge; helper + fallback + badge attr unchanged.
+  /stockBadgeLabel\((?:displayProduct|product)\.stock/.test(pd) &&
     /pd_stock_fallback/.test(pd) &&
     /data-stock-badge=["']1["']/.test(pd)
 );

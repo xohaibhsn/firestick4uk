@@ -47,7 +47,8 @@ ok(
 );
 ok(
   "pd_stock_fallback_wired",
-  /stockBadgeLabel\(product\.stock,\s*t\(["']pd_stock_fallback["']/.test(
+  // MULTI-132: displayProduct merges live preview overrides; still stockBadgeLabel + pd_stock_fallback.
+  /stockBadgeLabel\((?:displayProduct|product)\.stock,\s*t\(["']pd_stock_fallback["']/.test(
     productDetail
   )
 );
