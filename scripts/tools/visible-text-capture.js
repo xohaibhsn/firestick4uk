@@ -14,6 +14,7 @@ const {
   normalizeVisibleText,
   NORMALIZE_VISIBLE_TEXT_SOURCE,
 } = require("./visible-text-normalize");
+const { readUntilStable } = require("./visible-text-stable");
 
 const BASE = "https://firestick4uk.com";
 const CART = JSON.stringify([
@@ -140,36 +141,47 @@ async function capturePage(context, pageSpec, attempt, normSource) {
         { timeout: 30000 }
       )
       .catch(() => {});
-    await page.waitForTimeout(2000);
+    // networkidle best-effort (timeout 20000 ms, catch ignored)
+    await page
+      .waitForLoadState("networkidle", { timeout: 20000 })
+      .catch(() => {});
+    await page.evaluate(() => document.fonts.ready).catch(() => {});
 
-    const result = await page.evaluate(async (normSrc) => {
-      // Inject shared normaliser source (must match scripts/tools/visible-text-normalize.js)
-      // eslint-disable-next-line no-new-func
-      const norm = new Function("return (" + normSrc + ")")();
-      await new Promise((r) => setTimeout(r, 500));
-      const mc = document.querySelector(
-        '[aria-label="Cart summary"], header'
-      );
-      const marker = mc
-        ? "[[MC]]" + (mc.innerText || "") + "[[/MC]]\n"
-        : "";
-      const vt = marker + ((document.body && document.body.innerText) || "");
-      const n = norm(vt);
-      const buf = await crypto.subtle.digest(
-        "SHA-256",
-        new TextEncoder().encode(n)
-      );
-      const hash = Array.from(new Uint8Array(buf))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-      return {
-        path: location.pathname,
-        hash,
-        len: n.length,
-        rawLen: vt.length,
-        preview: n.slice(0, 120),
-      };
-    }, normSource);
+    const readOnce = () =>
+      page.evaluate(async (normSrc) => {
+        // Inject shared normaliser source (must match scripts/tools/visible-text-normalize.js)
+        // eslint-disable-next-line no-new-func
+        const norm = new Function("return (" + normSrc + ")")();
+        const mc = document.querySelector(
+          '[aria-label="Cart summary"], header'
+        );
+        const marker = mc
+          ? "[[MC]]" + (mc.innerText || "") + "[[/MC]]\n"
+          : "";
+        const vt = marker + ((document.body && document.body.innerText) || "");
+        const n = norm(vt);
+        const buf = await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(n)
+        );
+        const hash = Array.from(new Uint8Array(buf))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        return {
+          path: location.pathname,
+          hash,
+          len: n.length,
+          rawLen: vt.length,
+          preview: n.slice(0, 120),
+          text: n,
+        };
+      }, normSource);
+
+    const stab = await readUntilStable(readOnce, {
+      maxReads: 6,
+      intervalMs: 1500,
+    });
+    const result = stab.final;
 
     if (!result || result.len < 150) {
       return {
@@ -180,6 +192,8 @@ async function capturePage(context, pageSpec, attempt, normSource) {
         error: `too_short len=${result && result.len} preview=${result && result.preview}`,
       };
     }
+    const text = String(result.text || "");
+    const lineArr = text.split(/\n/);
     return {
       key: pageSpec.key,
       path: pageSpec.path,
@@ -188,6 +202,11 @@ async function capturePage(context, pageSpec, attempt, normSource) {
       rawLen: result.rawLen,
       attempt,
       ok: true,
+      stable: stab.stable,
+      reads: stab.reads,
+      distinctHashes: stab.distinctHashes,
+      lines: lineArr.length,
+      text,
     };
   } catch (err) {
     return {
@@ -219,8 +238,13 @@ async function main() {
     outDir,
     `visible-text-${args.label}-${stamp}.json`
   );
+  const textsDir = outFile.replace(/\.json$/i, ".texts");
   if (fs.existsSync(outFile)) {
     console.error("REFUSE overwrite existing file:", outFile);
+    process.exit(3);
+  }
+  if (fs.existsSync(textsDir)) {
+    console.error("REFUSE overwrite existing file:", textsDir);
     process.exit(3);
   }
 
@@ -275,29 +299,59 @@ async function main() {
       process.exit(1);
     }
     captured.push(last);
-    console.log("ok", last.path, last.hash.slice(0, 12), "len", last.len);
+    console.log(
+      "ok",
+      last.path,
+      last.hash.slice(0, 12),
+      "len",
+      last.len,
+      "stable=" + last.stable,
+      "reads=" + last.reads
+    );
+  }
+
+  // Second existence check (race / identical stamp)
+  if (fs.existsSync(outFile) || fs.existsSync(textsDir)) {
+    console.error(
+      "REFUSE overwrite existing file:",
+      fs.existsSync(outFile) ? outFile : textsDir
+    );
+    await browser.close();
+    process.exit(3);
+  }
+
+  fs.mkdirSync(textsDir, { recursive: true });
+  const pagesOut = [];
+  for (const p of captured) {
+    const textFileName = p.key + ".txt";
+    const textAbs = path.join(textsDir, textFileName);
+    const body = String(p.text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    fs.writeFileSync(textAbs, body.endsWith("\n") ? body : body + "\n", "utf8");
+    const { text: _drop, ...rest } = p;
+    pagesOut.push({
+      ...rest,
+      textFile: path.join(path.basename(textsDir), textFileName).replace(/\\/g, "/"),
+    });
   }
 
   const payload = {
     label: args.label,
     capturedAt: new Date().toISOString(),
     base: BASE,
-    pageCount: captured.length,
-    pages: captured,
+    pageCount: pagesOut.length,
+    textsDir: path.basename(textsDir),
+    pages: pagesOut,
   };
 
-  // Second existence check (race / identical stamp)
-  if (fs.existsSync(outFile)) {
-    console.error("REFUSE overwrite existing file:", outFile);
-    await browser.close();
-    process.exit(3);
-  }
   fs.writeFileSync(outFile, JSON.stringify(payload, null, 2) + "\n", "utf8");
   console.log("wrote", outFile);
+  console.log("texts", textsDir);
   await browser.close();
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
