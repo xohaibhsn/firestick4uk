@@ -316,6 +316,22 @@ const {
       "scripts/tools/visible-text-stable.js",
       "scripts/phase-multi-138-tests.js",
       "scripts/phase-multi-112-tests.js",
+      // F4UK-MULTI-139: atomic staff password + SEO reconcile lock (+ plumbing).
+      "lib/adminStaffPasswordTx.ts",
+      "lib/namedLock.ts",
+      "pages/api/admin-profile.ts",
+      "pages/api/admin-staff-password.ts",
+      "lib/seoIssueMemoryServer.ts",
+      "pages/api/admin-seo-issues/reconcile.ts",
+      "scripts/phase-multi-139-tests.js",
+      "scripts/phase-multi-116-tests.js",
+      "scripts/phase-multi-130-tests.js",
+      "scripts/phase-multi-131-tests.js",
+      "scripts/phase-multi-132-tests.js",
+      "scripts/phase-multi-133-tests.js",
+      "scripts/phase-multi-135-tests.js",
+      "scripts/phase-multi-136-tests.js",
+      "scripts/phase-multi-137-tests.js",
     ]);
     const names = new Set();
     for (const block of [diff.stdout || "", unstaged.stdout || ""]) {

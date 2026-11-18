@@ -511,6 +511,16 @@ async function main() {
     "components/sidhu/ReviewsPanel.tsx",
     "scripts/phase-multi-137-tests.js",
   ]);
+  // F4UK-MULTI-139: atomic staff password + SEO reconcile lock.
+  const MULTI139_OK = new Set([
+    "lib/adminStaffPasswordTx.ts",
+    "lib/namedLock.ts",
+    "pages/api/admin-profile.ts",
+    "pages/api/admin-staff-password.ts",
+    "lib/seoIssueMemoryServer.ts",
+    "pages/api/admin-seo-issues/reconcile.ts",
+    "scripts/phase-multi-139-tests.js",
+  ]);
   const dirtyNames = (diffCheck.stdout || "")
     .split(/\r?\n/)
     .map((s) => s.trim())
@@ -521,7 +531,8 @@ async function main() {
         !MULTI133_OK.has(n) &&
         !MULTI135_OK.has(n) &&
         !MULTI136_OK.has(n) &&
-        !MULTI137_OK.has(n)
+        !MULTI137_OK.has(n) &&
+        !MULTI139_OK.has(n)
     );
   ok("no_app_tree_diff", dirtyNames.length === 0, dirtyNames.join(",") || "clean");
 

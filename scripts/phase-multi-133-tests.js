@@ -227,6 +227,20 @@ const APPROVED = new Set([
   "scripts/phase-multi-131-tests.js",
   "scripts/phase-coupon-validation-tests.js",
   "scripts/phase-multi-105-tests.js",
+  // F4UK-MULTI-139: atomic staff password + SEO reconcile lock (+ plumbing).
+  "lib/adminStaffPasswordTx.ts",
+  "lib/namedLock.ts",
+  "pages/api/admin-profile.ts",
+  "pages/api/admin-staff-password.ts",
+  "lib/seoIssueMemoryServer.ts",
+  "pages/api/admin-seo-issues/reconcile.ts",
+  "scripts/phase-multi-139-tests.js",
+  "scripts/phase-multi-116-tests.js",
+  "scripts/phase-multi-130-tests.js",
+  "scripts/phase-multi-135-tests.js",
+  "scripts/phase-multi-136-tests.js",
+  "scripts/phase-multi-137-tests.js",
+  "scripts/phase-multi-138-tests.js",
 ]);
 
 const LABEL_OK = "AbCdEf123456";
@@ -579,6 +593,12 @@ const LABEL_WA = "WaLabel_99xyz";
       "pages/api/faqs.ts",
       "pages/api/admin-reviews.ts",
     ]);
+    // F4UK-MULTI-139: atomic staff password + SEO reconcile lock.
+    const MULTI139_API_OK = new Set([
+      "pages/api/admin-profile.ts",
+      "pages/api/admin-staff-password.ts",
+      "pages/api/admin-seo-issues/reconcile.ts",
+    ]);
     const r = spawnSync(
       "git",
       ["diff", "--name-only", "origin/main", "--", "pages/api", "lib/insightsIngest.ts"],
@@ -588,7 +608,7 @@ const LABEL_WA = "WaLabel_99xyz";
       .split(/\r?\n/)
       .map((s) => s.trim().replace(/\\/g, "/"))
       .filter(Boolean)
-      .filter((n) => !MULTI137_API_OK.has(n));
+      .filter((n) => !MULTI137_API_OK.has(n) && !MULTI139_API_OK.has(n));
     ok("zero_api_and_ingest_diff", names.length === 0, names.join(",") || "clean");
   }
 

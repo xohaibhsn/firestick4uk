@@ -437,6 +437,16 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "components/sidhu/ReviewsPanel.tsx",
     "scripts/phase-multi-137-tests.js",
   ]);
+  // F4UK-MULTI-139: atomic staff password + SEO reconcile lock.
+  const MULTI139_OK = new Set([
+    "lib/adminStaffPasswordTx.ts",
+    "lib/namedLock.ts",
+    "pages/api/admin-profile.ts",
+    "pages/api/admin-staff-password.ts",
+    "lib/seoIssueMemoryServer.ts",
+    "pages/api/admin-seo-issues/reconcile.ts",
+    "scripts/phase-multi-139-tests.js",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -447,9 +457,12 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       !MULTI133_OK.has(n) &&
       !MULTI135_OK.has(n) &&
       !MULTI136_OK.has(n) &&
-      !MULTI137_OK.has(n)
+      !MULTI137_OK.has(n) &&
+      !MULTI139_OK.has(n)
   );
-  const apiTouchedUnexpected = apiTouched.filter((n) => !MULTI137_OK.has(n));
+  const apiTouchedUnexpected = apiTouched.filter(
+    (n) => !MULTI137_OK.has(n) && !MULTI139_OK.has(n)
+  );
   ok(
     "no_pages_api_changes",
     apiTouchedUnexpected.length === 0,
@@ -488,8 +501,12 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "scripts/phase-multi-135-tests.js",
     "scripts/phase-multi-136-tests.js",
     "scripts/phase-multi-137-tests.js",
+    "scripts/phase-multi-137-tests.js",
+    "scripts/phase-multi-138-tests.js",
+    "scripts/phase-multi-139-tests.js",
     "scripts/phase-multi-97-tests.js",
     "scripts/phase-multi-114-tests.js",
+    "scripts/phase-multi-116-tests.js",
     "scripts/phase-multi-123-tests.js",
     "scripts/phase-multi-126-tests.js",
     "scripts/phase-coupon-validation-tests.js",
@@ -502,6 +519,7 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       MULTI135_OK.has(n) ||
       MULTI136_OK.has(n) ||
       MULTI137_OK.has(n) ||
+      MULTI139_OK.has(n) ||
       PLUMBING_OK.has(n)
     ) {
       return false;
@@ -514,7 +532,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       !MULTI133_OK.has(n) &&
       !MULTI135_OK.has(n) &&
       !MULTI136_OK.has(n) &&
-      !MULTI137_OK.has(n)
+      !MULTI137_OK.has(n) &&
+      !MULTI139_OK.has(n)
     ) {
       return true;
     }

@@ -3,6 +3,11 @@
  * Never import from client components.
  */
 import pool from "@/lib/db";
+import {
+  acquireNamedLockOnConn,
+  LOCK_SEO_ISSUE_RECONCILE,
+  releaseNamedLockOnConn,
+} from "@/lib/namedLock";
 import { buildSeoDiagnostics } from "@/lib/seoDiagnostics";
 import {
   normalizeBlogDiagnosticRow,
@@ -336,8 +341,13 @@ export async function reconcileSeoIssueMemory(
   scopeInput: SeoIssueReconcileScope
 ): Promise<SeoIssueReconcileResult> {
   const conn = await pool.getConnection();
+  let lockHeld = false;
+  let begun = false;
   try {
+    await acquireNamedLockOnConn(conn, LOCK_SEO_ISSUE_RECONCILE, 5);
+    lockHeld = true;
     await conn.beginTransaction();
+    begun = true;
 
     const evaluatedProducts =
       scopeInput.scope === "all" ||
@@ -480,13 +490,27 @@ export async function reconcileSeoIssueMemory(
       currentIssues,
     };
   } catch (err) {
-    try {
-      await conn.rollback();
-    } catch {
-      /* ignore */
+    if (begun) {
+      try {
+        await conn.rollback();
+      } catch {
+        /* ignore */
+      }
     }
     throw err;
   } finally {
-    conn.release();
+    if (lockHeld) {
+      const released = await releaseNamedLockOnConn(
+        conn,
+        LOCK_SEO_ISSUE_RECONCILE
+      );
+      if (released === false) {
+        conn.destroy();
+      } else {
+        conn.release();
+      }
+    } else {
+      conn.release();
+    }
   }
 }

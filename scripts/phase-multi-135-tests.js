@@ -368,6 +368,12 @@ function assertNotMutated(input, snapshot, label) {
     "pages/api/faqs.ts",
     "pages/api/admin-reviews.ts",
   ]);
+  // F4UK-MULTI-139: atomic staff password + SEO reconcile lock.
+  const MULTI139_API_OK = new Set([
+    "pages/api/admin-profile.ts",
+    "pages/api/admin-staff-password.ts",
+    "pages/api/admin-seo-issues/reconcile.ts",
+  ]);
   const apiNames = [
     ...(diffApi.stdout || "").split(/\r?\n/),
     ...(workingApi.stdout || "").split(/\r?\n/),
@@ -375,7 +381,7 @@ function assertNotMutated(input, snapshot, label) {
   ]
     .map((s) => s.trim().replace(/\\/g, "/"))
     .filter(Boolean)
-    .filter((n) => !MULTI137_API_OK.has(n));
+    .filter((n) => !MULTI137_API_OK.has(n) && !MULTI139_API_OK.has(n));
   ok("zero_pages_api_diff", apiNames.length === 0, apiNames.join(",") || "clean");
 
   const siteContentSrc = read("pages/api/site-content.ts");

@@ -14,6 +14,7 @@ export class LockTimeoutError extends Error {
 
 export const LOCK_ADMIN_STAFF = "f4uk_admin_staff";
 export const LOCK_REDIRECTS = "f4uk_redirects";
+export const LOCK_SEO_ISSUE_RECONCILE = "f4uk_seo_issue_reconcile";
 
 /**
  * Acquire a MySQL named advisory lock on a dedicated pool connection,
@@ -42,5 +43,34 @@ export async function withNamedLock<T>(
       // best-effort release
     }
     conn.release();
+  }
+}
+
+/** Acquire GET_LOCK on an existing connection (same conn as the caller's transaction). */
+export async function acquireNamedLockOnConn(
+  conn: PoolConnection,
+  name: string,
+  timeoutSec: number
+): Promise<void> {
+  const [rows]: any = await conn.query("SELECT GET_LOCK(?, ?) AS got", [
+    name,
+    timeoutSec,
+  ]);
+  const got = Array.isArray(rows) ? Number(rows[0]?.got) : NaN;
+  if (got !== 1) {
+    throw new LockTimeoutError(name);
+  }
+}
+
+/** Best-effort RELEASE_LOCK on an existing connection. Never throws. */
+export async function releaseNamedLockOnConn(
+  conn: PoolConnection,
+  name: string
+): Promise<boolean> {
+  try {
+    await conn.query("SELECT RELEASE_LOCK(?)", [name]);
+    return true;
+  } catch {
+    return false;
   }
 }

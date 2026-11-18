@@ -13,6 +13,7 @@ import {
   isValidEntityId,
   type SeoIssueReconcileScope,
 } from "@/lib/seoIssueMemory";
+import { LockTimeoutError } from "@/lib/namedLock";
 import { reconcileSeoIssueMemory } from "@/lib/seoIssueMemoryServer";
 import { getClientIp } from "@/lib/rateLimit";
 
@@ -101,6 +102,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     return res.status(200).json(result);
   } catch (err: any) {
+    if (err instanceof LockTimeoutError || err?.name === "LockTimeoutError") {
+      return res.status(409).json({
+        error: "Reconcile busy",
+        message:
+          "Another SEO reconcile is running. Please try again in a moment.",
+        code: "busy",
+      });
+    }
     console.error("[admin-seo-issues/reconcile] failed:", err?.message || err);
     return res.status(500).json({
       error: "Reconcile failed",

@@ -476,8 +476,17 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
     "pages/api/faqs.ts",
     "pages/api/admin-reviews.ts",
   ]);
+  // MULTI-139: atomic staff password + SEO reconcile lock.
+  const MULTI139_API_OK = new Set([
+    "pages/api/admin-profile.ts",
+    "pages/api/admin-staff-password.ts",
+    "pages/api/admin-seo-issues/reconcile.ts",
+  ]);
   const apiTouched = names.filter(
-    (n) => n.startsWith("pages/api/") && !MULTI137_API_OK.has(n)
+    (n) =>
+      n.startsWith("pages/api/") &&
+      !MULTI137_API_OK.has(n) &&
+      !MULTI139_API_OK.has(n)
   );
   // MULTI-132: ProductDetail.tsx may receive additive preview listener (still no pages/api).
   // MULTI-133: lib-only tracking gates (no public app/components required).
@@ -518,7 +527,9 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
   if (committed.length) {
     const bad = committed.filter(
       (n) =>
-        (n.startsWith("pages/api/") && !MULTI137_API_OK.has(n)) ||
+        (n.startsWith("pages/api/") &&
+          !MULTI137_API_OK.has(n) &&
+          !MULTI139_API_OK.has(n)) ||
         (n.startsWith("app/") &&
           n !== "app/sidhu/page.tsx" &&
           n !== "app/products/[slug]/ProductDetail.tsx")

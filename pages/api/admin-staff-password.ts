@@ -1,12 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "../../lib/db";
 import {
-  destroyAdminSessionsForStaff,
   getRequestMeta,
   hashStaffPassword,
   requireAdminPermission,
   validateStaffPassword,
 } from "../../lib/adminAuth";
+import { applyStaffPasswordChange } from "../../lib/adminStaffPasswordTx";
 import { recordAdminAudit } from "../../lib/adminAudit";
 import { setAdminNoStore } from "../../lib/adminNoStore";
 
@@ -42,13 +42,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const passwordHash = await hashStaffPassword(String(new_password));
-    await pool.query(
-      `UPDATE admin_staff
-       SET password_hash = ?, password_changed_at = NOW(), updated_at = NOW()
-       WHERE id = ?`,
-      [passwordHash, staffId]
-    );
-    await destroyAdminSessionsForStaff(staffId);
+    const applied = await applyStaffPasswordChange(staffId, passwordHash);
+    if (!applied.ok) {
+      return res.status(404).json({ error: "Staff user not found" });
+    }
 
     const { ip } = getRequestMeta(req);
     await recordAdminAudit({

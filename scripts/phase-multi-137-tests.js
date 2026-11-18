@@ -1550,9 +1550,20 @@ function runSourceAssertions() {
     }
   }
 
-  // pages/api diff limited to coupons.ts, faqs.ts, admin-reviews.ts
+  // pages/api diff limited to MULTI-137 surfaces (+ later MULTI-139 password/reconcile).
   {
-    const allowed = new Set(["pages/api/coupons.ts", "pages/api/faqs.ts", "pages/api/admin-reviews.ts"]);
+    const allowed137 = new Set([
+      "pages/api/coupons.ts",
+      "pages/api/faqs.ts",
+      "pages/api/admin-reviews.ts",
+    ]);
+    // F4UK-MULTI-139: atomic staff password + SEO reconcile lock.
+    const allowed139 = new Set([
+      "pages/api/admin-profile.ts",
+      "pages/api/admin-staff-password.ts",
+      "pages/api/admin-seo-issues/reconcile.ts",
+    ]);
+    const allowed = new Set([...allowed137, ...allowed139]);
     const changed = git(["diff", "--name-only", BASE, "--", "pages/api"]);
     const untracked = git(["ls-files", "--others", "--exclude-standard", "--", "pages/api"]);
     const names = (changed.stdout + "\n" + untracked.stdout)
@@ -1567,7 +1578,7 @@ function runSourceAssertions() {
     );
     ok(
       "src_pages_api_expected_files_changed",
-      [...allowed].every((f) => names.includes(f))
+      [...allowed137].every((f) => names.includes(f))
     );
   }
 }

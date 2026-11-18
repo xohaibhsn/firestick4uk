@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import pool from "../../lib/db";
 import {
   clearAdminSessionCookie,
-  destroyAdminSessionsForStaff,
   getRequestMeta,
   hashStaffPassword,
   readAdminSessionToken,
@@ -11,6 +10,7 @@ import {
   verifyStaffPassword,
   destroyAdminSessionByToken,
 } from "../../lib/adminAuth";
+import { applyStaffPasswordChange } from "../../lib/adminStaffPasswordTx";
 import { recordAdminAudit } from "../../lib/adminAudit";
 import { setAdminNoStore } from "../../lib/adminNoStore";
 
@@ -89,14 +89,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const passwordHash = await hashStaffPassword(String(new_password));
-      await pool.query(
-        `UPDATE admin_staff
-         SET password_hash = ?, password_changed_at = NOW(), updated_at = NOW()
-         WHERE id = ?`,
-        [passwordHash, admin.staffId]
-      );
+      const applied = await applyStaffPasswordChange(admin.staffId, passwordHash, {
+        expectedHash: String(staff.password_hash || ""),
+        requireActive: true,
+      });
+      if (!applied.ok) {
+        if (applied.code === "stale") {
+          return res.status(409).json({
+            error:
+              "Your password was changed elsewhere. Please sign in again and retry.",
+            code: "stale",
+          });
+        }
+        return res.status(401).json({ error: "Unauthorized" });
+      }
 
-      await destroyAdminSessionsForStaff(admin.staffId);
       const token = readAdminSessionToken(req);
       if (token) await destroyAdminSessionByToken(token).catch(() => {});
       clearAdminSessionCookie(res, req);
