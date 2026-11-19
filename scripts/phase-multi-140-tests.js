@@ -238,7 +238,10 @@ function main() {
         rel === "docs/design/DRAFT-PUBLISH.md" ||
         rel === "lib/contentDrafts.ts" ||
         rel === "lib/contentDraftsCapability.ts" ||
-        rel === "pages/api/admin-drafts.ts"
+        rel === "pages/api/admin-drafts.ts" ||
+        // F4UK-MULTI-143: D3 UI files (expected not to mention content_drafts; skip if they do).
+        rel === "components/admin/CmsDraftBar.tsx" ||
+        rel === "lib/contentDraftClient.ts"
       ) {
         continue;
       }
@@ -318,6 +321,11 @@ function main() {
     "lib/contentDrafts.ts",
     "lib/contentDraftsCapability.ts",
     "scripts/phase-multi-142-tests.js",
+    // F4UK-MULTI-143: Draft/Publish D3 admin UI (CmsDraftBar + client helper).
+    "components/admin/CmsDraftBar.tsx",
+    "lib/contentDraftClient.ts",
+    "app/sidhu/page.tsx",
+    "scripts/phase-multi-143-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

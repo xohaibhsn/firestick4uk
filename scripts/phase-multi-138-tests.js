@@ -341,6 +341,11 @@ const {
       "lib/contentDrafts.ts",
       "lib/contentDraftsCapability.ts",
       "scripts/phase-multi-142-tests.js",
+      // F4UK-MULTI-143: Draft/Publish D3 admin UI (CmsDraftBar + client helper).
+      "components/admin/CmsDraftBar.tsx",
+      "lib/contentDraftClient.ts",
+      "app/sidhu/page.tsx",
+      "scripts/phase-multi-143-tests.js",
     ]);
     const names = new Set();
     for (const block of [diff.stdout || "", unstaged.stdout || ""]) {

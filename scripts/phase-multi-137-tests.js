@@ -1405,8 +1405,33 @@ function parseHunks(diffText) {
   return hunks;
 }
 
+// F4UK-MULTI-143 (Draft/Publish D3): the ONLY non-saveFaqOrder edits allowed in
+// app/sidhu/page.tsx are the CmsDraftBar import and single-line <CmsDraftBar ... /> elements.
+const CMS_DRAFT_BAR_IMPORT_RE = /^import CmsDraftBar from "@\/components\/admin\/CmsDraftBar";\s*$/;
+const CMS_DRAFT_BAR_ELEMENT_RE = /^\s*<CmsDraftBar\b.*\/>\s*$/;
+
+function isCmsDraftBarLine(line) {
+  return CMS_DRAFT_BAR_IMPORT_RE.test(line) || CMS_DRAFT_BAR_ELEMENT_RE.test(line);
+}
+
+/** Remove the MULTI-143 CmsDraftBar import / element lines; returns {src, removed}. */
+function stripCmsDraftBarWiring(src) {
+  const kept = [];
+  let removed = 0;
+  let importCount = 0;
+  for (const line of norm(src).split("\n")) {
+    if (isCmsDraftBarLine(line)) {
+      removed++;
+      if (CMS_DRAFT_BAR_IMPORT_RE.test(line)) importCount++;
+      continue;
+    }
+    kept.push(line);
+  }
+  return { src: kept.join("\n"), removed, importCount };
+}
+
 function runSourceAssertions() {
-  // app/sidhu/page.tsx — only saveFaqOrder changed
+  // app/sidhu/page.tsx — only saveFaqOrder changed (+ MULTI-143 CmsDraftBar import/element wiring)
   {
     let baseSrc = "";
     let err = "";
@@ -1415,7 +1440,10 @@ function runSourceAssertions() {
     } catch (e) {
       err = String(e.message || e);
     }
-    const curSrc = read("app/sidhu/page.tsx");
+    const curSrcRaw = read("app/sidhu/page.tsx");
+    // Strip MULTI-143 CmsDraftBar wiring lines so the remaining source must still equal baseline.
+    const stripped = stripCmsDraftBarWiring(curSrcRaw);
+    const curSrc = stripped.src;
     const cur = extractConstArrowBlock(curSrc, "saveFaqOrder");
     const base = baseSrc ? extractConstArrowBlock(baseSrc, "saveFaqOrder") : null;
     ok("src_sidhu_saveFaqOrder_found", !!cur && !!base, err);
@@ -1426,7 +1454,15 @@ function runSourceAssertions() {
     ok(
       "src_sidhu_rest_of_file_equals_baseline",
       !!cur && !!base && cur.rest === base.rest,
-      cur && base && cur.rest !== base.rest ? "content outside saveFaqOrder differs" : ""
+      cur && base && cur.rest !== base.rest
+        ? "content outside saveFaqOrder (after stripping MULTI-143 CmsDraftBar lines) differs"
+        : ""
+    );
+    // MULTI-143: at most one CmsDraftBar import line may have been stripped.
+    ok(
+      "src_sidhu_cmsdraftbar_wiring_limited",
+      stripped.importCount <= 1,
+      `removed=${stripped.removed} imports=${stripped.importCount}`
     );
 
     const d = git(["diff", "-U0", BASE, "--", "app/sidhu/page.tsx"]);
@@ -1451,7 +1487,17 @@ function runSourceAssertions() {
         hunks.every((h) => {
           const first = h.oldCount === 0 ? h.oldStart + 1 : h.oldStart;
           const last = h.oldCount === 0 ? h.oldStart : h.oldStart + h.oldCount - 1;
-          return first >= lo && last <= hi;
+          if (first >= lo && last <= hi) return true;
+          // MULTI-143: pure-addition hunk whose changed lines are all CmsDraftBar
+          // import/element lines (blank '+' lines tolerated, but at least one CmsDraftBar line).
+          const body = h.lines.map((l) => l.slice(1));
+          return (
+            h.oldCount === 0 &&
+            h.lines.length > 0 &&
+            h.lines.every((l) => l.startsWith("+")) &&
+            body.some((l) => isCmsDraftBarLine(l)) &&
+            body.every((l) => l.trim() === "" || isCmsDraftBarLine(l))
+          );
         }),
       `hunks=${hunks.length}`
     );

@@ -24,6 +24,7 @@ export type DraftChanges = Record<string, DraftChangeEntry>;
 export type DraftValidationError = {
   code:
     | "invalid_entity"
+    | "invalid_version"
     | "empty_draft"
     | "too_many_keys"
     | "invalid_key"
@@ -97,20 +98,26 @@ export function validateEntityTypeOnly(
   return { ok: true, entity_type: type as DraftEntityType };
 }
 
-export function validateDraftChanges(
-  changes: unknown,
-  opts: { knownKeys: Set<string> }
-): { ok: true; changes: DraftChanges } | { ok: false; errors: DraftValidationError[] } {
-  const errors: DraftValidationError[] = [];
+/**
+ * Structure / size gate only — no DB. Used before loadKnownKeys so >200 keys
+ * and non-objects never hit site_content.
+ */
+export function validateDraftChangesEarly(
+  changes: unknown
+):
+  | { ok: true; keys: string[] }
+  | { ok: false; errors: DraftValidationError[] } {
   if (
     changes == null ||
     typeof changes !== "object" ||
     Array.isArray(changes) ||
     Object.getPrototypeOf(changes) !== Object.prototype
   ) {
-    return { ok: false, errors: [{ code: "empty_draft", message: "Draft changes must be a plain object." }] };
+    return {
+      ok: false,
+      errors: [{ code: "empty_draft", message: "Draft changes must be a plain object." }],
+    };
   }
-
   const keys = Object.keys(changes as Record<string, unknown>);
   if (keys.length === 0) {
     return { ok: false, errors: [{ code: "empty_draft", message: "Draft has no changes." }] };
@@ -121,7 +128,18 @@ export function validateDraftChanges(
       errors: [{ code: "too_many_keys", message: "Draft exceeds 200 keys." }],
     };
   }
+  return { ok: true, keys };
+}
 
+export function validateDraftChanges(
+  changes: unknown,
+  opts: { knownKeys: Set<string> }
+): { ok: true; changes: DraftChanges } | { ok: false; errors: DraftValidationError[] } {
+  const errors: DraftValidationError[] = [];
+  const early = validateDraftChangesEarly(changes);
+  if (!early.ok) return early;
+
+  const keys = early.keys;
   const out: DraftChanges = {};
   for (const key of keys) {
     if (!CONTENT_KEY_RE.test(key)) {

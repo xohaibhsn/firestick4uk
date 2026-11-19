@@ -92,3 +92,19 @@ All six = **Yes**:
 4. No scheduled publish
 5. Table approved
 6. No auto-delete; show an "N days old" warning
+
+## D3 as built
+
+Admin-only Content Editor draft bar on `/sidhu` → Content Editor. **Zero public change.** Normal live Save buttons unchanged. Publish goes through existing `saveContent()` → `POST /api/site-content` (base_hash + Reload/Overwrite/Cancel stale dialog), then `DELETE` the draft.
+
+| Item | Detail |
+|------|--------|
+| UI | `components/admin/CmsDraftBar.tsx` (`"use client"`) — Save draft / Open draft / Publish draft / Discard draft |
+| Helpers | `lib/contentDraftClient.ts` — pure, client-safe (`buildDraftChanges`, `liveChangedKeys`, `draftOverrides`, `keysMatchingLive`, `formatDraftBanner`) |
+| Wiring | `app/sidhu/page.tsx` — one import + one `<CmsDraftBar …/>` directly after `<CmsPreviewPane …/>`; `saveContent` byte-identical |
+| Overview | Compact “Pages with unpublished drafts” list when drafts exist (`GET ?entity_type=site_content_page`) |
+| Page bar | Banner “Draft by {who}, saved {when} — N change(s) — NOT live”; ⚠ when `age_days >= 7` |
+| Auth | `credentials:"include"`; `401` → session expired; `403` / `available:false` → render nothing |
+| Concurrency | PUT/DELETE send `expected_draft_version`; `409 draft_stale`/`draft_exists` → toast + reload |
+| No auto-save | No timers, no polling, no new `localStorage` keys |
+| D2 nits | (N1) structure/`too_many_keys` before `loadKnownKeys`; (N2) bad version → `400 invalid_version` |

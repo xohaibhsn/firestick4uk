@@ -12,6 +12,7 @@ import CmsEaseToolbar, {
 import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
 import type { AdminSearchTarget } from "@/components/admin/AdminGlobalSearch";
 import CmsPreviewPane from "@/components/admin/CmsPreviewPane";
+import CmsDraftBar from "@/components/admin/CmsDraftBar";
 import ProductPreviewPane from "@/components/admin/ProductPreviewPane";
 import CmsUpdatesAfterSaveChip from "@/components/admin/CmsUpdatesAfterSaveChip";
 import { productPreviewDisabledReason } from "@/lib/productPreview";
@@ -9771,6 +9772,7 @@ function AdminPageInner() {
                 savedContent={siteContentSaved}
                 forceOverrides={cmsPreviewForce}
               />
+              <CmsDraftBar activePage={activePage} siteContent={siteContent} savedContent={siteContentSaved} setSiteContent={setSiteContent} baseHashForKey={baseHashForKey} onPublish={saveContent} contentSaving={contentSaving} onSessionExpired={handleSessionExpired} onOpenPage={requestActivePage} />
 
               <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
                 {[

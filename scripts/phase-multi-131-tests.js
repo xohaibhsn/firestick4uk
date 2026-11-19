@@ -454,6 +454,16 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "lib/contentDraftsCapability.ts",
     "scripts/phase-multi-142-tests.js",
   ]);
+  // F4UK-MULTI-143: Draft/Publish D3 admin UI (CmsDraftBar + client helper).
+  const MULTI143_OK = new Set([
+    "components/admin/CmsDraftBar.tsx",
+    "lib/contentDraftClient.ts",
+    "app/sidhu/page.tsx",
+    "pages/api/admin-drafts.ts",
+    "lib/contentDrafts.ts",
+    "scripts/phase-multi-143-tests.js",
+    "docs/design/DRAFT-PUBLISH.md",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -466,10 +476,15 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       !MULTI136_OK.has(n) &&
       !MULTI137_OK.has(n) &&
       !MULTI139_OK.has(n) &&
-      !MULTI142_OK.has(n)
+      !MULTI142_OK.has(n) &&
+      !MULTI143_OK.has(n)
   );
   const apiTouchedUnexpected = apiTouched.filter(
-    (n) => !MULTI137_OK.has(n) && !MULTI139_OK.has(n) && !MULTI142_OK.has(n)
+    (n) =>
+      !MULTI137_OK.has(n) &&
+      !MULTI139_OK.has(n) &&
+      !MULTI142_OK.has(n) &&
+      !MULTI143_OK.has(n)
   );
   ok(
     "no_pages_api_changes",
@@ -513,6 +528,7 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "scripts/phase-multi-138-tests.js",
     "scripts/phase-multi-139-tests.js",
     "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-143-tests.js",
     "scripts/phase-multi-97-tests.js",
     "scripts/phase-multi-114-tests.js",
     "scripts/phase-multi-116-tests.js",
@@ -530,6 +546,7 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       MULTI137_OK.has(n) ||
       MULTI139_OK.has(n) ||
       MULTI142_OK.has(n) ||
+      MULTI143_OK.has(n) ||
       PLUMBING_OK.has(n)
     ) {
       return false;
@@ -544,7 +561,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       !MULTI136_OK.has(n) &&
       !MULTI137_OK.has(n) &&
       !MULTI139_OK.has(n) &&
-      !MULTI142_OK.has(n)
+      !MULTI142_OK.has(n) &&
+      !MULTI143_OK.has(n)
     ) {
       return true;
     }
@@ -554,7 +572,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       n !== "components/admin/ProductListToolbar.tsx" &&
       n !== "components/admin/ProductPreviewPane.tsx" &&
       !MULTI136_OK.has(n) &&
-      !MULTI137_OK.has(n)
+      !MULTI137_OK.has(n) &&
+      !MULTI143_OK.has(n)
     ) {
       return true;
     }

@@ -13,6 +13,7 @@ import {
   draftRowToSummary,
   loadKnownKeys,
   validateDraftChanges,
+  validateDraftChangesEarly,
   validateEntity,
   validateEntityTypeOnly,
   type ContentDraftRow,
@@ -136,7 +137,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!isCreate && expectedVersion === null) {
         return res.status(400).json({
           error: "expected_draft_version must be null (create) or a number (update).",
-          code: "invalid_entity",
+          code: "invalid_version",
+        });
+      }
+
+      // N1: reject non-object / >200 keys before any site_content query.
+      const early = validateDraftChangesEarly(body.changes);
+      if (!early.ok) {
+        return res.status(400).json({
+          error: early.errors[0]?.message || "Invalid draft",
+          code: early.errors[0]?.code || "empty_draft",
+          details: early.errors,
         });
       }
 
@@ -145,10 +156,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let auditVersion = 0;
       let auditKeys: string[] = [];
       try {
-        const changeKeys =
-          body.changes != null && typeof body.changes === "object" && !Array.isArray(body.changes)
-            ? Object.keys(body.changes as Record<string, unknown>)
-            : [];
+        const changeKeys = early.keys;
         const knownKeys = await loadKnownKeys(conn, changeKeys);
         const validated = validateDraftChanges(body.changes, { knownKeys });
         if (!validated.ok) {
@@ -273,7 +281,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (typeof expectedRaw !== "number" || !Number.isFinite(expectedRaw)) {
       return res.status(400).json({
         error: "expected_draft_version is required.",
-        code: "invalid_entity",
+        code: "invalid_version",
       });
     }
     const expectedVersion = Math.floor(expectedRaw);

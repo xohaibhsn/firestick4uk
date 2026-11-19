@@ -527,6 +527,16 @@ async function main() {
     "lib/contentDrafts.ts",
     "lib/contentDraftsCapability.ts",
   ]);
+  // F4UK-MULTI-143: Draft/Publish D3 admin UI (CmsDraftBar + client helper).
+  const MULTI143_OK = new Set([
+    "components/admin/CmsDraftBar.tsx",
+    "lib/contentDraftClient.ts",
+    "app/sidhu/page.tsx",
+    "scripts/phase-multi-143-tests.js",
+    "pages/api/admin-drafts.ts",
+    "lib/contentDrafts.ts",
+    "docs/design/DRAFT-PUBLISH.md",
+  ]);
   const dirtyNames = (diffCheck.stdout || "")
     .split(/\r?\n/)
     .map((s) => s.trim())
@@ -539,7 +549,8 @@ async function main() {
         !MULTI136_OK.has(n) &&
         !MULTI137_OK.has(n) &&
         !MULTI139_OK.has(n) &&
-        !MULTI142_OK.has(n)
+        !MULTI142_OK.has(n) &&
+        !MULTI143_OK.has(n)
     );
   ok("no_app_tree_diff", dirtyNames.length === 0, dirtyNames.join(",") || "clean");
 

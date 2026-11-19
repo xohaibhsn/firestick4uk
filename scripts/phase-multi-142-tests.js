@@ -910,7 +910,13 @@ function runSourceAssertions() {
   }
   for (const r of clientRoots) walk(r);
   ok("no_client_siteContentBaseHash_import", badHashImports.length === 0, badHashImports.join(","));
-  ok("no_ui_refs_to_drafts", uiRefs.length === 0, uiRefs.join(","));
+  // F4UK-MULTI-143 (D3): only the CmsDraftBar component and the /sidhu page may reference drafts in UI.
+  const ALLOWED_UI_REFS = new Set([
+    "components/admin/CmsDraftBar.tsx",
+    "app/sidhu/page.tsx",
+  ]);
+  const unexpectedUiRefs = uiRefs.filter((r) => !ALLOWED_UI_REFS.has(r));
+  ok("no_ui_refs_to_drafts", unexpectedUiRefs.length === 0, unexpectedUiRefs.join(","));
 }
 
 // ─── no-forbidden-diff ──────────────────────────────────────────────────────
@@ -935,6 +941,11 @@ function runDiffAllowlist() {
     "scripts/phase-multi-138-tests.js",
     "scripts/phase-multi-139-tests.js",
     "scripts/phase-multi-140-tests.js",
+    // F4UK-MULTI-143: Draft/Publish D3 admin UI (CmsDraftBar + client helper).
+    "components/admin/CmsDraftBar.tsx",
+    "lib/contentDraftClient.ts",
+    "app/sidhu/page.tsx",
+    "scripts/phase-multi-143-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,
