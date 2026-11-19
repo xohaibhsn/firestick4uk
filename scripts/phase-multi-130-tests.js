@@ -482,11 +482,14 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
     "pages/api/admin-staff-password.ts",
     "pages/api/admin-seo-issues/reconcile.ts",
   ]);
+  // F4UK-MULTI-142: admin drafts API for CMS pages (Draft/Publish D2).
+  const MULTI142_API_OK = new Set(["pages/api/admin-drafts.ts"]);
   const apiTouched = names.filter(
     (n) =>
       n.startsWith("pages/api/") &&
       !MULTI137_API_OK.has(n) &&
-      !MULTI139_API_OK.has(n)
+      !MULTI139_API_OK.has(n) &&
+      !MULTI142_API_OK.has(n)
   );
   // MULTI-132: ProductDetail.tsx may receive additive preview listener (still no pages/api).
   // MULTI-133: lib-only tracking gates (no public app/components required).
@@ -529,7 +532,8 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
       (n) =>
         (n.startsWith("pages/api/") &&
           !MULTI137_API_OK.has(n) &&
-          !MULTI139_API_OK.has(n)) ||
+          !MULTI139_API_OK.has(n) &&
+          !MULTI142_API_OK.has(n)) ||
         (n.startsWith("app/") &&
           n !== "app/sidhu/page.tsx" &&
           n !== "app/products/[slug]/ProductDetail.tsx")

@@ -1,6 +1,6 @@
 # Draft / Publish (CMS Pages) — design v1
 
-Status: **D1 check-only** — `content_drafts` migration script shipped; no runtime/API/UI use yet. Owner applies DDL separately after Berlin PASS.
+Status: **D2 as built** — admin drafts API on live `content_drafts`; no UI; publishing still `POST /api/site-content`.
 
 ## Problem
 
@@ -61,6 +61,26 @@ Public reads, sitemap, head/metadata/JSON-LD, consent/CSP are untouched in D1–
 - Scheduled publish (unattended publish rule)
 - Approval workflow
 - Auto-expiry / auto-delete of old drafts
+
+## D2 as built
+
+Admin-only drafts API on the live `content_drafts` table. **No UI. Never writes `site_content`.** Publish remains existing `POST /api/site-content` (D3 will call it later).
+
+| Item | Detail |
+|------|--------|
+| Endpoint | `pages/api/admin-drafts.ts` — `GET` / `PUT` / `DELETE` |
+| Auth | `requireAdminPermission(..., "content.manage", { mutate: method !== "GET" })` |
+| Cache | `Cache-Control: no-store` |
+| Capability | Probe `SELECT id FROM content_drafts LIMIT 0`; missing table → inert (`available:false` / `503 drafts_unavailable`) |
+| Entity (phase 1) | `entity_type=site_content_page`, `entity_id` = page name `/^[a-z0-9_-]{1,50}$/` |
+| GET single | `?entity_type&entity_id` → `{ available, draft }` |
+| GET list | `?entity_type` only → `{ available, drafts }` (no `changes`, max 100, `updated_at DESC`) |
+| PUT create | `expected_draft_version: null` → INSERT v1; duplicate → `409 draft_exists` |
+| PUT update | number + `SELECT … FOR UPDATE`; mismatch → `409 draft_stale`; missing → `409 draft_missing` |
+| DELETE | body requires `expected_draft_version`; missing → `404 draft_missing`; stale → `409` |
+| Validation codes | `invalid_entity`, `empty_draft`, `too_many_keys` (≤200), `invalid_key`, `settings_key_not_allowed`, `secret_key_not_allowed`, `unknown_key`, `invalid_value`, `invalid_base_hash`, `draft_too_large` (≤1 MB) |
+| Audit | `content_draft.save` / `content_draft.discard`; metadata `{ keys, draft_version }` — never values |
+| Helpers | `lib/contentDrafts.ts`, `lib/contentDraftsCapability.ts` |
 
 ## Owner decisions (recorded 19 Nov 2026)
 

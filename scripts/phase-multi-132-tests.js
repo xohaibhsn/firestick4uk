@@ -139,6 +139,11 @@ const APPROVED = new Set([
   "scripts/migrate-content-drafts.js",
   "scripts/phase-multi-140-tests.js",
   "docs/design/DRAFT-PUBLISH.md",
+  // F4UK-MULTI-142: admin drafts API for CMS pages (Draft/Publish D2).
+  "pages/api/admin-drafts.ts",
+  "lib/contentDrafts.ts",
+  "lib/contentDraftsCapability.ts",
+  "scripts/phase-multi-142-tests.js",
 ]);
 
 (async () => {
@@ -396,6 +401,8 @@ const APPROVED = new Set([
       "pages/api/admin-staff-password.ts",
       "pages/api/admin-seo-issues/reconcile.ts",
     ]);
+    // F4UK-MULTI-142: admin drafts API for CMS pages (Draft/Publish D2).
+    const MULTI142_API_OK = new Set(["pages/api/admin-drafts.ts"]);
     const r = spawnSync(
       "git",
       ["diff", "--name-only", "origin/main", "--", "pages/api", "app/products/[slug]/page.tsx"],
@@ -405,7 +412,10 @@ const APPROVED = new Set([
       .split(/\r?\n/)
       .map((s) => s.trim())
       .filter(Boolean)
-      .filter((n) => !MULTI137_API_OK.has(n) && !MULTI139_API_OK.has(n));
+      .filter(
+        (n) =>
+          !MULTI137_API_OK.has(n) && !MULTI139_API_OK.has(n) && !MULTI142_API_OK.has(n)
+      );
     ok("zero_diff_pages_api_and_pdp_page", names.length === 0, names.join(",") || "clean");
   }
 

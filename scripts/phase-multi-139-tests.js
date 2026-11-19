@@ -811,6 +811,11 @@ function runDiffAllowlist() {
     "scripts/migrate-content-drafts.js",
     "scripts/phase-multi-140-tests.js",
     "docs/design/DRAFT-PUBLISH.md",
+    // F4UK-MULTI-142: admin drafts API for CMS pages (Draft/Publish D2).
+    "pages/api/admin-drafts.ts",
+    "lib/contentDrafts.ts",
+    "lib/contentDraftsCapability.ts",
+    "scripts/phase-multi-142-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

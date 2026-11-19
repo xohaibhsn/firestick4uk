@@ -233,7 +233,15 @@ function main() {
   for (const dir of scanRoots) {
     for (const file of walkFiles(dir)) {
       const rel = path.relative(ROOT, file).replace(/\\/g, "/");
-      if (rel === "docs/design/DRAFT-PUBLISH.md") continue;
+      // D1 design doc + D2 runtime (admin drafts API) may reference content_drafts.
+      if (
+        rel === "docs/design/DRAFT-PUBLISH.md" ||
+        rel === "lib/contentDrafts.ts" ||
+        rel === "lib/contentDraftsCapability.ts" ||
+        rel === "pages/api/admin-drafts.ts"
+      ) {
+        continue;
+      }
       const text = fs.readFileSync(file, "utf8");
       if (text.includes("migrate-content-drafts") || text.includes("content_drafts")) {
         hits.push(rel);
@@ -305,6 +313,11 @@ function main() {
     "scripts/phase-multi-137-tests.js",
     "scripts/phase-multi-138-tests.js",
     "scripts/phase-multi-139-tests.js",
+    // F4UK-MULTI-142: admin drafts API for CMS pages (Draft/Publish D2).
+    "pages/api/admin-drafts.ts",
+    "lib/contentDrafts.ts",
+    "lib/contentDraftsCapability.ts",
+    "scripts/phase-multi-142-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

@@ -521,6 +521,12 @@ async function main() {
     "pages/api/admin-seo-issues/reconcile.ts",
     "scripts/phase-multi-139-tests.js",
   ]);
+  // F4UK-MULTI-142: admin drafts API for CMS pages (Draft/Publish D2).
+  const MULTI142_OK = new Set([
+    "pages/api/admin-drafts.ts",
+    "lib/contentDrafts.ts",
+    "lib/contentDraftsCapability.ts",
+  ]);
   const dirtyNames = (diffCheck.stdout || "")
     .split(/\r?\n/)
     .map((s) => s.trim())
@@ -532,7 +538,8 @@ async function main() {
         !MULTI135_OK.has(n) &&
         !MULTI136_OK.has(n) &&
         !MULTI137_OK.has(n) &&
-        !MULTI139_OK.has(n)
+        !MULTI139_OK.has(n) &&
+        !MULTI142_OK.has(n)
     );
   ok("no_app_tree_diff", dirtyNames.length === 0, dirtyNames.join(",") || "clean");
 
