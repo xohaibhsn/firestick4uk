@@ -807,6 +807,10 @@ function runDiffAllowlist() {
     "scripts/phase-multi-136-tests.js",
     "scripts/phase-multi-137-tests.js",
     "scripts/phase-multi-138-tests.js",
+    // F4UK-MULTI-140: content_drafts check-only migrate + Draft/Publish design doc.
+    "scripts/migrate-content-drafts.js",
+    "scripts/phase-multi-140-tests.js",
+    "docs/design/DRAFT-PUBLISH.md",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

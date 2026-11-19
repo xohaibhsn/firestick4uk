@@ -332,6 +332,10 @@ const {
       "scripts/phase-multi-135-tests.js",
       "scripts/phase-multi-136-tests.js",
       "scripts/phase-multi-137-tests.js",
+      // F4UK-MULTI-140: content_drafts check-only migrate + Draft/Publish design doc.
+      "scripts/migrate-content-drafts.js",
+      "scripts/phase-multi-140-tests.js",
+      "docs/design/DRAFT-PUBLISH.md",
     ]);
     const names = new Set();
     for (const block of [diff.stdout || "", unstaged.stdout || ""]) {
