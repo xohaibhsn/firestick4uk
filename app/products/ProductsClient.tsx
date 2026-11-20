@@ -13,6 +13,7 @@ import { fillVars } from "@/lib/cms";
 import type { PublicProduct } from "@/lib/publicProductsServer";
 import { productCardSrc } from "@/lib/cloudinaryDelivery";
 import PriceDisplay from "@/components/PriceDisplay";
+import { splitProductsTitle } from "@/lib/productsPageTitle";
 
 const cardDescXss = {
   whiteList: {
@@ -126,6 +127,10 @@ export default function ProductsClient({
     setAdded(p.id);
     setTimeout(() => setAdded(null), 1500);
   };
+
+  const { lead: productsTitleLead, tail: productsTitleTail } = splitProductsTitle(
+    t("products_title", "All")
+  );
 
   const applyFilter = (cat: string) => { setFilter(cat); fetchProducts(cat, sort, minPrice, maxPrice); };
   const applySort = (s: string) => { setSort(s); fetchProducts(filter, s, minPrice, maxPrice); };
@@ -309,7 +314,7 @@ export default function ProductsClient({
       <main className="page-wrapper">
         <div className="page-header">
           <div className="section-tag">✦ {t("products_tag", "Our Store")}</div>
-          <h1 className="page-title">{t("products_title", "All")} <span>Products</span></h1>
+          <h1 className="page-title">{productsTitleLead ? productsTitleLead : null}{productsTitleLead ? " " : ""}<span>{productsTitleTail}</span></h1>
         </div>
 
         <div className="activation-banner">

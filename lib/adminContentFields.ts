@@ -316,7 +316,7 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
       title: "Products listing",
       fields: [
         { key: "products_tag", label: "Page tag", help: "Small tag above the products page title." },
-        { key: "products_title", label: "Page title", help: "Main heading on /products." },
+        { key: "products_title", label: "Page title", help: 'Main heading on /products. "All" or "All Products" both show as "All Products".' },
         {
           key: "products_activation",
           label: "Activation banner",
@@ -461,6 +461,11 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
         { key: "cart_lbl_city", label: "City label" },
         { key: "cart_lbl_postcode", label: "Postcode label" },
         { key: "cart_lbl_notes", label: "Notes label" },
+        {
+          key: "cart_optional_tag",
+          label: "Optional field tag",
+          help: "Small text after optional checkout fields",
+        },
         { key: "cart_pay_heading", label: "Payment heading", help: "Heading above payment method choices." },
         { key: "cart_pay_bank", label: "Bank transfer label", help: "Bank transfer option title." },
         { key: "cart_pay_bank_sub", label: "Bank transfer sub", help: "Short explanation under bank transfer." },

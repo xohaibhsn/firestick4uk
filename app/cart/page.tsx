@@ -241,6 +241,7 @@ const navStyles = `
   .form-group input::placeholder, .form-group textarea::placeholder { color:#AAAAAA; }
   .form-group textarea { resize:vertical; min-height:80px; }
   .form-group .req-star { color:#B91C1C; margin-left:3px; }
+  .form-group .opt-tag { font-size:0.8em; font-weight:normal; color:#666666; text-transform:none; letter-spacing:0; }
   .form-group input[aria-invalid="true"], .form-group select[aria-invalid="true"] { border-color:#DC2626; }
   .field-error { color:#B91C1C; font-size:12px; line-height:1.4; margin-top:6px; }
   .phone-row { display:flex; gap:8px; align-items:stretch; width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
@@ -1155,6 +1156,7 @@ export default function CartPage() {
                       <label htmlFor={`checkout-${f.key}`}>
                         {f.label}
                         {isEmail && <span className="req-star" aria-hidden="true">*</span>}
+                        {!isEmail && <span className="opt-tag"> ({t("cart_optional_tag","optional")})</span>}
                       </label>
                       <input
                         id={`checkout-${f.key}`}
@@ -1235,7 +1237,7 @@ export default function CartPage() {
                   })}
                   <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px"}}>
                     <div className="form-group">
-                      <label htmlFor="checkout-city">{t("cart_lbl_city", "City")}</label>
+                      <label htmlFor="checkout-city">{t("cart_lbl_city", "City")}<span className="opt-tag"> ({t("cart_optional_tag","optional")})</span></label>
                       <input
                         id="checkout-city"
                         type="text"
@@ -1249,7 +1251,7 @@ export default function CartPage() {
                       />
                     </div>
                     <div className="form-group">
-                      <label htmlFor="checkout-postcode">{t("cart_lbl_postcode", "Postcode")}</label>
+                      <label htmlFor="checkout-postcode">{t("cart_lbl_postcode", "Postcode")}<span className="opt-tag"> ({t("cart_optional_tag","optional")})</span></label>
                       <input
                         id="checkout-postcode"
                         type="text"
@@ -1264,7 +1266,7 @@ export default function CartPage() {
                     </div>
                   </div>
                   <div className="form-group">
-                    <label htmlFor="checkout-notes">{t("cart_lbl_notes", "Order Notes (Optional)")}</label>
+                    <label htmlFor="checkout-notes">{t("cart_lbl_notes", "Order Notes (Optional)")}<span className="opt-tag"> ({t("cart_optional_tag","optional")})</span></label>
                     <textarea
                       id="checkout-notes"
                       name="order-notes"

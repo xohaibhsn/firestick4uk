@@ -180,6 +180,27 @@ const APPROVED = new Set([
   "scripts/phase-multi-130-tests.js",
   "scripts/phase-multi-135-tests.js",
   "scripts/phase-multi-137-tests.js",
+  // F4UK-MULTI-146: /products H1 no duplicate + checkout optional-field tags.
+  "app/products/ProductsClient.tsx",
+  "lib/productsPageTitle.ts",
+  "app/cart/page.tsx",
+  "lib/adminContentFields.ts",
+  "scripts/phase-multi-146-tests.js",
+  "scripts/phase-multi-116-tests.js",
+  "scripts/phase-multi-130-tests.js",
+  "scripts/phase-multi-131-tests.js",
+  "scripts/phase-multi-132-tests.js",
+  "scripts/phase-multi-133-tests.js",
+  "scripts/phase-multi-135-tests.js",
+  "scripts/phase-multi-136-tests.js",
+  "scripts/phase-multi-137-tests.js",
+  "scripts/phase-multi-138-tests.js",
+  "scripts/phase-multi-139-tests.js",
+  "scripts/phase-multi-140-tests.js",
+  "scripts/phase-multi-142-tests.js",
+  "scripts/phase-multi-143-tests.js",
+  "scripts/phase-multi-144-tests.js",
+  "scripts/phase-multi-145-tests.js",
 ]);
 
 (async () => {

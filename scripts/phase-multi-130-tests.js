@@ -499,6 +499,11 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
   // MULTI-136: TrackingConsent suppression gate (+ pathname watcher) on public component.
   const MULTI132_PUBLIC_OK = new Set(["app/products/[slug]/ProductDetail.tsx"]);
   const MULTI136_PUBLIC_OK = new Set(["components/TrackingConsent.tsx"]);
+  // F4UK-MULTI-146: /products H1 no duplicate + checkout optional-field tags.
+  const MULTI146_PUBLIC_OK = new Set([
+    "app/products/ProductsClient.tsx",
+    "app/cart/page.tsx",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -506,7 +511,8 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
           !n.startsWith("components/admin/") &&
           !n.startsWith("components/sidhu/"))) &&
       !MULTI132_PUBLIC_OK.has(n) &&
-      !MULTI136_PUBLIC_OK.has(n)
+      !MULTI136_PUBLIC_OK.has(n) &&
+      !MULTI146_PUBLIC_OK.has(n)
   );
   ok("no_pages_api_changes", apiTouched.length === 0, apiTouched.join(","));
   ok(
@@ -540,7 +546,8 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
           !MULTI145_API_OK.has(n)) ||
         (n.startsWith("app/") &&
           n !== "app/sidhu/page.tsx" &&
-          n !== "app/products/[slug]/ProductDetail.tsx")
+          n !== "app/products/[slug]/ProductDetail.tsx" &&
+          !MULTI146_PUBLIC_OK.has(n))
     );
     ok("committed_diff_no_api_public", bad.length === 0, bad.join(","));
   } else {
