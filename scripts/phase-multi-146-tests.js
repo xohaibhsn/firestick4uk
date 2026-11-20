@@ -322,9 +322,18 @@ function runAdminFieldsTests() {
     )
   );
 
-  // All other entries unchanged: strip the two intentional edits and compare hashes
+  // All other entries unchanged: strip intentional MULTI-146 edits + later additive MULTI-155 field
   function normalizeForRest(text) {
     return text
+      .replace(
+        /\/\*\* Mirrors lib\/seasonalPromoStyle\.ts SEASONAL_PROMO_STYLE_OPTIONS[\s\S]*?\] as const;\r?\n\r?\n/,
+        ""
+      )
+      .replace(/ \| "select"/g, "")
+      .replace(
+        /\r?\n\s*options\?: ReadonlyArray<\{ value: string; label: string \}>;/,
+        ""
+      )
       .replace(
         /help:\s*"Main heading on \/products\."/,
         "HELP_PRODUCTS_PLACEHOLDER"
@@ -335,6 +344,10 @@ function runAdminFieldsTests() {
       )
       .replace(
         /\r?\n\s*\{\s*\r?\n\s*key:\s*["']cart_optional_tag["'][\s\S]*?help:\s*["']Small text after optional checkout fields["'],?\s*\r?\n\s*\},?/,
+        ""
+      )
+      .replace(
+        /\r?\n\s*\{\s*\r?\n\s*key:\s*["']seasonal_promo_style["'][\s\S]*?Empty = Red Alert\.\s*",?\s*\r?\n\s*\},?/,
         ""
       );
   }
@@ -347,9 +360,10 @@ function runAdminFieldsTests() {
   );
 
   const keyCount = (t) => (t.match(/key:\s*["'][^"']+["']/g) || []).length;
+  // +1 MULTI-146 cart_optional_tag; +1 MULTI-155 seasonal_promo_style
   ok(
     "admin_fields_key_count_plus_one",
-    keyCount(src) === keyCount(base) + 1,
+    keyCount(src) === keyCount(base) + 2,
     `base=${keyCount(base)} now=${keyCount(src)}`
   );
 }
@@ -501,6 +515,14 @@ function runDiffAllowlist() {
     // F4UK-MULTI-154: hero active-dot hotfix
     "components/HeroSlider.tsx",
     "scripts/phase-multi-154-tests.js",
+    // F4UK-MULTI-155: promo bar styles
+    "lib/seasonalPromoStyle.ts",
+    "components/home/SeasonalHomePromoStrip.tsx",
+    "app/HomeClient.tsx",
+    "app/page.tsx",
+    "lib/adminContentFields.ts",
+    "components/admin/AdminContentPanel.tsx",
+    "scripts/phase-multi-155-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

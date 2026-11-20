@@ -272,6 +272,26 @@ export default function AdminContentPanel({
                           }))
                         }
                       />
+                    ) : field.type === "select" ? (
+                      <select
+                        style={{ width: "100%" }}
+                        value={siteContent[field.key] || ""}
+                        onChange={(e) =>
+                          setSiteContent((s) => ({
+                            ...s,
+                            [field.key]: e.target.value,
+                          }))
+                        }
+                      >
+                        <option value="">
+                          Default (Red Alert (Blinking))
+                        </option>
+                        {(field.options || []).map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
                     ) : (
                       <input
                         style={{ width: "100%" }}

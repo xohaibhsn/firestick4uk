@@ -1,8 +1,17 @@
+/** Mirrors lib/seasonalPromoStyle.ts SEASONAL_PROMO_STYLE_OPTIONS (kept local so CommonJS test loaders need no @/ alias). */
+const SEASONAL_PROMO_STYLE_OPTIONS = [
+  { value: "classic", label: "Brand Purple (Classic)" },
+  { value: "red-alert", label: "Red Alert (Blinking)" },
+  { value: "black-friday", label: "Black Friday (Black + Amber)" },
+  { value: "timer-pulse", label: "Purple + Red Timer (Pulse)" },
+] as const;
+
 export type AdminField = {
   key: string;
   label: string;
   wide?: boolean;
-  type?: "text" | "textarea" | "json" | "html";
+  type?: "text" | "textarea" | "json" | "html" | "select";
+  options?: ReadonlyArray<{ value: string; label: string }>;
   /** Short help under the label (editor UX only). */
   help?: string;
 };
@@ -26,6 +35,13 @@ export const ADMIN_CONTENT_SECTIONS: Record<string, AdminSection[]> = {
           key: "seasonal_promo_cta",
           label: "Seasonal promo strip CTA",
           help: "Button label on the promo bar (for example Shop deals).",
+        },
+        {
+          key: "seasonal_promo_style",
+          label: "Offer bar style",
+          type: "select",
+          options: SEASONAL_PROMO_STYLE_OPTIONS,
+          help: "Colour and animation of the top offer bar. Red Alert blinks for 5 seconds, then stays red. Empty = Red Alert.",
         },
       ],
     },

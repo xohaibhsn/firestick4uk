@@ -11,6 +11,7 @@ import SeasonalHomePromoStrip, {
   HOME_NAV_OFFSET_PX,
   HOME_PROMO_BAR_HEIGHT_PX,
 } from "@/components/home/SeasonalHomePromoStrip";
+import type { SeasonalPromoStyle } from "@/lib/seasonalPromoStyle";
 import SeasonalCardCountdown from "@/components/product/SeasonalCardCountdown";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import type { PublicProduct } from "@/lib/publicProductsServer";
@@ -154,6 +155,7 @@ export type SeasonalHomePromoProps = {
   cta: string;
   href: string;
   endsAt?: string | null;
+  style?: SeasonalPromoStyle;
 };
 
 interface HomeClientProps {
@@ -793,6 +795,7 @@ export default function HomeClient({
           cta={seasonalPromo.cta}
           href={seasonalPromo.href}
           endsAt={seasonalPromo.endsAt}
+          promoStyle={seasonalPromo.style}
           onEnded={() => setPromoEnded(true)}
         />
       ) : null}

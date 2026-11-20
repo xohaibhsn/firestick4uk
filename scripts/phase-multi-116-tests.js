@@ -698,6 +698,14 @@ async function main() {
     // F4UK-MULTI-154: hero active-dot hotfix
     "components/HeroSlider.tsx",
     "scripts/phase-multi-154-tests.js",
+    // F4UK-MULTI-155: promo bar styles
+    "lib/seasonalPromoStyle.ts",
+    "components/home/SeasonalHomePromoStrip.tsx",
+    "app/HomeClient.tsx",
+    "app/page.tsx",
+    "lib/adminContentFields.ts",
+    "components/admin/AdminContentPanel.tsx",
+    "scripts/phase-multi-155-tests.js",
   ]);
   const dirtyNames = (diffCheck.stdout || "")
     .split(/\r?\n/)

@@ -20,6 +20,10 @@ import {
   DEFAULT_SEASONAL_PROMO_CTA,
 } from "@/lib/seasonalCountdownLabel";
 import {
+  normalizeSeasonalPromoStyle,
+  type SeasonalPromoStyle,
+} from "@/lib/seasonalPromoStyle";
+import {
   heroSlideSrc,
   heroSlideSrcSet,
   HERO_SIZES,
@@ -46,6 +50,7 @@ const getHomeContent = cache(async (): Promise<Record<string, string>> => {
             'home_tagline',
             'seasonal_promo_text',
             'seasonal_promo_cta',
+            'seasonal_promo_style',
             'season_countdown_prefix',
             'season_countdown_upcoming_prefix',
             'home_product_ids',
@@ -117,6 +122,7 @@ export default async function HomePage() {
     cta: string;
     href: string;
     endsAt?: string | null;
+    style: SeasonalPromoStyle;
   } | null = null;
 
   if (hubState.effectivelyPublic) {
@@ -158,6 +164,7 @@ export default async function HomePage() {
         cta: content.seasonal_promo_cta?.trim() || DEFAULT_SEASONAL_PROMO_CTA,
         href,
         endsAt: earliest?.endRaw ?? null,
+        style: normalizeSeasonalPromoStyle(content.seasonal_promo_style),
       };
     }
   }
