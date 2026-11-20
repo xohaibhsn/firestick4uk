@@ -117,6 +117,8 @@ export default function ProductDetail({
   const [productPreviewMode, setProductPreviewMode] = useState(false);
   const [previewOverrides, setPreviewOverrides] = useState<Record<string, string> | null>(null);
   const boundaryRef = useRef<BoundaryCoordinatorState>(createBoundaryCoordinator());
+  const inlineAtcRef = useRef<HTMLButtonElement | null>(null);
+  const stickyAtcBarRef = useRef<HTMLDivElement | null>(null);
   // Bind coordinator to the current product/slug on route changes (never via late callbacks).
   useEffect(() => {
     if (!initialProduct?.id && !product?.id) return;
@@ -439,6 +441,32 @@ export default function ProductDetail({
     };
   }, [displayProduct]);
 
+  // Tuck sticky ATC while the inline ATC button is in view (mobile only via CSS).
+  useEffect(() => {
+    if (!displayProduct) return;
+    const inlineEl = inlineAtcRef.current;
+    const barEl = stickyAtcBarRef.current;
+    if (!inlineEl || !barEl) return;
+    if (typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        if (entry.isIntersecting) {
+          barEl.classList.add("pdp-sticky-atc--tucked");
+        } else {
+          barEl.classList.remove("pdp-sticky-atc--tucked");
+        }
+      },
+      { threshold: 0, rootMargin: "0px 0px -56px 0px" }
+    );
+    io.observe(inlineEl);
+    return () => {
+      io.disconnect();
+      barEl.classList.remove("pdp-sticky-atc--tucked");
+    };
+  }, [displayProduct, canPurchase]);
+
   const featureList = displayProduct?.features
     ? displayProduct.features.split('\n').map(f => f.trim()).filter(Boolean)
     : [];
@@ -524,6 +552,11 @@ export default function ProductDetail({
             align-items:center;justify-content:space-between;gap:12px;
             min-height:56px;padding:10px 16px;padding-bottom:max(10px, env(safe-area-inset-bottom, 0px));
             background:#111111;color:#FFFFFF;box-shadow:0 -4px 20px rgba(0,0,0,0.18);
+            transition:transform .2s ease, opacity .2s ease;
+          }
+          .pdp-sticky-atc.pdp-sticky-atc--tucked{transform:translateY(110%);opacity:0;pointer-events:none;}
+          @media (prefers-reduced-motion: reduce){
+            .pdp-sticky-atc{transition:none;}
           }
           .pdp-sticky-atc__price{font-family:var(--font-display);font-size:18px;font-weight:800;color:#C4B5FD;white-space:nowrap;}
           .pdp-sticky-atc__btn{
@@ -642,6 +675,7 @@ export default function ProductDetail({
                 ) : null}
                 {canPurchase ? (
                   <button
+                    ref={inlineAtcRef}
                     className={`add-btn${added ? " added" : ""}`}
                     data-pdp-atc="inline"
                     data-insights-id="cart_add"
@@ -659,6 +693,7 @@ export default function ProductDetail({
                   </button>
                 ) : (
                   <button
+                    ref={inlineAtcRef}
                     type="button"
                     className="add-btn"
                     disabled
@@ -742,6 +777,7 @@ export default function ProductDetail({
       )}
       {displayProduct ? (
         <div
+          ref={stickyAtcBarRef}
           className="pdp-sticky-atc"
           data-pdp-sticky-atc-bar="1"
           role="region"

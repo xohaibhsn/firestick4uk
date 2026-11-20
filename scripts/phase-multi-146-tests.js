@@ -212,22 +212,22 @@ function runCartTests() {
 
   // Optional fields get opt-tag
   const optionalKeys = [
-    { name: "name", re: /key:"name"[\s\S]*?!isEmail && <span className="opt-tag">/ },
+    { name: "name", re: /key:"name"[\s\S]*?!isEmail && !labelHasOptional\(f\.label\) && <span className="opt-tag">/ },
     {
       name: "address",
-      re: /!isEmail && <span className="opt-tag"> \(\{t\(["']cart_optional_tag["'],\s*["']optional["']\)\}\)<\/span>/,
+      re: /!isEmail && !labelHasOptional\(f\.label\) && <span className="opt-tag"> \(\{t\(["']cart_optional_tag["'],\s*["']optional["']\)\}\)<\/span>/,
     },
     {
       name: "city",
-      re: /checkout-city[\s\S]{0,80}opt-tag[\s\S]{0,80}cart_optional_tag/,
+      re: /checkout-city[\s\S]{0,200}!labelHasOptional[\s\S]{0,200}opt-tag[\s\S]{0,80}cart_optional_tag/,
     },
     {
       name: "postcode",
-      re: /checkout-postcode[\s\S]{0,80}opt-tag[\s\S]{0,80}cart_optional_tag/,
+      re: /checkout-postcode[\s\S]{0,200}!labelHasOptional[\s\S]{0,200}opt-tag[\s\S]{0,80}cart_optional_tag/,
     },
     {
       name: "notes",
-      re: /checkout-notes[\s\S]{0,120}opt-tag[\s\S]{0,80}cart_optional_tag/,
+      re: /checkout-notes[\s\S]{0,400}!labelHasOptional[\s\S]{0,200}opt-tag[\s\S]{0,80}cart_optional_tag/,
     },
   ];
   for (const { name, re } of optionalKeys) {
@@ -397,6 +397,29 @@ function runDiffAllowlist() {
     "scripts/phase-multi-143-tests.js",
     "scripts/phase-multi-144-tests.js",
     "scripts/phase-multi-145-tests.js",
+
+    // F4UK-MULTI-147: optional-tag dedupe, contact phone hint, PDP sticky ATC tuck.
+    "lib/optionalLabel.ts",
+    "app/cart/page.tsx",
+    "app/contact/page.tsx",
+    "app/products/[slug]/ProductDetail.tsx",
+    "scripts/phase-multi-147-tests.js",
+    "scripts/phase-multi-116-tests.js",
+    "scripts/phase-multi-130-tests.js",
+    "scripts/phase-multi-131-tests.js",
+    "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-133-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-136-tests.js",
+    "scripts/phase-multi-137-tests.js",
+    "scripts/phase-multi-138-tests.js",
+    "scripts/phase-multi-139-tests.js",
+    "scripts/phase-multi-140-tests.js",
+    "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-143-tests.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-145-tests.js",
+    "scripts/phase-multi-146-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

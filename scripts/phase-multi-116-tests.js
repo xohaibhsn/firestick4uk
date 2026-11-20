@@ -600,6 +600,30 @@ async function main() {
     "scripts/phase-multi-144-tests.js",
     "scripts/phase-multi-145-tests.js",
   ]);
+  // F4UK-MULTI-147: optional-tag dedupe, contact phone hint, PDP sticky ATC tuck.
+  const MULTI147_OK = new Set([
+    "lib/optionalLabel.ts",
+    "app/cart/page.tsx",
+    "app/contact/page.tsx",
+    "app/products/[slug]/ProductDetail.tsx",
+    "scripts/phase-multi-147-tests.js",
+    "scripts/phase-multi-116-tests.js",
+    "scripts/phase-multi-130-tests.js",
+    "scripts/phase-multi-131-tests.js",
+    "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-133-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-136-tests.js",
+    "scripts/phase-multi-137-tests.js",
+    "scripts/phase-multi-138-tests.js",
+    "scripts/phase-multi-139-tests.js",
+    "scripts/phase-multi-140-tests.js",
+    "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-143-tests.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-145-tests.js",
+    "scripts/phase-multi-146-tests.js",
+  ]);
   const dirtyNames = (diffCheck.stdout || "")
     .split(/\r?\n/)
     .map((s) => s.trim())
@@ -616,7 +640,8 @@ async function main() {
         !MULTI143_OK.has(n) &&
         !MULTI144_OK.has(n) &&
         !MULTI145_OK.has(n) &&
-        !MULTI146_OK.has(n)
+        !MULTI146_OK.has(n) &&
+        !MULTI147_OK.has(n)
     );
   ok("no_app_tree_diff", dirtyNames.length === 0, dirtyNames.join(",") || "clean");
 

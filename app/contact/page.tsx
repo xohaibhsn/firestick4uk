@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useContactConfig } from "@/hooks/useContactConfig";
 import { useSiteContent } from "@/hooks/useSiteContent";
+import { labelHasOptional } from "@/lib/optionalLabel";
 
 const styles = `
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -69,6 +70,7 @@ const styles = `
   .hp-field { position:absolute; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden; }
   .form-group label { display:block; font-size:11px; letter-spacing:2px; text-transform:uppercase;
     color:#666666; margin-bottom:7px; font-weight:600; }
+  .form-group .opt-tag { font-size:0.8em; font-weight:normal; color:#666666; text-transform:none; letter-spacing:0; }
   .form-group input, .form-group select, .form-group textarea {
     width:100%; background:#FFFFFF; border:1px solid #E5E5E5;
     border-radius:9px; padding:12px 14px; color:#111111; font-family:var(--font-body);
@@ -262,7 +264,7 @@ export default function ContactPage() {
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>{t("contact_lbl_phone", "Phone / WhatsApp")}</label>
+                    <label>{t("contact_lbl_phone", "Phone / WhatsApp")}{!labelHasOptional(t("contact_lbl_phone", "Phone / WhatsApp")) && !String(t("contact_lbl_phone", "Phone / WhatsApp")).includes("*") && <span className="opt-tag"> ({t("cart_optional_tag","optional")})</span>}</label>
                     <input type="tel" placeholder={contact.phone} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                   </div>
                   <div className="form-group">

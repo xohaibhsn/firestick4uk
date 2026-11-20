@@ -504,6 +504,12 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
     "app/products/ProductsClient.tsx",
     "app/cart/page.tsx",
   ]);
+  // F4UK-MULTI-147: optional-tag dedupe, contact phone hint, PDP sticky ATC tuck.
+  const MULTI147_PUBLIC_OK = new Set([
+    "app/cart/page.tsx",
+    "app/contact/page.tsx",
+    "app/products/[slug]/ProductDetail.tsx",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -512,7 +518,8 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
           !n.startsWith("components/sidhu/"))) &&
       !MULTI132_PUBLIC_OK.has(n) &&
       !MULTI136_PUBLIC_OK.has(n) &&
-      !MULTI146_PUBLIC_OK.has(n)
+      !MULTI146_PUBLIC_OK.has(n) &&
+      !MULTI147_PUBLIC_OK.has(n)
   );
   ok("no_pages_api_changes", apiTouched.length === 0, apiTouched.join(","));
   ok(
@@ -547,7 +554,8 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
         (n.startsWith("app/") &&
           n !== "app/sidhu/page.tsx" &&
           n !== "app/products/[slug]/ProductDetail.tsx" &&
-          !MULTI146_PUBLIC_OK.has(n))
+          !MULTI146_PUBLIC_OK.has(n) &&
+      !MULTI147_PUBLIC_OK.has(n))
     );
     ok("committed_diff_no_api_public", bad.length === 0, bad.join(","));
   } else {

@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import CopyButton from "@/components/CopyButton";
 import { useContactConfig } from "@/hooks/useContactConfig";
 import { useSiteContent } from "@/hooks/useSiteContent";
+import { labelHasOptional } from "@/lib/optionalLabel";
 import {
   DIGITAL_SUPPLY_ACK_TEXT,
   PHYSICAL_SHIPPING_GBP,
@@ -1156,7 +1157,7 @@ export default function CartPage() {
                       <label htmlFor={`checkout-${f.key}`}>
                         {f.label}
                         {isEmail && <span className="req-star" aria-hidden="true">*</span>}
-                        {!isEmail && <span className="opt-tag"> ({t("cart_optional_tag","optional")})</span>}
+                        {!isEmail && !labelHasOptional(f.label) && <span className="opt-tag"> ({t("cart_optional_tag","optional")})</span>}
                       </label>
                       <input
                         id={`checkout-${f.key}`}
@@ -1237,7 +1238,7 @@ export default function CartPage() {
                   })}
                   <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px"}}>
                     <div className="form-group">
-                      <label htmlFor="checkout-city">{t("cart_lbl_city", "City")}<span className="opt-tag"> ({t("cart_optional_tag","optional")})</span></label>
+                      <label htmlFor="checkout-city">{t("cart_lbl_city", "City")}{!labelHasOptional(t("cart_lbl_city", "City")) && <span className="opt-tag"> ({t("cart_optional_tag","optional")})</span>}</label>
                       <input
                         id="checkout-city"
                         type="text"
@@ -1251,7 +1252,7 @@ export default function CartPage() {
                       />
                     </div>
                     <div className="form-group">
-                      <label htmlFor="checkout-postcode">{t("cart_lbl_postcode", "Postcode")}<span className="opt-tag"> ({t("cart_optional_tag","optional")})</span></label>
+                      <label htmlFor="checkout-postcode">{t("cart_lbl_postcode", "Postcode")}{!labelHasOptional(t("cart_lbl_postcode", "Postcode")) && <span className="opt-tag"> ({t("cart_optional_tag","optional")})</span>}</label>
                       <input
                         id="checkout-postcode"
                         type="text"
@@ -1266,7 +1267,7 @@ export default function CartPage() {
                     </div>
                   </div>
                   <div className="form-group">
-                    <label htmlFor="checkout-notes">{t("cart_lbl_notes", "Order Notes (Optional)")}<span className="opt-tag"> ({t("cart_optional_tag","optional")})</span></label>
+                    <label htmlFor="checkout-notes">{t("cart_lbl_notes", "Order Notes (Optional)")}{!labelHasOptional(t("cart_lbl_notes", "Order Notes (Optional)")) && <span className="opt-tag"> ({t("cart_optional_tag","optional")})</span>}</label>
                     <textarea
                       id="checkout-notes"
                       name="order-notes"
