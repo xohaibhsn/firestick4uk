@@ -196,6 +196,9 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
             background: transparent;
             position: relative;
           }
+          .hero-slider-dot.active {
+            background: transparent;
+          }
           .hero-slider-dot::before {
             content: "";
             position: absolute;

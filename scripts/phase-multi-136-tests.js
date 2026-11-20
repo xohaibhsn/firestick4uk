@@ -360,6 +360,9 @@ const APPROVED = new Set([
     "app/faq/FAQClient.tsx",
     "app/blog/BlogClient.tsx",
     "scripts/phase-multi-153-tests.js",
+    // F4UK-MULTI-154: hero active-dot hotfix
+    "components/HeroSlider.tsx",
+    "scripts/phase-multi-154-tests.js",
 ]);
 
 const NOT_APPROVED = [

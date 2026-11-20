@@ -536,6 +536,11 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
     "app/blog/BlogClient.tsx",
     "scripts/phase-multi-153-tests.js",
   ]);
+  // F4UK-MULTI-154: hero active-dot hotfix
+  const MULTI154_PUBLIC_OK = new Set([
+    "components/HeroSlider.tsx",
+    "scripts/phase-multi-154-tests.js",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -548,7 +553,8 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
       !MULTI147_PUBLIC_OK.has(n) &&
       !MULTI148_PUBLIC_OK.has(n) &&
       !MULTI149_PUBLIC_OK.has(n) &&
-      !MULTI153_PUBLIC_OK.has(n)
+      !MULTI153_PUBLIC_OK.has(n) &&
+      !MULTI154_PUBLIC_OK.has(n)
   );
   ok("no_pages_api_changes", apiTouched.length === 0, apiTouched.join(","));
   ok(
@@ -588,7 +594,8 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
       !MULTI147_PUBLIC_OK.has(n) &&
       !MULTI148_PUBLIC_OK.has(n) &&
       !MULTI149_PUBLIC_OK.has(n) &&
-      !MULTI153_PUBLIC_OK.has(n))
+      !MULTI153_PUBLIC_OK.has(n) &&
+          !MULTI154_PUBLIC_OK.has(n))
     );
     ok("committed_diff_no_api_public", bad.length === 0, bad.join(","));
   } else {

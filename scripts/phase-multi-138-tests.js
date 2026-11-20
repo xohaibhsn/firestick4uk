@@ -501,6 +501,9 @@ const {
     "app/faq/FAQClient.tsx",
     "app/blog/BlogClient.tsx",
     "scripts/phase-multi-153-tests.js",
+    // F4UK-MULTI-154: hero active-dot hotfix
+    "components/HeroSlider.tsx",
+    "scripts/phase-multi-154-tests.js",
   ]);
     const names = new Set();
     for (const block of [diff.stdout || "", unstaged.stdout || ""]) {
