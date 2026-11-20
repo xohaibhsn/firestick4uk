@@ -177,7 +177,8 @@ export default function CmsDraftBar(props: CmsDraftBarProps) {
       siteContent,
       savedContent,
       baseHashForKey,
-      isSuperAdminSettingsKey
+      isSuperAdminSettingsKey,
+      draft && openedVersion === Number(draft.draft_version) ? draft.changes : null
     );
     const changeKeys = Object.keys(changes);
     if (!changeKeys.length && !skippedSettingsKeys.length && !missingHashKeys.length) {

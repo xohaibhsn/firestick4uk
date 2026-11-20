@@ -383,6 +383,15 @@ const {
       "scripts/phase-multi-140-tests.js",
       "scripts/phase-multi-142-tests.js",
       "scripts/phase-multi-143-tests.js",
+      // F4UK-MULTI-145: health 429 warn, draft base keep, atomic staff login session.
+      "lib/contentDraftClient.ts",
+      "components/admin/CmsDraftBar.tsx",
+      "lib/adminStaffPasswordTx.ts",
+      "pages/api/admin-login.ts",
+      "scripts/phase-multi-145-tests.js",
+      "scripts/phase-multi-130-tests.js",
+      "scripts/phase-multi-135-tests.js",
+      "scripts/phase-multi-137-tests.js",
     ]);
     const diff = spawnSync(
       "git",

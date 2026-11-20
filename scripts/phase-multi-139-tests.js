@@ -169,6 +169,15 @@ function makePwHarness(opts = {}) {
   };
   const mod = loadTs("lib/adminStaffPasswordTx.ts", {
     "./db": { __esModule: true, default: pool },
+    // F4UK-MULTI-145: createStaffSessionIfUnchanged imports adminAuth (applyStaffPasswordChange unchanged).
+    "./adminAuth": {
+      ADMIN_SESSION_TTL_MS: 12 * 60 * 60 * 1000,
+      generateSessionToken: () => "a".repeat(64),
+      hashSessionToken: (t) => "hash:" + String(t),
+      isAdminRole: (v) =>
+        typeof v === "string" &&
+        ["super_admin", "manager", "writer"].includes(v),
+    },
   });
   return { mod, calls, poolQueries, conn };
 }
@@ -834,6 +843,16 @@ function runDiffAllowlist() {
     "scripts/phase-multi-136-tests.js",
     "scripts/phase-multi-140-tests.js",
     "scripts/phase-multi-142-tests.js",
+    // F4UK-MULTI-145: health 429 warn, draft base keep, atomic staff login session.
+    "lib/contentDraftClient.ts",
+    "components/admin/CmsDraftBar.tsx",
+    "pages/api/admin-login.ts",
+    "scripts/phase-multi-145-tests.js",
+    "scripts/phase-multi-143-tests.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-130-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-137-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

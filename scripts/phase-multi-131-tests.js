@@ -480,6 +480,29 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "scripts/phase-multi-142-tests.js",
     "scripts/phase-multi-143-tests.js",
   ]);
+  // F4UK-MULTI-145: health 429 warn, draft base keep, atomic staff login session.
+  const MULTI145_OK = new Set([
+    "scripts/live-health-check.js",
+    "lib/contentDraftClient.ts",
+    "components/admin/CmsDraftBar.tsx",
+    "lib/adminStaffPasswordTx.ts",
+    "pages/api/admin-login.ts",
+    "scripts/phase-multi-145-tests.js",
+    "scripts/phase-multi-139-tests.js",
+    "scripts/phase-multi-116-tests.js",
+    "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-133-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-136-tests.js",
+    "scripts/phase-multi-138-tests.js",
+    "scripts/phase-multi-140-tests.js",
+    "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-143-tests.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-130-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-137-tests.js",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -494,14 +517,16 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       !MULTI139_OK.has(n) &&
       !MULTI142_OK.has(n) &&
       !MULTI143_OK.has(n) &&
-      !MULTI144_OK.has(n)
+      !MULTI144_OK.has(n) &&
+      !MULTI145_OK.has(n)
   );
   const apiTouchedUnexpected = apiTouched.filter(
     (n) =>
       !MULTI137_OK.has(n) &&
       !MULTI139_OK.has(n) &&
       !MULTI142_OK.has(n) &&
-      !MULTI143_OK.has(n)
+      !MULTI143_OK.has(n) &&
+      !MULTI145_OK.has(n)
   );
   ok(
     "no_pages_api_changes",
@@ -547,6 +572,7 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "scripts/phase-multi-142-tests.js",
     "scripts/phase-multi-143-tests.js",
     "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-145-tests.js",
     "scripts/phase-multi-97-tests.js",
     "scripts/phase-multi-114-tests.js",
     "scripts/phase-multi-116-tests.js",
@@ -566,6 +592,7 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       MULTI142_OK.has(n) ||
       MULTI143_OK.has(n) ||
       MULTI144_OK.has(n) ||
+      MULTI145_OK.has(n) ||
       PLUMBING_OK.has(n)
     ) {
       return false;

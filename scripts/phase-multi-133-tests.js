@@ -267,6 +267,25 @@ const APPROVED = new Set([
   "scripts/phase-multi-139-tests.js",
   "scripts/phase-multi-140-tests.js",
   "scripts/phase-multi-142-tests.js",
+  // F4UK-MULTI-145: health 429 warn, draft base keep, atomic staff login session.
+  "lib/contentDraftClient.ts",
+  "components/admin/CmsDraftBar.tsx",
+  "lib/adminStaffPasswordTx.ts",
+  "pages/api/admin-login.ts",
+  "scripts/phase-multi-145-tests.js",
+  "scripts/phase-multi-139-tests.js",
+  "scripts/phase-multi-116-tests.js",
+  "scripts/phase-multi-131-tests.js",
+  "scripts/phase-multi-132-tests.js",
+  "scripts/phase-multi-136-tests.js",
+  "scripts/phase-multi-138-tests.js",
+  "scripts/phase-multi-140-tests.js",
+  "scripts/phase-multi-142-tests.js",
+  "scripts/phase-multi-143-tests.js",
+  "scripts/phase-multi-144-tests.js",
+  "scripts/phase-multi-130-tests.js",
+  "scripts/phase-multi-135-tests.js",
+  "scripts/phase-multi-137-tests.js",
 ]);
 
 const LABEL_OK = "AbCdEf123456";
@@ -627,6 +646,8 @@ const LABEL_WA = "WaLabel_99xyz";
     ]);
     // F4UK-MULTI-142: admin drafts API for CMS pages (Draft/Publish D2).
     const MULTI142_API_OK = new Set(["pages/api/admin-drafts.ts"]);
+    // F4UK-MULTI-145: atomic staff login session (staff branch only).
+    const MULTI145_API_OK = new Set(["pages/api/admin-login.ts"]);
     const r = spawnSync(
       "git",
       ["diff", "--name-only", "origin/main", "--", "pages/api", "lib/insightsIngest.ts"],
@@ -638,7 +659,10 @@ const LABEL_WA = "WaLabel_99xyz";
       .filter(Boolean)
       .filter(
         (n) =>
-          !MULTI137_API_OK.has(n) && !MULTI139_API_OK.has(n) && !MULTI142_API_OK.has(n)
+          !MULTI137_API_OK.has(n) &&
+          !MULTI139_API_OK.has(n) &&
+          !MULTI142_API_OK.has(n) &&
+          !MULTI145_API_OK.has(n)
       );
     ok("zero_api_and_ingest_diff", names.length === 0, names.join(",") || "clean");
   }

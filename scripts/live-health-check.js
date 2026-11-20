@@ -204,11 +204,37 @@ function isHtmlPath(p) {
   return p !== "/sitemap.xml" && !p.startsWith("/api/");
 }
 
+/**
+ * Classify a negative-probe HTTP status for the health report.
+ * HEALTH-RL-1: reviews_empty_post + 429 is a warning (still ok), not a failure.
+ */
+function classifyNegStatus(name, status, expectStatus) {
+  if (name === "reviews_empty_post" && status === 429) {
+    return {
+      ok: true,
+      warn: "rate_limited_not_checked",
+      warning:
+        "reviews_empty_post: 429 rate-limited (3/hour/IP) - not checked",
+      failure: null,
+    };
+  }
+  const ok = status === expectStatus;
+  return {
+    ok,
+    warn: null,
+    warning: null,
+    failure: ok
+      ? null
+      : `negative ${name}: got ${status} expect ${expectStatus}`,
+  };
+}
+
 async function main() {
   resetNetworkRetryCount();
   const args = parseArgs(process.argv);
   const base = args.base;
   const failures = [];
+  const warnings = [];
   const notes = [];
   const httpResults = [];
   const seoLive = {};
@@ -341,8 +367,18 @@ async function main() {
     const res = await politeFetch(`${base}${urlPath}`, opts);
     // Follow one redirect hop for /admin if needed for status capture
     let status = res.status;
-    const row = { name, method, path: urlPath, status, expect: expectStatus, ok: status === expectStatus };
-    if (!row.ok) failures.push(`negative ${name}: got ${status} expect ${expectStatus}`);
+    const classified = classifyNegStatus(name, status, expectStatus);
+    const row = {
+      name,
+      method,
+      path: urlPath,
+      status,
+      expect: expectStatus,
+      ok: classified.ok,
+    };
+    if (classified.warn) row.warn = classified.warn;
+    if (classified.warning) warnings.push(classified.warning);
+    if (classified.failure) failures.push(classified.failure);
     negative.push(row);
     // drain
     try {
@@ -467,6 +503,7 @@ async function main() {
     negative,
     keyGuard,
     failures,
+    warnings,
     notes,
   };
 
@@ -480,9 +517,13 @@ async function main() {
     `- SEO field diffs: ${seoDiffs.length}`,
     `- Network retries: ${networkRetryCount}`,
     `- Failures: ${failures.length}`,
+    `- Warnings: ${warnings.length}`,
     ``,
     `## Failures`,
     ...(failures.length ? failures.map((f) => `- ${f}`) : ["- (none)"]),
+    ``,
+    `## Warnings`,
+    ...(warnings.length ? warnings.map((w) => `- ${w}`) : ["- (none)"]),
     ``,
     `## Negative API`,
     ...negative.map((n) => `- ${n.name}: ${n.status} (expect ${n.expect}) ${n.ok ? "OK" : "FAIL"}`),
@@ -527,6 +568,7 @@ module.exports = {
   getNetworkRetryCount,
   resetNetworkRetryCount,
   setSleepForTests,
+  classifyNegStatus,
   MIN_GAP_MS,
   FETCH_TIMEOUT_MS,
   RETRY_BACKOFF_MS,

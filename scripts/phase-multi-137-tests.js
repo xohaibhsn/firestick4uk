@@ -1611,7 +1611,14 @@ function runSourceAssertions() {
     ]);
     // F4UK-MULTI-142: admin drafts API for CMS pages (Draft/Publish D2).
     const allowed142 = new Set(["pages/api/admin-drafts.ts"]);
-    const allowed = new Set([...allowed137, ...allowed139, ...allowed142]);
+    // F4UK-MULTI-145: atomic staff login session (staff branch only).
+    const allowed145 = new Set(["pages/api/admin-login.ts"]);
+    const allowed = new Set([
+      ...allowed137,
+      ...allowed139,
+      ...allowed142,
+      ...allowed145,
+    ]);
     const changed = git(["diff", "--name-only", BASE, "--", "pages/api"]);
     const untracked = git(["ls-files", "--others", "--exclude-standard", "--", "pages/api"]);
     const names = (changed.stdout + "\n" + untracked.stdout)

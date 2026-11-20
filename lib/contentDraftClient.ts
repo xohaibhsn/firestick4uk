@@ -27,7 +27,8 @@ export function buildDraftChanges(
   siteContent: Record<string, string>,
   savedContent: Record<string, string>,
   baseHashFn: (key: string) => string | undefined,
-  isSettingsKey: (key: string) => boolean
+  isSettingsKey: (key: string) => boolean,
+  keepBaseFrom?: DraftChanges | null
 ): BuildDraftChangesResult {
   const changes: DraftChanges = {};
   const skippedSettingsKeys: string[] = [];
@@ -44,7 +45,13 @@ export function buildDraftChanges(
       skippedSettingsKeys.push(key);
       continue;
     }
-    const bh = baseHashFn(key);
+    const kept = keepBaseFrom?.[key];
+    const keptHash =
+      kept && typeof kept === "object"
+        ? String((kept as DraftChangeEntry).base_hash ?? "")
+        : "";
+    const bh =
+      /^[0-9a-f]{64}$/i.test(keptHash) ? keptHash : baseHashFn(key);
     if (bh === undefined) {
       missingHashKeys.push(key);
       continue;

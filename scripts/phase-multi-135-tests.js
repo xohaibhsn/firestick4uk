@@ -376,6 +376,8 @@ function assertNotMutated(input, snapshot, label) {
   ]);
   // F4UK-MULTI-142: admin drafts API for CMS pages (Draft/Publish D2).
   const MULTI142_API_OK = new Set(["pages/api/admin-drafts.ts"]);
+  // F4UK-MULTI-145: atomic staff login session (staff branch only).
+  const MULTI145_API_OK = new Set(["pages/api/admin-login.ts"]);
   const apiNames = [
     ...(diffApi.stdout || "").split(/\r?\n/),
     ...(workingApi.stdout || "").split(/\r?\n/),
@@ -385,7 +387,10 @@ function assertNotMutated(input, snapshot, label) {
     .filter(Boolean)
     .filter(
       (n) =>
-        !MULTI137_API_OK.has(n) && !MULTI139_API_OK.has(n) && !MULTI142_API_OK.has(n)
+        !MULTI137_API_OK.has(n) &&
+        !MULTI139_API_OK.has(n) &&
+        !MULTI142_API_OK.has(n) &&
+        !MULTI145_API_OK.has(n)
     );
   ok("zero_pages_api_diff", apiNames.length === 0, apiNames.join(",") || "clean");
 

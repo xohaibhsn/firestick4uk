@@ -537,6 +537,17 @@ function runDiffAllowlist() {
     "scripts/phase-multi-133-tests.js",
     "scripts/phase-multi-136-tests.js",
     "scripts/phase-multi-139-tests.js",
+    // F4UK-MULTI-145: health 429 warn, draft base keep, atomic staff login session.
+    "lib/adminStaffPasswordTx.ts",
+    "pages/api/admin-login.ts",
+    "scripts/phase-multi-145-tests.js",
+    "scripts/phase-multi-116-tests.js",
+    "scripts/phase-multi-140-tests.js",
+    "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-130-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-137-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

@@ -10,6 +10,7 @@ import {
   setAdminSessionCookie,
   verifyStaffPassword,
 } from "../../lib/adminAuth";
+import { createStaffSessionIfUnchanged } from "../../lib/adminStaffPasswordTx";
 import { recordAdminAudit } from "../../lib/adminAudit";
 import {
   readRecoveryAuthConfigFromEnv,
@@ -62,30 +63,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(401).json({ success: false, error: PUBLIC_INVALID });
       }
 
-      if (verified.needsUpgrade) {
-        const bcryptHash = await hashStaffPassword(String(password));
-        await pool.query(
-          `UPDATE admin_staff
-           SET password_hash = ?, password_changed_at = NOW(), updated_at = NOW()
-           WHERE id = ?`,
-          [bcryptHash, staff.id]
-        );
-      }
-
-      await pool.query("UPDATE admin_staff SET last_login_at = NOW(), updated_at = NOW() WHERE id = ?", [
-        staff.id,
-      ]);
-
-      const { token } = await createAdminSession({
-        principalType: "staff",
+      const upgradeHash = verified.needsUpgrade
+        ? await hashStaffPassword(String(password))
+        : null;
+      const session = await createStaffSessionIfUnchanged({
+        staffId: Number(staff.id),
+        verifiedHash: String(staff.password_hash || ""),
+        upgradeHash,
         principalName: String(staff.name || "Staff"),
         role: staff.role,
-        staffId: Number(staff.id),
-        email: String(staff.email || ""),
         ip: meta.ip,
         userAgent: meta.userAgent,
       });
-      setAdminSessionCookie(res, token, req);
+      if (!session.ok) {
+        return res.status(401).json({ success: false, error: PUBLIC_INVALID });
+      }
+      setAdminSessionCookie(res, session.token, req);
       await recordAdminAudit({
         actor: {
           principalType: "staff",
