@@ -13,6 +13,7 @@ import AdminGlobalSearch from "@/components/admin/AdminGlobalSearch";
 import type { AdminSearchTarget } from "@/components/admin/AdminGlobalSearch";
 import CmsPreviewPane from "@/components/admin/CmsPreviewPane";
 import CmsDraftBar from "@/components/admin/CmsDraftBar";
+import ProductDraftBar from "@/components/admin/ProductDraftBar";
 import ProductPreviewPane from "@/components/admin/ProductPreviewPane";
 import CmsUpdatesAfterSaveChip from "@/components/admin/CmsUpdatesAfterSaveChip";
 import { productPreviewDisabledReason } from "@/lib/productPreview";
@@ -583,6 +584,11 @@ function AdminPageInner() {
   const [productUrlChangeOpen, setProductUrlChangeOpen] = useState(false);
   /** Base product_version for the open content draft — not advanced by arbitrary list refresh/409. */
   const [contentDraftBaseVersion, setContentDraftBaseVersion] = useState<number | null>(null);
+  /** MULTI-150 — when a product draft is opened, arm atomic draft delete on Update. */
+  const [productDraftPublishVersion, setProductDraftPublishVersion] = useState<number | null>(null);
+  useEffect(() => {
+    setProductDraftPublishVersion(null);
+  }, [productModal]);
   const [contentConflict, setContentConflict] = useState<null | {
     server: Record<string, unknown>;
     draft: typeof editProduct;
@@ -3467,6 +3473,13 @@ function AdminPageInner() {
                         ),
                       }
                     : {}),
+                ...(productDraftPublishVersion != null
+                  ? {
+                      publish_draft: {
+                        expected_draft_version: productDraftPublishVersion,
+                      },
+                    }
+                  : {}),
               }
         ),
       });
@@ -5508,6 +5521,24 @@ function AdminPageInner() {
               </button>
             </div>
           </div>
+          {productModal !== "new" && productModal?.id ? (
+            <ProductDraftBar
+              productId={Number(productModal.id)}
+              liveVersion={
+                productModal.product_version != null &&
+                Number.isFinite(Number(productModal.product_version))
+                  ? Number(productModal.product_version)
+                  : null
+              }
+              editProduct={editProduct}
+              setEditProduct={setEditProduct}
+              contentDraftBaseVersion={contentDraftBaseVersion}
+              setContentDraftBaseVersion={setContentDraftBaseVersion}
+              onPublishArmed={setProductDraftPublishVersion}
+              productSaving={productSaving}
+              onSessionExpired={handleSessionExpired}
+            />
+          ) : null}
           {productModal !== "new" && productModal?.slug ? (
             <ProductPreviewPane
               open={productPreviewOpen}

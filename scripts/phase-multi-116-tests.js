@@ -672,6 +672,17 @@ async function main() {
     "scripts/phase-multi-147-tests.js",
     "scripts/phase-multi-148-tests.js",
   ]);
+  // F4UK-MULTI-150: product drafts (Draft/Publish D4).
+  const MULTI150_OK = new Set([
+    "lib/contentDrafts.ts",
+    "pages/api/admin-drafts.ts",
+    "pages/api/admin-products.ts",
+    "components/admin/ProductDraftBar.tsx",
+    "lib/productDraftClient.ts",
+    "app/sidhu/page.tsx",
+    "scripts/phase-multi-150-tests.js",
+    "docs/design/DRAFT-PUBLISH.md",
+  ]);
   const dirtyNames = (diffCheck.stdout || "")
     .split(/\r?\n/)
     .map((s) => s.trim())
@@ -691,7 +702,8 @@ async function main() {
         !MULTI146_OK.has(n) &&
         !MULTI147_OK.has(n) &&
         !MULTI148_OK.has(n) &&
-        !MULTI149_OK.has(n)
+        !MULTI149_OK.has(n) &&
+      !MULTI150_OK.has(n)
     );
   ok("no_app_tree_diff", dirtyNames.length === 0, dirtyNames.join(",") || "clean");
 

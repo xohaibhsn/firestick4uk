@@ -108,3 +108,20 @@ Admin-only Content Editor draft bar on `/sidhu` → Content Editor. **Zero publi
 | Concurrency | PUT/DELETE send `expected_draft_version`; `409 draft_stale`/`draft_exists` → toast + reload |
 | No auto-save | No timers, no polling, no new `localStorage` keys |
 | D2 nits | (N1) structure/`too_many_keys` before `loadKnownKeys`; (N2) bad version → `400 invalid_version` |
+
+## D4 as built
+
+Admin-only **product** drafts on the existing `content_drafts` table (entity_type=`product`). **Zero public change. No new table / schema.** Live product data changes only when the normal Update (PUT `/api/admin-products`) succeeds; the draft row is deleted best-effort in the same TX right before commit.
+
+| Item | Detail |
+|------|--------|
+| Entity | `entity_type=product`, `entity_id` = product id `/^[1-9][0-9]{0,9}$/` |
+| Draft JSON | `{ fields: {…13 EditProductDraft keys, all optional strings}, base_version: integer >= 0 }` |
+| Validation | `validateProductDraft` — `unknown_field` / `invalid_value` / `invalid_base_version` / `draft_too_large` (≤1 MB) |
+| Permission | `products.manage` for product drafts; `content.manage` unchanged for `site_content_page` |
+| PUT missing product | `404 product_missing` |
+| UI | `components/admin/ProductDraftBar.tsx` — Save draft / Open draft / Discard draft; publish via Update |
+| Helpers | `lib/productDraftClient.ts` — pure client helpers + `formatDraftBanner` reuse |
+| Publish | Optional `publish_draft: { expected_draft_version }` on product PUT; DELETE draft on same conn before commit (noop + update); errors ignored → `draft_published:false` |
+| Audit | Field **names** only (never values); product update audit may include `draft_published` |
+| Site pages | `site_content_page` validators / DTO / API behaviour unchanged |

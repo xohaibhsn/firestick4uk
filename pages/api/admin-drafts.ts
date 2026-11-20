@@ -1,11 +1,13 @@
 /**
- * F4UK-MULTI-142 — Admin-only shared draft API for CMS Pages (Draft/Publish D2).
- * Never writes site_content. Publishing remains POST /api/site-content.
+ * F4UK-MULTI-142 / MULTI-150 — Admin-only shared draft API (Draft/Publish D2 + D4).
+ * Never writes site_content or products (except reading product id existence).
+ * Publishing remains POST /api/site-content (pages) or PUT /api/admin-products (products).
  */
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import pool from "../../lib/db";
 import { getRequestMeta, requireAdminPermission } from "../../lib/adminAuth";
+import type { AdminPermission } from "../../lib/adminPermissions";
 import { recordAdminAudit } from "../../lib/adminAudit";
 import { setAdminNoStore } from "../../lib/adminNoStore";
 import {
@@ -16,8 +18,11 @@ import {
   validateDraftChangesEarly,
   validateEntity,
   validateEntityTypeOnly,
+  validateProductDraft,
   type ContentDraftRow,
   type DraftChanges,
+  type DraftEntityType,
+  type ProductDraftChanges,
 } from "../../lib/contentDrafts";
 import {
   contentDraftsTableAvailable,
@@ -39,6 +44,41 @@ function actorStaffId(admin: { staffId?: number }): number | null {
   return admin.staffId != null && Number(admin.staffId) > 0 ? Number(admin.staffId) : null;
 }
 
+function permissionForEntity(entityType: DraftEntityType): AdminPermission {
+  return entityType === "product" ? "products.manage" : "content.manage";
+}
+
+function productFieldNames(changes: ProductDraftChanges): string[] {
+  return Object.keys(changes.fields || {});
+}
+
+function auditKeysFromDraftJson(
+  entityType: DraftEntityType,
+  draftJson: string
+): string[] {
+  try {
+    const parsed = JSON.parse(String(draftJson || "{}"));
+    if (entityType === "product") {
+      const fields =
+        parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed) &&
+        parsed.fields &&
+        typeof parsed.fields === "object" &&
+        !Array.isArray(parsed.fields)
+          ? parsed.fields
+          : {};
+      return Object.keys(fields);
+    }
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return Object.keys(parsed as DraftChanges);
+    }
+  } catch {
+    /* ignore */
+  }
+  return [];
+}
+
 async function safeRollback(conn: { rollback: () => Promise<void> }): Promise<void> {
   try {
     await conn.rollback();
@@ -54,9 +94,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const admin = await requireAdminPermission(req, res, "content.manage", {
-    mutate: method !== "GET",
-  });
+  // Entity type first (query for GET, body for PUT/DELETE) — invalid → 400 before auth.
+  const entityTypeRaw =
+    method === "GET"
+      ? qOne(req.query.entity_type)
+      : String(((req.body || {}) as Record<string, unknown>).entity_type ?? "");
+  const typeOnly = validateEntityTypeOnly(entityTypeRaw);
+  if (!typeOnly.ok) {
+    return res.status(400).json({
+      error: typeOnly.errors[0]?.message || "Invalid entity",
+      code: typeOnly.errors[0]?.code || "invalid_entity",
+      details: typeOnly.errors,
+    });
+  }
+
+  const admin = await requireAdminPermission(
+    req,
+    res,
+    permissionForEntity(typeOnly.entity_type),
+    { mutate: method !== "GET" }
+  );
   if (!admin) return;
 
   setAdminNoStore(res);
@@ -74,7 +131,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (method === "GET") {
-      const entityTypeRaw = qOne(req.query.entity_type);
       const entityIdRaw = qOne(req.query.entity_id).trim();
 
       if (entityIdRaw) {
@@ -97,14 +153,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      const typeOnly = validateEntityTypeOnly(entityTypeRaw);
-      if (!typeOnly.ok) {
-        return res.status(400).json({
-          error: typeOnly.errors[0]?.message || "Invalid entity",
-          code: typeOnly.errors[0]?.code || "invalid_entity",
-          details: typeOnly.errors,
-        });
-      }
       const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT ${SELECT_COLS} FROM content_drafts WHERE entity_type = ? ORDER BY updated_at DESC LIMIT 100`,
         [typeOnly.entity_type]
@@ -126,6 +174,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const { ip } = getRequestMeta(req);
+    const isProduct = entity.entity_type === "product";
 
     if (method === "PUT") {
       const expectedRaw = body.expected_draft_version;
@@ -141,14 +190,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      // N1: reject non-object / >200 keys before any site_content query.
-      const early = validateDraftChangesEarly(body.changes);
-      if (!early.ok) {
-        return res.status(400).json({
-          error: early.errors[0]?.message || "Invalid draft",
-          code: early.errors[0]?.code || "empty_draft",
-          details: early.errors,
-        });
+      // Product: validate shape before any DB work.
+      let productValidated: ProductDraftChanges | null = null;
+      let pageEarlyKeys: string[] | null = null;
+      if (isProduct) {
+        const validated = validateProductDraft(body.changes);
+        if (!validated.ok) {
+          return res.status(400).json({
+            error: validated.errors[0]?.message || "Invalid draft",
+            code: validated.errors[0]?.code || "invalid_value",
+            details: validated.errors,
+          });
+        }
+        productValidated = validated.changes;
+      } else {
+        // N1: reject non-object / >200 keys before any site_content query.
+        const early = validateDraftChangesEarly(body.changes);
+        if (!early.ok) {
+          return res.status(400).json({
+            error: early.errors[0]?.message || "Invalid draft",
+            code: early.errors[0]?.code || "empty_draft",
+            details: early.errors,
+          });
+        }
+        pageEarlyKeys = early.keys;
       }
 
       const conn = await pool.getConnection();
@@ -156,19 +221,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let auditVersion = 0;
       let auditKeys: string[] = [];
       try {
-        const changeKeys = early.keys;
-        const knownKeys = await loadKnownKeys(conn, changeKeys);
-        const validated = validateDraftChanges(body.changes, { knownKeys });
-        if (!validated.ok) {
-          return res.status(400).json({
-            error: validated.errors[0]?.message || "Invalid draft",
-            code: validated.errors[0]?.code || "empty_draft",
-            details: validated.errors,
-          });
+        let draftJson: string;
+
+        if (isProduct && productValidated) {
+          const [prows] = await conn.query<RowDataPacket[]>(
+            `SELECT id FROM products WHERE id = ? LIMIT 1`,
+            [entity.entity_id]
+          );
+          if (!Array.isArray(prows) || !prows[0]) {
+            return res.status(404).json({
+              error: "Product not found.",
+              code: "product_missing",
+            });
+          }
+          draftJson = JSON.stringify(productValidated);
+          auditKeys = productFieldNames(productValidated);
+        } else {
+          const changeKeys = pageEarlyKeys || [];
+          const knownKeys = await loadKnownKeys(conn, changeKeys);
+          const validated = validateDraftChanges(body.changes, { knownKeys });
+          if (!validated.ok) {
+            return res.status(400).json({
+              error: validated.errors[0]?.message || "Invalid draft",
+              code: validated.errors[0]?.code || "empty_draft",
+              details: validated.errors,
+            });
+          }
+          draftJson = JSON.stringify(validated.changes);
+          auditKeys = Object.keys(validated.changes);
         }
 
-        const draftJson = JSON.stringify(validated.changes);
-        auditKeys = Object.keys(validated.changes);
         const name = actorName(admin);
         const staffId = actorStaffId(admin);
 
@@ -196,7 +278,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 : "";
             if (code === "ER_DUP_ENTRY") {
               return res.status(409).json({
-                error: "A draft for this page already exists - reload it first.",
+                error: isProduct
+                  ? "A draft for this product already exists - reload it first."
+                  : "A draft for this page already exists - reload it first.",
                 code: "draft_exists",
               });
             }
@@ -319,14 +403,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               : String(existing.updated_at),
         });
       }
-      try {
-        const parsed = JSON.parse(String(existing.draft_json || "{}")) as DraftChanges;
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          auditKeys = Object.keys(parsed);
-        }
-      } catch {
-        auditKeys = [];
-      }
+      auditKeys = auditKeysFromDraftJson(
+        entity.entity_type,
+        String(existing.draft_json || "{}")
+      );
       auditVersion = Number(existing.draft_version);
       await conn.query(
         `DELETE FROM content_drafts WHERE entity_type = ? AND entity_id = ?`,

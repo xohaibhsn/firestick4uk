@@ -461,7 +461,35 @@ const {
     "scripts/phase-multi-146-tests.js",
     "scripts/phase-multi-147-tests.js",
     "scripts/phase-multi-148-tests.js",
-]);
+// F4UK-MULTI-150: product drafts (Draft/Publish D4).
+    "lib/contentDrafts.ts",
+    "pages/api/admin-drafts.ts",
+    "pages/api/admin-products.ts",
+    "components/admin/ProductDraftBar.tsx",
+    "lib/productDraftClient.ts",
+    "app/sidhu/page.tsx",
+    "scripts/phase-multi-150-tests.js",
+    "docs/design/DRAFT-PUBLISH.md",
+    "scripts/phase-multi-116-tests.js",
+    "scripts/phase-multi-130-tests.js",
+    "scripts/phase-multi-131-tests.js",
+    "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-133-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-136-tests.js",
+    "scripts/phase-multi-137-tests.js",
+    "scripts/phase-multi-138-tests.js",
+    "scripts/phase-multi-139-tests.js",
+    "scripts/phase-multi-140-tests.js",
+    "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-143-tests.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-145-tests.js",
+    "scripts/phase-multi-146-tests.js",
+    "scripts/phase-multi-147-tests.js",
+    "scripts/phase-multi-148-tests.js",
+    "scripts/phase-multi-149-tests.js",
+  ]);
     const names = new Set();
     for (const block of [diff.stdout || "", unstaged.stdout || ""]) {
       for (const line of block.split(/\r?\n/)) {

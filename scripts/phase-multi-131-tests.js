@@ -598,6 +598,17 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "scripts/phase-multi-147-tests.js",
     "scripts/phase-multi-148-tests.js",
   ]);
+  // F4UK-MULTI-150: product drafts (Draft/Publish D4).
+  const MULTI150_OK = new Set([
+    "lib/contentDrafts.ts",
+    "pages/api/admin-drafts.ts",
+    "pages/api/admin-products.ts",
+    "components/admin/ProductDraftBar.tsx",
+    "lib/productDraftClient.ts",
+    "app/sidhu/page.tsx",
+    "scripts/phase-multi-150-tests.js",
+    "docs/design/DRAFT-PUBLISH.md",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -617,7 +628,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
         !MULTI146_OK.has(n) &&
         !MULTI147_OK.has(n) &&
         !MULTI148_OK.has(n) &&
-        !MULTI149_OK.has(n)
+        !MULTI149_OK.has(n) &&
+        !MULTI150_OK.has(n)
   );
   const apiTouchedUnexpected = apiTouched.filter(
     (n) =>
@@ -629,7 +641,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
         !MULTI146_OK.has(n) &&
         !MULTI147_OK.has(n) &&
         !MULTI148_OK.has(n) &&
-        !MULTI149_OK.has(n)
+        !MULTI149_OK.has(n) &&
+        !MULTI150_OK.has(n)
   );
   ok(
     "no_pages_api_changes",
@@ -703,6 +716,7 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       MULTI147_OK.has(n) ||
       MULTI148_OK.has(n) ||
       MULTI149_OK.has(n) ||
+      MULTI150_OK.has(n) ||
       PLUMBING_OK.has(n)
     ) {
       return false;
@@ -729,7 +743,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       n !== "components/admin/ProductPreviewPane.tsx" &&
       !MULTI136_OK.has(n) &&
       !MULTI137_OK.has(n) &&
-      !MULTI143_OK.has(n)
+      !MULTI143_OK.has(n) &&
+      !MULTI150_OK.has(n)
     ) {
       return true;
     }

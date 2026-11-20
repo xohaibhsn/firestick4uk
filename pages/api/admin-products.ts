@@ -225,6 +225,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Valid product id is required' });
       }
 
+      // Optional publish_draft: { expected_draft_version: integer >= 1 } — any other shape → 400.
+      let publishDraft: { expected_draft_version: number } | null = null;
+      if (hasOwn(body, 'publish_draft')) {
+        const pd = body.publish_draft;
+        const pdOk =
+          pd != null &&
+          typeof pd === 'object' &&
+          !Array.isArray(pd) &&
+          Object.getPrototypeOf(pd) === Object.prototype &&
+          Object.keys(pd as object).length === 1 &&
+          Object.prototype.hasOwnProperty.call(pd, 'expected_draft_version') &&
+          typeof (pd as { expected_draft_version?: unknown }).expected_draft_version ===
+            'number' &&
+          Number.isInteger(
+            (pd as { expected_draft_version: number }).expected_draft_version
+          ) &&
+          (pd as { expected_draft_version: number }).expected_draft_version >= 1;
+        if (!pdOk) {
+          return res.status(400).json({
+            error: 'publish_draft must be { expected_draft_version: integer >= 1 }',
+            code: 'validation',
+          });
+        }
+        publishDraft = {
+          expected_draft_version: (pd as { expected_draft_version: number })
+            .expected_draft_version,
+        };
+      }
+
+      /** Best-effort draft delete on the same TX conn; never fails the product save. */
+      const tryDeletePublishedDraft = async (
+        c: { query: (sql: string, params?: unknown[]) => Promise<any> },
+        productId: number,
+        expectedDraftVersion: number
+      ): Promise<boolean> => {
+        try {
+          const [delResult]: any = await c.query(
+            `DELETE FROM content_drafts WHERE entity_type='product' AND entity_id=? AND draft_version=?`,
+            [String(productId), expectedDraftVersion]
+          );
+          return Number(delResult?.affectedRows) === 1;
+        } catch {
+          return false;
+        }
+      };
+
       const OPS_REJECT = [
         'lifecycle_mode',
         'shop_listed',
@@ -387,6 +433,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         if (isNoop) {
+          let draft_published: boolean | undefined;
+          if (publishDraft) {
+            draft_published = await tryDeletePublishedDraft(
+              conn,
+              id,
+              publishDraft.expected_draft_version
+            );
+          }
           await conn.commit();
           const skip = shouldRunPostSaveSeoGuard({
             entityType: 'product',
@@ -400,6 +454,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             changed_fields: changedFields,
             product: normalizeSeasonalUtcFields({ ...current }),
             ...(expandedOps ? { product_version: Number(current.product_version) } : {}),
+            ...(draft_published !== undefined ? { draft_published } : {}),
             seo_guard: {
               status: 'skipped' as const,
               entity_type: 'product' as const,
@@ -505,6 +560,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const fresh = normalizeSeasonalUtcFields(
           Array.isArray(freshRows) && freshRows[0] ? freshRows[0] : { ...current, ...merged }
         );
+        let draft_published: boolean | undefined;
+        if (publishDraft) {
+          draft_published = await tryDeletePublishedDraft(
+            conn,
+            id,
+            publishDraft.expected_draft_version
+          );
+        }
         await conn.commit();
 
         const { ip } = getRequestMeta(req);
@@ -514,7 +577,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           entityType: 'product',
           entityId: id,
           summary: `Updated product ${merged.name}`,
-          metadata: { changed_fields: changedFields },
+          metadata: {
+            changed_fields: changedFields,
+            ...(draft_published !== undefined ? { draft_published } : {}),
+          },
           ip,
         });
 
@@ -533,6 +599,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           product: fresh,
           seo_guard,
           ...(expandedOps ? { product_version: Number(fresh.product_version) } : {}),
+          ...(draft_published !== undefined ? { draft_published } : {}),
         });
       } catch (err: any) {
         try { await conn.rollback(); } catch { /* ignore */ }

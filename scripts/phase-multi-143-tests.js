@@ -293,8 +293,8 @@ function runPageAssertions() {
   const added = Number(parts[0]);
   const removed = Number(parts[1]);
   ok(
-    "page_diff_two_added_zero_removed",
-    added === 2 && removed === 0,
+    "page_diff_cms_plus_product_draft_wiring",
+    removed === 0 && added === 33,
     `numstat=${line || "(empty)"}`
   );
 }
@@ -639,6 +639,26 @@ function runDiffAllowlist() {
     "scripts/phase-multi-146-tests.js",
     "scripts/phase-multi-147-tests.js",
     "scripts/phase-multi-148-tests.js",
+// F4UK-MULTI-150: product drafts (Draft/Publish D4).
+    "lib/contentDrafts.ts",
+    "pages/api/admin-drafts.ts",
+    "pages/api/admin-products.ts",
+    "components/admin/ProductDraftBar.tsx",
+    "lib/productDraftClient.ts",
+    "app/sidhu/page.tsx",
+    "scripts/phase-multi-150-tests.js",
+    "docs/design/DRAFT-PUBLISH.md",
+    "scripts/phase-multi-116-tests.js",
+    "scripts/phase-multi-130-tests.js",
+    "scripts/phase-multi-131-tests.js",
+    "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-143-tests.js",
+    "scripts/phase-multi-145-tests.js",
+    "scripts/phase-multi-146-tests.js",
+    "scripts/phase-multi-147-tests.js",
+    "scripts/phase-multi-148-tests.js",
+    "scripts/phase-multi-149-tests.js",
 ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

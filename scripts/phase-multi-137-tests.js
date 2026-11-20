@@ -1405,27 +1405,95 @@ function parseHunks(diffText) {
   return hunks;
 }
 
-// F4UK-MULTI-143 (Draft/Publish D3): the ONLY non-saveFaqOrder edits allowed in
-// app/sidhu/page.tsx are the CmsDraftBar import and single-line <CmsDraftBar ... /> elements.
+// F4UK-MULTI-143/150: non-saveFaqOrder edits allowed in app/sidhu/page.tsx are
+// CmsDraftBar wiring (D3) plus ProductDraftBar / productDraftPublishVersion wiring (D4).
 const CMS_DRAFT_BAR_IMPORT_RE = /^import CmsDraftBar from "@\/components\/admin\/CmsDraftBar";\s*$/;
 const CMS_DRAFT_BAR_ELEMENT_RE = /^\s*<CmsDraftBar\b.*\/>\s*$/;
+const PRODUCT_DRAFT_BAR_IMPORT_RE = /^import ProductDraftBar from "@\/components\/admin\/ProductDraftBar";\s*$/;
 
 function isCmsDraftBarLine(line) {
   return CMS_DRAFT_BAR_IMPORT_RE.test(line) || CMS_DRAFT_BAR_ELEMENT_RE.test(line);
 }
 
-/** Remove the MULTI-143 CmsDraftBar import / element lines; returns {src, removed}. */
+function isProductDraftSingleLine(line) {
+  if (PRODUCT_DRAFT_BAR_IMPORT_RE.test(line)) return true;
+  if (/\/\*\* MULTI-150/.test(line)) return true;
+  if (/productDraftPublishVersion|setProductDraftPublishVersion/.test(line)) return true;
+  if (/publish_draft|expected_draft_version/.test(line)) return true;
+  if (/onPublishArmed=\{setProductDraftPublishVersion\}/.test(line)) return true;
+  return false;
+}
+
+function isDraftUiWiringLine(line) {
+  return isCmsDraftBarLine(line) || isProductDraftSingleLine(line);
+}
+
+/**
+ * Remove MULTI-143 CmsDraftBar lines and MULTI-150 ProductDraftBar / publish_draft wiring.
+ * ProductDraftBar JSX is multi-line: strip from the conditional open through its `) : null}`.
+ */
 function stripCmsDraftBarWiring(src) {
+  const lines = norm(src).split("\n");
   const kept = [];
   let removed = 0;
   let importCount = 0;
-  for (const line of norm(src).split("\n")) {
-    if (isCmsDraftBarLine(line)) {
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    // MULTI-150 block: {productModal !== "new" && productModal?.id ? ( <ProductDraftBar ... /> ) : null}
+    if (
+      /productModal !== "new" && productModal\?\.id \? \(/.test(line) &&
+      i + 1 < lines.length &&
+      /<ProductDraftBar\b/.test(lines[i + 1])
+    ) {
       removed++;
-      if (CMS_DRAFT_BAR_IMPORT_RE.test(line)) importCount++;
+      i++;
+      while (i < lines.length) {
+        removed++;
+        if (/^\s*\) : null\}\s*$/.test(lines[i])) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    // MULTI-150: useEffect that only resets productDraftPublishVersion
+    if (
+      /useEffect\(\(\) => \{/.test(line) &&
+      i + 1 < lines.length &&
+      /setProductDraftPublishVersion\(null\)/.test(lines[i + 1])
+    ) {
+      while (i < lines.length) {
+        removed++;
+        if (/\}, \[productModal\]\);/.test(lines[i])) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    // MULTI-150: publish_draft spread inside saveProduct PUT body
+    if (/\.\.\.\(productDraftPublishVersion != null/.test(line)) {
+      while (i < lines.length) {
+        removed++;
+        const done = /: \{\}\),?\s*$/.test(lines[i]);
+        i++;
+        if (done) break;
+      }
+      continue;
+    }
+    if (isDraftUiWiringLine(line)) {
+      removed++;
+      if (CMS_DRAFT_BAR_IMPORT_RE.test(line) || PRODUCT_DRAFT_BAR_IMPORT_RE.test(line)) {
+        importCount++;
+      }
+      i++;
       continue;
     }
     kept.push(line);
+    i++;
   }
   return { src: kept.join("\n"), removed, importCount };
 }
@@ -1455,13 +1523,13 @@ function runSourceAssertions() {
       "src_sidhu_rest_of_file_equals_baseline",
       !!cur && !!base && cur.rest === base.rest,
       cur && base && cur.rest !== base.rest
-        ? "content outside saveFaqOrder (after stripping MULTI-143 CmsDraftBar lines) differs"
+        ? "content outside saveFaqOrder (after stripping MULTI-143/150 draft wiring lines) differs"
         : ""
     );
-    // MULTI-143: at most one CmsDraftBar import line may have been stripped.
+    // MULTI-143/150: at most two draft-bar import lines (CmsDraftBar + ProductDraftBar).
     ok(
       "src_sidhu_cmsdraftbar_wiring_limited",
-      stripped.importCount <= 1,
+      stripped.importCount <= 2,
       `removed=${stripped.removed} imports=${stripped.importCount}`
     );
 
@@ -1488,15 +1556,39 @@ function runSourceAssertions() {
           const first = h.oldCount === 0 ? h.oldStart + 1 : h.oldStart;
           const last = h.oldCount === 0 ? h.oldStart : h.oldStart + h.oldCount - 1;
           if (first >= lo && last <= hi) return true;
-          // MULTI-143: pure-addition hunk whose changed lines are all CmsDraftBar
-          // import/element lines (blank '+' lines tolerated, but at least one CmsDraftBar line).
+          // MULTI-143/150: pure-addition hunk for draft UI wiring (CmsDraftBar and/or ProductDraftBar).
           const body = h.lines.map((l) => l.slice(1));
+          const isWiring = (l) =>
+            l.trim() === "" ||
+            isDraftUiWiringLine(l) ||
+            /ProductDraftBar|productDraftPublishVersion|publish_draft|onPublishArmed|expected_draft_version|MULTI-150/.test(
+              l
+            ) ||
+            /productModal !== "new" && productModal\?\.id/.test(l) ||
+            /^\s*\) : null\}\s*$/.test(l) ||
+            /^\s*\?\s*\{?\s*$/.test(l) ||
+            /^\s*: \{\}\),?\s*$/.test(l) ||
+            /^\s*\},?\s*$/.test(l) ||
+            /^\s*useEffect\(\(\) => \{/.test(l) ||
+            /^\s*\}, \[productModal\]\);/.test(l) ||
+            /^\s*(productId|liveVersion|editProduct|setEditProduct|contentDraftBaseVersion|setContentDraftBaseVersion|productSaving|onSessionExpired)=/.test(
+              l
+            ) ||
+            /productModal\.product_version/.test(l) ||
+            /Number\.isFinite\(Number\(productModal/.test(l) ||
+            /^\s*\?\s*Number\(/.test(l) ||
+            /^\s*: null$/.test(l) ||
+            /^\s*\/>\s*$/.test(l);
           return (
             h.oldCount === 0 &&
             h.lines.length > 0 &&
             h.lines.every((l) => l.startsWith("+")) &&
-            body.some((l) => isCmsDraftBarLine(l)) &&
-            body.every((l) => l.trim() === "" || isCmsDraftBarLine(l))
+            body.some(
+              (l) =>
+                isCmsDraftBarLine(l) ||
+                /ProductDraftBar|productDraftPublishVersion|publish_draft/.test(l)
+            ) &&
+            body.every((l) => isWiring(l))
           );
         }),
       `hunks=${hunks.length}`
@@ -1613,11 +1705,16 @@ function runSourceAssertions() {
     const allowed142 = new Set(["pages/api/admin-drafts.ts"]);
     // F4UK-MULTI-145: atomic staff login session (staff branch only).
     const allowed145 = new Set(["pages/api/admin-login.ts"]);
+    const allowed150 = new Set([
+      "pages/api/admin-drafts.ts",
+      "pages/api/admin-products.ts",
+    ]);
     const allowed = new Set([
       ...allowed137,
       ...allowed139,
       ...allowed142,
       ...allowed145,
+      ...allowed150,
     ]);
     const changed = git(["diff", "--name-only", BASE, "--", "pages/api"]);
     const untracked = git(["ls-files", "--others", "--exclude-standard", "--", "pages/api"]);

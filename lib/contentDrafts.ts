@@ -7,7 +7,7 @@ import { isSuperAdminSettingsKey } from "./adminPermissions";
 import { REVISION_MAX_BYTES } from "./contentRevisions";
 import { SITE_CONTENT_DEFAULTS } from "./siteContentSeed";
 
-export const DRAFT_ENTITY_TYPES = ["site_content_page"] as const;
+export const DRAFT_ENTITY_TYPES = ["site_content_page", "product"] as const;
 export type DraftEntityType = (typeof DRAFT_ENTITY_TYPES)[number];
 
 /** Identical source to lib/contentRevisions.ts SECRET_KEY_RE (not exported there). */
@@ -15,11 +15,38 @@ const SECRET_KEY_RE =
   /password|password_hash|session_token|cookie|authorization|smtp|secret|credential|api_key|api_secret|db_password|private_key/i;
 
 const ENTITY_ID_RE = /^[a-z0-9_-]{1,50}$/;
+/** Product entity_id: positive integer as decimal string, max 10 digits. */
+const PRODUCT_ENTITY_ID_RE = /^[1-9][0-9]{0,9}$/;
 const CONTENT_KEY_RE = /^[a-z0-9_]{1,100}$/;
 const BASE_HASH_RE = /^[a-f0-9]{64}$/;
 
+/** The 13 product editor fields that may appear in a product draft (all optional). */
+export const PRODUCT_DRAFT_FIELD_KEYS = [
+  "name",
+  "slug",
+  "category",
+  "price",
+  "stock",
+  "image",
+  "short_description",
+  "full_description",
+  "features",
+  "seo_title",
+  "meta_description",
+  "focus_keyword",
+  "og_image",
+] as const;
+export type ProductDraftFieldKey = (typeof PRODUCT_DRAFT_FIELD_KEYS)[number];
+const PRODUCT_DRAFT_FIELD_SET = new Set<string>(PRODUCT_DRAFT_FIELD_KEYS);
+
 export type DraftChangeEntry = { value: string; base_hash: string };
 export type DraftChanges = Record<string, DraftChangeEntry>;
+
+/** Product draft payload stored in draft_json / returned as DTO.changes. */
+export type ProductDraftChanges = {
+  fields: Partial<Record<ProductDraftFieldKey, string>>;
+  base_version: number;
+};
 
 export type DraftValidationError = {
   code:
@@ -33,7 +60,9 @@ export type DraftValidationError = {
     | "unknown_key"
     | "invalid_value"
     | "invalid_base_hash"
-    | "draft_too_large";
+    | "draft_too_large"
+    | "unknown_field"
+    | "invalid_base_version";
   message: string;
   key?: string;
 };
@@ -52,7 +81,7 @@ export type ContentDraftRow = {
 export type ContentDraftDto = {
   entity_type: string;
   entity_id: string;
-  changes: DraftChanges;
+  changes: DraftChanges | ProductDraftChanges;
   draft_version: number;
   created_by_name: string;
   updated_by_name: string;
@@ -76,7 +105,15 @@ export function validateEntity(
 ): { ok: true; entity_type: DraftEntityType; entity_id: string } | { ok: false; errors: DraftValidationError[] } {
   const type = typeof entityType === "string" ? entityType.trim() : "";
   const id = typeof entityId === "string" ? entityId.trim() : "";
-  if (!(DRAFT_ENTITY_TYPES as readonly string[]).includes(type) || !ENTITY_ID_RE.test(id)) {
+  if (!(DRAFT_ENTITY_TYPES as readonly string[]).includes(type)) {
+    return {
+      ok: false,
+      errors: [{ code: "invalid_entity", message: "Invalid entity_type or entity_id." }],
+    };
+  }
+  const idOk =
+    type === "product" ? PRODUCT_ENTITY_ID_RE.test(id) : ENTITY_ID_RE.test(id);
+  if (!idOk) {
     return {
       ok: false,
       errors: [{ code: "invalid_entity", message: "Invalid entity_type or entity_id." }],
@@ -206,6 +243,109 @@ export function validateDraftChanges(
   return { ok: true, changes: out };
 }
 
+/**
+ * Product draft shape gate — no DB.
+ * Shape: { fields: { …13 optional string keys }, base_version: integer >= 0 }.
+ */
+export function validateProductDraft(
+  changes: unknown
+):
+  | { ok: true; changes: ProductDraftChanges }
+  | { ok: false; errors: DraftValidationError[] } {
+  if (
+    changes == null ||
+    typeof changes !== "object" ||
+    Array.isArray(changes) ||
+    Object.getPrototypeOf(changes) !== Object.prototype
+  ) {
+    return {
+      ok: false,
+      errors: [{ code: "invalid_value", message: "Product draft must be a plain object." }],
+    };
+  }
+  const raw = changes as Record<string, unknown>;
+  const allowedTop = new Set(["fields", "base_version"]);
+  for (const k of Object.keys(raw)) {
+    if (!allowedTop.has(k)) {
+      return {
+        ok: false,
+        errors: [{ code: "unknown_field", message: "Unknown product draft key.", key: k }],
+      };
+    }
+  }
+
+  const baseRaw = raw.base_version;
+  if (
+    typeof baseRaw !== "number" ||
+    !Number.isFinite(baseRaw) ||
+    !Number.isInteger(baseRaw) ||
+    baseRaw < 0
+  ) {
+    return {
+      ok: false,
+      errors: [
+        {
+          code: "invalid_base_version",
+          message: "base_version must be an integer >= 0.",
+        },
+      ],
+    };
+  }
+
+  const fieldsRaw = raw.fields;
+  if (
+    fieldsRaw == null ||
+    typeof fieldsRaw !== "object" ||
+    Array.isArray(fieldsRaw) ||
+    Object.getPrototypeOf(fieldsRaw) !== Object.prototype
+  ) {
+    return {
+      ok: false,
+      errors: [{ code: "invalid_value", message: "fields must be a plain object." }],
+    };
+  }
+
+  const fields: Partial<Record<ProductDraftFieldKey, string>> = {};
+  for (const [key, value] of Object.entries(fieldsRaw as Record<string, unknown>)) {
+    if (!PRODUCT_DRAFT_FIELD_SET.has(key)) {
+      return {
+        ok: false,
+        errors: [{ code: "unknown_field", message: "Unknown product field.", key }],
+      };
+    }
+    if (typeof value !== "string") {
+      return {
+        ok: false,
+        errors: [{ code: "invalid_value", message: "Product field must be a string.", key }],
+      };
+    }
+    fields[key as ProductDraftFieldKey] = value;
+  }
+
+  const out: ProductDraftChanges = {
+    fields,
+    base_version: baseRaw,
+  };
+
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(out);
+  } catch {
+    return {
+      ok: false,
+      errors: [{ code: "draft_too_large", message: "Draft could not be serialized." }],
+    };
+  }
+  if (Buffer.byteLength(serialized, "utf8") > REVISION_MAX_BYTES) {
+    return {
+      ok: false,
+      errors: [{ code: "draft_too_large", message: "Draft exceeds 1 MB." }],
+    };
+  }
+
+  return { ok: true, changes: out };
+}
+
 /** Keys that exist in site_content (for the requested set) UNION seed defaults. */
 export async function loadKnownKeys(
   conn: Pick<PoolConnection, "query">,
@@ -283,10 +423,51 @@ function parseDraftJson(raw: unknown): { changes: DraftChanges; corrupt?: true }
   }
 }
 
+function parseProductDraftJson(
+  raw: unknown
+): { changes: ProductDraftChanges; key_count: number; corrupt?: true } {
+  const empty: ProductDraftChanges = { fields: {}, base_version: 0 };
+  if (typeof raw !== "string" || !raw.trim()) {
+    return { changes: empty, key_count: 0, corrupt: true };
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    const validated = validateProductDraft(parsed);
+    if (!validated.ok) {
+      return { changes: empty, key_count: 0, corrupt: true };
+    }
+    return {
+      changes: validated.changes,
+      key_count: Object.keys(validated.changes.fields).length,
+    };
+  } catch {
+    return { changes: empty, key_count: 0, corrupt: true };
+  }
+}
+
 export function draftRowToDto(row: ContentDraftRow, nowMs = Date.now()): ContentDraftDto {
+  const entityType = String(row.entity_type);
+  if (entityType === "product") {
+    const parsed = parseProductDraftJson(row.draft_json);
+    const dto: ContentDraftDto = {
+      entity_type: entityType,
+      entity_id: String(row.entity_id),
+      changes: parsed.changes,
+      draft_version: Number(row.draft_version) || 0,
+      created_by_name: String(row.created_by_name || ""),
+      updated_by_name: String(row.updated_by_name || ""),
+      created_at: toIso(row.created_at),
+      updated_at: toIso(row.updated_at),
+      age_days: ageDaysFrom(row.created_at, nowMs),
+      key_count: parsed.key_count,
+    };
+    if (parsed.corrupt) dto.corrupt = true;
+    return dto;
+  }
+
   const parsed = parseDraftJson(row.draft_json);
   const dto: ContentDraftDto = {
-    entity_type: String(row.entity_type),
+    entity_type: entityType,
     entity_id: String(row.entity_id),
     changes: parsed.changes,
     draft_version: Number(row.draft_version) || 0,

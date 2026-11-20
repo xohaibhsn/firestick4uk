@@ -486,13 +486,19 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
   const MULTI142_API_OK = new Set(["pages/api/admin-drafts.ts"]);
   // F4UK-MULTI-145: atomic staff login session (staff branch only).
   const MULTI145_API_OK = new Set(["pages/api/admin-login.ts"]);
+  // F4UK-MULTI-150: product drafts API surfaces.
+  const MULTI150_API_OK = new Set([
+    "pages/api/admin-drafts.ts",
+    "pages/api/admin-products.ts",
+  ]);
   const apiTouched = names.filter(
     (n) =>
       n.startsWith("pages/api/") &&
       !MULTI137_API_OK.has(n) &&
       !MULTI139_API_OK.has(n) &&
       !MULTI142_API_OK.has(n) &&
-      !MULTI145_API_OK.has(n)
+      !MULTI145_API_OK.has(n) &&
+      !MULTI150_API_OK.has(n)
   );
   // MULTI-132: ProductDetail.tsx may receive additive preview listener (still no pages/api).
   // MULTI-133: lib-only tracking gates (no public app/components required).
@@ -563,7 +569,8 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
           !MULTI137_API_OK.has(n) &&
           !MULTI139_API_OK.has(n) &&
           !MULTI142_API_OK.has(n) &&
-          !MULTI145_API_OK.has(n)) ||
+          !MULTI145_API_OK.has(n) &&
+          !MULTI150_API_OK.has(n)) ||
         (n.startsWith("app/") &&
           n !== "app/sidhu/page.tsx" &&
           n !== "app/products/[slug]/ProductDetail.tsx" &&

@@ -375,6 +375,34 @@ const APPROVED = new Set([
   "scripts/phase-multi-146-tests.js",
   "scripts/phase-multi-147-tests.js",
   "scripts/phase-multi-148-tests.js",
+    // F4UK-MULTI-150: product drafts (Draft/Publish D4).
+    "lib/contentDrafts.ts",
+    "pages/api/admin-drafts.ts",
+    "pages/api/admin-products.ts",
+    "components/admin/ProductDraftBar.tsx",
+    "lib/productDraftClient.ts",
+    "app/sidhu/page.tsx",
+    "scripts/phase-multi-150-tests.js",
+    "docs/design/DRAFT-PUBLISH.md",
+    "scripts/phase-multi-116-tests.js",
+    "scripts/phase-multi-130-tests.js",
+    "scripts/phase-multi-131-tests.js",
+    "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-133-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-136-tests.js",
+    "scripts/phase-multi-137-tests.js",
+    "scripts/phase-multi-138-tests.js",
+    "scripts/phase-multi-139-tests.js",
+    "scripts/phase-multi-140-tests.js",
+    "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-143-tests.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-145-tests.js",
+    "scripts/phase-multi-146-tests.js",
+    "scripts/phase-multi-147-tests.js",
+    "scripts/phase-multi-148-tests.js",
+    "scripts/phase-multi-149-tests.js",
 ]);
 
 const LABEL_OK = "AbCdEf123456";
@@ -737,6 +765,10 @@ const LABEL_WA = "WaLabel_99xyz";
     const MULTI142_API_OK = new Set(["pages/api/admin-drafts.ts"]);
     // F4UK-MULTI-145: atomic staff login session (staff branch only).
     const MULTI145_API_OK = new Set(["pages/api/admin-login.ts"]);
+  const MULTI150_API_OK = new Set([
+    "pages/api/admin-drafts.ts",
+    "pages/api/admin-products.ts",
+  ]);
     const r = spawnSync(
       "git",
       ["diff", "--name-only", "origin/main", "--", "pages/api", "lib/insightsIngest.ts"],
@@ -751,7 +783,8 @@ const LABEL_WA = "WaLabel_99xyz";
           !MULTI137_API_OK.has(n) &&
           !MULTI139_API_OK.has(n) &&
           !MULTI142_API_OK.has(n) &&
-          !MULTI145_API_OK.has(n)
+          !MULTI145_API_OK.has(n) &&
+        !MULTI150_API_OK.has(n)
       );
     ok("zero_api_and_ingest_diff", names.length === 0, names.join(",") || "clean");
   }

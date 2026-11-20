@@ -241,7 +241,11 @@ function main() {
         rel === "pages/api/admin-drafts.ts" ||
         // F4UK-MULTI-143: D3 UI files (expected not to mention content_drafts; skip if they do).
         rel === "components/admin/CmsDraftBar.tsx" ||
-        rel === "lib/contentDraftClient.ts"
+        rel === "lib/contentDraftClient.ts" ||
+        rel === "pages/api/admin-products.ts" ||
+        rel === "components/admin/ProductDraftBar.tsx" ||
+        rel === "lib/productDraftClient.ts" ||
+        rel === "app/sidhu/page.tsx"
       ) {
         continue;
       }
@@ -441,7 +445,35 @@ function main() {
     "scripts/phase-multi-146-tests.js",
     "scripts/phase-multi-147-tests.js",
     "scripts/phase-multi-148-tests.js",
-]);
+// F4UK-MULTI-150: product drafts (Draft/Publish D4).
+    "lib/contentDrafts.ts",
+    "pages/api/admin-drafts.ts",
+    "pages/api/admin-products.ts",
+    "components/admin/ProductDraftBar.tsx",
+    "lib/productDraftClient.ts",
+    "app/sidhu/page.tsx",
+    "scripts/phase-multi-150-tests.js",
+    "docs/design/DRAFT-PUBLISH.md",
+    "scripts/phase-multi-116-tests.js",
+    "scripts/phase-multi-130-tests.js",
+    "scripts/phase-multi-131-tests.js",
+    "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-133-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-136-tests.js",
+    "scripts/phase-multi-137-tests.js",
+    "scripts/phase-multi-138-tests.js",
+    "scripts/phase-multi-139-tests.js",
+    "scripts/phase-multi-140-tests.js",
+    "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-143-tests.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-145-tests.js",
+    "scripts/phase-multi-146-tests.js",
+    "scripts/phase-multi-147-tests.js",
+    "scripts/phase-multi-148-tests.js",
+    "scripts/phase-multi-149-tests.js",
+  ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,
     encoding: "utf8",
