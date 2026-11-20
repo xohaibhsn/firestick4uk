@@ -617,6 +617,28 @@ function runDiffAllowlist() {
     "scripts/phase-multi-145-tests.js",
     "scripts/phase-multi-146-tests.js",
     "scripts/phase-multi-147-tests.js",
+
+    // F4UK-MULTI-149: compact mobile consent banner (presentation only).
+    "components/TrackingConsent.tsx",
+    "scripts/phase-multi-149-tests.js",
+    "scripts/phase-multi-116-tests.js",
+    "scripts/phase-multi-130-tests.js",
+    "scripts/phase-multi-131-tests.js",
+    "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-133-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-136-tests.js",
+    "scripts/phase-multi-137-tests.js",
+    "scripts/phase-multi-138-tests.js",
+    "scripts/phase-multi-139-tests.js",
+    "scripts/phase-multi-140-tests.js",
+    "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-143-tests.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-145-tests.js",
+    "scripts/phase-multi-146-tests.js",
+    "scripts/phase-multi-147-tests.js",
+    "scripts/phase-multi-148-tests.js",
 ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

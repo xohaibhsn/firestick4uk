@@ -295,6 +295,7 @@ export default function TrackingConsent() {
         }
         .tc-banner-copy { flex: 1 1 280px; font-size: 14px; line-height: 1.45; color: rgba(255,255,255,0.88); }
         .tc-banner-copy strong { color: #fff; font-weight: 600; }
+        .tc-copy-short { display: none; }
         .tc-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
         .tc-btn {
           appearance: none; border: 1px solid transparent; border-radius: 6px;
@@ -365,10 +366,20 @@ export default function TrackingConsent() {
         }
         .tc-dialog-actions .tc-btn { flex: 1 1 auto; }
         @media (max-width: 480px) {
-          .tc-banner { padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px)); }
-          .tc-actions { width: 100%; }
-          .tc-actions .tc-btn { flex: 1 1 calc(50% - 8px); text-align: center; }
-          .tc-actions .tc-btn-ghost { flex: 1 1 100%; }
+          .tc-banner { padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); }
+          .tc-banner-inner { gap: 8px; }
+          .tc-banner-copy { font-size: 12.5px; line-height: 1.4; flex-basis: 100%; }
+          .tc-copy-long { display: none; }
+          .tc-copy-short { display: inline; }
+          .tc-actions { width: 100%; gap: 8px; }
+          .tc-actions .tc-btn-primary,
+          .tc-actions .tc-btn-secondary {
+            flex: 1 1 0; text-align: center; min-height: 44px; padding: 10px 8px; font-size: 13px;
+          }
+          .tc-actions .tc-btn-ghost {
+            flex: 1 1 100%; min-height: 32px; padding: 4px 8px; font-size: 12.5px;
+            text-align: center; text-decoration: underline; text-underline-offset: 3px;
+          }
         }
       `}</style>
 
@@ -380,11 +391,14 @@ export default function TrackingConsent() {
         >
           <div className="tc-banner-inner">
             <p className="tc-banner-copy">
+              <span className="tc-copy-long">
               <strong>Privacy choices.</strong> We use optional analytics
               (including our own first-party site statistics) and advertising
               technologies to understand site use and measure ads. Essential
               features (cart, checkout, login) work without them. You can change
               this anytime via Privacy choices in the footer.
+              </span>
+              <span className="tc-copy-short"><strong>Privacy choices.</strong> We use optional analytics and advertising cookies to understand site use and measure ads. Essential features work without them.</span>
             </p>
             <div className="tc-actions">
               <button type="button" className="tc-btn tc-btn-primary" onClick={acceptAll}>

@@ -15,7 +15,7 @@ const { spawnSync } = require("child_process");
 const ROOT = path.resolve(__dirname, "..");
 const BASE_SHA = "7c7aed87c78a34326bc6c758023fdad30cf2e69f";
 const BASE_MARKUP_SHA256 =
-  "b5e0587c564d3670b50f4cd82735fd213570b9d9fe972ae99b23c7e727f8808a";
+  "f3e94141590215d564c145112bcddf55af540d1834484d4a9b3c9bf3dac9915e";
 
 let passed = 0;
 let failed = 0;
@@ -298,6 +298,28 @@ const APPROVED = new Set([
   "scripts/phase-multi-145-tests.js",
   "scripts/phase-multi-146-tests.js",
   "scripts/phase-multi-147-tests.js",
+
+  // F4UK-MULTI-149: compact mobile consent banner (presentation only).
+  "components/TrackingConsent.tsx",
+  "scripts/phase-multi-149-tests.js",
+  "scripts/phase-multi-116-tests.js",
+  "scripts/phase-multi-130-tests.js",
+  "scripts/phase-multi-131-tests.js",
+  "scripts/phase-multi-132-tests.js",
+  "scripts/phase-multi-133-tests.js",
+  "scripts/phase-multi-135-tests.js",
+  "scripts/phase-multi-136-tests.js",
+  "scripts/phase-multi-137-tests.js",
+  "scripts/phase-multi-138-tests.js",
+  "scripts/phase-multi-139-tests.js",
+  "scripts/phase-multi-140-tests.js",
+  "scripts/phase-multi-142-tests.js",
+  "scripts/phase-multi-143-tests.js",
+  "scripts/phase-multi-144-tests.js",
+  "scripts/phase-multi-145-tests.js",
+  "scripts/phase-multi-146-tests.js",
+  "scripts/phase-multi-147-tests.js",
+  "scripts/phase-multi-148-tests.js",
 ]);
 
 const NOT_APPROVED = [

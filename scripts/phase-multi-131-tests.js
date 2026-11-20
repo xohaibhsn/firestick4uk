@@ -575,6 +575,29 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "scripts/phase-multi-146-tests.js",
     "scripts/phase-multi-147-tests.js",
   ]);
+  // F4UK-MULTI-149: compact mobile consent banner (presentation only).
+  const MULTI149_OK = new Set([
+    "components/TrackingConsent.tsx",
+    "scripts/phase-multi-149-tests.js",
+    "scripts/phase-multi-116-tests.js",
+    "scripts/phase-multi-130-tests.js",
+    "scripts/phase-multi-131-tests.js",
+    "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-133-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-136-tests.js",
+    "scripts/phase-multi-137-tests.js",
+    "scripts/phase-multi-138-tests.js",
+    "scripts/phase-multi-139-tests.js",
+    "scripts/phase-multi-140-tests.js",
+    "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-143-tests.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-145-tests.js",
+    "scripts/phase-multi-146-tests.js",
+    "scripts/phase-multi-147-tests.js",
+    "scripts/phase-multi-148-tests.js",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -593,7 +616,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       !MULTI145_OK.has(n) &&
         !MULTI146_OK.has(n) &&
         !MULTI147_OK.has(n) &&
-        !MULTI148_OK.has(n)
+        !MULTI148_OK.has(n) &&
+        !MULTI149_OK.has(n)
   );
   const apiTouchedUnexpected = apiTouched.filter(
     (n) =>
@@ -604,7 +628,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       !MULTI145_OK.has(n) &&
         !MULTI146_OK.has(n) &&
         !MULTI147_OK.has(n) &&
-        !MULTI148_OK.has(n)
+        !MULTI148_OK.has(n) &&
+        !MULTI149_OK.has(n)
   );
   ok(
     "no_pages_api_changes",
@@ -677,6 +702,7 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       MULTI146_OK.has(n) ||
       MULTI147_OK.has(n) ||
       MULTI148_OK.has(n) ||
+      MULTI149_OK.has(n) ||
       PLUMBING_OK.has(n)
     ) {
       return false;
