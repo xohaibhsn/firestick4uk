@@ -821,6 +821,19 @@ function runDiffAllowlist() {
     "lib/contentDraftClient.ts",
     "app/sidhu/page.tsx",
     "scripts/phase-multi-143-tests.js",
+    // F4UK-MULTI-144: health-check network retry + capture waits for CMS load.
+    "scripts/live-health-check.js",
+    "scripts/tools/visible-text-capture.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-138-tests.js",
+    "scripts/phase-multi-116-tests.js",
+    "scripts/phase-multi-131-tests.js",
+    "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-133-tests.js",
+    "scripts/phase-multi-136-tests.js",
+    "scripts/phase-multi-140-tests.js",
+    "scripts/phase-multi-142-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

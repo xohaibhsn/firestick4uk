@@ -130,6 +130,16 @@ async function capturePage(context, pageSpec, attempt, normSource) {
       }
     }, CART);
     const url = BASE + pageSpec.path;
+    // Register BEFORE goto so the client CMS fetch cannot be missed.
+    const cmsResp = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes("/api/site-content?page=all") &&
+          r.request().method() === "GET",
+        { timeout: 45000 }
+      )
+      .then((r) => ({ ok: true, status: r.status() }))
+      .catch(() => ({ ok: false, status: null }));
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 90000 });
     await page
       .waitForFunction(
@@ -141,6 +151,18 @@ async function capturePage(context, pageSpec, attempt, normSource) {
         { timeout: 30000 }
       )
       .catch(() => {});
+    const cms = await cmsResp;
+    if (!cms.ok) {
+      return {
+        key: pageSpec.key,
+        path: pageSpec.path,
+        ok: false,
+        attempt,
+        cmsLoaded: false,
+        cmsStatus: cms.status,
+        error: "cms_not_loaded",
+      };
+    }
     // networkidle best-effort (timeout 20000 ms, catch ignored)
     await page
       .waitForLoadState("networkidle", { timeout: 20000 })
@@ -189,6 +211,8 @@ async function capturePage(context, pageSpec, attempt, normSource) {
         path: pageSpec.path,
         ok: false,
         attempt,
+        cmsLoaded: true,
+        cmsStatus: cms.status,
         error: `too_short len=${result && result.len} preview=${result && result.preview}`,
       };
     }
@@ -202,6 +226,8 @@ async function capturePage(context, pageSpec, attempt, normSource) {
       rawLen: result.rawLen,
       attempt,
       ok: true,
+      cmsLoaded: true,
+      cmsStatus: cms.status,
       stable: stab.stable,
       reads: stab.reads,
       distinctHashes: stab.distinctHashes,
@@ -214,6 +240,8 @@ async function capturePage(context, pageSpec, attempt, normSource) {
       path: pageSpec.path,
       ok: false,
       attempt,
+      cmsLoaded: false,
+      cmsStatus: null,
       error: String(err && err.message ? err.message : err),
     };
   } finally {

@@ -400,12 +400,12 @@ function assertNotMutated(input, snapshot, label) {
       )
   );
 
+  // F4UK-MULTI-144: live-health-check.js removed from NOT_APPROVED (tooling retry allowed).
   const NOT_APPROVED = [
     "lib/paymentMethodSettings.ts",
     "lib/publicSiteContentServer.ts",
     "lib/publicSiteContentDenylist.json",
     "lib/siteContentDefaults.ts",
-    "scripts/live-health-check.js",
   ];
   const badNotApproved = [];
   for (const f of NOT_APPROVED) {

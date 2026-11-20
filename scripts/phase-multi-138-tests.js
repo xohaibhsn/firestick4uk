@@ -346,6 +346,11 @@ const {
       "lib/contentDraftClient.ts",
       "app/sidhu/page.tsx",
       "scripts/phase-multi-143-tests.js",
+      // F4UK-MULTI-144: health-check network retry + capture waits for CMS load.
+      "scripts/live-health-check.js",
+      "scripts/tools/visible-text-capture.js",
+      "scripts/phase-multi-144-tests.js",
+      "scripts/phase-multi-135-tests.js",
     ]);
     const names = new Set();
     for (const block of [diff.stdout || "", unstaged.stdout || ""]) {

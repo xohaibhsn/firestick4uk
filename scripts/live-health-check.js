@@ -103,21 +103,101 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/** Injectable for tests (backoff / gap); default real sleep. */
+let sleepImpl = sleep;
+function setSleepForTests(fn) {
+  sleepImpl = typeof fn === "function" ? fn : sleep;
+}
+
+const TRANSIENT_CAUSE_CODES = new Set([
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_SOCKET",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "EAI_AGAIN",
+  "ECONNREFUSED",
+]);
+
+/**
+ * Pure helper: true when err is a transient network failure with no HTTP response.
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+function isTransientNetworkError(err) {
+  if (!err || typeof err !== "object") return false;
+  const name = String(err.name || "");
+  const message = String(err.message || "");
+  if (name === "AbortError" || name === "TimeoutError") return true;
+  if (name === "TypeError" && /fetch failed/i.test(message)) return true;
+  const code =
+    err.cause && typeof err.cause === "object" && err.cause.code
+      ? String(err.cause.code)
+      : err.code
+        ? String(err.code)
+        : "";
+  if (code && TRANSIENT_CAUSE_CODES.has(code)) return true;
+  return false;
+}
+
 let lastReqAt = 0;
+/** Module-level count of politeFetch retries (not failures). */
+let networkRetryCount = 0;
+
+function getNetworkRetryCount() {
+  return networkRetryCount;
+}
+
+function resetNetworkRetryCount() {
+  networkRetryCount = 0;
+}
+
+const FETCH_TIMEOUT_MS = 20000;
+const RETRY_BACKOFF_MS = [2000, 5000];
+
+/**
+ * Rate-limited fetch with per-request timeout and transient-network retries.
+ * HTTP responses of any status are never retried.
+ */
 async function politeFetch(url, opts = {}) {
-  const now = Date.now();
-  const wait = MIN_GAP_MS - (now - lastReqAt);
-  if (wait > 0) await sleep(wait);
-  lastReqAt = Date.now();
-  const res = await fetch(url, {
-    redirect: "manual",
-    ...opts,
-    headers: {
-      "user-agent": "F4UK-live-health-check/1.0",
-      ...(opts.headers || {}),
-    },
-  });
-  return res;
+  const maxAttempts = 1 + RETRY_BACKOFF_MS.length;
+  let lastErr;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      await sleepImpl(RETRY_BACKOFF_MS[attempt - 1]);
+      networkRetryCount += 1;
+    }
+    const now = Date.now();
+    const wait = MIN_GAP_MS - (now - lastReqAt);
+    if (wait > 0) await sleepImpl(wait);
+    lastReqAt = Date.now();
+
+    const timeoutSignal = AbortSignal.timeout(20000); // FETCH_TIMEOUT_MS
+    const signal = opts.signal
+      ? AbortSignal.any([opts.signal, timeoutSignal])
+      : timeoutSignal;
+
+    try {
+      const res = await fetch(url, {
+        redirect: "manual",
+        ...opts,
+        signal,
+        headers: {
+          "user-agent": "F4UK-live-health-check/1.0",
+          ...(opts.headers || {}),
+        },
+      });
+      // Any HTTP response (any status) — never retry.
+      return res;
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientNetworkError(err) || attempt >= maxAttempts - 1) {
+        throw err;
+      }
+      // transient: continue to retry
+    }
+  }
+  throw lastErr;
 }
 
 function isHtmlPath(p) {
@@ -125,6 +205,7 @@ function isHtmlPath(p) {
 }
 
 async function main() {
+  resetNetworkRetryCount();
   const args = parseArgs(process.argv);
   const base = args.base;
   const failures = [];
@@ -370,6 +451,7 @@ async function main() {
     ok: failures.length === 0,
     base,
     generatedAt: new Date().toISOString(),
+    networkRetries: networkRetryCount,
     http: httpResults,
     sitemapUrlCount: sitemapCount,
     productsCount,
@@ -396,6 +478,7 @@ async function main() {
     `- Sitemap URLs: ${sitemapCount}`,
     `- /api/products length: ${productsCount}`,
     `- SEO field diffs: ${seoDiffs.length}`,
+    `- Network retries: ${networkRetryCount}`,
     `- Failures: ${failures.length}`,
     ``,
     `## Failures`,
@@ -438,7 +521,31 @@ async function main() {
   process.exit(summary.ok ? 0 : 1);
 }
 
-main().catch((err) => {
-  console.error("fatal", err && err.name ? err.name : "error");
-  process.exit(1);
-});
+module.exports = {
+  isTransientNetworkError,
+  politeFetch,
+  getNetworkRetryCount,
+  resetNetworkRetryCount,
+  setSleepForTests,
+  MIN_GAP_MS,
+  FETCH_TIMEOUT_MS,
+  RETRY_BACKOFF_MS,
+};
+
+if (require.main === module) {
+  main().catch((err) => {
+    const name = err && err.name ? err.name : "error";
+    const causeCode =
+      err && err.cause && err.cause.code
+        ? String(err.cause.code)
+        : err && err.code
+          ? String(err.code)
+          : "";
+    const msg = String(err && err.message != null ? err.message : err).slice(
+      0,
+      200
+    );
+    console.error("fatal", name, causeCode, msg);
+    process.exit(1);
+  });
+}

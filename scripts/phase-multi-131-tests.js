@@ -464,6 +464,22 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "scripts/phase-multi-143-tests.js",
     "docs/design/DRAFT-PUBLISH.md",
   ]);
+  // F4UK-MULTI-144: health-check network retry + capture waits for CMS load.
+  const MULTI144_OK = new Set([
+    "scripts/live-health-check.js",
+    "scripts/tools/visible-text-capture.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-138-tests.js",
+    "scripts/phase-multi-116-tests.js",
+    "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-133-tests.js",
+    "scripts/phase-multi-136-tests.js",
+    "scripts/phase-multi-139-tests.js",
+    "scripts/phase-multi-140-tests.js",
+    "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-143-tests.js",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -477,7 +493,8 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       !MULTI137_OK.has(n) &&
       !MULTI139_OK.has(n) &&
       !MULTI142_OK.has(n) &&
-      !MULTI143_OK.has(n)
+      !MULTI143_OK.has(n) &&
+      !MULTI144_OK.has(n)
   );
   const apiTouchedUnexpected = apiTouched.filter(
     (n) =>
@@ -529,6 +546,7 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "scripts/phase-multi-139-tests.js",
     "scripts/phase-multi-142-tests.js",
     "scripts/phase-multi-143-tests.js",
+    "scripts/phase-multi-144-tests.js",
     "scripts/phase-multi-97-tests.js",
     "scripts/phase-multi-114-tests.js",
     "scripts/phase-multi-116-tests.js",
@@ -547,6 +565,7 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
       MULTI139_OK.has(n) ||
       MULTI142_OK.has(n) ||
       MULTI143_OK.has(n) ||
+      MULTI144_OK.has(n) ||
       PLUMBING_OK.has(n)
     ) {
       return false;

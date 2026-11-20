@@ -537,6 +537,22 @@ async function main() {
     "lib/contentDrafts.ts",
     "docs/design/DRAFT-PUBLISH.md",
   ]);
+  // F4UK-MULTI-144: health-check network retry + capture waits for CMS load.
+  const MULTI144_OK = new Set([
+    "scripts/live-health-check.js",
+    "scripts/tools/visible-text-capture.js",
+    "scripts/phase-multi-144-tests.js",
+    "scripts/phase-multi-135-tests.js",
+    "scripts/phase-multi-138-tests.js",
+    "scripts/phase-multi-131-tests.js",
+    "scripts/phase-multi-132-tests.js",
+    "scripts/phase-multi-133-tests.js",
+    "scripts/phase-multi-136-tests.js",
+    "scripts/phase-multi-139-tests.js",
+    "scripts/phase-multi-140-tests.js",
+    "scripts/phase-multi-142-tests.js",
+    "scripts/phase-multi-143-tests.js",
+  ]);
   const dirtyNames = (diffCheck.stdout || "")
     .split(/\r?\n/)
     .map((s) => s.trim())
@@ -550,7 +566,8 @@ async function main() {
         !MULTI137_OK.has(n) &&
         !MULTI139_OK.has(n) &&
         !MULTI142_OK.has(n) &&
-        !MULTI143_OK.has(n)
+        !MULTI143_OK.has(n) &&
+        !MULTI144_OK.has(n)
     );
   ok("no_app_tree_diff", dirtyNames.length === 0, dirtyNames.join(",") || "clean");
 
