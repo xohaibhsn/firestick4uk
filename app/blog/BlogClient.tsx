@@ -4,6 +4,7 @@ import BreadcrumbSchema from "@/components/BreadcrumbSchema";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useSiteContent } from "@/hooks/useSiteContent";
+import { formatBlogDate } from "@/lib/blogDateFormat";
 import type { PublicBlogPost } from "@/lib/publicBlogServer";
 
 const styles = `
@@ -160,13 +161,7 @@ function mapPublicPost(p: PublicBlogPost): BlogListPost {
     excerpt: p.excerpt,
     slug: p.slug || String(p.id),
     featured_image: p.featured_image || "",
-    date: p.created_at
-      ? new Date(p.created_at).toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        })
-      : "",
+    date: formatBlogDate(p.created_at),
     readTime: "3 min read",
     category: p.category || "Guides",
     featured: !!p.featured,

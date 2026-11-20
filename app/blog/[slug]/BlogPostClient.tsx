@@ -5,6 +5,7 @@ import { fixContentLinkRels } from "@/lib/seoLinks";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useSiteContent } from "@/hooks/useSiteContent";
+import { formatBlogDate } from "@/lib/blogDateFormat";
 
 // Allowed HTML tags from TipTap editor output
 const xssOptions = {
@@ -37,9 +38,7 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const { t } = useSiteContent();
 
-  const dateStr = post?.created_at
-    ? new Date(post.created_at).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" })
-    : "";
+  const dateStr = formatBlogDate(post?.created_at);
 
   const faqs = post?.faqs
     ? (typeof post.faqs === "string" ? JSON.parse(post.faqs) : post.faqs) as Array<{question:string;answer:string}>

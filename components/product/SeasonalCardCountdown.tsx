@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSharedSecondTicker } from "@/hooks/useSharedSecondTicker";
 import { parseUtcSqlToMs } from "@/lib/productSeasonLondon";
 import { formatSeasonalCardCountdown } from "@/lib/seasonalCountdownLabel";
@@ -8,6 +8,7 @@ import { formatSeasonalCardCountdown } from "@/lib/seasonalCountdownLabel";
 /**
  * Compact pill countdown for product cards (home + /products + seasonal offers).
  * Uses the shared 1s ticker. Reserved height avoids CLS. aria-live="off".
+ * Mounted gate: SSR + first client render share an empty pill (no #418).
  */
 export default function SeasonalCardCountdown({
   endsAt,
@@ -19,26 +20,33 @@ export default function SeasonalCardCountdown({
   /** Fires once when remaining hits 0 (card should disable ATC until refresh). */
   onEnded?: () => void;
 }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const live = phase === "live" && Boolean(endsAt);
   const nowMs = useSharedSecondTicker(live);
   const endMs = live ? parseUtcSqlToMs(endsAt) : null;
   const endedNotified = useRef(false);
 
   const remainingSec =
-    live && endMs != null ? Math.floor((endMs - nowMs) / 1000) : null;
-  const ended = remainingSec != null && remainingSec <= 0;
+    mounted && live && endMs != null
+      ? Math.floor((endMs - nowMs) / 1000)
+      : null;
+  const ended = mounted && remainingSec != null && remainingSec <= 0;
   const label =
-    remainingSec == null ? "" : formatSeasonalCardCountdown(remainingSec);
+    !mounted || remainingSec == null
+      ? ""
+      : formatSeasonalCardCountdown(remainingSec);
 
   useEffect(() => {
     endedNotified.current = false;
   }, [endsAt, phase]);
 
   useEffect(() => {
-    if (!ended || !onEnded || endedNotified.current) return;
+    if (!mounted || !ended || !onEnded || endedNotified.current) return;
     endedNotified.current = true;
     onEnded();
-  }, [ended, onEnded]);
+  }, [mounted, ended, onEnded]);
 
   if (!live || endMs == null) return null;
 
@@ -65,7 +73,7 @@ export default function SeasonalCardCountdown({
         whiteSpace: "nowrap",
       }}
     >
-      {label}
+      {label || "\u00A0"}
     </div>
   );
 }

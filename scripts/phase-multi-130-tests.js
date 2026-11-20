@@ -510,6 +510,13 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
     "app/contact/page.tsx",
     "app/products/[slug]/ProductDetail.tsx",
   ]);
+  // F4UK-MULTI-148: hydration-safe seasonal card countdown + London blog dates.
+  const MULTI148_PUBLIC_OK = new Set([
+    "components/product/SeasonalCardCountdown.tsx",
+    "app/blog/BlogClient.tsx",
+    "app/blog/[slug]/BlogPostClient.tsx",
+    "lib/blogDateFormat.ts",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -519,7 +526,8 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
       !MULTI132_PUBLIC_OK.has(n) &&
       !MULTI136_PUBLIC_OK.has(n) &&
       !MULTI146_PUBLIC_OK.has(n) &&
-      !MULTI147_PUBLIC_OK.has(n)
+      !MULTI147_PUBLIC_OK.has(n) &&
+      !MULTI148_PUBLIC_OK.has(n)
   );
   ok("no_pages_api_changes", apiTouched.length === 0, apiTouched.join(","));
   ok(
@@ -555,7 +563,8 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
           n !== "app/sidhu/page.tsx" &&
           n !== "app/products/[slug]/ProductDetail.tsx" &&
           !MULTI146_PUBLIC_OK.has(n) &&
-      !MULTI147_PUBLIC_OK.has(n))
+      !MULTI147_PUBLIC_OK.has(n) &&
+      !MULTI148_PUBLIC_OK.has(n))
     );
     ok("committed_diff_no_api_public", bad.length === 0, bad.join(","));
   } else {
