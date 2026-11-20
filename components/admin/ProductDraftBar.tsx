@@ -80,6 +80,18 @@ export default function ProductDraftBar(props: ProductDraftBarProps) {
   const busyAll = busy || productSaving;
   const entityId = String(productId);
 
+  // Parent often passes a fresh onSessionExpired identity every render; keep latest via ref
+  // so reloadDraft (and the load effect) do not churn on every keystroke.
+  const onSessionExpiredRef = useRef(onSessionExpired);
+  useEffect(() => {
+    onSessionExpiredRef.current = onSessionExpired;
+  });
+  // onPublishArmed is typically a stable setter; ref keeps the load effect productId-only.
+  const onPublishArmedRef = useRef(onPublishArmed);
+  useEffect(() => {
+    onPublishArmedRef.current = onPublishArmed;
+  });
+
   const reloadDraft = useCallback(async () => {
     if (!productId) return;
     const url = `/api/admin-drafts?entity_type=${encodeURIComponent(
@@ -87,7 +99,7 @@ export default function ProductDraftBar(props: ProductDraftBarProps) {
     )}&entity_id=${encodeURIComponent(entityId)}`;
     const r = await draftFetch(url);
     if (r.status === 401) {
-      onSessionExpired();
+      onSessionExpiredRef.current();
       return;
     }
     if (r.status === 403) {
@@ -102,14 +114,14 @@ export default function ProductDraftBar(props: ProductDraftBarProps) {
     }
     setAvailable(true);
     setDraft(data?.draft && typeof data.draft === "object" ? data.draft : null);
-  }, [productId, entityId, onSessionExpired]);
+  }, [productId, entityId]);
 
   useEffect(() => {
     setForbidden(false);
     setOpenedVersion(null);
     setDraft(null);
     setAvailable(null);
-    onPublishArmed(null);
+    onPublishArmedRef.current(null);
     liveBaselineRef.current = { ...editProduct };
     let cancelled = false;
     (async () => {
@@ -125,7 +137,7 @@ export default function ProductDraftBar(props: ProductDraftBarProps) {
     };
     // Intentionally only re-run on productId change (not every editProduct keystroke).
     // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot baseline once per product
-  }, [productId, reloadDraft, onPublishArmed]);
+  }, [productId, reloadDraft]);
 
   const handleSaveDraft = async () => {
     if (busyAll || !productId) return;
@@ -164,7 +176,7 @@ export default function ProductDraftBar(props: ProductDraftBarProps) {
         }),
       });
       if (r.status === 401) {
-        onSessionExpired();
+        onSessionExpiredRef.current();
         return;
       }
       if (r.status === 403) {
@@ -248,7 +260,7 @@ export default function ProductDraftBar(props: ProductDraftBarProps) {
         }),
       });
       if (r.status === 401) {
-        onSessionExpired();
+        onSessionExpiredRef.current();
         return;
       }
       if (r.status === 409 || r.status === 404) {

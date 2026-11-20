@@ -1550,7 +1550,12 @@ function runBarSourceTests() {
     "armed_not_called_on_plain_save_create",
     /if \(openedVersion != null && nextVer != null\)\s*\{\s*onPublishArmed\(nextVer\)/.test(src)
   );
-  ok("reset_armed_on_product_change", /onPublishArmed\(null\);\s*\n\s*liveBaselineRef/.test(src));
+  // F4UK-MULTI-151: load-effect reset may go through onPublishArmedRef.current(null)
+  // (stable-ref pattern) as well as a direct onPublishArmed(null) call.
+  ok(
+    "reset_armed_on_product_change",
+    /onPublishArmed(?:Ref\.current)?\(null\);\s*\n\s*liveBaselineRef/.test(src)
+  );
 
   ok("no_localStorage", !/localStorage|sessionStorage/.test(src));
   ok("no_timers", !/setInterval\s*\(/.test(src) && !/setTimeout\s*\(/.test(src));
@@ -1723,6 +1728,10 @@ function runDiffAllowlist() {
     "scripts/phase-multi-147-tests.js",
     "scripts/phase-multi-148-tests.js",
     "scripts/phase-multi-149-tests.js",
+    // F4UK-MULTI-151: draft bars stable session-expired refs (no reload on parent render).
+    "components/admin/CmsDraftBar.tsx",
+    "components/admin/ProductDraftBar.tsx",
+    "scripts/phase-multi-151-tests.js",
   ]);
   // Any other phase-*-tests.js that had its allowlist widened.
   const phaseTestRe = /^scripts\/phase-[a-z0-9-]+-tests\.js$/;

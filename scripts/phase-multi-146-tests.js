@@ -486,6 +486,11 @@ function runDiffAllowlist() {
     "scripts/phase-multi-147-tests.js",
     "scripts/phase-multi-148-tests.js",
     "scripts/phase-multi-149-tests.js",
+
+    // F4UK-MULTI-151: draft bars stable session-expired refs (no reload on parent render).
+    "components/admin/CmsDraftBar.tsx",
+    "components/admin/ProductDraftBar.tsx",
+    "scripts/phase-multi-151-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

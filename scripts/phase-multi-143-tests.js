@@ -238,7 +238,13 @@ function runBarSourceAssertions() {
     "available_false_null",
     /if \(available === false\) return null;/.test(src)
   );
-  ok("session_401", /status === 401/.test(src) && /onSessionExpired\(/.test(src));
+  // F4UK-MULTI-151: session expiry may be invoked via onSessionExpiredRef.current()
+  // (stable-ref pattern) as well as a direct onSessionExpired() call.
+  ok(
+    "session_401",
+    /status === 401/.test(src) &&
+      (/onSessionExpiredRef\.current\s*\(/.test(src) || /onSessionExpired\s*\(/.test(src))
+  );
   ok(
     "no_server_only_imports",
     !/from\s+["']@\/lib\/db["']/.test(src) &&
@@ -659,6 +665,10 @@ function runDiffAllowlist() {
     "scripts/phase-multi-147-tests.js",
     "scripts/phase-multi-148-tests.js",
     "scripts/phase-multi-149-tests.js",
+    // F4UK-MULTI-151: draft bars stable session-expired refs (no reload on parent render).
+    "components/admin/CmsDraftBar.tsx",
+    "components/admin/ProductDraftBar.tsx",
+    "scripts/phase-multi-151-tests.js",
 ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

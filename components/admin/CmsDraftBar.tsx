@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAdminDialogs } from "@/components/admin/AdminDialogs";
 import { isSuperAdminSettingsKey } from "@/lib/adminPermissions";
 import {
@@ -100,6 +100,13 @@ export default function CmsDraftBar(props: CmsDraftBarProps) {
 
   const busyAll = busy || contentSaving;
 
+  // Parent often passes a fresh onSessionExpired identity every render; keep latest via ref
+  // so reloadDraft/reloadList (and the load effect) do not churn on every keystroke.
+  const onSessionExpiredRef = useRef(onSessionExpired);
+  useEffect(() => {
+    onSessionExpiredRef.current = onSessionExpired;
+  });
+
   const reloadDraft = useCallback(async () => {
     if (!activePage || activePage === "overview") return;
     const url = `/api/admin-drafts?entity_type=${encodeURIComponent(
@@ -107,7 +114,7 @@ export default function CmsDraftBar(props: CmsDraftBarProps) {
     )}&entity_id=${encodeURIComponent(activePage)}`;
     const r = await draftFetch(url);
     if (r.status === 401) {
-      onSessionExpired();
+      onSessionExpiredRef.current();
       return;
     }
     if (r.status === 403) {
@@ -122,7 +129,7 @@ export default function CmsDraftBar(props: CmsDraftBarProps) {
     }
     setAvailable(true);
     setDraft(data?.draft && typeof data.draft === "object" ? data.draft : null);
-  }, [activePage, onSessionExpired]);
+  }, [activePage]);
 
   const reloadList = useCallback(async () => {
     const url = `/api/admin-drafts?entity_type=${encodeURIComponent(
@@ -130,7 +137,7 @@ export default function CmsDraftBar(props: CmsDraftBarProps) {
     )}`;
     const r = await draftFetch(url);
     if (r.status === 401) {
-      onSessionExpired();
+      onSessionExpiredRef.current();
       return;
     }
     if (r.status === 403) {
@@ -145,7 +152,7 @@ export default function CmsDraftBar(props: CmsDraftBarProps) {
     }
     setAvailable(true);
     setDrafts(Array.isArray(data?.drafts) ? data.drafts : []);
-  }, [onSessionExpired]);
+  }, []);
 
   useEffect(() => {
     setForbidden(false);
@@ -227,7 +234,7 @@ export default function CmsDraftBar(props: CmsDraftBarProps) {
         }),
       });
       if (r.status === 401) {
-        onSessionExpired();
+        onSessionExpiredRef.current();
         return;
       }
       if (r.status === 403) {
@@ -339,7 +346,7 @@ export default function CmsDraftBar(props: CmsDraftBarProps) {
         }),
       });
       if (del.status === 401) {
-        onSessionExpired();
+        onSessionExpiredRef.current();
         return;
       }
       if (del.ok) {
@@ -377,7 +384,7 @@ export default function CmsDraftBar(props: CmsDraftBarProps) {
         }),
       });
       if (r.status === 401) {
-        onSessionExpired();
+        onSessionExpiredRef.current();
         return;
       }
       if (r.status === 409 || r.status === 404) {

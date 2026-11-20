@@ -683,6 +683,12 @@ async function main() {
     "scripts/phase-multi-150-tests.js",
     "docs/design/DRAFT-PUBLISH.md",
   ]);
+  // F4UK-MULTI-151: draft bars stable session-expired refs.
+  const MULTI151_OK = new Set([
+    "components/admin/CmsDraftBar.tsx",
+    "components/admin/ProductDraftBar.tsx",
+    "scripts/phase-multi-151-tests.js",
+  ]);
   const dirtyNames = (diffCheck.stdout || "")
     .split(/\r?\n/)
     .map((s) => s.trim())
@@ -703,7 +709,8 @@ async function main() {
         !MULTI147_OK.has(n) &&
         !MULTI148_OK.has(n) &&
         !MULTI149_OK.has(n) &&
-      !MULTI150_OK.has(n)
+      !MULTI150_OK.has(n) &&
+        !MULTI151_OK.has(n)
     );
   ok("no_app_tree_diff", dirtyNames.length === 0, dirtyNames.join(",") || "clean");
 
