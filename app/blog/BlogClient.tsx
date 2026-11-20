@@ -132,6 +132,7 @@ body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow
     .newsletter-box{padding:36px 24px;}
     footer{padding:30px 24px;flex-direction:column;text-align:center;}
   }
+  @media(max-width:640px){ .cat-btn{ min-height:44px; } }
 `;
 
 const categories = ["All", "Guides", "Tips", "News"];

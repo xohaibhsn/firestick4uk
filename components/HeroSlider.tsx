@@ -184,13 +184,41 @@ export default function HeroSlider({ slides, children }: HeroSliderProps) {
             transform: none;
             display: flex;
             justify-content: center;
-            padding: 12px 0;
+            padding: 0;
             background: #0a0010;
-            gap: 12px;
+            gap: 2px;
           }
           .hero-slider-dot {
+            width: 44px;
+            height: 44px;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            position: relative;
+          }
+          .hero-slider-dot::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 50%;
             width: 14px;
             height: 14px;
+            transform: translate(-50%, -50%);
+            box-sizing: border-box;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.85);
+            background: transparent;
+            transition: background 0.2s;
+          }
+          .hero-slider-dot.active::before {
+            background: #FFFFFF;
+          }
+          .hero-slider-dot:hover {
+            transform: none;
+          }
+          .hero-slider-dot:focus-visible {
+            outline: 2px solid #FFFFFF;
+            outline-offset: -8px;
           }
         }
       `}</style>

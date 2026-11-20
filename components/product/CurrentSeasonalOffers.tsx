@@ -82,7 +82,7 @@ export default function CurrentSeasonalOffers({
                 background: "#FFFFFF",
               }}
             >
-              <a href={href} style={{ flexShrink: 0 }}>
+              <a href={href} style={{ flexShrink: 0 }} aria-hidden="true" tabIndex={-1}>
                 {p.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img

@@ -233,6 +233,10 @@ const navStyles = `
   /* CHECKOUT */
   .checkout-section { max-width:1200px; margin:0 auto; padding:0 60px 80px; }
   .checkout-grid { display:grid; grid-template-columns:1fr 1fr; gap:28px; }
+  .checkout-grid > *, .cart-layout > * { min-width:0; }
+  .checkout-city-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; }
+  .checkout-city-row input { min-width:0; }
+  @media(max-width:360px){ .checkout-city-row { grid-template-columns:minmax(0,1fr); gap:0; } }
   .form-section { background:#FFFFFF; border:1px solid #E5E5E5; border-radius:16px; padding:30px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
   .form-section h3 { font-family:var(--font-display); font-size:17px; font-weight:700; color:#111111; margin-bottom:22px; padding-bottom:14px; border-bottom:1px solid #F0F0F0; }
   .form-group { margin-bottom:16px; }
@@ -326,9 +330,9 @@ const navStyles = `
   .whatsapp-btn:hover { transform:scale(1.1); }
 
   @media(max-width:900px){
-    .cart-layout{grid-template-columns:1fr;padding:0 24px 60px;}
+    .cart-layout{grid-template-columns:minmax(0,1fr);padding:0 24px 60px;}
     .order-summary{position:static;}
-    .checkout-grid{grid-template-columns:1fr;}
+    .checkout-grid{grid-template-columns:minmax(0,1fr);}
     .checkout-section{padding:0 24px 60px;}
     .page-header{padding:36px 24px 20px;}
     footer{padding:36px 24px;flex-direction:column;text-align:center;}
@@ -1236,7 +1240,7 @@ export default function CartPage() {
                     </Fragment>
                     );
                   })}
-                  <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px"}}>
+                  <div className="checkout-city-row">
                     <div className="form-group">
                       <label htmlFor="checkout-city">{t("cart_lbl_city", "City")}{!labelHasOptional(t("cart_lbl_city", "City")) && <span className="opt-tag"> ({t("cart_optional_tag","optional")})</span>}</label>
                       <input

@@ -66,6 +66,7 @@ body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow
   .whatsapp-btn { position:fixed; bottom:30px; right:30px; z-index:999; width:58px; height:58px; border-radius:50%; background:linear-gradient(135deg,#25d366,#128c7e); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 25px rgba(37,211,102,0.5); text-decoration:none; font-size:26px; transition:all 0.3s; }
   .loading-state { text-align:center; padding:60px 24px; color:#666666; }
   @media(max-width:768px){ .help-box{padding:36px 24px;} footer{padding:30px 24px;flex-direction:column;text-align:center;} }
+  @media(max-width:640px){ .cat-btn{ min-height:44px; } }
 `;
 
 interface FaqItem { id:number; question:string; answer:string; category:string; sort_order:number; }

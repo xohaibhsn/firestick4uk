@@ -614,6 +614,13 @@ console.log("\nF4UK-MULTI-131 Products bulk actions\n");
     "components/admin/CmsDraftBar.tsx",
     "components/admin/ProductDraftBar.tsx",
     "scripts/phase-multi-151-tests.js",
+    // F4UK-MULTI-153: UX fix batch B
+    "app/cart/page.tsx",
+    "components/product/CurrentSeasonalOffers.tsx",
+    "components/HeroSlider.tsx",
+    "app/faq/FAQClient.tsx",
+    "app/blog/BlogClient.tsx",
+    "scripts/phase-multi-153-tests.js",
   ]);
   const publicTouched = names.filter(
     (n) =>
