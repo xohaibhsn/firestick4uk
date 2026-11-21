@@ -51,10 +51,11 @@ body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow
   .help-section { max-width:800px; margin:50px auto 80px; padding:0 24px; }
   .help-box { background:#111111; border-radius:16px; padding:50px 40px; text-align:center; }
   .help-title { font-family:var(--font-display); font-size:clamp(20px,3vw,28px); font-weight:700; color:#FFFFFF; margin-bottom:12px; }
-  .help-sub { color:rgba(255,255,255,0.7); font-size:15px; margin-bottom:30px; }
+  html body .help-box .help-sub { color:#B3B3B3 !important; font-size:15px; margin-bottom:30px; }
   .help-btns { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
   .btn-whatsapp { background:linear-gradient(135deg,#25d366,#128c7e); color:#FFFFFF; padding:14px 32px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; transition:all 0.2s; }
-  .btn-telegram { background:#229ED9; color:#FFFFFF; padding:14px 32px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; transition:all 0.2s; }
+  .btn-telegram { background:#0A6FA6; color:#FFFFFF; padding:14px 32px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; transition:all 0.2s; }
+  .btn-telegram:hover { background:#085A87; }
   .btn-contact { background:transparent; color:#FFFFFF; padding:14px 32px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; border:2px solid rgba(255,255,255,0.4); transition:all 0.2s; }
   .btn-contact:hover { border-color:#FFFFFF; }
   footer { background:#111111; padding:40px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }

@@ -62,7 +62,7 @@ body { background:#FFFFFF; color:#111111; font-family:var(--font-body); overflow
   .post-badge { display:inline-block; background:#5B21B6;
     color:#FFFFFF !important; font-size:10px; font-weight:700; padding:4px 14px; border-radius:20px;
     letter-spacing:1.5px; text-transform:uppercase; margin-bottom:16px; width:fit-content; }
-  .post-badge.guide { background:#16A34A; color:#FFFFFF !important; }
+  .post-badge.guide { background:#15803D; color:#FFFFFF !important; }
   .post-badge.news { background:#EA580C; color:#FFFFFF !important; }
   .post-badge.tips { background:#2563EB; color:#FFFFFF !important; }
   .featured-title { font-family:var(--font-display); font-size:clamp(1.5rem,2.5vw,2rem); font-weight:700;

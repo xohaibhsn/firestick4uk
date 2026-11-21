@@ -114,7 +114,7 @@ const styles = `
   .timeline-item { display:flex; gap:20px; }
   .tl-left { display:flex; flex-direction:column; align-items:center; width:40px; flex-shrink:0; }
   .tl-dot { width:40px; height:40px; border-radius:50%; flex-shrink:0;
-    background:#5B21B6; display:flex; align-items:center; justify-content:center; font-size:16px;
+    background:#5B21B6; color:#FFFFFF !important; display:flex; align-items:center; justify-content:center; font-size:16px;
     box-shadow:0 4px 12px rgba(91,33,182,0.3); }
   .tl-line { width:2px; flex:1; min-height:20px; background:#E5E5E5; margin:4px 0; }
   .tl-content { padding:4px 0 32px; flex:1; }

@@ -84,7 +84,7 @@ const styles = `
   .submit-btn { width:100%; background:#5B21B6; color:#FFFFFF; border:none; padding:15px;
     border-radius:9px; font-size:15px; font-weight:600; cursor:pointer; transition:all 0.2s; margin-top:6px; }
   .submit-btn:hover { background:#4C1D95; transform:translateY(-1px); box-shadow:0 4px 14px rgba(91,33,182,0.35); }
-  .submit-btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+  .submit-btn:disabled { opacity:1; background:#6B7280; color:#FFFFFF; cursor:not-allowed; transform:none; }
 
   /* SUCCESS */
   .form-success { text-align:center; padding:40px 20px; }

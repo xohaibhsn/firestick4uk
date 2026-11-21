@@ -309,6 +309,19 @@ function runProductDetailIfChanged() {
       .replace(
         /\r?\n[ \t]*\.back-link\{ min-height:44px; margin-bottom:12px; \}/,
         ""
+      )
+      // F4UK-MULTI-157: contrast batch D — strip exact MULTI-157 colour additions
+      .replace(
+        /\r?\n[ \t]*\.pdp-sticky-atc \.price-incl-vat-suffix\{color:#D1D5DB !important;\}/,
+        ""
+      )
+      .replace(
+        /\.pdp-sticky-atc__btn:disabled\{background:#6B7280;cursor:not-allowed;\}/,
+        ".pdp-sticky-atc__btn:disabled{background:#9CA3AF;cursor:not-allowed;}"
+      )
+      .replace(
+        /style=\{\{ background: "#6B7280", cursor: "not-allowed", transform: "none" \}\}/,
+        'style={{ background: "#9CA3AF", cursor: "not-allowed", transform: "none" }}'
       );
   }
   ok(
@@ -423,6 +436,20 @@ function runDiffAllowlist() {
     "app/products/[slug]/ProductDetail.tsx",
     "app/blog/[slug]/BlogPostClient.tsx",
     "scripts/phase-multi-156-tests.js",
+    // F4UK-MULTI-157: contrast batch D
+    "app/globals.css",
+    "app/faq/FAQClient.tsx",
+    "app/order-tracking/page.tsx",
+    "app/cart/page.tsx",
+    "app/cart/success/page.tsx",
+    "app/blog/BlogClient.tsx",
+    "app/blog/[slug]/BlogPostClient.tsx",
+    "app/about/page.tsx",
+    "app/products/[slug]/ProductDetail.tsx",
+    "app/products/ProductsClient.tsx",
+    "app/HomeClient.tsx",
+    "app/contact/page.tsx",
+    "scripts/phase-multi-157-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

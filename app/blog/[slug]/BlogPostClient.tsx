@@ -71,7 +71,8 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
 
         .post-title{font-family:var(--font-display);font-size:clamp(1.5rem,2.5vw,2rem);font-weight:700;color:#111111;line-height:1.25;margin-bottom:16px;}
 
-        .post-meta{color:#888888;font-size:13px;margin-bottom:28px;display:flex;gap:18px;flex-wrap:wrap;}
+        .post-meta{color:#737373;font-size:13px;margin-bottom:28px;display:flex;gap:18px;flex-wrap:wrap;}
+        html body .post-meta,html body .post-meta span{color:#737373 !important;}
 
         .featured-img{width:100%;max-height:420px;object-fit:cover;border-radius:14px;margin-bottom:36px;border:1px solid #E5E5E5;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
 

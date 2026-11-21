@@ -562,6 +562,22 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
     "app/blog/[slug]/BlogPostClient.tsx",
     "scripts/phase-multi-156-tests.js",
   ]);
+  // F4UK-MULTI-157: contrast batch D
+  const MULTI157_PUBLIC_OK = new Set([
+    "app/globals.css",
+    "app/faq/FAQClient.tsx",
+    "app/order-tracking/page.tsx",
+    "app/cart/page.tsx",
+    "app/cart/success/page.tsx",
+    "app/blog/BlogClient.tsx",
+    "app/blog/[slug]/BlogPostClient.tsx",
+    "app/about/page.tsx",
+    "app/products/[slug]/ProductDetail.tsx",
+    "app/products/ProductsClient.tsx",
+    "app/HomeClient.tsx",
+    "app/contact/page.tsx",
+    "scripts/phase-multi-157-tests.js",
+  ]);
   const publicTouched = names.filter(
     (n) =>
       ((n.startsWith("app/") && !n.startsWith("app/sidhu/")) ||
@@ -577,7 +593,8 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
       !MULTI153_PUBLIC_OK.has(n) &&
       !MULTI154_PUBLIC_OK.has(n) &&
       !MULTI155_PUBLIC_OK.has(n) &&
-      !MULTI156_PUBLIC_OK.has(n)
+      !MULTI156_PUBLIC_OK.has(n) &&
+      !MULTI157_PUBLIC_OK.has(n)
   );
   ok("no_pages_api_changes", apiTouched.length === 0, apiTouched.join(","));
   ok(
@@ -620,7 +637,8 @@ console.log("\nF4UK-MULTI-130 WooCommerce-style product admin\n");
       !MULTI153_PUBLIC_OK.has(n) &&
           !MULTI154_PUBLIC_OK.has(n) &&
           !MULTI155_PUBLIC_OK.has(n) &&
-          !MULTI156_PUBLIC_OK.has(n))
+          !MULTI156_PUBLIC_OK.has(n) &&
+          !MULTI157_PUBLIC_OK.has(n))
     );
     ok("committed_diff_no_api_public", bad.length === 0, bad.join(","));
   } else {

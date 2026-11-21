@@ -688,3 +688,8 @@ html body .sidebar nav { background: transparent !important; }
 html body .sidebar .nav-item { color: #CCCCCC !important; }
 html body .sidebar .nav-item:hover { background: rgba(255,255,255,0.08) !important; color: #FFFFFF !important; }
 html body .sidebar .nav-item.active { background: #5B21B6 !important; color: #FFFFFF !important; }
+
+/* F4UK-MULTI-157: headings on dark surfaces */
+html body .help-box .help-title,
+html body .help-card .help-text h4,
+html body .cta-band .cta-box h2 { color:#FFFFFF !important; -webkit-text-fill-color:#FFFFFF !important; }

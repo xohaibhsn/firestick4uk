@@ -34,7 +34,7 @@ const styles = `
   .search-section { max-width:600px; margin:0 auto; padding:30px 24px 0; }
   .search-fields { display:flex; flex-direction:column; gap:14px; }
   .field-label { display:block; font-size:12px; font-weight:600; letter-spacing:1px; text-transform:uppercase; color:#555555; margin-bottom:8px; }
-  .field-help { font-size:12px; color:#777777; margin-top:6px; line-height:1.4; }
+  .field-help { font-size:12px; color:#666666; margin-top:6px; line-height:1.4; }
   .search-box { display:flex; gap:12px; align-items:stretch; }
   .search-input { flex:1; width:100%; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:50px; padding:16px 24px; color:#111111; font-family:var(--font-body); font-size:15px; outline:none; transition:all 0.2s; }
   .search-input::placeholder { color:#999999; }
@@ -97,6 +97,7 @@ const styles = `
   .help-text p { font-size:13px; color:rgba(255,255,255,0.7); }
   .wa-btn { background:linear-gradient(135deg,#25d366,#128c7e); color:#FFFFFF; padding:12px 28px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; transition:all 0.2s; }
   .wa-btn:hover { transform:translateY(-1px); }
+  a.wa-btn[style*="#0A6FA6"]:hover { background:#085A87 !important; }
   footer { background:#111111; padding:40px 60px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
   .footer-logo { font-family:var(--font-display); font-size:16px; font-weight:800; color:#FFFFFF; }
   .footer-links { display:flex; gap:20px; list-style:none; flex-wrap:wrap; }
@@ -366,7 +367,7 @@ export default function OrderTrackingPage() {
             <a href={contact.whatsappUrl} className="wa-btn" target="_blank" rel="noopener noreferrer">
               💬 {t("track_wa_btn", "WhatsApp Us")}
             </a>
-            <a href={contact.telegramUrl} className="wa-btn" target="_blank" rel="noopener noreferrer" style={{background:"#229ED9"}}>
+            <a href={contact.telegramUrl} className="wa-btn" target="_blank" rel="noopener noreferrer" style={{background:"#0A6FA6"}}>
               ✈️ Telegram {contact.telegram}
             </a>
           </div>

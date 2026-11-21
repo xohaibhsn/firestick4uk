@@ -173,11 +173,11 @@ const navStyles = `
   .bank-row-value__text--nowrap { white-space:nowrap; }
   .bank-row-value__text--wrap { white-space:normal; overflow-wrap:break-word; word-break:normal; }
   .bank-row-value .copy-btn-wrap { justify-self:end; }
-  .checkout-steps { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:16px 0 18px; font-size:12px; letter-spacing:0.04em; text-transform:uppercase; color:#888888; }
-  .checkout-steps span { color:#888888; }
+  .checkout-steps { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:16px 0 18px; font-size:12px; letter-spacing:0.04em; text-transform:uppercase; color:#737373; }
+  .checkout-steps span { color:#737373; }
   .checkout-steps .step-current { color:#5B21B6; font-weight:700; }
-  .checkout-steps .step-done { color:#16A34A; font-weight:600; }
-  .cart-help-wa { display:inline-flex; align-items:center; gap:6px; margin:0 20px 16px; font-size:13px; color:#25d366; text-decoration:none; font-weight:600; }
+  .checkout-steps .step-done { color:#15803D; font-weight:600; }
+  .cart-help-wa { display:inline-flex; align-items:center; gap:6px; margin:0 20px 16px; font-size:13px; color:#15803D; text-decoration:none; font-weight:600; }
   .checkout-btn.preparing { opacity:0.75; cursor:wait; }
   .checkout-btn.preparing::after { content:""; display:inline-block; width:12px; height:12px; margin-left:8px; border:2px solid rgba(255,255,255,0.35); border-top-color:#fff; border-radius:50%; vertical-align:-1px; animation:cartPrepSpin 0.7s linear infinite; }
   @keyframes cartPrepSpin { to { transform:rotate(360deg); } }
@@ -212,7 +212,7 @@ const navStyles = `
     .order-summary { padding-bottom:8px; }
   }
   .qty-num { font-size:16px; font-weight:700; color:#111111; min-width:20px; text-align:center; }
-  .remove-btn { background:none; border:none; color:#CCCCCC; font-size:13px; cursor:pointer; transition:color 0.2s; display:inline-flex; align-items:center; justify-content:center; }
+  .remove-btn { background:none; border:none; color:#737373; font-size:13px; cursor:pointer; transition:color 0.2s; display:inline-flex; align-items:center; justify-content:center; }
   .remove-btn:hover { color:#DC2626; }
 
   /* ORDER SUMMARY */
@@ -263,7 +263,7 @@ const navStyles = `
   .payment-option.selected { border-color:#5B21B6; background:#F5F3FF; }
   .payment-option input[type="radio"] { accent-color:#5B21B6; width:16px; height:16px; }
   .payment-option-label { font-size:15px; font-weight:600; color:#111111; }
-  .payment-option-sub { font-size:12px; color:#888888; margin-top:2px; }
+  .payment-option-sub { font-size:12px; color:#5B5B5B; margin-top:2px; }
 
   /* BANK DETAILS */
   .bank-details { background:#F9F9F9; border:1px solid #E5E5E5; border-radius:10px; padding:18px; margin-bottom:18px; width:100%; max-width:100%; box-sizing:border-box; }

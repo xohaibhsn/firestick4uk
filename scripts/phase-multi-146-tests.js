@@ -422,12 +422,17 @@ function runCssTests() {
   const styleNow = (src.match(/\.form-group \.req-star[\s\S]*?\.field-error/) || [""])[0];
   const styleBase = (base.match(/\.form-group \.req-star[\s\S]*?\.field-error/) || [""])[0];
   ok("css_added_opt_tag_only", /\.opt-tag/.test(styleNow) && !/\.opt-tag/.test(styleBase));
-  // globals untouched
-  const gDiff = spawnSync("git", ["diff", "--name-only", BASE, "--", "app/globals.css"], {
-    cwd: ROOT,
-    encoding: "utf8",
-  });
-  ok("globals_css_untouched", !(gDiff.stdout || "").trim());
+  // globals untouched (except F4UK-MULTI-157 append-only contrast block)
+  // F4UK-MULTI-157: contrast batch D — strip ONLY the exact MULTI-157 append before untouched check
+  function stripMulti157Globals(text) {
+    return text.replace(
+      /\r?\n\/\* F4UK-MULTI-157: headings on dark surfaces \*\/\r?\n[\s\S]*$/,
+      ""
+    );
+  }
+  const gNow = stripMulti157Globals(read("app/globals.css"));
+  const gBase = gitShow(BASE, "app/globals.css");
+  ok("globals_css_untouched", gNow === gBase, gNow === gBase ? "match after strip" : "mismatch after strip");
 }
 
 // ─── no-forbidden-diff ──────────────────────────────────────────────────────
@@ -577,6 +582,20 @@ function runDiffAllowlist() {
     "app/products/[slug]/ProductDetail.tsx",
     "app/blog/[slug]/BlogPostClient.tsx",
     "scripts/phase-multi-156-tests.js",
+    // F4UK-MULTI-157: contrast batch D
+    "app/globals.css",
+    "app/faq/FAQClient.tsx",
+    "app/order-tracking/page.tsx",
+    "app/cart/page.tsx",
+    "app/cart/success/page.tsx",
+    "app/blog/BlogClient.tsx",
+    "app/blog/[slug]/BlogPostClient.tsx",
+    "app/about/page.tsx",
+    "app/products/[slug]/ProductDetail.tsx",
+    "app/products/ProductsClient.tsx",
+    "app/HomeClient.tsx",
+    "app/contact/page.tsx",
+    "scripts/phase-multi-157-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,

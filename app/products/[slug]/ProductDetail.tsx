@@ -560,12 +560,13 @@ export default function ProductDetail({
             .pdp-sticky-atc{transition:none;}
           }
           .pdp-sticky-atc__price{font-family:var(--font-display);font-size:18px;font-weight:800;color:#C4B5FD;white-space:nowrap;}
+          .pdp-sticky-atc .price-incl-vat-suffix{color:#D1D5DB !important;}
           .pdp-sticky-atc__btn{
             flex:1;max-width:240px;min-height:44px;border:none;border-radius:8px;
             background:#5B21B6;color:#FFFFFF;font-size:14px;font-weight:700;cursor:pointer;
           }
           .pdp-sticky-atc__btn.added{background:#16A34A;}
-          .pdp-sticky-atc__btn:disabled{background:#9CA3AF;cursor:not-allowed;}
+          .pdp-sticky-atc__btn:disabled{background:#6B7280;cursor:not-allowed;}
         }
       `}</style>
 
@@ -699,7 +700,7 @@ export default function ProductDetail({
                     className="add-btn"
                     disabled
                     data-testid="seasonal-purchase-disabled"
-                    style={{ background: "#9CA3AF", cursor: "not-allowed", transform: "none" }}
+                    style={{ background: "#6B7280", cursor: "not-allowed", transform: "none" }}
                   >
                     {phase === "upcoming" ? "Purchasing opens soon" : "Offer not available to purchase"}
                   </button>

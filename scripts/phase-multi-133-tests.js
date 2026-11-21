@@ -435,6 +435,20 @@ const APPROVED = new Set([
     "app/products/[slug]/ProductDetail.tsx",
     "app/blog/[slug]/BlogPostClient.tsx",
     "scripts/phase-multi-156-tests.js",
+    // F4UK-MULTI-157: contrast batch D
+    "app/globals.css",
+    "app/faq/FAQClient.tsx",
+    "app/order-tracking/page.tsx",
+    "app/cart/page.tsx",
+    "app/cart/success/page.tsx",
+    "app/blog/BlogClient.tsx",
+    "app/blog/[slug]/BlogPostClient.tsx",
+    "app/about/page.tsx",
+    "app/products/[slug]/ProductDetail.tsx",
+    "app/products/ProductsClient.tsx",
+    "app/HomeClient.tsx",
+    "app/contact/page.tsx",
+    "scripts/phase-multi-157-tests.js",
 ]);
 
 const LABEL_OK = "AbCdEf123456";

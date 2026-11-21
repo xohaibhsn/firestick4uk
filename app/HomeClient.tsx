@@ -515,7 +515,7 @@ export default function HomeClient({
         .hero-tag { font-family:var(--font-body); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5B21B6; margin-bottom:14px; display:block; font-weight:700; }
         .hero-title { font-family:var(--font-display); font-size:clamp(1.7rem,3.2vw,2.5rem); font-weight:800; letter-spacing:-0.02em; color:#111111 !important; -webkit-text-fill-color:#111111 !important; line-height:1.15; margin-bottom:16px; }
         .hero-title span { color:#5B21B6 !important; -webkit-text-fill-color:#5B21B6 !important; }
-        .hero-subtitle { font-family:var(--font-body); font-size:clamp(0.95rem,1.6vw,1.15rem); font-weight:400; color:#64748b; line-height:1.7; margin-bottom:22px; max-width:720px; }
+        .hero-subtitle { font-family:var(--font-body); font-size:clamp(0.95rem,1.6vw,1.15rem); font-weight:400; color:#475569; line-height:1.7; margin-bottom:22px; max-width:720px; }
         .hero-btns { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:0; }
         .hero-btn-primary { font-family:var(--font-body); background:#5B21B6; color:#FFFFFF; padding:14px 28px; border-radius:8px; font-size:14px; font-weight:600; letter-spacing:0.01em; text-decoration:none; transition:all 0.2s; display:inline-block; }
         .hero-btn-primary:hover { background:#4C1D95; transform:translateY(-2px); box-shadow:0 6px 20px rgba(91,33,182,0.35); }
@@ -650,7 +650,7 @@ export default function HomeClient({
         .feature-desc { font-size:13px; color:#666666; line-height:1.6; }
         .reviews-section { max-width:1300px; margin:0 auto; padding:0 60px 70px; background:transparent; }
         .reviews-heading { margin-bottom:10px; }
-        .reviews-subtitle { max-width:640px; margin:0 auto 20px; text-align:center; font-family:var(--font-body); font-size:15px; line-height:1.6; color:#64748b; }
+        .reviews-subtitle { max-width:640px; margin:0 auto 20px; text-align:center; font-family:var(--font-body); font-size:15px; line-height:1.6; color:#475569; }
         .reviews-summary { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px 18px; min-height:44px; margin:0 auto 22px; padding:12px 18px; max-width:720px; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:10px; }
         .reviews-summary-avg { font-family:var(--font-display); font-size:28px; font-weight:800; color:#111111; line-height:1; }
         .reviews-summary-stars { display:flex; gap:2px; font-size:18px; line-height:1; }
@@ -664,7 +664,7 @@ export default function HomeClient({
         .reviews-write-btn { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:11px 22px; border-radius:8px; border:1px solid #5B21B6; background:#FFFFFF; color:#5B21B6; font-family:var(--font-body); font-size:14px; font-weight:600; cursor:pointer; transition:background 0.2s, color 0.2s, transform 0.2s; }
         .reviews-write-btn:hover { background:#5B21B6; color:#FFFFFF; transform:translateY(-1px); }
         .reviews-write-btn:focus-visible { outline:2px solid #5B21B6; outline-offset:3px; }
-        .reviews-write-helper { margin:12px auto 0; max-width:560px; font-family:var(--font-body); font-size:13px; line-height:1.55; color:#64748b; }
+        .reviews-write-helper { margin:12px auto 0; max-width:560px; font-family:var(--font-body); font-size:13px; line-height:1.55; color:#475569; }
         .reviews-carousel-wrap { position:relative; margin-top:8px; min-height:200px; }
         .reviews-nav { display:none; }
         .reviews-track { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
