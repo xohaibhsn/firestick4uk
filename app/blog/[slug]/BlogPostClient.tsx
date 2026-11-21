@@ -130,6 +130,9 @@ export default function BlogPostClient({ post }: { post: Post | null }) {
           .nav-links{display:none;}
           .wrap{padding:90px 16px 60px;}
           footer{padding:36px 24px;flex-direction:column;text-align:center;}
+          .breadcrumb a{ display:inline-flex; align-items:center; min-height:44px; }
+          .breadcrumb{ margin-bottom:4px; }
+          .back{ min-height:44px; margin-bottom:12px; }
         }
       `}</style>
 

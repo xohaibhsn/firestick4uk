@@ -261,6 +261,7 @@ export default function ProductsClient({
           .add-btn{padding:7px 8px;font-size:11px;width:100%;min-height:44px;white-space:normal;}
           .badge{font-size:9px;padding:3px 7px;top:6px;right:6px;}
           footer{padding:36px 24px;flex-direction:column;text-align:center;}
+          .products-search-input, .products-price-input, .products-sort-select { font-size:16px !important; }
         }
         @media(min-width:769px){
           .filters-mobile-toggle{display:none !important;}
@@ -278,7 +279,7 @@ export default function ProductsClient({
         {/* Live Search */}
         <div ref={searchRef} style={{position:"relative",display:"flex",alignItems:"center",gap:8}}>
           {searchActive
-            ? <input autoFocus aria-label={t("products_search_aria", "Search products")} style={{background:"#F5F5F5",border:"1px solid #E5E5E5",borderRadius:20,padding:"7px 16px",color:"#111",fontSize:13,outline:"none",width:220,minHeight:44}} placeholder={t("products_search_placeholder", "Search products...")} value={searchQ} onChange={e=>setSearchQ(e.target.value)} onKeyDown={e=>e.key==="Escape"&&(setSearchActive(false),setSearchQ(""),setSearchOpen(false))} />
+            ? <input className="products-search-input" autoFocus aria-label={t("products_search_aria", "Search products")} style={{background:"#F5F5F5",border:"1px solid #E5E5E5",borderRadius:20,padding:"7px 16px",color:"#111",fontSize:13,outline:"none",width:220,minHeight:44}} placeholder={t("products_search_placeholder", "Search products...")} value={searchQ} onChange={e=>setSearchQ(e.target.value)} onKeyDown={e=>e.key==="Escape"&&(setSearchActive(false),setSearchQ(""),setSearchOpen(false))} />
             : <button type="button" className="products-search-btn" onClick={()=>setSearchActive(true)} title="Search" aria-label={t("products_search_aria", "Search products")}>🔍</button>
           }
           {searchOpen && searchResults.length > 0 && (
@@ -348,11 +349,11 @@ export default function ProductsClient({
               ))}
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-              <input type="number" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none",minHeight:44}} placeholder={t("products_min_ph", "Min £")} value={minPrice} onChange={e=>setMinPrice(e.target.value)} />
-              <span style={{color:"rgba(255,255,255,0.3)",fontSize:13}}>—</span>
-              <input type="number" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none",minHeight:44}} placeholder={t("products_max_ph", "Max £")} value={maxPrice} onChange={e=>setMaxPrice(e.target.value)} />
+              <input type="number" className="products-price-input" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none",minHeight:44}} placeholder={t("products_min_ph", "Min £")} value={minPrice} onChange={e=>setMinPrice(e.target.value)} />
+              <span style={{color:"#999999",fontSize:13}}>—</span>
+              <input type="number" className="products-price-input" style={{width:70,background:"rgba(139,0,255,0.08)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none",minHeight:44}} placeholder={t("products_max_ph", "Max £")} value={maxPrice} onChange={e=>setMaxPrice(e.target.value)} />
               <button type="button" style={{background:"rgba(139,0,255,0.15)",border:"1px solid rgba(139,0,255,0.3)",color:"#5B21B6",padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600,minHeight:44}} onClick={applyPrice}>{t("products_apply", "Apply")}</button>
-              <select style={{background:"rgba(13,0,20,0.9)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none",cursor:"pointer",minHeight:44}} value={sort} onChange={e=>applySort(e.target.value)}>
+              <select className="products-sort-select" style={{background:"rgba(13,0,20,0.9)",border:"1px solid rgba(139,0,255,0.25)",borderRadius:8,padding:"6px 10px",color:"white",fontSize:13,outline:"none",cursor:"pointer",minHeight:44}} value={sort} onChange={e=>applySort(e.target.value)}>
                 <option value="featured">{t("products_sort_featured", "Featured")}</option>
                 <option value="price_asc">{t("products_sort_low", "Price: Low → High")}</option>
                 <option value="price_desc">{t("products_sort_high", "Price: High → Low")}</option>
@@ -368,9 +369,9 @@ export default function ProductsClient({
           ) : loadError ? (
             <div className="loading" style={{textAlign:"center",padding:"40px 0"}}>
               <div style={{fontSize:"32px",marginBottom:"12px"}}>⚠️</div>
-              <div style={{color:"rgba(255,255,255,0.7)",marginBottom:"8px"}}>{t("products_error", "Could not load products right now.")}</div>
-              <div style={{color:"rgba(255,255,255,0.4)",fontSize:"13px",marginBottom:"20px"}}>{fillVars(t("products_error_help", "Please try again in a moment or contact us via WhatsApp or Telegram {telegram}."), vars)}</div>
-              <button onClick={() => window.location.reload()} style={{background:"linear-gradient(135deg,#4a0080,#8b00ff)",color:"white",border:"none",padding:"10px 24px",borderRadius:"30px",cursor:"pointer",fontSize:"14px"}}>{t("products_retry", "Try Again")}</button>
+              <div style={{color:"#111111",marginBottom:"8px"}}>{t("products_error", "Could not load products right now.")}</div>
+              <div style={{color:"#666666",fontSize:"13px",marginBottom:"20px"}}>{fillVars(t("products_error_help", "Please try again in a moment or contact us via WhatsApp or Telegram {telegram}."), vars)}</div>
+              <button onClick={() => window.location.reload()} style={{background:"#5B21B6",color:"#FFFFFF",border:"none",padding:"10px 24px",borderRadius:"30px",cursor:"pointer",fontSize:"14px"}}>{t("products_retry", "Try Again")}</button>
             </div>
           ) : filtered.length === 0 ? (
             <div className="products-empty-state" data-products-empty="1">

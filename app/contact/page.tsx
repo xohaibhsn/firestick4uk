@@ -145,6 +145,7 @@ const styles = `
     .form-row{grid-template-columns:1fr;}
     .contact-cards{padding:0 16px;}
     footer{padding:36px 24px;flex-direction:column;text-align:center;}
+    .form-group input, .form-group select, .form-group textarea { font-size:16px; }
   }
 `;
 

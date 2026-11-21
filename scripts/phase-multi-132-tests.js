@@ -311,6 +311,15 @@ const APPROVED = new Set([
     "lib/adminContentFields.ts",
     "components/admin/AdminContentPanel.tsx",
     "scripts/phase-multi-155-tests.js",
+    // F4UK-MULTI-156: polish batch C
+    "app/cart/page.tsx",
+    "app/products/ProductsClient.tsx",
+    "app/contact/page.tsx",
+    "app/HomeClient.tsx",
+    "app/order-tracking/page.tsx",
+    "app/products/[slug]/ProductDetail.tsx",
+    "app/blog/[slug]/BlogPostClient.tsx",
+    "scripts/phase-multi-156-tests.js",
 ]);
 
 (async () => {

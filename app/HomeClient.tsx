@@ -719,8 +719,9 @@ export default function HomeClient({
           .products-header{padding:28px 16px 16px;flex-direction:column;align-items:flex-start;gap:12px;}
           .search-wrap{padding:0 16px 16px;}
           .search-bar{padding:5px 5px 5px 16px;}
-          .search-input{font-size:14px;}
-          .search-btn{padding:10px 16px;font-size:13px;}
+          .search-input{font-size:16px; min-height:44px;}
+          .search-btn{padding:10px 16px;font-size:13px; min-height:44px;}
+          .view-all-link{ display:inline-flex; align-items:center; min-height:44px; }
           .products-grid{grid-template-columns:repeat(2,1fr);gap:12px;padding:0 12px 16px;}
           .product-info{padding:10px 12px;}
           .product-name{font-size:12px;}

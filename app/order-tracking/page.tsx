@@ -39,6 +39,7 @@ const styles = `
   .search-input { flex:1; width:100%; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:50px; padding:16px 24px; color:#111111; font-family:var(--font-body); font-size:15px; outline:none; transition:all 0.2s; }
   .search-input::placeholder { color:#999999; }
   .search-input:focus { border-color:#5B21B6; box-shadow:0 0 0 3px rgba(91,33,182,0.1); }
+  @media(max-width:768px){ .search-input { font-size:16px; } }
   .search-btn { background:#5B21B6; color:#FFFFFF; border:none; padding:16px 32px; border-radius:50px; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
   .search-btn:hover { background:#4C1D95; transform:translateY(-1px); }
   .search-btn:disabled { opacity:0.7; cursor:wait; transform:none; }

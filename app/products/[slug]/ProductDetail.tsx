@@ -547,6 +547,7 @@ export default function ProductDetail({
           .product-sections{padding:0 16px 60px;padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px));}
           .product-layout{grid-template-columns:1fr;gap:24px;}
           footer{padding:30px 24px;flex-direction:column;text-align:center;}
+          .back-link{ min-height:44px; margin-bottom:12px; }
           .pdp-sticky-atc{
             display:flex;position:fixed;left:0;right:0;bottom:0;z-index:10001;
             align-items:center;justify-content:space-between;gap:12px;

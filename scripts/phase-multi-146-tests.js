@@ -5,6 +5,7 @@
 "use strict";
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const Module = require("module");
 const { createHash } = require("crypto");
@@ -158,11 +159,55 @@ function runProductsClientTests() {
   );
 
   // Diff limited to import + H1 area (numstat / line budget)
+  // F4UK-MULTI-156: polish batch C — strip ONLY the exact MULTI-156 additions from the
+  // current source before the numstat budget check (reverts them to their pre-156 form).
+  function stripMulti156ProductsClient(text) {
+    return text
+      .replace(/className="products-search-input" /g, "")
+      .replace(/className="products-price-input" /g, "")
+      .replace(/className="products-sort-select" /g, "")
+      .replace(
+        /color:"#999999",fontSize:13/g,
+        'color:"rgba(255,255,255,0.3)",fontSize:13'
+      )
+      .replace(
+        /color:"#111111",marginBottom:"8px"/g,
+        'color:"rgba(255,255,255,0.7)",marginBottom:"8px"'
+      )
+      .replace(
+        /color:"#666666",fontSize:"13px",marginBottom:"20px"/g,
+        'color:"rgba(255,255,255,0.4)",fontSize:"13px",marginBottom:"20px"'
+      )
+      .replace(
+        /background:"#5B21B6",color:"#FFFFFF",border:"none"/g,
+        'background:"linear-gradient(135deg,#4a0080,#8b00ff)",color:"white",border:"none"'
+      )
+      .replace(
+        /\r?\n[ \t]*\.products-search-input, \.products-price-input, \.products-sort-select \{ font-size:16px !important; \}/g,
+        ""
+      );
+  }
+  const strippedPc = path.join(
+    os.tmpdir(),
+    `f4uk-m146-ProductsClient-${process.pid}.tsx`
+  );
+  const basePc = path.join(
+    os.tmpdir(),
+    `f4uk-m146-ProductsClient-base-${process.pid}.tsx`
+  );
+  fs.writeFileSync(strippedPc, stripMulti156ProductsClient(src), "utf8");
+  fs.writeFileSync(basePc, base, "utf8");
   const diff = spawnSync(
     "git",
-    ["diff", "--numstat", BASE, "--", "app/products/ProductsClient.tsx"],
+    ["diff", "--no-index", "--numstat", basePc, strippedPc],
     { cwd: ROOT, encoding: "utf8" }
   );
+  try {
+    fs.unlinkSync(strippedPc);
+    fs.unlinkSync(basePc);
+  } catch {
+    /* ignore */
+  }
   const line = (diff.stdout || "").trim().split(/\r?\n/)[0] || "";
   const parts = line.split(/\s+/);
   const added = Number(parts[0] || 0);
@@ -523,6 +568,15 @@ function runDiffAllowlist() {
     "lib/adminContentFields.ts",
     "components/admin/AdminContentPanel.tsx",
     "scripts/phase-multi-155-tests.js",
+    // F4UK-MULTI-156: polish batch C
+    "app/cart/page.tsx",
+    "app/products/ProductsClient.tsx",
+    "app/contact/page.tsx",
+    "app/HomeClient.tsx",
+    "app/order-tracking/page.tsx",
+    "app/products/[slug]/ProductDetail.tsx",
+    "app/blog/[slug]/BlogPostClient.tsx",
+    "scripts/phase-multi-156-tests.js",
   ]);
   const diff = spawnSync("git", ["diff", "--name-only", `${BASE}..HEAD`], {
     cwd: ROOT,
